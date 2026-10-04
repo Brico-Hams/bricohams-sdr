@@ -25,7 +25,7 @@
 | Prensaestopas PG7 + pigtail SMA–N hembra de panel (o latiguillo SMA–N) | 1 |
 | **Bias-tee SMA de 5 V** (en la caja) | 1 |
 | LMR-400 o Hyperflex 5 con N macho en los dos extremos | 7–8 m |
-| Abrazadera en U M6 para el brazo Ø25 | 1 |
+| **v4:** tubo Ø25 de 300 mm + `cruceta_brazo_tubo` (cuerpo + tapa) + `adsb_tapa_tubo` + 2 prisioneros M5 (manual 21 §3.5) | 1 juego |
 
 **Piezas impresas** (PETG blanco):
 - `adsb_base`: mide tu LNA y ajusta `LNA` en el `.scad` si hace falta;
@@ -42,7 +42,7 @@
    2. Dentro, conecta SMA de panel → latiguillo → **LNA IN**.
    3. Conecta **LNA OUT** → pigtail → PG7 de salida.
 4. **Tapa y radomo:** cierra con la `adsb_tapa` y la junta. Pega el `adsb_radomo` sobre la torreta con silicona neutra, con los radiales saliendo por sus 4 ranuras, y sella las ranuras.
-5. **Brazo:** fíjala con una U M6 por la oreja lateral, en el extremo E del brazo de 1,7 m.
+5. **Brazo (v4, manual 21 §3.5):** cierra la base con la **`adsb_tapa_tubo`** en lugar de la `adsb_tapa`. Su vaso encaja en la punta de un tubo Ø25 de 300 mm vertical y se aprieta con 2 prisioneros M5. Ese tubo va al extremo E del brazo de 1,7 m con una `cruceta_brazo_tubo` (dos M6 a tuercas cautivas + autotaladrante antigiro). El coaxial baja por fuera del tubo con bridas y un bucle de goteo.
 6. **En la caja:** pasamuros N «ADSB» → **bias-tee** (puerto «RF+DC» hacia la antena, «RF» hacia el FlightStick, «DC» a 5 V de la regleta USB) → FlightStick.
 7. **Comprobación:**
    - En `http://<pi>/tar1090/`: más aviones lejanos (> 250 km) y mensajes por segundo.

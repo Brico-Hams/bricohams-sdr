@@ -391,6 +391,113 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - El LNA solo sirve **antes** del cable.
 - **Implica:** quedan en la documentación los avisos de los errores que rompen equipos (manual 16).
 
+## ADR-29 · Con el HAT no hay GPIO: sensores y ventiladores en una Raspberry Pi Pico por USB
+- **Decisión:**
+  - BME280, DS18B20, pluviómetro y los 2 ventiladores (PWM + tacómetro) van a una **Raspberry Pi Pico** con MicroPython (`firmware/pico-io/main.py`), enchufada por USB a la regleta (`/dev/bricohams-io`).
+  - El servicio `bricohams-io` deja los datos en `/run/bricohams/io.json` y pasa a la Pico las órdenes de `bricohams-fan`.
+  - `IO_MODE="gpio"` conserva el montaje de la v3 para una Pi sin HAT.
+- **Por qué:** el usuario lo comprobó: con el HAT puesto no se puede llegar a la cabecera. Así se evitan una cabecera apiladora y los pines que el HAT pueda usar.
+- **Alternativas descartadas:**
+  - **Cabecera apiladora:** depende de que el HAT deje pasar los pines.
+  - **ESP32/LilyGO:** más caro y gasta más.
+- **Implica:**
+  - Una pieza más (~5 €) y una placa perforada con 2 MOSFET.
+  - Si la Pi deja de mandar órdenes 60 s, la Pico pone los ventiladores al 100 % ella sola.
+  - El viento sigue por USB-RS485 y la cámara por CSI.
+
+## ADR-30 · Anclajes impresos sin abrazaderas en U: crucetas de tres piezas con tuercas cautivas
+- **Decisión:**
+  - Toda unión de dos tubos perpendiculares usa la **cruceta**: cuerpo + 2 tapas, 2 × M6 por tubo, media caña 1 mm menos profunda que el radio y un tornillo autotaladrante como antigiro.
+  - Piezas propias para la base de la ADS-B, la brida de anemómetro y veleta (vale para los dos patrones de brida), el pluviómetro nivelable y la Pico.
+- **Por qué:**
+  - El usuario no encontraba cómo anclar la fibra, la quad y la ADS-B.
+  - Un solo diseño paramétrico cubre todos los casos y se imprime sin soportes.
+- **Implica:**
+  - ASA para exterior y revisión del apriete cada 6 meses.
+  - Los vientos del mástil siguen siendo de cable de acero: no se imprimen.
+
+## ADR-31 · Satélites: pases calculados en la Pi y ▶ Escuchar con el Doppler del plugin de 0xAF
+- **Decisión:**
+  - `bricohams-satpass` (SGP4 + CelesTrak, cada 15 min) genera `pases.json`.
+  - El plugin `satelites` muestra la franja del próximo pase y el botón PASES.
+  - ▶ Escuchar cambia de perfil, sintoniza y llama a `Plugins.doppler.start_tracker()` con los mismos elementos orbitales.
+  - SatDump decodifica en segundo plano las imágenes METEOR.
+- **Por qué:**
+  - OpenWebRX+ no trae predicción de pases.
+  - El plugin `doppler` ya corrige la frecuencia, pero obliga a buscar el satélite a mano.
+- **Implica:**
+  - La precisión se comprueba con Skyfield en las pruebas.
+  - Solo recepción: el «duplex» es la bajada con Doppler; la subida queda documentada.
+
+## ADR-32 · Web pública por nginx con SSL y portal de servicios
+- **Decisión:**
+  - nginx en 80/443 delante de OpenWebRX+ (websockets y `X-Forwarded-For`), tar1090 (lighttpd movido a 127.0.0.1:8504), HLS de la cámara, portal `/bricohams/` y API.
+  - Let's Encrypt con dominio propio o DuckDNS; si falla, certificado autofirmado.
+  - En el router solo se abren 80 y 443.
+- **Por qué:** lo pidió el usuario (servicio sin SSL). Además da una sola entrada, las IP reales para los baneos y las estadísticas, y nada más expuesto.
+- **Implica:**
+  - Meshtastic web (9443), RTSP y MQTT quedan solo en la LAN.
+  - `bricohams-check` vigila la caducidad del certificado.
+
+## ADR-33 · Visitas: MQTT de OpenWebRX+ + GeoIP local + Telegram, con IP truncada
+- **Decisión:**
+  - `mqtt_enabled` en OpenWebRX+ (mosquitto solo en 127.0.0.1).
+  - `bricohams-visitas` escucha `openwebrx/CLIENT`, localiza con DB-IP Lite **local** y guarda **solo la IP truncada**.
+  - Avisa por Telegram (1 por IP cada 10 min), reenvía el chat y publica totales y países en la web, con aviso de privacidad.
+- **Por qué:**
+  - Es la fuente oficial de conexiones de OpenWebRX+: no hay log de IPs.
+  - El usuario eligió «país, ciudad e IP parcial»: minimización del RGPD.
+  - La GeoIP local no filtra IPs a terceros.
+- **Implica:**
+  - Hace falta el texto de privacidad con contacto (`ADMIN_EMAIL`).
+  - Se conservan 90 días, configurable.
+
+## ADR-34 · Mantenimiento con una cuenta de servicio y cron, sin credenciales guardadas
+- **Decisión:**
+  - Cuenta de sistema `bricohams` sin contraseña ni shell.
+  - `/etc/sudoers.d/bricohams` solo permite `/usr/local/sbin/bricohams-tarea`, con verbos fijos.
+  - `/etc/cron.d/bricohams` lanza copia diaria, actualización semanal, reinicio preventivo (aplazado si hay un pase), salud cada 30 min con aviso por Telegram, resumen y GeoIP.
+- **Por qué:** el usuario quería tareas «sin sudo» y una cuenta de servicio. Guardar una contraseña en un script la expondría en las copias y en el git; con sudoers restringido no hace falta ninguna.
+- **Implica:**
+  - La copia diaria pasa del temporizador systemd al cron, para tenerlo todo en un sitio.
+  - El calendario se cambia en `bricohams.env` (`CRON_*`).
+
+## ADR-35 · FT2 (experimental): decodium-rx + adaptador con formato jt9 + parche reversible
+- **Decisión:**
+  - Se compila solo el decodificador de terminal de Decodium (GPLv3).
+  - `bricohams-ft2-decode` traduce su salida al formato de `jt9`.
+  - `bricohams-ft2-patch` añade `Ft2Profile` (3,75 s) y el modo FT2 a OpenWebRX+, con marcas y un hook de apt que lo vuelve a aplicar.
+- **Por qué:**
+  - OpenWebRX+ y WSJT-X no traen FT2.
+  - Reutilizar el analizador de FT8 da mapa, PSK Reporter y banderas sin más cambios.
+- **Implica:**
+  - Depende de los ficheros internos de OpenWebRX+. Si cambian, el parche no se aplica y lo avisa, sin romper nada.
+  - Hay que compilar Qt6 (unos 700 MB y 20–40 min).
+
+## ADR-36 · Marcadores: canales abiertos sí, comunicaciones privadas no
+- **Decisión:**
+  - Se añaden CB (40 canales CEPT), PMR446 (16), Radio Club Región de Murcia (RU-75 ED5YBF, 145,325, 430,325, CB 32 = 27,325, PMR 5), aviación (AIP de ENAIRE), marítimo de Cartagena y Mazarrón, FM (Radio María 91,0…), DAB+, FT8/FT4/WSPR/JS8/FT2 y satélites (`data/marcadores_v4.json`).
+  - **No** se publican radiotaxis ni TETRA de emergencias o policía.
+- **Por qué:** es un receptor público en Internet. Escuchar y difundir comunicaciones privadas puede vulnerar el secreto de las comunicaciones (Ley 11/2022).
+- **Implica:**
+  - El perfil TETRA queda solo como exploración de banda.
+  - Los marcadores PMR 9–16 vuelven a ser FM analógico. Antes estaban mal como DMR; DMR446 usa las mismas portadoras.
+
+## ADR-37 · Actualizar con huellas por paso, a mano y sin perder nada
+- **Decisión:** `install.sh --actualizar` = git pull `--ff-only` + variables nuevas en `bricohams.env` + copia + `apt upgrade` + **solo los pasos con huella cambiada**. La huella de cada paso son tres SHA-256 cortados: su código (`declare -f`), los ficheros del kit que nombra (`$FILES/…`, `$KIT/…`) y las variables de `bricohams.env` que lee (`configuracion`: todas). Se guardan en `/var/lib/bricohams/kit-estado` al terminar bien cada paso.
+- **Por qué:**
+  - Los pasos ya eran idempotentes, pero repetirlos todos tarda 30–60 min, para OpenWebRX y reinicia servicios sin necesidad.
+  - Una tabla «fichero → paso» escrita a mano se queda vieja; la huella sale del propio código.
+  - `git pull --ff-only` como el dueño del kit: nunca fusiona ni pisa cambios locales, y git no protesta por un repositorio ajeno.
+  - Si llega un `install.sh` nuevo, se relanza con él (`--continuar`): el plan lo hace siempre el código nuevo.
+  - **No va en el cron:** bajar código de un git y ejecutarlo como root sin nadie delante es un riesgo (un commit roto o un git comprometido). El cron sigue solo con `apt`.
+  - Marcadores en tres vías: el kit anterior (`bookmarks.kit.json`) dice qué marcadores son «propios», así se conservan los añadidos desde la web y llegan las correcciones del kit.
+- **Implica:**
+  - La primera actualización de una estación anterior a la v4.1 aplica todos los pasos.
+  - Un cambio de hardware sin cambio de código (p. ej. conectar la Pico después) no cambia la huella: `--solo io`.
+  - Si cambia la versión de bash, `declare -f` puede formatear distinto y repetir todos los pasos una vez (inofensivo).
+  - `settings.json` sigue saliendo de la plantilla: los cambios hechos en `/settings` se pierden (queda copia `.antes-FECHA`).
+
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
 2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
@@ -403,3 +510,9 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 9. **FBP-868s**: potencia máxima real de tu unidad (SAW, ~18 dBm).
 10. **Antenas**: ajuste final con NanoVNA (manuales 12–14).
 11. **Temperatura de la caja en verano**: medir con `bricohams-fan --estado` y ajustar la curva.
+12. **v4:**
+    - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
+    - **Token y chat de Telegram.**
+    - **Medir** el Ø del tubo de la antena de fibra (`FIBRA_D`) y la brida de los sensores de viento.
+    - **Cable de cámara de Pi 5:** comprar el Standard–Mini (15 → 22 pines).
+    - **Primera compilación de FT2 en la Pi**, todavía sin probar en arm64.

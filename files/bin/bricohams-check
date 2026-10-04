@@ -33,6 +33,13 @@ grep -q 'Raspberry Pi 5' /proc/device-tree/model 2>/dev/null && bien "$(tr -d '\
 t=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2); [ -n "$t" ] && bien "temperatura CPU $t"
 th=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
 [ "$th" = 0x0 ] && bien "alimentación correcta (sin bajadas de tensión)" || aviso "get_throttled=$th: revisa la fuente (los 4 SDR piden mucha corriente USB)"
+if [ -s /var/lib/bricohams/actualizaciones.log ]; then
+    bien "última actualización: $(tail -1 /var/lib/bricohams/actualizaciones.log)"
+elif [ -s /var/lib/bricohams/kit-estado ]; then
+    bien "instalado con huellas de pasos (listo para: sudo bash install.sh --actualizar)"
+else
+    aviso "sin huellas de pasos: la primera «sudo bash install.sh --actualizar» aplicará todos los pasos"
+fi
 
 titulo "Red"
 if command -v nmcli >/dev/null; then
@@ -160,10 +167,57 @@ if systemctl is-enabled --quiet bricohams-fan 2>/dev/null; then
     else
         aviso "bricohams-fan sin estado todavía"
     fi
-    ls /sys/bus/w1/devices/28-* >/dev/null 2>&1 && bien "DS18B20 de la caja detectado" || aviso "no veo el DS18B20 (1-Wire GPIO4): los ventiladores se guían solo por la CPU"
+    if grep -qs '^IO_MODE=pico' /etc/bricohams/fan.env; then
+        python3 -c 'import json,sys;d=json.load(open("/run/bricohams/io.json"));sys.exit(0 if d.get("ds") else 1)' 2>/dev/null \
+            && bien "DS18B20 de la caja en la Pico" || aviso "la Pico no ve el DS18B20 (GP22 + 4,7 kΩ): los ventiladores se guían solo por la CPU"
+    else
+        ls /sys/bus/w1/devices/28-* >/dev/null 2>&1 && bien "DS18B20 de la caja detectado" || aviso "no veo el DS18B20 (1-Wire GPIO4): los ventiladores se guían solo por la CPU"
+    fi
 else
     aviso "ventiladores no instalados (FAN_ENABLE=no)"
 fi
+
+titulo "Pico bricohams-io (sensores y ventiladores por USB)"
+if systemctl is-enabled --quiet bricohams-io 2>/dev/null; then
+    servicio bricohams-io
+    [ -e /dev/bricohams-io ] && bien "/dev/bricohams-io presente" || mal "no veo la Pico (/dev/bricohams-io): ¿cable USB? ¿MicroPython grabado? (manual 20)"
+    e=$(edad /run/bricohams/io.json)
+    if [ "$e" -lt 30 ]; then
+        bien "datos de la Pico al día: $(python3 -c 'import json;d=json.load(open("/run/bricohams/io.json"));b=d.get("bme") or {};f=d.get("fan") or {};print("BME %s °C %s hPa · lluvia %s vuelcos · rpm %s%s" % (b.get("t"), round(b["p"]/100,1) if b.get("p") else "?", d.get("rain"), f.get("rpm"), " · ¡ventiladores en modo seguridad!" if f.get("auto") else ""))')"
+    else
+        mal "la Pico no manda datos (hace ${e}s): sudo bricohams-io ping"
+    fi
+else
+    aviso "bricohams-io no instalado (IO_MODE=gpio)"
+fi
+
+titulo "Web, SSL y visitas"
+servicio nginx
+servicio bricohams-api
+if [ -r /etc/bricohams/web.env ]; then . /etc/bricohams/web.env; fi
+if [ -n "${SSL_DOMAIN:-}" ] && [ -s "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" ]; then
+    fin=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" | cut -d= -f2)
+    dias=$(( ( $(date -d "$fin" +%s) - $(date +%s) ) / 86400 ))
+    [ "$dias" -gt 14 ] && bien "certificado Let's Encrypt de $SSL_DOMAIN: $dias días" || mal "el certificado de $SSL_DOMAIN caduca en $dias días: sudo certbot renew"
+else
+    aviso "certificado autofirmado (pon SSL_DOMAIN para Let's Encrypt)"
+fi
+servicio mosquitto
+servicio bricohams-visitas
+[ -s /var/lib/bricohams/dbip-city-lite.mmdb ] && bien "base GeoIP local presente" || aviso "sin base GeoIP: sudo -u openwebrx bricohams-visitas --geoip"
+[ -s /etc/bricohams/telegram.env ] && grep -q 'TELEGRAM_TOKEN=.\+' /etc/bricohams/telegram.env && bien "Telegram configurado" || aviso "Telegram sin configurar (TELEGRAM_TOKEN)"
+systemctl is-active --quiet bricohams-satpass.timer && bien "pases de satélites cada 15 min" || aviso "bricohams-satpass.timer parado"
+command -v satdump >/dev/null && bien "SatDump instalado (imágenes METEOR)" || aviso "sin SatDump: no se decodifican las imágenes METEOR"
+if grep -qs BRICOHAMS-FT2 /usr/lib/python3/dist-packages/owrx/modes.py; then bien "modo FT2 activo (experimental)"
+elif command -v decodium-rx >/dev/null; then aviso "decodium-rx instalado pero el modo FT2 no está activo: sudo bricohams-ft2 activar"
+else aviso "FT2 no instalado (FT2_ENABLE)"; fi
+
+titulo "Tareas automáticas"
+[ -s /etc/cron.d/bricohams ] && bien "cron: $(grep -c 'bricohams-tarea' /etc/cron.d/bricohams) tareas en /etc/cron.d/bricohams" || mal "falta /etc/cron.d/bricohams (sudo bash install.sh --solo tareas)"
+id bricohams >/dev/null 2>&1 && bien "cuenta de servicio «bricohams»" || mal "falta la cuenta de servicio bricohams"
+[ -s /etc/sudoers.d/bricohams ] && bien "sudoers limitado a bricohams-tarea" || mal "falta /etc/sudoers.d/bricohams"
+u=$(ls -1t /var/backups/bricohams/backup-openwebrx-*.tar.gz 2>/dev/null | head -1)
+[ -n "$u" ] && [ "$(edad "$u")" -lt 172800 ] && bien "última copia: $(basename "$u")" || aviso "no hay copia de las últimas 48 h"
 
 titulo "Meteo y plugins"
 systemctl is-active --quiet bricohams-meteo.timer && bien "temporizador de meteo activo" || mal "bricohams-meteo.timer parado"
@@ -173,7 +227,7 @@ if [ "$e" -lt 1800 ]; then
     bien "meteo.json al día (hace ${e}s): $(python3 -c "import json;d=json.load(open('$mj'));print(sum(1 for s in d['stations'] if 'ta' in s),'de',len(d['stations']),'estaciones AEMET, modelo','sí' if d.get('model') else 'no')")"
 else mal "meteo.json viejo o ausente: sudo systemctl start bricohams-meteo"; fi
 [ -n "${AEMET_API_KEY:-}" ] || aviso "sin AEMET_API_KEY: solo verás el modelo de Open-Meteo"
-for p in solar meteo camara bricohams; do
+for p in solar meteo camara bricohams banderas dvficha satelites visitas; do
     [ -s "$HTDOCS/plugins/receiver/$p/$p.js" ] && bien "plugin $p instalado" || mal "falta el plugin $p"
 done
 grep -q "Plugins.load(name)" "$HTDOCS/plugins/receiver/init.js" 2>/dev/null && bien "init.js de BricoHams" || mal "init.js no es el de BricoHams"

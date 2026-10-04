@@ -8,6 +8,9 @@
 - HAT: RTC, GPS, PPS, hora y SPI.
 - ADS-B, Meshtastic, LilyGO, sensor, cámara, meteo y plugins.
 
+## Tareas automáticas (v4)
+Las copias, las actualizaciones semanales, el reinicio preventivo, la comprobación de salud con aviso por Telegram y el resumen de visitas los lanza el cron de la cuenta de servicio `bricohams` ([manual 25](25_TAREAS_AUTOMATICAS.md)). Registro: `/var/log/bricohams-tareas.log`. Direcciones y estado de cada servicio: `bricohams-servicios`.
+
 ## Copias
 - **Copia diaria:** `/var/backups/bricohams/backup-openwebrx-AAAA-MM-DD.tar.gz` a las 04:30 (se guardan las 14 últimas). Para hacer una al momento: `sudo /usr/local/sbin/bricohams-backup`.
 - **Qué incluye:**
@@ -28,8 +31,9 @@
 4. **No** hace falta volver a grabar las series de los SDR ni a identificar los LilyGO si son los mismos: las series están en su EEPROM. La regla udev de los LilyGO sí hay que volver a crearla, salvo que la restaures desde la copia.
 
 ## Actualizar
-- **Sistema y OpenWebRX:** `sudo apt update && sudo apt full-upgrade`. En Bookworm, el driver rtl-sdr-blog está fijado con `apt-mark hold`. En Trixie se usa el rtl-sdr de Debian y se actualiza con el sistema.
-- **Repositorio:** `git pull`, después `sudo bash install.sh --solo plugins,configuracion` (o los pasos que hayan cambiado).
+- **Todo de una vez (v4.1, recomendado):** `sudo bash install.sh --actualizar`. Baja el kit con git, añade las variables nuevas a `bricohams.env`, hace copia, actualiza paquetes y repite **solo** los pasos que han cambiado. Antes, para ver qué hará: `--actualizar --simular`. Detalle en el [manual 29](29_ACTUALIZAR.md).
+- **Solo sistema y OpenWebRX:** `sudo apt update && sudo apt full-upgrade` (o la tarea semanal del cron). En Bookworm, el driver rtl-sdr-blog está fijado con `apt-mark hold`. En Trixie se usa el rtl-sdr de Debian y se actualiza con el sistema.
+- **Un paso concreto:** `sudo bash install.sh --solo plugins,configuracion`.
 - **Meshtastic del HAT:** se actualiza con apt.
 - **LilyGO:** Meshtastic desde flasher.meshtastic.org. El iGate con `sudo bricohams-lilygo igate`, que vuelve a clonar y grabar.
 

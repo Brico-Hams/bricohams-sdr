@@ -1,0 +1,13 @@
+{
+ "_nota": "Satélites del aviso de pases (bricohams-satpass). perfil = receptor|perfil de OpenWebRX (ver settings.json.tmpl). Fuente de estado: AMSAT (oct 2026).",
+ "satelites": [
+  {"norad": 25544, "nombre": "ISS", "mhz": 145.800, "modo": "nfm", "perfil": "sat|sat2m", "nota": "voz ARISS y SSTV (eventos); repetidor 437,800"},
+  {"norad": 27607, "nombre": "SO-50", "mhz": 436.795, "modo": "nfm", "perfil": "sat|sat70", "nota": "repetidor FM (subida 145,850, 67 Hz)"},
+  {"norad": 43017, "nombre": "AO-91", "mhz": 145.960, "modo": "nfm", "perfil": "sat|sat2m", "nota": "repetidor FM, solo de día"},
+  {"norad": 44909, "nombre": "RS-44", "mhz": 435.640, "modo": "usb", "perfil": "sat|sat70", "nota": "transpondedor lineal 435,610–435,670 (SSB/CW)"},
+  {"norad": 44881, "nombre": "TO-108", "mhz": 145.925, "modo": "usb", "perfil": "sat|sat2m", "nota": "transpondedor lineal (a ráfagas)"},
+  {"norad": 53106, "nombre": "IO-117 GreenCube", "mhz": 435.310, "modo": "usb", "perfil": "sat|sat70", "nota": "digipeater GMSK"},
+  {"norad": 57166, "nombre": "METEOR-M2-3", "mhz": 137.900, "modo": "nfm", "perfil": "sat|meteor", "nota": "imágenes LRPT: las decodifica el servicio de fondo y salen en «Files»"},
+  {"norad": 59051, "nombre": "METEOR-M2-4", "mhz": 137.900, "modo": "nfm", "perfil": "sat|meteor", "nota": "imágenes LRPT: las decodifica el servicio de fondo y salen en «Files»"}
+ ]
+}

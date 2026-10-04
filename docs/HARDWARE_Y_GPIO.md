@@ -2,6 +2,25 @@
 
 ![GPIO de la Pi 5](esquemas/02_gpio_pi5.png)
 
+## 0. v4: la cabecera la ocupa el HAT → sensores y ventiladores en la Pico «bricohams-io»
+
+![Pico IO](esquemas/16_pico_io.png)
+
+| Pico (pin físico) | Señal | Dispositivo | Variable / dónde |
+|---|---|---|---|
+| GP4 (6) | I2C0 SDA | BME280 / BMP280 | `firmware/pico-io/main.py` (`PIN_SDA`) |
+| GP5 (7) | I2C0 SCL | BME280 / BMP280 | `PIN_SCL` |
+| GP22 (29) | 1-Wire | DS18B20 (4,7 kΩ a 3V3) | `PIN_1W` |
+| GP15 (20) | entrada con pull-up | pluviómetro (10 kΩ a 3V3 + 100 nF) | `PIN_RAIN` |
+| GP16 (21) | PWM 25 kHz (slice 0 A) | ventilador 1 por 2N7002 | `PIN_PWM` |
+| GP17 (22) | PWM 25 kHz (slice 0 B) | ventilador 2 por 2N7002 | `PIN_PWM` |
+| GP18 (24) | contador | tacómetro 1 (10 kΩ a 3V3 + 1 kΩ) | `PIN_TACH` |
+| GP19 (25) | contador | tacómetro 2 | `PIN_TACH` |
+| 3V3(OUT) (36) / GND (38) | — | alimentación de los sensores · masa común con el bus de 12 V | — |
+| USB | CDC serie | Pi → `/dev/bricohams-io` (2e8a:0005) | `IO_MODE="pico"` |
+
+La tabla siguiente (cabecera de la Pi) sigue siendo válida para el **HAT**. Los pines 4, 5, 12, 13, 17 y 22 solo se usan si no hay HAT (`IO_MODE="gpio"`).
+
 ## 1. Asignación de la cabecera de 40 pines (Raspberry Pi 5)
 
 > ⚠ Los pines del HAT HackerGadgets son los de su guía para la placa AIO (mismos módulos). Están **A VERIFICAR** con la documentación del HAT. Se cambian en `bricohams.env` (variables `HAT_*`), nunca en el código.
@@ -115,6 +134,7 @@ Cableado del sensor: [esquema 03](esquemas/03_cableado_bme280.png) y [manual 06]
 | Consumidor | Potencia típica |
 |---|---|
 | Raspberry Pi 5 con 4 SDR decodificando | 7–10 W |
+| Pico «bricohams-io» (v4) | 0,1 W |
 | 4 RTL-SDR | 5–6 W |
 | LilyGO ×2 | 0,5–1 W |
 | Cámara + LED IR (de noche) | ~1 W |
@@ -185,3 +205,11 @@ Cableado del sensor: [esquema 03](esquemas/03_cableado_bme280.png) y [manual 06]
 - **Ventilación:** [manual 18](manuales/18_VENTILACION.md).
 - **Viento y lluvia:** [manual 19](manuales/19_VIENTO_Y_LLUVIA.md).
 - **Lista completa de cables (C1–C18) y componentes:** [MEMORIA_TECNICA](MEMORIA_TECNICA.md).
+
+## 9. Cámara (v4)
+- **Cámara:** **Waveshare RPi Camera (F)**: OV5647, NoIR permanente, 50°, con dos LED IR.
+- **Cable:** **Standard–Mini de 15 a 22 pines** (el de la Pi 5), al conector CAM/DISP 0, con los contactos hacia el Ethernet.
+- **Ajuste de color:** `CAM_TUNING=/usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json`. Detalles en el [manual 07](manuales/07_CAMARA.md).
+
+## 10. Filtros y preamplificadores (v4)
+![Filtros](esquemas/17_filtros_lna.png)

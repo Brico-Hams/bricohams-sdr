@@ -7,12 +7,14 @@
  *    bajo la barra superior.
  *  - Mini bandera de Murcia junto al nombre del receptor.
  *  - Botón flotante al canal de Telegram.
+ *  - v4: plan de bandas visible por defecto (la primera vez; luego manda lo que elija
+ *    cada visitante) y foto superior más baja para que se vea la web.
  *
  * Ajustes opcionales en init.js:
  *   window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
  */
 
-Plugins.bricohams._version = '1.0.0';
+Plugins.bricohams._version = '1.1.0';
 Plugins.bricohams._author = 'EA5KAO';
 Plugins.bricohams.no_css = true;
 
@@ -48,6 +50,8 @@ Plugins.bricohams.init = function () {
             'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
         '#bricohams-tg:hover{opacity:1;background:#229ED9}' +
         '@media (max-width:600px){#bricohams-tg span{display:none}}';
+    // v4: la foto de cabecera abierta no tapa media pantalla
+    css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -72,5 +76,11 @@ Plugins.bricohams.init = function () {
             '9.6C-.2 10.2-.1 11 1 11.4l5.4 1.7L18.8 5.3c.6-.4 1.1-.2.7.2z"/></svg><span>BricoHams</span>';
         document.body.appendChild(a);
     }
+    // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
+    try {
+        if (typeof LS !== 'undefined' && !LS.has('ui_bandplan') && typeof UI !== 'undefined' && UI.toggleBandplan) {
+            setTimeout(function () { UI.toggleBandplan(true); }, 1500);
+        }
+    } catch (e) { console.debug('bandplan', e); }
     return true;
 };

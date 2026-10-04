@@ -1,0 +1,55 @@
+#!/bin/bash
+# =====================================================================
+#  bricohams-tarea · EA5KAO · BricoHams (v4)
+#  Tareas de mantenimiento con verbos FIJOS. La cuenta de servicio «bricohams»
+#  (sin contraseña ni shell) puede ejecutarlas como root SIN clave gracias a
+#  /etc/sudoers.d/bricohams, que solo permite este programa. Así el cron no
+#  necesita credenciales guardadas en ningún sitio.
+#   actualizar   apt update + upgrade sin preguntas (respeta lo retenido)
+#   copia        copia de seguridad (bricohams-backup)
+#   reinicio     reinicio preventivo (se aplaza si hay un pase de satélite en curso)
+#   salud        bricohams-check; avisa por Telegram si algo falla
+#   geoip        actualiza la base GeoIP de las visitas
+#   resumen      resumen diario de visitas por Telegram
+#   satpass      recalcula los pases de satélites
+# =====================================================================
+set -u
+LOG=/var/log/bricohams-tareas.log
+tg() { /usr/local/bin/bricohams-telegram "$*"; }
+log() { echo "$(date '+%F %T') $*" >>"$LOG"; }
+[ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con: sudo -n /usr/local/sbin/bricohams-tarea <verbo>"; exit 1; }
+
+case "${1:-}" in
+    actualizar)
+        log "actualizar: inicio"
+        if apt-get update -q >>"$LOG" 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get -y -q \
+             -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade >>"$LOG" 2>&1; then
+            extra=""; [ -f /var/run/reboot-required ] && extra=" · necesita reinicio (se hará en el reinicio preventivo)"
+            log "actualizar: ok"; tg "✅ Actualización semanal hecha${extra}"
+        else
+            log "actualizar: ERROR"; tg "⚠️ La actualización semanal ha fallado: mira $LOG"
+        fi ;;
+    copia)
+        if /usr/local/sbin/bricohams-backup >>"$LOG" 2>&1; then log "copia: ok"; else log "copia: ERROR"; tg "⚠️ Falló la copia de seguridad"; fi ;;
+    reinicio)
+        P=/usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json
+        if [ -r "$P" ] && python3 -c "import json,time,sys;t=time.time();sys.exit(0 if any(p['aos']-300<t<p['los'] for p in json.load(open('$P'))['pases']) else 1)" 2>/dev/null; then
+            log "reinicio: aplazado 20 min (pase de satélite)"; echo "/usr/local/sbin/bricohams-tarea reinicio" | at now + 20 minutes 2>/dev/null || true
+            exit 0
+        fi
+        log "reinicio preventivo"; tg "🔄 Reinicio preventivo de la estación"; sync; sleep 3; systemctl reboot ;;
+    salud)
+        out=$(/usr/local/bin/bricohams-check 2>&1); ko=$(echo "$out" | grep -c '✘')
+        marca=/run/bricohams/salud.ko
+        if [ "$ko" -gt 0 ]; then
+            resumen=$(echo "$out" | grep '✘' | head -8 | sed 's/\x1b\[[0-9;]*m//g')
+            if [ ! -f "$marca" ] || [ "$(cat "$marca")" != "$resumen" ]; then
+                mkdir -p /run/bricohams; echo "$resumen" >"$marca"; tg "🩺 Problemas en la estación:
+$resumen"
+            fi
+        elif [ -f "$marca" ]; then rm -f "$marca"; tg "✅ La estación vuelve a estar bien"; fi ;;
+    geoip)   /usr/local/bin/bricohams-visitas --geoip >>"$LOG" 2>&1 ;;
+    resumen) /usr/local/bin/bricohams-visitas --resumen >>"$LOG" 2>&1 ;;
+    satpass) systemctl start bricohams-satpass.service ;;
+    *) sed -n '2,19p' "$0"; exit 1 ;;
+esac

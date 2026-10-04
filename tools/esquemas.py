@@ -135,8 +135,8 @@ def gpio():
     uso = {3: 'RTC 0x51 + BME280 SDA', 5: 'RTC 0x51 + BME280 SCL', 8: 'GPS RX (HAT)', 10: 'GPS TX (HAT)',
            12: 'LoRa NSS/CS', 18: 'LoRa BUSY', 22: 'LoRa RESET', 31: 'GPS PPS', 35: 'LoRa MISO', 37: 'LoRa DIO1/IRQ',
            38: 'LoRa MOSI', 40: 'LoRa SCK', 1: 'BME280 VIN · pull-ups', 9: 'BME280 GND', 2: 'alimentación HAT', 4: 'alimentación HAT', 6: 'GND HAT',
-           7: 'DS18B20 caja (v3)', 11: 'pluviómetro (v3)', 15: 'tacómetro vent. 1 (v3)', 29: 'tacómetro vent. 2 (v3)',
-           32: 'PWM vent. entrada (v3)', 33: 'PWM vent. salida (v3)', 14: 'GND pluviómetro'}
+           7: 'DS18B20 (solo sin HAT)', 11: 'pluviómetro (solo sin HAT)', 15: 'tacóm. 1 (solo sin HAT)', 29: 'tacóm. 2 (solo sin HAT)',
+           32: 'PWM vent. 1 (solo sin HAT)', 33: 'PWM vent. 2 (solo sin HAT)', 14: 'GND'}
     col = {'pwr': C['pwr'], 'gnd': C['gnd'], 'i2c': C['i2c'], 'uart': C['uart'], 'spi': C['spi'], 'gps': C['gps'],
            'fan': '#5d4037', 'w1': '#8e24aa', 'wx': '#0277bd'}
     W, H = 1240, 820
@@ -158,11 +158,12 @@ def gpio():
     b += f"<text x='{x0 + 130}' y='{y0 - 28}' font-size='12' text-anchor='middle' fill='{C['ink']}'>Cabecera de 40 pines (vista desde arriba, USB/Ethernet abajo)</text>"
     ley = [('pwr', 'Alimentación 3V3 / 5V'), ('gnd', 'GND'), ('i2c', 'I2C-1: RTC 0x51 + BME280 0x76/77'),
            ('uart', 'UART0 ttyAMA0 9600: GPS'), ('gps', 'PPS → /dev/pps0'),
-           ('spi', 'SPI1 spidev1.0: LoRa SX1262'), ('fan', 'v3: PWM y tacómetros (ventiladores)'),
-           ('w1', 'v3: 1-Wire DS18B20'), ('wx', 'v3: pluviómetro')]
+           ('spi', 'SPI1 spidev1.0: LoRa SX1262'), ('fan', 'IO_MODE=gpio: ventiladores (con HAT: Pico)'),
+           ('w1', 'IO_MODE=gpio: DS18B20'), ('wx', 'IO_MODE=gpio: pluviómetro')]
     for i, (k, t) in enumerate(ley):
         b += f"<rect x='930' y='{510 + i * 26}' width='14' height='14' fill='{col[k]}'/><text x='952' y='{522 + i * 26}' font-size='12' fill='{C['ink']}'>{esc(t)}</text>"
     b += (f"<text x='24' y='{790}' font-size='12' fill='{C['cr']}' font-weight='bold'>⚠ Pines del HAT tomados de la guía AIO de HackerGadgets: A VERIFICAR con su documentación (bricohams.env, HAT_*).</text>")
+    b += (f"<text x='24' y='{770}' font-size='12' fill='{C['or']}' font-weight='bold'>v4: con el HAT puesto la cabecera queda ocupada; sensores y ventiladores van a la Pico «bricohams-io» por USB (esquema 16).</text>")
     return svg(W, H, b, 'Raspberry Pi 5: asignación de GPIO')
 
 
@@ -563,6 +564,176 @@ def alimentacion_v3():
     return svg(W, H, b, 'Alimentación v3: módulo de potencia → módulo de electrónica')
 
 
+# ---------------------------------------------------------------------
+#  v4
+# ---------------------------------------------------------------------
+def pico_io():
+    """Esquema 16: Raspberry Pi Pico «bricohams-io» por USB (la cabecera de la Pi la ocupa el HAT)."""
+    W, H = 1500, 1000
+    b = markers([C['pwr']])
+    b += caja_s(40, 90, 260, 120, 'Raspberry Pi 5 + HAT', 'la cabecera de 40 pines la usa el HAT', C['pi'], '#edf7ee')
+    b += caja_s(40, 260, 260, 80, 'Regleta USB Vansuny', 'alimentada por el bus de 12 V', C['sdr'], '#eef4fb')
+    b += linea(170, 210, 170, 260, C['sdr'], 3)
+    b += txt(180, 240, 'USB 3.0 (datos)', 10, C['sdr'])
+    # Pico
+    px, py = 420, 160
+    b += caja_s(px, py, 300, 560, 'Raspberry Pi Pico «bricohams-io»', 'MicroPython · /dev/bricohams-io (2e8a:0005)', C['or'], '#fff3e0', arriba=True)
+    b += linea(300, 300, px, 300, C['sdr'], 3)
+    b += txt(310, 292, 'cable micro-USB (datos + 5 V)', 10, C['sdr'])
+    pines = [('GP4 · pin 6 · SDA (I2C0)', 240, C['i2c']), ('GP5 · pin 7 · SCL (I2C0)', 270, C['i2c']),
+             ('GP22 · pin 29 · 1-Wire', 330, C['i2c']), ('GP15 · pin 20 · pluviómetro', 390, C['net']),
+             ('GP16 · pin 21 · PWM ventilador 1', 460, C['spi']), ('GP17 · pin 22 · PWM ventilador 2', 490, C['spi']),
+             ('GP18 · pin 24 · TACH 1', 550, C['uart']), ('GP19 · pin 25 · TACH 2', 580, C['uart']),
+             ('3V3(OUT) · pin 36', 640, C['pwr']), ('GND · pin 38 (y 3, 8, 13…)', 670, C['gnd'])]
+    for t, y, c in pines:
+        b += txt(px + 290, y, t, 10.5, c, False, 'end')
+        b += linea(px + 300, y - 4, px + 360, y - 4, c, 1.6)
+    b += txt(px + 366, 640, '→ VIN del BME280, VDD del DS18B20 y pull-ups', 9.5, C['pwr'])
+    b += txt(px + 366, 670, '→ masa común (sensores, MOSFET y bus de 12 V)', 9.5, C['gnd'])
+    # BME280
+    b += caja_s(860, 200, 270, 90, 'BME280 / BMP280 (garita)', 'VIN 3V3 · GND · SDA · SCL · cable ≤ 5 m', C['i2c'], '#edf7ee')
+    b += linea(780, 236, 860, 236, C['i2c'], 1.6); b += linea(780, 266, 860, 266, C['i2c'], 1.6)
+    # DS18B20
+    b += caja_s(860, 310, 270, 70, 'DS18B20 (aire de la caja)', 'DQ · 4,7 kΩ entre DQ y 3V3', C['i2c'], '#edf7ee')
+    b += linea(780, 326, 860, 340, C['i2c'], 1.6)
+    # pluviómetro
+    b += caja_s(860, 395, 270, 70, 'Pluviómetro (reed)', '10 kΩ a 3V3 + 100 nF a GND · otro hilo a GND', C['net'], '#e0f2f1')
+    b += linea(780, 386, 860, 425, C['net'], 1.6)
+    # MOSFET y ventiladores
+    for k, yb in enumerate((470, 620)):
+        b += caja_s(860, yb, 230, 110, 'Q%d · 2N7002 (o BSS138)' % (k + 1), 'G ← 1 kΩ ← GP%d · 100 kΩ G–S · S a GND' % (16 + k), C['spi'])
+        b += linea(780, (456, 486)[k], 860, yb + 40, C['spi'], 1.5)
+        b += caja_s(1180, yb, 280, 110, 'Ventilador %d · 60 mm 12 V PWM' % (k + 1), ('ENTRADA (abajo izq.)', 'SALIDA (arriba dcha.)')[k], C['sdr'], '#eef4fb')
+        b += linea(1090, yb + 55, 1180, yb + 55, C['spi'], 1.8)
+        b += txt(1135, yb + 48, 'D → PWM azul', 9.5, C['spi'], False, 'middle')
+    b += linea(780, 546, 840, 546, C['uart'], 1.5, True); b += linea(840, 546, 840, 600, C['uart'], 1.5, True)
+    b += linea(840, 600, 1470, 600, C['uart'], 1.5, True); b += linea(1470, 600, 1470, 560, C['uart'], 1.5, True)
+    b += linea(780, 576, 820, 576, C['uart'], 1.5, True); b += linea(820, 576, 820, 750, C['uart'], 1.5, True)
+    b += linea(820, 750, 1470, 750, C['uart'], 1.5, True); b += linea(1470, 750, 1470, 710, C['uart'], 1.5, True)
+    b += txt(1140, 616, 'TACH verde → GP18 · 10 kΩ a 3V3 + 1 kΩ en serie', 9.5, C['uart'], False, 'middle')
+    b += txt(1140, 766, 'TACH verde → GP19 · igual', 9.5, C['uart'], False, 'middle')
+    b += caja_s(1180, 790, 280, 70, 'Bus 12 V (WAGO) · fusible 1 A', '+12 V amarillo a los dos ventiladores', C['pwr'], '#fdecea')
+    notas = ['• El GND del bus de 12 V, el de la Pico y el de los ventiladores tienen que estar unidos (masa común en el WAGO de masa).',
+             '• La Pico NO admite 5 V en sus pines: tacómetro y PWM siempre con las resistencias / el MOSFET del esquema.',
+             '• Firmware: firmware/pico-io/main.py (MicroPython). Grabar: BOOTSEL + UF2 de MicroPython, después «sudo bricohams-io instalar».',
+             '• Seguridad: si la Pi deja de mandar órdenes 60 s, la Pico pone los ventiladores al 100 % ella sola.']
+    for k, t in enumerate(notas):
+        b += txt(40, 890 + k * 24, t, 11.2)
+    return svg(W, H, b, 'Puente USB «bricohams-io»: sensores y ventiladores en una Raspberry Pi Pico')
+
+
+def filtros_lna():
+    """Esquema 17: dónde va cada filtro, el LNA de ADS-B y los bias-tee."""
+    W, H = 1500, 900
+    b = markers([C['rf'], C['pwr']])
+    filas = [
+        ('Bigsignal 433 (iGate)', 'pasamuros N «IG433»', 'FBP-433s (430–438 MHz, 1 W)', 'LilyGO iGate (solo RX)', C['lora']),
+        ('Fibra 433 (Meshtastic)', 'pasamuros N «M433»', 'sin filtro (TX 20 dBm; ver manual 16)', 'LilyGO Meshtastic 433', C['lora']),
+        ('Bigsignal 868 (Meshtastic)', 'pasamuros N «868»', 'sin filtro (TX 22 dBm > SAW 18 dBm)', 'SX1262 del HAT', C['lora']),
+        ('Plano de tierra 1090 + LNA en la base', 'pasamuros N «ADSB»', 'bias-tee 5 V (RF+DC ← · → RF · DC ← USB)', 'FlightStick RadarBox', C['sdr']),
+        ('Eggbeater 2 m/70 cm + LNA', 'pasamuros N «SAT»', 'bias-tee del propio HAT (SAT_BIAS_TEE=yes)', 'RTL-SDR del HAT', C['rf']),
+        ('Quad 2 m/70 cm + diplexor (cabecera)', 'pasamuros N «HAM»', '—', 'Mini RTL-SDR', C['rf']),
+        ('Lazo MLA-30 + discone grande', 'N «HF» y N «VHF»', 'inyector MLA-30 (12 V) + diplexor HF/VHF', 'RTL-SDR V3', C['rf']),
+    ]
+    xs = [40, 380, 640, 1080]
+    for k, (a, n, f, r, c) in enumerate(filas):
+        y = 100 + k * 100
+        b += caja_s(xs[0], y, 300, 64, a, '', c, '#f3e5f5')
+        b += caja_s(xs[1], y, 220, 64, n, 'coaxial LMR-400 / H155', C['cam'])
+        b += caja_s(xs[2], y, 400, 64, f, '', C['pwr'] if 'bias' in f or 'inyector' in f else C['ink'], '#fdecea' if ('bias' in f or 'inyector' in f) else '#f7f9fb')
+        b += caja_s(xs[3], y, 360, 64, r, '', C['sdr'], '#eef4fb')
+        for x1, x2 in ((340, 380), (600, 640), (1040, 1080)):
+            b += arrow(x1, y + 32, x2, y + 32, C['rf'])
+    notas = ['• FBP-433s atornillado directo al pasamuros N por dentro (adaptador N macho–SMA hembra) y apoyado en «clip_filtro»; latiguillo SMA de 20 cm al LilyGO.',
+             '• Bias-tee de ADS-B: el LNA admite 5 V como máximo. Nunca conectar el bias-tee a una antena sin LNA (cortocircuito de continua).',
+             '• FBP-868s: solo en recepción y solo si hay bloqueo por LTE800 (nunca en la TX de 22 dBm del HAT).']
+    for k, t in enumerate(notas):
+        b += txt(40, 820 + k * 24, t, 11.2)
+    return svg(W, H, b, 'Filtros, preamplificadores y bias-tee: de cada antena a su receptor')
+
+
+def red_servicios():
+    """Esquema 18: servicios web, SSL, MQTT, Telegram y tareas automáticas."""
+    W, H = 1500, 900
+    b = markers([C['net'], C['ink'], C['or'], C['pi'], C['sdr']])
+    b += caja_s(40, 110, 220, 70, 'Internet (oyentes)', 'https://SSL_DOMAIN', C['net'], '#e0f2f1')
+    b += caja_s(40, 240, 220, 80, 'Router de casa', 'abrir SOLO 80 y 443 TCP', C['cam'])
+    b += arrow(150, 180, 150, 240, C['net'], 'HTTPS')
+    b += caja_s(360, 230, 260, 100, 'nginx (80 → 443)', 'Let\'s Encrypt · X-Forwarded-For', C['or'], '#fff3e0')
+    b += arrow(260, 280, 360, 280, C['net'])
+    dest = [('/  → OpenWebRX+ 127.0.0.1:8073', 120, C['pi']), ('/tar1090/ → lighttpd 127.0.0.1:8504', 200, C['sdr']),
+            ('/camara/ → MediaMTX HLS 127.0.0.1:8888', 280, C['cam']), ('/bricohams/ → portal y privacidad', 360, C['ink']),
+            ('/bricohams/api/ → bricohams-api 127.0.0.1:8075', 440, C['ink'])]
+    for t, y, c in dest:
+        b += caja_s(760, y - 30, 420, 56, t, '', c)
+        b += arrow(620, 280, 760, y - 2, C['ink'], w=1.5)
+    b += caja_s(760, 520, 420, 70, 'mosquitto 127.0.0.1:1883', 'tema openwebrx/CLIENT (conexiones y chat)', C['net'], '#e0f2f1')
+    b += linea(1180, 118, 1240, 118, C['ink'], 1.5, True); b += linea(1240, 118, 1240, 555, C['ink'], 1.5, True)
+    b += arrow(1240, 555, 1180, 555, C['net'], 'MQTT')
+    b += caja_s(760, 640, 420, 70, 'bricohams-visitas', 'GeoIP local · IP truncada · visitas.json para la web', C['or'], '#fff3e0')
+    b += arrow(970, 590, 970, 640, C['net'])
+    b += caja_s(1250, 640, 210, 70, 'Telegram', 'grupo de operadores', C['sdr'], '#eef4fb')
+    b += arrow(1180, 675, 1250, 675, C['sdr'], 'avisos')
+    b += caja_s(40, 520, 560, 190, 'cron · cuenta de servicio «bricohams»', '', C['pi'], '#edf7ee', arriba=True)
+    for k, t in enumerate(['04:30 copia diaria', 'lunes 03:30 apt update + upgrade', 'lunes 05:00 reinicio preventivo (se aplaza si hay pase)',
+                           'cada 30 min bricohams-check → Telegram si falla', '21:00 resumen de visitas · día 2: GeoIP']):
+        b += txt(60, 580 + k * 24, '• ' + t, 11)
+    b += txt(60, 700, 'sudo -n /usr/local/sbin/bricohams-tarea <verbo>  (sudoers: solo ese programa, sin contraseña)', 10, C['mute'])
+    b += arrow(600, 675, 760, 675, C['pi'])
+    b += txt(40, 780, '• Desde casa sigue funcionando http://IP:8073 sin nginx (la ficha DMR/YSF y el portal necesitan nginx).', 11.2)
+    b += txt(40, 804, '• Solo LAN: Meshtastic https://IP:9443, API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
+    return svg(W, H, b, 'Servicios web, SSL, visitas y tareas automáticas')
+
+
+def actualizar():
+    """Esquema 19: install.sh --actualizar (v4.1)."""
+    W, H = 1500, 930
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr']])
+    pasos = [('1 · Kit (git)', 'git pull --ff-only como el dueño del kit', 'install.sh nuevo → se relanza (--continuar)', C['sdr'], '#eef4fb'),
+             ('2 · bricohams.env', 'añade las variables nuevas del .example', 'nunca cambia las tuyas ni tus claves', C['or'], '#fff3e0'),
+             ('3 · Copia', 'bricohams-backup → /var/backups/bricohams', 'si falla, no sigue', C['pi'], '#edf7ee'),
+             ('4 · Sistema (apt)', 'apt update (IPv4 si hace falta) + upgrade', 'respeta lo retenido y tus .conf', C['cam'], '#eceff1'),
+             ('5 · Plan de pasos', 'huella actual  ≠  huella guardada ?', 'solo esos pasos + comprobar + herramientas', C['cr'], '#fdecee'),
+             ('6 · Pasos', 'paso_x … y guarda su huella', 'si se corta, se relanza y sigue', C['ink'], '#f7f9fb'),
+             ('7 · Final', 'bricohams-check · Telegram', 'actualizaciones.log · ¿reiniciar?', C['pi'], '#edf7ee')]
+    y = 90
+    for k, (t, s1, s2, c, f) in enumerate(pasos):
+        b += caja_s(40, y, 430, 82, t, '', c, f, arriba=True)
+        b += txt(255, y + 52, s1, 10.5, C['ink'], False, 'middle') + txt(255, y + 70, s2, 10, C['mute'], False, 'middle')
+        if k < len(pasos) - 1:
+            b += arrow(255, y + 82, 255, y + 110, C['ink'])
+        y += 110
+    # huella
+    b += caja_s(560, 90, 900, 300, 'Huella de cada paso · /var/lib/bricohams/kit-estado (600, sin valores)', '', C['cr'], '#fff', arriba=True)
+    filas = [('código', 'declare -f paso_x | sha256', 'cambia el paso en install.sh', 'web → solo web'),
+             ('ficheros', 'sha256 de los $FILES/… y $KIT/… que usa', 'plugin nuevo, firmware, plantilla…', 'htdocs/plugins → plugins'),
+             ('variables', 'NOMBRE=valor de las que lee (configuracion: todas)', 'cambias bricohams.env', 'WX_APRS_COMMENT → sensor')]
+    b += txt(590, 150, 'huella', 11, C['mute'], True) + txt(700, 150, 'cómo se calcula', 11, C['mute'], True)
+    b += txt(1060, 150, 'cuándo cambia', 11, C['mute'], True) + txt(1280, 150, 'ejemplo', 11, C['mute'], True)
+    for k, (a, c1, c2, c3) in enumerate(filas):
+        yy = 185 + k * 52
+        b += linea(580, yy - 22, 1440, yy - 22, C['line'], 1)
+        b += txt(590, yy, a, 11.5, C['cr'], True) + txt(700, yy, c1, 10.5) + txt(1060, yy, c2, 10.5) + txt(1280, yy, c3, 10.5)
+    b += txt(590, 355, 'Sin huellas (estación anterior a la v4.1): se aplican todos los pasos, igual que una instalación, sin perder nada.', 10.5, C['mute'])
+    b += linea(560, 240, 515, 240, C['cr'], 1.5, True) + linea(515, 240, 515, 570, C['cr'], 1.5, True)
+    b += arrow(515, 570, 472, 570, C['cr'], dash=True, w=1.5) + txt(522, 410, 'compara', 10.5, C['cr'])
+    # marcadores
+    b += caja_s(560, 440, 900, 230, 'Marcadores en tres vías (paso configuracion)', '', C['or'], '#fff', arriba=True)
+    b += caja_s(600, 500, 230, 60, 'kit anterior', 'bookmarks.kit.json', C['mute'])
+    b += caja_s(890, 500, 230, 60, 'actuales (web)', '/var/lib/openwebrx/bookmarks.json', C['ink'])
+    b += caja_s(1180, 500, 230, 60, 'kit nuevo', 'files/openwebrx/bookmarks.json', C['sdr'])
+    b += txt(1010, 600, 'resultado = kit nuevo (gana) + propios (actuales que no venían en el kit anterior)', 11, C['ink'], True, 'middle')
+    b += txt(1010, 625, 'clave: frecuencia + modo · copia previa bookmarks.json.antes-FECHA', 10.5, C['mute'], False, 'middle')
+    # opciones
+    b += caja_s(560, 710, 900, 160, 'Órdenes', '', C['pi'], '#edf7ee', arriba=True)
+    for k, t in enumerate(['sudo bash install.sh --actualizar --simular  →  ver qué haría, sin cambiar nada',
+                           'sudo bash install.sh --actualizar  →  actualizar',
+                           'opciones: --sin-git (kit copiado del zip) · --sin-apt · --todo (repite todos los pasos)',
+                           'El cron semanal solo hace apt: bajar código y ejecutarlo como root, a mano (ADR-37).']):
+        b += txt(590, 765 + k * 24, t, 11)
+    return svg(W, H, b, 'Actualizar la estación: install.sh --actualizar')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -573,7 +744,8 @@ def main():
                      ('04_rf_antenas_alimentacion', rf), ('05_red_puertos', red),
                      ('06_alimentacion_caja', alimentacion), ('07_caja_distribucion', caja),
                      ('12_cadena_rf', rf_completo), ('13_ventiladores', ventiladores), ('14_sensores_wx', sensores_wx),
-                     ('15_alimentacion_v3', alimentacion_v3)]:
+                     ('15_alimentacion_v3', alimentacion_v3), ('16_pico_io', pico_io), ('17_filtros_lna', filtros_lna),
+                     ('18_red_servicios', red_servicios), ('19_actualizar', actualizar)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

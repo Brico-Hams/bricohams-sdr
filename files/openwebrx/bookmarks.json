@@ -11,28 +11,28 @@
   "frequency": 145800000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Bajada voz y eventos SSTV"
+  "description": "ISS (NORAD 25544): voz ARISS y SSTV (eventos). Activa con el plugin DOP el seguimiento Doppler"
  },
  {
   "name": "🛰️ ISS APRS",
   "frequency": 145825000,
   "modulation": "packet",
-  "scannable": true,
-  "description": "Digipeater APRS ISS"
+  "scannable": false,
+  "description": "ISS digipeater APRS 145,825"
  },
  {
   "name": "🛰️ ISS Repetidor",
   "frequency": 437800000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Bajada repetidor cross-band"
+  "description": "Repetidor FM de la ISS: bajada 437,800 (subida 145,990, tono 67 Hz)"
  },
  {
   "name": "🛰️ SO-50",
   "frequency": 436795000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Bajada FM, tono subida 67.0"
+  "description": "SO-50 (27607): bajada 436,795 FM (subida 145,850, tono 67 Hz)"
  },
  {
   "name": "🛰️ PO-101",
@@ -53,14 +53,14 @@
   "frequency": 435605000,
   "modulation": "cw",
   "scannable": true,
-  "description": "Baliza CW"
+  "description": "Baliza CW de RS-44"
  },
  {
   "name": "🛰️ RS-44 lineal",
   "frequency": 435640000,
   "modulation": "usb",
   "scannable": true,
-  "description": "Transpondedor 435.610-435.670"
+  "description": "RS-44 (44909): transpondedor lineal inversor 435,610–435,670 USB/CW"
  },
  {
   "name": "🛰️ FO-29",
@@ -70,18 +70,18 @@
   "description": "Transpondedor lineal 435.800-435.900"
  },
  {
-  "name": "🛰️ METEOR M2-3",
+  "name": "🛰️ METEOR M2-3 / M2-4 LRPT",
   "frequency": 137900000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "LRPT 72k – decodificar con SatDump"
+  "description": "Meteor-M2-3 (57166) y M2-4 (59051): imágenes LRPT 72k en 137,900 (decodificador LRPT)"
  },
  {
-  "name": "🛰️ METEOR M2-4",
+  "name": "🛰️ METEOR LRPT (alterna)",
   "frequency": 137100000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "LRPT 72k – decodificar con SatDump"
+  "description": "Frecuencia alternativa LRPT de los Meteor (137,100)"
  },
  {
   "name": "🟢 R0 Sierra Espuña ED5YAK",
@@ -134,11 +134,11 @@
   "scannable": true
  },
  {
-  "name": "🟢 RU-75 Carrascoy ED5YBF",
+  "name": "🏛️ RU-75 ED5YBF · Radio Club Región de Murcia",
   "frequency": 438775000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Entrada 431.175 · Tono 77.0 [EA5KGV también ED5YAY: Entrada 431,175 MHz (-7,6 MHz) · Subtono 77,0 Hz para abrirlo (para escuchar no hace falta)]"
+  "description": "Repetidor del Radio Club Región de Murcia en Sierra de Carrascoy (IM97IU), 15 W, Big Signal CQ-70. Entrada 431,175 MHz (−7,6 MHz) · Subtono 77,0 Hz para abrirlo (para escuchar no hace falta)"
  },
  {
   "name": "🟢 RU-70 Sierra Espuña ED5YAL",
@@ -250,123 +250,123 @@
   "description": "LoRa (solo visible en cascada)"
  },
  {
-  "name": "🎙️ PMR 1",
+  "name": "🎙️ PMR 1 · 446,00625",
   "frequency": 446006250,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 1 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 2",
+  "name": "🎙️ PMR 2 · 446,01875",
   "frequency": 446018750,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 2 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 3",
+  "name": "🎙️ PMR 3 · 446,03125",
   "frequency": 446031250,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 3 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 4",
+  "name": "🎙️ PMR 4 · 446,04375",
   "frequency": 446043750,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 4 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 5",
+  "name": "🏛️ PMR 5 · 446,05625 · Radio Club R. Murcia",
   "frequency": 446056250,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 5 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora · Radio Club Región de Murcia"
  },
  {
-  "name": "🎙️ PMR 6",
+  "name": "🎙️ PMR 6 · 446,06875",
   "frequency": 446068750,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 6 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 7",
+  "name": "🎙️ PMR 7 · 446,08125",
   "frequency": 446081250,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 7 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 8",
+  "name": "🎙️ PMR 8 · 446,09375",
   "frequency": 446093750,
   "modulation": "nfm",
   "scannable": true,
-  "description": "PMR446 analógico FM"
+  "description": "PMR446 canal 8 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 9 / DMR446 1",
+  "name": "🎙️ PMR 9 · 446,10625",
   "frequency": 446106250,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 9 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora · llamada digital DMR446"
  },
  {
-  "name": "🎙️ PMR 10 / DMR446 2",
+  "name": "🎙️ PMR 10 · 446,11875",
   "frequency": 446118750,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 10 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 11 / DMR446 3",
+  "name": "🎙️ PMR 11 · 446,13125",
   "frequency": 446131250,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 11 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 12 / DMR446 4",
+  "name": "🎙️ PMR 12 · 446,14375",
   "frequency": 446143750,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 12 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 13 / DMR446 5",
+  "name": "🎙️ PMR 13 · 446,15625",
   "frequency": 446156250,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 13 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 14 / DMR446 6",
+  "name": "🎙️ PMR 14 · 446,16875",
   "frequency": 446168750,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 14 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 15 / DMR446 7",
+  "name": "🎙️ PMR 15 · 446,18125",
   "frequency": 446181250,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 15 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
-  "name": "🎙️ PMR 16 / DMR446 8",
+  "name": "🎙️ PMR 16 · 446,19375",
   "frequency": 446193750,
-  "modulation": "dmr",
+  "modulation": "nfm",
   "scannable": true,
-  "description": "DMR446 Tier I (446.1-446.2); si oyes FM cambia a NFM"
+  "description": "PMR446 canal 16 · FM analógico 12,5 kHz · las emisoras DMR446 usan la misma portadora"
  },
  {
   "name": "✈️ 121.500 Emergencia",
   "frequency": 121500000,
   "modulation": "am",
   "scannable": true,
-  "description": "Frecuencia de socorro aeronáutica"
+  "description": "Frecuencia internacional de emergencia (guardia)"
  },
  {
   "name": "✈️ 123.450 Aire-aire · LEOL Lorca-Coy",
@@ -393,35 +393,35 @@
   "frequency": 121325000,
   "modulation": "am",
   "scannable": true,
-  "description": "Canal 121.330 · Pistas 05/23 (3000 m)"
+  "description": "Torre del Aeropuerto Internacional Región de Murcia (canal 8,33 kHz 121,330)"
  },
  {
   "name": "✈️ LEMI Murcia-Corvera GND",
   "frequency": 121750000,
   "modulation": "am",
   "scannable": true,
-  "description": "Canal 121.755 · Rodadura"
+  "description": "Rodadura (GMC) de Corvera (canal 121,755)"
  },
  {
   "name": "✈️ San Javier APP",
   "frequency": 130300000,
   "modulation": "am",
   "scannable": true,
-  "description": "Aproximación civil/militar LEMI-LELC-LERI"
+  "description": "Aproximación San Javier (civil/militar) para LEMI"
  },
  {
   "name": "✈️ San Javier APP respaldo",
   "frequency": 125025000,
   "modulation": "am",
   "scannable": true,
-  "description": "Back-up"
+  "description": "Aproximación San Javier, frecuencia de respaldo"
  },
  {
   "name": "✈️ LELC San Javier AGA TWR",
   "frequency": 124425000,
   "modulation": "am",
   "scannable": true,
-  "description": "Militar · Pistas 05R/23L y 05L/23R"
+  "description": "Torre de San Javier (Academia General del Aire)"
  },
  {
   "name": "✈️ LERI Alcantarilla TWR",
@@ -529,11 +529,11 @@
   "description": "Dúplex · costera en 160.850"
  },
  {
-  "name": "⛵ Canal 6",
+  "name": "⛵ Canal 6 · Cartagena SAR",
   "frequency": 156300000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Búsqueda y rescate barco-barco"
+  "description": "Canal simplex asociado a Cartagena (trabajo SAR)"
  },
  {
   "name": "⛵ Canal 7 costera",
@@ -557,18 +557,18 @@
   "description": "Barco-barco"
  },
  {
-  "name": "⛵ Canal 9",
+  "name": "⛵ Canal 9 · Puerto de Mazarrón",
   "frequency": 156450000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Puertos deportivos"
+  "description": "Puerto deportivo de Mazarrón"
  },
  {
-  "name": "⛵ Canal 10",
+  "name": "⛵ Canal 10 · CCS Cartagena (meteo)",
   "frequency": 156500000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Salvamento Marítimo (trabajo)"
+  "description": "Salvamento Marítimo Cartagena: boletines meteorológicos 01:15, 05:15, 09:15, 13:15, 17:15 y 21:15 UTC (anunciados en el 16)"
  },
  {
   "name": "⛵ Canal 11",
@@ -578,25 +578,25 @@
   "description": "Operaciones portuarias / VTS"
  },
  {
-  "name": "⛵ Canal 12",
+  "name": "⛵ Canal 12 · Prácticos Cartagena",
   "frequency": 156600000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Operaciones portuarias"
+  "description": "Corporación de Prácticos del Puerto de Cartagena (12/13/14/16). Operaciones portuarias"
  },
  {
-  "name": "⛵ Canal 13",
+  "name": "⛵ Canal 13 · puente a puente",
   "frequency": 156650000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Puente a puente (seguridad navegación)"
+  "description": "Seguridad de la navegación entre buques"
  },
  {
-  "name": "⛵ Canal 14",
+  "name": "⛵ Canal 14 · Puerto de Cartagena",
   "frequency": 156700000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Operaciones portuarias"
+  "description": "Operaciones portuarias de Cartagena (prácticos / control)"
  },
  {
   "name": "⛵ Canal 15",
@@ -606,11 +606,11 @@
   "description": "Comunicaciones a bordo (baja potencia)"
  },
  {
-  "name": "🆘 Canal 16",
+  "name": "🆘 Canal 16 · socorro",
   "frequency": 156800000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "SOCORRO, SEGURIDAD Y LLAMADA"
+  "description": "Socorro, seguridad y llamada. Escucha permanente"
  },
  {
   "name": "⛵ Canal 17",
@@ -844,11 +844,11 @@
   "description": "Dúplex · costera en 160.825"
  },
  {
-  "name": "⛵ Canal 65 costera",
+  "name": "⛵ Canal 65 · Cartagena Radio (costera)",
   "frequency": 160875000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Dúplex · barco en 156.275"
+  "description": "Estación costera de Cartagena, dúplex (barco 156,275 / costera 160,875)"
  },
  {
   "name": "Canal 65 barco",
@@ -900,11 +900,11 @@
   "description": "Operaciones portuarias"
  },
  {
-  "name": "⛵ Canal 72",
+  "name": "⛵ Canal 72 · Cabo de Gata (costera)",
   "frequency": 156625000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Barco-barco (recreo)"
+  "description": "Estación costera de Cabo de Gata"
  },
  {
   "name": "⛵ Canal 73",
@@ -914,11 +914,11 @@
   "description": "Barco-barco / seguridad"
  },
  {
-  "name": "⛵ Canal 74",
+  "name": "⛵ Canal 74 · Cabo la Nao (costera)",
   "frequency": 156725000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Operaciones portuarias"
+  "description": "Estación costera de Cabo la Nao"
  },
  {
   "name": "⛵ Canal 77",
@@ -1159,10 +1159,11 @@
   "scannable": true
  },
  {
-  "name": "🎵 91.0 Radio María",
+  "name": "🎵 91.0 Radio María (Murcia)",
   "frequency": 91000000,
   "modulation": "wfm",
-  "scannable": true
+  "scannable": false,
+  "description": "Radio María · emisor Cabezo Cortado (Molina de Segura)"
  },
  {
   "name": "🎵 91.3 Los 40 Murcia",
@@ -1531,25 +1532,25 @@
   "scannable": true
  },
  {
-  "name": "🎧 DAB+ 8C",
+  "name": "🎧 DAB+ 8C · Cartagena",
   "frequency": 199360000,
   "modulation": "dab",
-  "scannable": true,
-  "description": "Múltiplex DAB+ Murcia"
+  "scannable": false,
+  "description": "Emisor de Cartagena del mismo grupo (Activa, Bikini, Flamenca, MuyBuena…)"
  },
  {
-  "name": "🎧 DAB+ 9A",
+  "name": "🎧 DAB+ 9A · Murcia local",
   "frequency": 202928000,
   "modulation": "dab",
-  "scannable": true,
-  "description": "Múltiplex DAB+ Murcia"
+  "scannable": false,
+  "description": "Múltiple local (Carrascoy): Activa FM, Bikini FM, MuyBuena, La Flamenca, La Mega, Corazón FM, Gold FM, RockStar, Sol Latino…"
  },
  {
-  "name": "🎧 DAB+ 9C",
+  "name": "🎧 DAB+ 9C · MF-I estatal",
   "frequency": 206352000,
   "modulation": "dab",
-  "scannable": true,
-  "description": "Múltiplex DAB+ Murcia"
+  "scannable": false,
+  "description": "Bloque asignado a Murcia para la red estatal MF-I (si no hay señal, aún no emite)"
  },
  {
   "name": "🟣 YSF Hotspot EA5KAO (local)",
@@ -1767,5 +1768,768 @@
   "modulation": "nfm",
   "scannable": true,
   "description": "Entrada 431,675 MHz (-7,6 MHz) · Subtono 77,0 Hz para abrirlo (para escuchar no hace falta) · lista EA5KGV, posición 403"
+ },
+ {
+  "name": "🏛️ Radio Club R. Murcia · VHF 145.325",
+  "frequency": 145325000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Frecuencia de encuentro VHF del Radio Club Región de Murcia (FM simplex)"
+ },
+ {
+  "name": "🏛️ Radio Club R. Murcia · UHF 430.325",
+  "frequency": 430325000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Frecuencia de encuentro UHF del Radio Club Región de Murcia (FM simplex)"
+ },
+ {
+  "name": "📻 CB 01",
+  "frequency": 26965000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 1 (26,965 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 02",
+  "frequency": 26975000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 2 (26,975 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 03",
+  "frequency": 26985000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 3 (26,985 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 04",
+  "frequency": 27005000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 4 (27,005 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 05",
+  "frequency": 27015000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 5 (27,015 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 06",
+  "frequency": 27025000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 6 (27,025 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 07",
+  "frequency": 27035000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 7 (27,035 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 08",
+  "frequency": 27055000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 8 (27,055 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 09 · EMERGENCIAS",
+  "frequency": 27065000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 9 (27,065 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP · EMERGENCIAS (canal legal de socorro)"
+ },
+ {
+  "name": "📻 CB 10",
+  "frequency": 27075000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 10 (27,075 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 11",
+  "frequency": 27085000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 11 (27,085 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 12",
+  "frequency": 27105000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 12 (27,105 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 13",
+  "frequency": 27115000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 13 (27,115 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 14",
+  "frequency": 27125000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 14 (27,125 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 15",
+  "frequency": 27135000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 15 (27,135 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 16",
+  "frequency": 27155000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 16 (27,155 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 17",
+  "frequency": 27165000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 17 (27,165 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 18",
+  "frequency": 27175000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 18 (27,175 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 19 · carretera / camioneros",
+  "frequency": 27185000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 19 (27,185 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP · carretera / camioneros (costumbre)"
+ },
+ {
+  "name": "📻 CB 20",
+  "frequency": 27205000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 20 (27,205 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 21",
+  "frequency": 27215000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 21 (27,215 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 22",
+  "frequency": 27225000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 22 (27,225 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 23",
+  "frequency": 27255000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 23 (27,255 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 24",
+  "frequency": 27235000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 24 (27,235 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 25",
+  "frequency": 27245000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 25 (27,245 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 26",
+  "frequency": 27265000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 26 (27,265 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 27",
+  "frequency": 27275000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 27 (27,275 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 28",
+  "frequency": 27285000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 28 (27,285 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 29",
+  "frequency": 27295000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 29 (27,295 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 30",
+  "frequency": 27305000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 30 (27,305 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 31",
+  "frequency": 27315000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 31 (27,315 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "🏛️ CB 32 · 27.325 · Radio Club Región de Murcia",
+  "frequency": 27325000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 32 (27,325 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP · Radio Club Región de Murcia (AM / FM / USB)"
+ },
+ {
+  "name": "📻 CB 33",
+  "frequency": 27335000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 33 (27,335 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 34",
+  "frequency": 27345000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 34 (27,345 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 35",
+  "frequency": 27355000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 35 (27,355 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 36",
+  "frequency": 27365000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 36 (27,365 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 37",
+  "frequency": 27375000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 37 (27,375 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 38",
+  "frequency": 27385000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 38 (27,385 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 39",
+  "frequency": 27395000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 39 (27,395 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "📻 CB 40",
+  "frequency": 27405000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "Banda Ciudadana canal 40 (27,405 MHz) · FM 4 W, AM 4 W, BLU 12 W PEP"
+ },
+ {
+  "name": "✈️ LELC San Javier GND",
+  "frequency": 121600000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Rodadura de San Javier"
+ },
+ {
+  "name": "✈️ LELC San Javier ATIS",
+  "frequency": 128605000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "ATIS de San Javier (H24)"
+ },
+ {
+  "name": "✈️ LEAL Alicante TWR",
+  "frequency": 118150000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Torre de Alicante-Elche (canal 118,155)"
+ },
+ {
+  "name": "✈️ LEAL Alicante DEL",
+  "frequency": 119850000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Autorizaciones de Alicante (canal 119,855)"
+ },
+ {
+  "name": "✈️ LEAL Alicante GND",
+  "frequency": 130650000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Rodadura de Alicante (canal 130,655)"
+ },
+ {
+  "name": "✈️ LEAL Alicante ATIS",
+  "frequency": 120075000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "ATIS de Alicante (canal 120,080)"
+ },
+ {
+  "name": "✈️ Valencia Control (APP Alicante)",
+  "frequency": 118800000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Aproximación de Alicante / Valencia Control"
+ },
+ {
+  "name": "✈️ Valencia Control (APP Alicante) 2",
+  "frequency": 120400000,
+  "modulation": "am",
+  "scannable": true,
+  "description": "Aproximación de Alicante / Valencia Control"
+ },
+ {
+  "name": "🔢 FT8 160m",
+  "frequency": 1840000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 1,84 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 160m",
+  "frequency": 1840000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 1,84 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 160m",
+  "frequency": 1836600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 1,8366 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 160m",
+  "frequency": 1842000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 1,842 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 160m",
+  "frequency": 1843000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 1,843 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 80m",
+  "frequency": 3573000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 3,573 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 80m",
+  "frequency": 3575000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 3,575 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 80m",
+  "frequency": 3568600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 3,5686 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 80m",
+  "frequency": 3578000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 3,578 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 80m",
+  "frequency": 3578000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 3,578 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 60m",
+  "frequency": 5357000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 5,357 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 60m",
+  "frequency": 5357000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 5,357 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 60m",
+  "frequency": 5364700,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 5,3647 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 FT2 60m",
+  "frequency": 5360000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 5,36 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 40m",
+  "frequency": 7074000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 7,074 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 40m",
+  "frequency": 7047500,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 7,0475 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 40m",
+  "frequency": 7038600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 7,0386 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 40m",
+  "frequency": 7078000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 7,078 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 40m",
+  "frequency": 7052000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 7,052 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 30m",
+  "frequency": 10136000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 10,136 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 30m",
+  "frequency": 10140000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 10,14 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 30m",
+  "frequency": 10138700,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 10,1387 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 30m",
+  "frequency": 10130000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 10,13 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 30m",
+  "frequency": 10144000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 10,144 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 20m",
+  "frequency": 14074000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 14,074 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 20m",
+  "frequency": 14080000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 14,08 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 20m",
+  "frequency": 14095600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 14,0956 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 20m",
+  "frequency": 14078000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 14,078 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 20m",
+  "frequency": 14084000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 14,084 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 17m",
+  "frequency": 18100000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 18,1 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 17m",
+  "frequency": 18104000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 18,104 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 17m",
+  "frequency": 18104600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 18,1046 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 17m",
+  "frequency": 18104000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 18,104 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 17m",
+  "frequency": 18108000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 18,108 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 15m",
+  "frequency": 21074000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 21,074 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 15m",
+  "frequency": 21140000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 21,14 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 15m",
+  "frequency": 21094600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 21,0946 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 15m",
+  "frequency": 21078000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 21,078 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 15m",
+  "frequency": 21144000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 21,144 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 12m",
+  "frequency": 24915000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 24,915 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 12m",
+  "frequency": 24919000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 24,919 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 12m",
+  "frequency": 24924600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 24,9246 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 12m",
+  "frequency": 24922000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 24,922 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 12m",
+  "frequency": 24923000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 24,923 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 10m",
+  "frequency": 28074000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 28,074 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 10m",
+  "frequency": 28180000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 28,18 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 10m",
+  "frequency": 28124600,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 28,1246 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 10m",
+  "frequency": 28078000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 28,078 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT2 10m",
+  "frequency": 28184000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "FT2 (IU8LMC, Decodium) · dial 28,184 MHz (USB), ciclo 3,75 s. Con el decodificador FT2 instalado, elige el modo FT2"
+ },
+ {
+  "name": "🔢 FT8 6m",
+  "frequency": 50313000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 50,313 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 6m",
+  "frequency": 50318000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 50,318 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 6m",
+  "frequency": 50293000,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 50,293 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🔢 JS8 6m",
+  "frequency": 50318000,
+  "modulation": "js8",
+  "scannable": false,
+  "description": "JS8Call · dial 50,318 MHz (USB)"
+ },
+ {
+  "name": "🔢 FT8 2m",
+  "frequency": 144174000,
+  "modulation": "ft8",
+  "scannable": false,
+  "description": "FT8 · frecuencia de dial 144,174 MHz (USB). Ciclo 15 s"
+ },
+ {
+  "name": "🔢 FT4 2m",
+  "frequency": 144170000,
+  "modulation": "ft4",
+  "scannable": false,
+  "description": "FT4 · dial 144,17 MHz (USB). Ciclo 7,5 s"
+ },
+ {
+  "name": "🔢 WSPR 2m",
+  "frequency": 144489000,
+  "modulation": "wspr",
+  "scannable": false,
+  "description": "WSPR · dial 144,489 MHz (USB). Balizas de baja potencia"
+ },
+ {
+  "name": "🛰️ AO-91",
+  "frequency": 145960000,
+  "modulation": "nfm",
+  "scannable": true,
+  "description": "AO-91 (43017): bajada 145,960 FM (solo de día; batería degradada)"
+ },
+ {
+  "name": "🛰️ TO-108 (CAS-6)",
+  "frequency": 145925000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "TO-108 (44881): transpondedor 145,915–145,935 USB; baliza 145,910 CW"
+ },
+ {
+  "name": "🛰️ IO-117 GreenCube",
+  "frequency": 435310000,
+  "modulation": "usb",
+  "scannable": true,
+  "description": "IO-117 GreenCube (53106): digipeater GMSK 435,310"
  }
 ]

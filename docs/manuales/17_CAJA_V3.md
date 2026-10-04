@@ -1,5 +1,9 @@
 # 17 · Caja v3: dos módulos al pie del mástil
 
+> **v4:**
+> - **Sensores y ventiladores:** la **Pico «bricohams-io»** va en su `pico_soporte` (hardware/anclajes) atornillada a la rejilla, junto a la regleta USB, con la placa perforada de los MOSFET ([manual 20](20_PICO_IO.md)).
+> - **Anclajes:** las piezas para fijar antenas y sensores al mástil están en el [manual 21](21_ANCLAJES.md).
+
 ![Montaje](../../hardware/caja_v3/render/electronica_montaje.png)
 ![Interior](../../hardware/caja_v3/render/electronica_interior.png)
 ![Cara inferior](../../hardware/caja_v3/render/electronica_inferior.png)
@@ -48,7 +52,7 @@
 | Prensaestopas M25 ×2, M20 ×1, PG7 ×4, PG9 ×1 | — |
 | Ventiladores de 60 mm 12 V **PWM de 4 hilos** (p. ej. Noctua NF-A6x25 PWM o Arctic P6 PWM) | 2 |
 | Malla de acero inox de 1 mm (contra insectos, bajo las rejillas) | 2 × 70 × 70 mm |
-| Abrazaderas en U M8 para el mástil o tacos para pared | 4 |
+| Tacos para pared, o 2 `cruceta_mastil_brazo` (manual 21) para fijar el `soporte_mastil` a un poste | 4 / 2 |
 | Manguera H07RN-F 4 × 0,75 para 12 V, ≤ 5 m, entre módulos | 1 |
 | Cable de red de exterior Cat6 FTP | — |
 
@@ -97,10 +101,11 @@
 ## 4. Cableado (resumen; detalle en MEMORIA_TECNICA, cables C1–C18)
 - **Coaxiales:** pasamuros N → latiguillo → filtro, bias-tee o inyector → SDR (esquema 12).
 - **12 V:** WAGO de electrónica → ventiladores (esquema 13), Vansuny (jack 5,5 × 2,1) y sensores RS485 (esquema 14).
-- **GPIO:** cabecera de 40 pines → DS18B20, pluviómetro, PWM y tacómetros (esquema 02).
+- **Sensores y ventiladores (v4):** Pico «bricohams-io» por USB → DS18B20 (GP22), pluviómetro (GP15), BME280 (GP4/GP5), PWM (GP16/GP17) y tacómetros (GP18/GP19) (esquema 16). La cabecera de 40 pines queda bajo el HAT.
+- **Cámara (v4):** Waveshare (F) con cinta Standard–Mini 15→22 pines a CAM/DISP 0; pasa por el lateral del HAT (manual 07).
 - **USB:** todo a la regleta Vansuny, cuyo upstream USB 3.0 va a la Pi. Excepciones: el HAT va por PCIe/USB interno y la cámara CSI por su cinta.
 
 ## 5. Comprobación
-1. **Antes de cerrar:** `sudo bricohams-check`. Todo debe salir en verde: 4 SDR, 2 LilyGO, `/dev/rs485`, DS18B20 y 2 ventiladores con rpm.
+1. **Antes de cerrar:** `sudo bricohams-check`. Todo debe salir en verde: 4 SDR, 2 LilyGO, `/dev/rs485`, `/dev/bricohams-io` (Pico con BME280, DS18B20 y 2 ventiladores con rpm).
 2. **Ventiladores:** `sudo systemctl stop bricohams-fan && sudo bricohams-fan --forzar 100; sudo systemctl start bricohams-fan`. Los dos deben girar y el aire debe entrar abajo y salir arriba.
 3. **Estanqueidad:** cierra y riega la caja con manguera, sin presión, 2 minutos. Ábrela: dentro no debe haber agua.

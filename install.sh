@@ -23,7 +23,13 @@
 #     Open-Meteo), cámara e imagen BricoHams con Murcia; marcadores.
 #   - v3: viento (RS485) y lluvia (GPIO) en la estación WX, ventiladores de
 #     la caja con PWM y tacómetro (bricohams-fan), cámara CSI o IP (RTSP).
-#   - Herramientas: bricohams-check, bricohams-sdr-serials, bricohams-lilygo.
+#   - v4: con el HAT no quedan GPIO: sensores y ventiladores en una Pico por USB
+#     (bricohams-io); satélites con aviso de pases y Doppler; FT2 (experimental);
+#     nginx + SSL, portal de servicios, privacidad; visitas por MQTT con avisos
+#     por Telegram; cuenta de servicio «bricohams» y tareas en cron.
+#   - v4.1: «--actualizar»: kit (git) + bricohams.env + apt + solo los pasos cambiados.
+#   - Herramientas: bricohams-check, bricohams-sdr-serials, bricohams-lilygo,
+#     bricohams-servicios, bricohams-io, bricohams-ft2.
 #
 #  Uso:
 #    sudo bash install.sh                      # todo (vale aunque falte el permiso de ejecución)
@@ -31,6 +37,10 @@
 #    sudo bash install.sh --backup copia.tar.gz   # además restaura usuarios/marcadores de una copia
 #    sudo bash install.sh --solo hat,meshtastic   # solo esos pasos
 #    sudo bash install.sh --lista                 # ver los pasos
+#    sudo bash install.sh --actualizar            # v4.1: actualiza kit (git) + sistema (apt) y
+#                                                 # repite SOLO los pasos que han cambiado
+#    sudo bash install.sh --actualizar --simular  # enseña qué haría, sin cambiar nada
+#       opciones de --actualizar: --sin-git  --sin-apt  --todo (repite todos los pasos)
 #  Se puede repetir sin miedo: cada paso deja el sistema igual.
 #  Registro: /var/log/bricohams-install.log
 # =====================================================================
@@ -44,10 +54,14 @@ OWRX_DATA=/var/lib/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo sensor camara ventilacion adsb meshtastic lilygo herramientas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo satelites ft2 web visitas herramientas tareas)
 BACKUP=""
 SOLO=""
 REINICIAR=0
+ARGS=("$@")                     # para volver a lanzarse si --actualizar trae un install.sh nuevo
+ACTUALIZAR=0; SIMULAR=0; TODO=0; SIN_GIT=0; SIN_APT=0; CONTINUAR=0; OWRX_CAMBIO=0
+ESTADO_KIT=/var/lib/bricohams/kit-estado      # huella de cada paso aplicado (v4.1)
+KIT_ANTES="${BRICOHAMS_KIT_ANTES:-}"; KIT_DESPUES=""; PLAN=()
 
 c_ok=$'\e[32m'; c_ko=$'\e[31m'; c_av=$'\e[33m'; c_b=$'\e[1m'; c_0=$'\e[0m'
 info()  { printf '%s==>%s %s\n' "$c_b" "$c_0" "$*"; }
@@ -61,26 +75,40 @@ while [ $# -gt 0 ]; do
         --backup) BACKUP="$2"; shift 2 ;;
         --solo)   SOLO="$2"; shift 2 ;;
         --lista)  printf '%s\n' "${PASOS[@]}"; exit 0 ;;
-        -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+        --actualizar) ACTUALIZAR=1; shift ;;
+        --simular)    SIMULAR=1; shift ;;
+        --todo)       TODO=1; shift ;;
+        --sin-git)    SIN_GIT=1; shift ;;
+        --sin-apt)    SIN_APT=1; shift ;;
+        --continuar)  CONTINUAR=1; shift ;;     # interno: segunda vuelta tras bajar un install.sh nuevo
+        -h|--help) awk 'NR>2 && /^# =====/{exit} NR>2' "$0"; exit 0 ;;
         *) fallo "Opción desconocida: $1" ;;
     esac
 done
 
+{ [ "$SIMULAR" -eq 0 ] && [ "$TODO" -eq 0 ] && [ "$SIN_GIT" -eq 0 ] && [ "$SIN_APT" -eq 0 ]; } || [ "$ACTUALIZAR" -eq 1 ] \
+    || fallo "--simular, --todo, --sin-git y --sin-apt van con --actualizar"
+[ "$ACTUALIZAR" -eq 0 ] || [ -z "$BACKUP$SOLO" ] || fallo "--actualizar no se combina con --backup ni --solo"
 [ "$(id -u)" -eq 0 ] || fallo "Ejecútalo con sudo: sudo bash $0"
 # Si el kit se copió por Windows, un móvil, un pendrive FAT o un unzip que no guarda
 # permisos, los scripts pierden el bit de ejecución ("sudo: ./install.sh: command not found")
 # y los ficheros de texto pueden traer finales de línea CRLF. Se reparan aquí.
-chmod +x "$KIT/install.sh" "$FILES"/bin/* "$KIT"/tools/*.sh "$KIT"/tests/*.sh 2>/dev/null || true
-for f in "$KIT/bricohams.env" "$KIT/install.sh" "$FILES"/bin/*; do
-    [ -f "$f" ] && grep -q $'\r' "$f" && sed -i 's/\r$//' "$f"
-done
+arreglar_kit() {
+    local f
+    chmod +x "$KIT/install.sh" "$FILES"/bin/* "$KIT"/tools/*.sh "$KIT"/tests/*.sh 2>/dev/null || true
+    for f in "$KIT/bricohams.env" "$KIT/install.sh" "$FILES"/bin/*; do
+        if [ -f "$f" ] && grep -q $'\r' "$f"; then sed -i 's/\r$//' "$f"; fi
+    done
+}
+arreglar_kit
 [ -r "$KIT/bricohams.env" ] || fallo "Falta $KIT/bricohams.env: cp bricohams.env.example bricohams.env y rellena las claves (docs/manuales/02_INSTALACION.md)"
 # shellcheck source=bricohams.env
 . "$KIT/bricohams.env"
 DEB=$(. /etc/os-release && echo "${VERSION_CODENAME:-}")   # bookworm | trixie: elige los repositorios
 DEB_NUM=$([ "$DEB" = trixie ] && echo 13 || echo 12)
-exec > >(tee -a "$LOG") 2>&1
-echo; info "BricoHams SDR · instalación $(date '+%F %T')"
+# al volver a lanzarse (--actualizar con install.sh nuevo) la salida ya va al registro
+[ -n "${BRICOHAMS_LOG_ACTIVO:-}" ] || exec > >(tee -a "$LOG") 2>&1
+echo; info "BricoHams SDR · $([ "$ACTUALIZAR" -eq 1 ] && echo actualización || echo instalación) $(date '+%F %T')"
 
 apt_i() { DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"; }
 # apt-get update robusto (v3.2): si falla (p. ej. IPv6 sin salida a Internet, "Network is
@@ -124,6 +152,202 @@ bloque() {  # fichero etiqueta <contenido por stdin>
     awk -v b="# >>> $tag" -v e="# <<< $tag" '$0==b{s=1;next} $0==e{s=0;next} !s' "$f" >"$tmp"
     { cat "$tmp"; echo "# >>> $tag"; cat; echo "# <<< $tag"; } >"$f"
     rm -f "$tmp"
+}
+
+# =====================================================================
+#  v4.1 · Actualización: sudo bash install.sh --actualizar
+#  1. copia de seguridad (bricohams-backup)
+#  2. kit: git pull --ff-only como el dueño de la carpeta; si llega un
+#     install.sh nuevo, se vuelve a lanzar con él (--continuar)
+#  3. bricohams.env: se AÑADEN las variables nuevas del .env.example con su
+#     valor por defecto; las tuyas y tus claves no se tocan
+#  4. sistema: apt upgrade (respeta los paquetes retenidos y tus ficheros de
+#     configuración)
+#  5. pasos: cada paso guarda en $ESTADO_KIT una huella de su código, de los
+#     ficheros del kit que usa y de las variables de bricohams.env que lee. Solo
+#     se repiten los pasos cuya huella ha cambiado (y comprobar + herramientas).
+#  6. bricohams-check, aviso por Telegram y si hace falta reiniciar.
+#  Si se corta a medias, se vuelve a lanzar y sigue: los pasos ya hechos tienen
+#  su huella guardada.
+# =====================================================================
+h16() { sha256sum | cut -c1-16; }
+
+# Ficheros del kit que usa un paso: las rutas "$FILES/…" y "$KIT/…" de su código.
+ficheros_paso() {
+    local ref base f
+    { declare -f "paso_$1" | grep -oE '(FILES|KIT)"?/[A-Za-z0-9_./*-]+' || true; } | sort -u | while read -r ref; do
+        case "$ref" in FILES*) base=$FILES ;; *) base=$KIT ;; esac
+        ref=${ref#*/}
+        [ "$ref" = bricohams.env ] && continue          # bricohams.env cuenta por variables, no entero
+        { compgen -G "$base/$ref" || true; } | while read -r f; do
+            if [ -d "$f" ]; then find "$f" -type f ! -name '*.pyc' ! -path '*/__pycache__/*'; elif [ -f "$f" ]; then echo "$f"; fi
+        done
+    done | sort -u
+}
+
+# Variables de bricohams.env que lee un paso. «configuracion» las usa todas (settings.json).
+vars_paso() {
+    local todas
+    todas=$(grep -oE '^[[:space:]]*(export[[:space:]]+)?[A-Z][A-Z0-9_]*=' "$KIT/bricohams.env" | grep -oE '[A-Z][A-Z0-9_]*' | sort -u || true)
+    [ -n "$todas" ] || return 0
+    if [ "$1" = configuracion ]; then echo "$todas"; return 0; fi
+    { declare -f "paso_$1" | grep -oE '\$\{?[A-Z][A-Z0-9_]*' | tr -d '${' | sort -u | grep -Fx -f <(echo "$todas") || true; }
+}
+
+# Huella de un paso: «código ficheros variables» (16 hex cada una).
+huella_paso() {
+    local c fh va f v
+    c=$(declare -f "paso_$1" | h16)
+    fh=$(ficheros_paso "$1" | while read -r f; do printf '%s %s\n' "${f#"$KIT"/}" "$(sha256sum <"$f" | cut -c1-64)"; done | h16)
+    va=$(vars_paso "$1" | while read -r v; do printf '%s=%s\n' "$v" "${!v-}"; done | h16)
+    echo "$c $fh $va"
+}
+
+estado_guardar() {
+    local h; h=$(huella_paso "$1")
+    install -d -m 755 "$(dirname "$ESTADO_KIT")"
+    { grep -v "^paso $1 " "$ESTADO_KIT" 2>/dev/null || true; echo "paso $1 $h $(date +%F)"; } >"$ESTADO_KIT.tmp"
+    mv "$ESTADO_KIT.tmp" "$ESTADO_KIT"; chmod 600 "$ESTADO_KIT"
+}
+
+# Por qué hay que repetir un paso (vacío si está al día).
+motivo_paso() {
+    local a c f v ac af av m=""
+    a=$(awk -v p="$1" '$1=="paso" && $2==p {print $3" "$4" "$5}' "$ESTADO_KIT" 2>/dev/null || true)
+    [ -n "$a" ] || { echo "sin registro anterior"; return 0; }
+    read -r c f v <<<"$(huella_paso "$1")"
+    read -r ac af av <<<"$a"
+    [ "$c" = "$ac" ] || m+="código del paso, "
+    [ "$f" = "$af" ] || m+="ficheros del kit, "
+    [ "$v" = "$av" ] || m+="variables de bricohams.env, "
+    echo "${m%, }"
+}
+
+# Añade a bricohams.env las variables del .env.example que no tiene (nunca cambia las que hay).
+env_nuevas() {
+    local ej="$KIT/bricohams.env.example" env="$KIT/bricohams.env" l n nuevas=()
+    [ -r "$ej" ] && [ -r "$env" ] || return 0
+    while IFS= read -r l; do
+        [[ "$l" =~ ^([A-Z][A-Z0-9_]*)= ]] || continue
+        n=${BASH_REMATCH[1]}
+        grep -qE "^[[:space:]]*(export[[:space:]]+)?$n=" "$env" || nuevas+=("$l")
+    done <"$ej"
+    if [ ${#nuevas[@]} -eq 0 ]; then bien "bricohams.env: no faltan variables"; return 0; fi
+    if [ "${1:-}" = mostrar ]; then
+        aviso "bricohams.env: se añadirían ${#nuevas[@]} variables nuevas: $(printf '%s ' "${nuevas[@]%%=*}")"; return 0
+    fi
+    { echo; echo "# >>> añadidas por install.sh --actualizar el $(date '+%F %T'): valor por defecto del .env.example (revísalas)"
+      printf '%s\n' "${nuevas[@]}"; } >>"$env"
+    bien "bricohams.env: ${#nuevas[@]} variables nuevas con su valor por defecto: $(printf '%s ' "${nuevas[@]%%=*}")"
+}
+
+# git en la carpeta del kit, como su dueño (git no deja a root tocar un repositorio ajeno).
+kit_g() {
+    local du; du=$(stat -c %U "$KIT")
+    if [ "$du" = root ]; then git -C "$KIT" "$@"; else sudo -H -u "$du" git -C "$KIT" "$@"; fi
+}
+
+kit_git() {
+    local n
+    if [ ! -d "$KIT/.git" ]; then
+        aviso "El kit no es un clon de git: no lo puedo bajar. Copia encima el kit nuevo (tu bricohams.env no viene en él) y repite."
+        return 0
+    fi
+    command -v git >/dev/null || { aviso "git no está instalado: me salto la descarga del kit"; return 0; }
+    KIT_ANTES=$(kit_g rev-parse --short HEAD)
+    if ! kit_g rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+        aviso "La rama del kit no sigue a ningún remoto: me salto git (git -C $KIT branch -u origin/main)"; return 0
+    fi
+    if [ "$SIMULAR" -eq 1 ]; then
+        kit_g fetch -q || { aviso "git fetch ha fallado (¿red?)"; return 0; }
+        n=$(kit_g rev-list --count 'HEAD..@{u}')
+        info "kit $KIT_ANTES: $n cambios nuevos en el remoto (en --simular no se bajan)"
+        kit_g log --oneline 'HEAD..@{u}' | head -20 | sed 's/^/    /'
+        return 0
+    fi
+    kit_g pull --ff-only \
+        || fallo "git pull no puede avanzar el kit. Mira «cd $KIT && git status»: si tienes cambios locales, guárdalos con «git stash»; sin red, usa --sin-git"
+    KIT_DESPUES=$(kit_g rev-parse --short HEAD)
+    if [ "$KIT_ANTES" = "$KIT_DESPUES" ]; then
+        bien "kit: ya estaba al día ($KIT_ANTES)"; return 0
+    fi
+    bien "kit: $KIT_ANTES → $KIT_DESPUES"
+    kit_g log --oneline "$KIT_ANTES..$KIT_DESPUES" | head -20 | sed 's/^/    /'
+    if ! kit_g diff --quiet "$KIT_ANTES" "$KIT_DESPUES" -- install.sh; then
+        info "Ha llegado un install.sh nuevo: sigo con él"
+        arreglar_kit
+        exec env BRICOHAMS_LOG_ACTIVO=1 BRICOHAMS_KIT_ANTES="$KIT_ANTES" bash "$KIT/install.sh" "${ARGS[@]}" --continuar
+    fi
+}
+
+sistema_actualizar() {
+    local v0 v1
+    v0=$(dpkg-query -W -f='${Version}' openwebrx 2>/dev/null || true)
+    apt_update
+    if [ "$SIMULAR" -eq 1 ]; then
+        info "Paquetes que se actualizarían:"
+        apt-get -s upgrade | awk '/^Inst /{print "    " $2}' | head -40
+        return 0
+    fi
+    if [ "$DEB" = trixie ]; then rtlsdr_debian >/dev/null; fi
+    DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade
+    v1=$(dpkg-query -W -f='${Version}' openwebrx 2>/dev/null || true)
+    if [ -n "$v0" ] && [ "$v0" != "$v1" ]; then
+        OWRX_CAMBIO=1; bien "OpenWebRX+ $v0 → $v1 (se vuelven a aplicar plugins y FT2)"
+    else
+        bien "paquetes del sistema al día (OpenWebRX+ ${v1:-no instalado})"
+    fi
+}
+
+plan_actualizar() {
+    local p m
+    local -A motivo=()
+    [ -s "$ESTADO_KIT" ] || aviso "No hay huellas de una instalación anterior (estación instalada antes de la v4.1): se aplican todos los pasos, sin perder usuarios, marcadores propios ni claves."
+    for p in "${PASOS[@]}"; do
+        if [ "$p" = comprobar ]; then m="siempre"
+        elif [ "$TODO" -eq 1 ]; then m="--todo"
+        elif [ "$OWRX_CAMBIO" -eq 1 ] && { [ "$p" = plugins ] || [ "$p" = ft2 ]; }; then m="OpenWebRX+ actualizado"
+        else m=$(motivo_paso "$p"); fi
+        [ -z "$m" ] || motivo[$p]=$m
+    done
+    # si cambia algo, herramientas refresca la copia del kit en /opt/bricohams/kit
+    if [ ${#motivo[@]} -gt 1 ] && [ -z "${motivo[herramientas]:-}" ]; then motivo[herramientas]="copia del kit en /opt/bricohams/kit"; fi
+    PLAN=()
+    for p in "${PASOS[@]}"; do
+        [ -n "${motivo[$p]:-}" ] || continue
+        PLAN+=("$p"); printf '    %-14s %s\n' "$p" "${motivo[$p]}"
+    done
+}
+
+copia_previa() {
+    local f
+    if [ -x /usr/local/sbin/bricohams-backup ]; then
+        f=$(/usr/local/sbin/bricohams-backup | tail -1) || fallo "La copia de seguridad ha fallado: no actualizo"
+        bien "copia de seguridad: $f"
+    else
+        aviso "No está bricohams-backup (paso herramientas): sigo sin copia"
+    fi
+}
+
+resumen_actualizacion() {
+    local pasos="${PLAN[*]}"
+    if [ -z "$KIT_DESPUES" ]; then
+        KIT_DESPUES="sin git"
+        if [ -d "$KIT/.git" ]; then KIT_DESPUES=$(kit_g rev-parse --short HEAD 2>/dev/null || echo "sin git"); fi
+    fi
+    echo; info "Actualización terminada"
+    bien "kit: ${KIT_ANTES:-$KIT_DESPUES} → $KIT_DESPUES · pasos: ${pasos:-ninguno}"
+    install -d -m 755 /var/lib/bricohams
+    echo "$(date '+%F %T') kit=$KIT_DESPUES pasos=${pasos// /,}" >>/var/lib/bricohams/actualizaciones.log
+    if [ ${#PLAN[@]} -gt 1 ] && command -v bricohams-check >/dev/null; then
+        info "Comprobación"; bricohams-check || aviso "bricohams-check ha encontrado problemas (arriba)"
+    fi
+    if [ -x /usr/local/bin/bricohams-telegram ]; then
+        /usr/local/bin/bricohams-telegram "🔄 Estación actualizada · kit $KIT_DESPUES · pasos: ${pasos:-ninguno}" >/dev/null 2>&1 || true
+    fi
+    if [ "$REINICIAR" -eq 1 ] || [ -f /var/run/reboot-required ]; then
+        aviso "Hace falta reiniciar: sudo reboot"
+    fi
 }
 
 # ---------------------------------------------------------------------
@@ -182,7 +406,7 @@ paso_arranque() {
         echo "# Cámara CSI del mástil"
         echo "camera_auto_detect=1"
         si "$PI5_USB_MAX_CURRENT" && echo "usb_max_current_enable=1"
-        if si "${FAN_ENABLE:-no}"; then
+        if si "${FAN_ENABLE:-no}" && [ "${IO_MODE:-pico}" = gpio ]; then
             echo "# Ventiladores de la caja: PWM por hardware en GPIO12/13 y DS18B20 (1-Wire) en GPIO${W1_GPIO:-4}"
             echo "dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
             echo "dtoverlay=w1-gpio,gpiopin=${W1_GPIO:-4}"
@@ -331,7 +555,18 @@ paso_configuracion() {
     install -d -m 755 "$ETC_BH"; install -m 600 "$KIT/bricohams.env" "$ETC_BH/bricohams.env"
     set -a; . "$KIT/bricohams.env"; set +a
     python3 "$FILES/bin/bricohams-render-settings.py" "$FILES/openwebrx/settings.json.tmpl" "$OWRX_DATA/settings.json"
-    install -m 644 "$FILES/openwebrx/bookmarks.json" "$OWRX_DATA/bookmarks.json"
+    # marcadores (v4.1): si ya hay, se conservan los que añadiste desde la web y se ponen al día los del kit
+    local bm_kit=/var/lib/bricohams/bookmarks.kit.json bm_ant
+    bm_ant=$bm_kit     # sin él (instalaciones de antes de la v4.1): la copia del kit anterior en /opt
+    [ -s "$bm_ant" ] || bm_ant=/opt/bricohams/kit/files/openwebrx/bookmarks.json
+    if [ -z "$BACKUP" ] && [ -s "$OWRX_DATA/bookmarks.json" ]; then
+        cp "$OWRX_DATA/bookmarks.json" "$OWRX_DATA/bookmarks.json.antes-$stamp"
+        python3 "$FILES/bin/bricohams-merge-bookmarks.py" --tres "$bm_ant" "$OWRX_DATA/bookmarks.json" \
+            "$FILES/openwebrx/bookmarks.json" "$OWRX_DATA/bookmarks.json"
+    else
+        install -m 644 "$FILES/openwebrx/bookmarks.json" "$OWRX_DATA/bookmarks.json"
+    fi
+    install -D -m 644 "$FILES/openwebrx/bookmarks.json" "$bm_kit"
     install -m 664 "$FILES/branding/receiver_avatar.png" "$OWRX_DATA/receiver_avatar.png"
     install -m 664 "$FILES/branding/receiver_top_photo.png" "$OWRX_DATA/receiver_top_photo.png"
     install -d /etc/openwebrx/openwebrx.conf.d
@@ -363,10 +598,12 @@ paso_plugins() {
     local R="$HTDOCS/plugins/receiver"
     [ -d "$HTDOCS" ] || fallo "No existe $HTDOCS (¿OpenWebRX instalado?)"
     [ -f "$R/init.js" ] && cp "$R/init.js" "$R/init.js.antes-$(date +%Y%m%d-%H%M%S)"
-    rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
+    rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
+        "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     sed -i -e "s/__LAT__/${STATION_LAT}/" -e "s/__LON__/${STATION_LON}/" \
-        -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" "$R/init.js"
-    install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap"
+        -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" \
+        -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" "$R/init.js"
+    install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
     bien "plugins: rig_skin (DX), solar, meteo, cámara, BricoHams y los de 0xAF"
 }
 
@@ -542,6 +779,8 @@ WIND_DIR_MODE=${WIND_DIR_MODE:-sector8}
 RAIN_ENABLE=${RAIN_ENABLE:-no}
 RAIN_GPIO=${RAIN_GPIO:-17}
 RAIN_MM=${RAIN_MM:-0.2794}
+IO_MODE=${IO_MODE:-pico}
+IO_RUN_DIR=/run/bricohams
 EOF
     chown root:openwebrx "$ETC_BH/wx.env"; chmod 640 "$ETC_BH/wx.env"
     for g in dialout gpio; do getent group "$g" >/dev/null && usermod -aG "$g" openwebrx; done
@@ -566,7 +805,11 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable bricohams-wx
-    if i2cdetect -y 1 2>/dev/null | grep -Eq ' (76|77) '; then
+    if [ "${IO_MODE:-pico}" = pico ]; then
+        sed -i 's/^After=network-online.target$/After=network-online.target bricohams-io.service/' /etc/systemd/system/bricohams-wx.service
+        systemctl daemon-reload; systemctl restart bricohams-wx
+        bien "sensor BME280 en la Pico bricohams-io, WX APRS ${WX_APRS} (${WX_APRS_CALLSIGN})"
+    elif i2cdetect -y 1 2>/dev/null | grep -Eq ' (76|77) '; then
         systemctl restart bricohams-wx
         bien "sensor BME/BMP280 en I2C-1, WX APRS ${WX_APRS} (${WX_APRS_CALLSIGN})"
     else
@@ -590,16 +833,16 @@ FAN_DUTY_MIN=${FAN_DUTY_MIN:-30}
 FAN_HIST=${FAN_HIST:-3}
 FAN_DS18B20_ID=${FAN_DS18B20_ID:-}
 FAN_OUT=${HTDOCS}/plugins/receiver/meteo/caja.json
+IO_MODE=${IO_MODE:-pico}
+IO_RUN_DIR=/run/bricohams
 EOF
     cat >/etc/systemd/system/bricohams-fan.service <<'EOF'
 [Unit]
 Description=BricoHams: ventiladores de la caja (PWM + tacómetro)
-After=multi-user.target
+After=multi-user.target bricohams-io.service
 
 [Service]
 EnvironmentFile=/etc/bricohams/fan.env
-RuntimeDirectory=bricohams
-RuntimeDirectoryPreserve=yes
 ExecStart=/usr/local/bin/bricohams-fan
 Restart=always
 RestartSec=15
@@ -609,6 +852,13 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable bricohams-fan
+    echo "d /run/bricohams 0775 openwebrx openwebrx -" >/etc/tmpfiles.d/bricohams.conf
+    systemd-tmpfiles --create /etc/tmpfiles.d/bricohams.conf
+    if [ "${IO_MODE:-pico}" = pico ]; then
+        systemctl restart bricohams-fan
+        bien "ventiladores en la Pico bricohams-io (PWM GP16/GP17, tacómetros GP18/GP19, DS18B20 GP22)"
+        return
+    fi
     if ls /sys/class/pwm/pwmchip* >/dev/null 2>&1; then systemctl restart bricohams-fan; fi
     REINICIAR=1
     bien "ventiladores: PWM GPIO${FAN_PWM_GPIOS:-12,13}, tacómetros GPIO${FAN_TACH_GPIOS:-22,5}, DS18B20 en GPIO${W1_GPIO:-4} (tras reiniciar)"
@@ -744,6 +994,8 @@ paso_herramientas() {
     install -m 755 "$FILES/bin/bricohams-render-settings.py" /usr/local/bin/bricohams-render-settings
     install -m 755 "$FILES/bin/bricohams-merge-bookmarks.py" /usr/local/bin/bricohams-merge-bookmarks
     install -m 755 "$FILES/bin/bricohams-lilygo" /usr/local/bin/bricohams-lilygo
+    install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
+    install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
     # copia del kit en la Raspberry para restaurar sin la tarjeta original
     install -d /opt/bricohams
     rsync -a --delete --exclude 'bricohams.env' "$KIT/" /opt/bricohams/kit/
@@ -759,7 +1011,9 @@ tar -czf "$f" --ignore-failed-read -C / \
   var/lib/openwebrx/receiver_avatar.png var/lib/openwebrx/receiver_top_photo.png \
   etc/openwebrx usr/lib/python3/dist-packages/htdocs/plugins \
   etc/bricohams etc/meshtasticd etc/mediamtx etc/default/gpsd etc/chrony/conf.d boot/firmware/config.txt \
-  etc/default/readsb etc/rbfeeder.ini etc/udev/rules.d/99-bricohams-lilygo.rules etc/udev/rules.d/99-bricohams-rs485.rules var/lib/bricohams 2>/dev/null
+  etc/default/readsb etc/rbfeeder.ini etc/udev/rules.d/99-bricohams-lilygo.rules etc/udev/rules.d/99-bricohams-rs485.rules \
+  etc/udev/rules.d/99-bricohams-io.rules etc/nginx/sites-available/bricohams-sdr etc/letsencrypt etc/mosquitto/conf.d \
+  etc/cron.d/bricohams etc/sudoers.d/bricohams var/www/bricohams var/lib/bricohams 2>/dev/null
 chmod 600 "$f"
 ls -1t "$d"/backup-openwebrx-*.tar.gz | tail -n +15 | xargs -r rm -f
 echo "$f"
@@ -785,16 +1039,337 @@ Persistent=true
 WantedBy=timers.target
 EOF
     systemctl daemon-reload
-    systemctl enable --now bricohams-backup.timer
+    if [ -f /etc/cron.d/bricohams ]; then
+        systemctl disable --now bricohams-backup.timer 2>/dev/null || true   # la copia la lleva el cron (paso tareas)
+    else
+        systemctl enable --now bricohams-backup.timer
+    fi
     bien "bricohams-check, bricohams-sdr-serials, copia diaria en /var/backups/bricohams y kit en /opt/bricohams/kit"
 }
 
+# =====================================================================
+#  v4 · Puente USB «bricohams-io» (Raspberry Pi Pico): con el HAT puesto no
+#  quedan pines libres; BME280, DS18B20, pluviómetro y ventiladores van a la Pico.
+# =====================================================================
+paso_io() {
+    if [ "${IO_MODE:-pico}" != pico ]; then aviso "IO_MODE=${IO_MODE}: sensores y ventiladores en los GPIO de la Pi (sin HAT)"; return; fi
+    apt_i python3-serial pipx
+    install -m 755 "$FILES/bin/bricohams-io.py" /usr/local/bin/bricohams-io
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install mpremote >/dev/null 2>&1 || aviso "No pude instalar mpremote (sirve para grabar el firmware de la Pico)"
+    # nombre fijo para la Pico con MicroPython (2e8a:0005)
+    cat >/etc/udev/rules.d/99-bricohams-io.rules <<'EOF'
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0005", SYMLINK+="bricohams-io", GROUP="dialout", MODE="0660"
+EOF
+    udevadm control --reload && udevadm trigger --subsystem-match=tty || true
+    # /run/bricohams compartido por bricohams-io (openwebrx), bricohams-fan (root) y bricohams-wx
+    echo "d /run/bricohams 0775 openwebrx openwebrx -" >/etc/tmpfiles.d/bricohams.conf
+    systemd-tmpfiles --create /etc/tmpfiles.d/bricohams.conf
+    cat >/etc/systemd/system/bricohams-io.service <<'EOF'
+[Unit]
+Description=BricoHams: puente USB con la Pico (BME280, DS18B20, pluviómetro y ventiladores)
+After=multi-user.target
+
+[Service]
+User=openwebrx
+SupplementaryGroups=dialout
+StateDirectory=bricohams
+Environment=IO_PORT=/dev/bricohams-io
+Environment=IO_FIRMWARE=/opt/bricohams/kit/firmware/pico-io/main.py
+ExecStart=/usr/local/bin/bricohams-io
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable bricohams-io
+    if [ -e /dev/bricohams-io ]; then
+        [ -f /opt/bricohams/kit/firmware/pico-io/main.py ] || { install -d /opt/bricohams/kit/firmware/pico-io; cp "$KIT/firmware/pico-io/main.py" /opt/bricohams/kit/firmware/pico-io/; }
+        IO_FIRMWARE="$KIT/firmware/pico-io/main.py" /usr/local/bin/bricohams-io instalar /dev/bricohams-io >/dev/null 2>&1 \
+            && bien "firmware bricohams-io copiado a la Pico" || aviso "No pude copiar el firmware: sudo bricohams-io instalar (manual 20)"
+        systemctl restart bricohams-io
+        bien "Pico bricohams-io en /dev/bricohams-io"
+    else
+        aviso "No veo la Pico (/dev/bricohams-io). Grábale MicroPython (BOOTSEL + UF2), conéctala a la regleta y: sudo bricohams-io instalar (manual 20)"
+    fi
+}
+
+# =====================================================================
+#  v4 · Satélites: pases (aviso en la web + ▶ Escuchar con Doppler) y SatDump
+#  para las imágenes LRPT de los METEOR (servicio de fondo de OpenWebRX+).
+# =====================================================================
+paso_satelites() {
+    apt_i python3-sgp4
+    install -m 755 "$FILES/bin/bricohams-satpass.py" /usr/local/bin/bricohams-satpass
+    install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/satelites"
+    cat >/etc/systemd/system/bricohams-satpass.service <<EOF
+[Unit]
+Description=BricoHams: próximos pases de satélites para la web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=openwebrx
+StateDirectory=bricohams
+Environment=STATION_LAT=${STATION_LAT}
+Environment=STATION_LON=${STATION_LON}
+Environment=STATION_ASL=${STATION_ASL}
+Environment=SAT_LIST=/opt/bricohams/kit/data/satelites.json
+ExecStart=/usr/local/bin/bricohams-satpass
+EOF
+    cat >/etc/systemd/system/bricohams-satpass.timer <<'EOF'
+[Unit]
+Description=BricoHams: pases de satélites cada 15 min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now bricohams-satpass.timer
+    if si "${SATDUMP_ENABLE:-yes}" && ! command -v satdump >/dev/null; then
+        local url tmp
+        url=$(curl -fsSL https://api.github.com/repos/SatDump/SatDump/releases/latest 2>/dev/null \
+            | jq -r --arg d "$DEB" '[.assets[].browser_download_url | select(test("(arm64|aarch64).*\\.deb$"; "i"))] as $a
+                | ([$a[] | select(test($d; "i"))] + $a)[0] // empty')
+        if [ -n "$url" ]; then
+            tmp=$(mktemp -d)
+            if curl -fsSL -o "$tmp/satdump.deb" "$url" && apt-get install -y "$tmp/satdump.deb"; then
+                bien "SatDump instalado (imágenes METEOR LRPT en «Files»)"
+            else
+                aviso "No pude instalar SatDump ($url): las imágenes METEOR no se decodificarán"
+            fi
+            rm -rf "$tmp"
+        else
+            aviso "No encuentro un paquete SatDump arm64 para $DEB en GitHub: https://github.com/SatDump/SatDump/releases"
+        fi
+    fi
+    bien "pases de satélites cada 15 min ($(jq -r '.satelites | length' "$KIT/data/satelites.json") satélites) · aviso y ▶ Escuchar en la web"
+}
+
+# =====================================================================
+#  v4 · FT2 (experimental): decodium-rx + modo FT2 en OpenWebRX+
+# =====================================================================
+paso_ft2() {
+    if ! si "${FT2_ENABLE:-yes}"; then aviso "FT2 omitido (FT2_ENABLE)"; return; fi
+    install -m 755 "$FILES/bin/bricohams-ft2" /usr/local/bin/bricohams-ft2
+    install -m 755 "$FILES/bin/bricohams-ft2-decode" /usr/local/bin/bricohams-ft2-decode
+    install -m 755 "$FILES/bin/bricohams-ft2-patch.py" /usr/local/sbin/bricohams-ft2-patch
+    if ! command -v decodium-rx >/dev/null; then
+        info "Compilando decodium-rx (20–40 min la primera vez)…"
+        /usr/local/bin/bricohams-ft2 compilar || { aviso "No pude compilar decodium-rx. Inténtalo luego: sudo bricohams-ft2 compilar && sudo bricohams-ft2 activar"; return; }
+    fi
+    /usr/local/bin/bricohams-ft2 activar && bien "modo FT2 en OpenWebRX+ (experimental)" \
+        || aviso "No pude activar FT2 (¿cambió OpenWebRX+?). sudo bricohams-ft2 estado"
+}
+
+# =====================================================================
+#  v4 · Web: nginx con SSL (Let's Encrypt o autofirmado), portal de servicios,
+#  aviso de privacidad y API de los plugins (bricohams-api).
+# =====================================================================
+paso_web() {
+    apt_i nginx certbot openssl
+    install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
+    install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
+    local ip dom cert key
+    ip=$(hostname -I | awk '{print $1}')
+    dom=${SSL_DOMAIN:-}
+    # tar1090 (lighttpd) deja el puerto 80 a nginx y solo escucha en local
+    if [ -f /etc/lighttpd/lighttpd.conf ]; then
+        sed -i -E 's/^server\.port\s*=.*/server.port = 8504/' /etc/lighttpd/lighttpd.conf
+        grep -q '^server.bind' /etc/lighttpd/lighttpd.conf || echo 'server.bind = "127.0.0.1"' >>/etc/lighttpd/lighttpd.conf
+        systemctl restart lighttpd || true
+    fi
+    # web estática del portal
+    install -d /var/www/bricohams /var/www/letsencrypt
+    sed -e "s#__OPERADOR__#${CALLSIGN:-EA5KAO}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
+        -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/privacidad.html" >/var/www/bricohams/privacidad.html
+    sed -e "s#__LAN__#${ip}#g" -e "s#__WX_CALL__#${WX_APRS_CALLSIGN:-EA5KAO-13}#g" -e "s#__RADARBOX_ID__#${RADARBOX_STATION_ID:-}#g" \
+        "$FILES/web/index.html.tmpl" >/var/www/bricohams/index.html
+    # certificado: primero uno autofirmado para que nginx arranque
+    install -d -m 700 /etc/bricohams/ssl
+    if [ ! -s /etc/bricohams/ssl/autofirmado.crt ]; then
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=${dom:-$(hostname)}" \
+            -keyout /etc/bricohams/ssl/autofirmado.key -out /etc/bricohams/ssl/autofirmado.crt 2>/dev/null
+    fi
+    cert=/etc/bricohams/ssl/autofirmado.crt; key=/etc/bricohams/ssl/autofirmado.key
+    [ -n "$dom" ] && [ -s "/etc/letsencrypt/live/$dom/fullchain.pem" ] && { cert="/etc/letsencrypt/live/$dom/fullchain.pem"; key="/etc/letsencrypt/live/$dom/privkey.pem"; }
+    escribir_nginx() {
+        sed -e "s#__DOMINIO__#${dom:-$(hostname)}#g" -e "s#__CERT__#$1#" -e "s#__KEY__#$2#" \
+            "$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
+        ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr
+        rm -f /etc/nginx/sites-enabled/default
+        nginx -t >/dev/null 2>&1 && systemctl reload-or-restart nginx
+    }
+    escribir_nginx "$cert" "$key"
+    if [ -n "$dom" ] && [ ! -s "/etc/letsencrypt/live/$dom/fullchain.pem" ]; then
+        local correo=(--register-unsafely-without-email)
+        [ -n "${SSL_EMAIL:-${ADMIN_EMAIL:-}}" ] && correo=(-m "${SSL_EMAIL:-${ADMIN_EMAIL:-}}")
+        if certbot certonly --webroot -w /var/www/letsencrypt -d "$dom" "${correo[@]}" --agree-tos -n >>"$LOG" 2>&1; then
+            escribir_nginx "/etc/letsencrypt/live/$dom/fullchain.pem" "/etc/letsencrypt/live/$dom/privkey.pem"
+            bien "certificado Let's Encrypt para $dom (se renueva solo)"
+        else
+            aviso "Let's Encrypt falló para $dom: ¿apunta el dominio a tu IP y está abierto el puerto 80 del router? Sigo con el autofirmado. Reintenta: sudo bash install.sh --solo web"
+        fi
+    fi
+    install -d /etc/letsencrypt/renewal-hooks/deploy
+    printf '#!/bin/sh\nsystemctl reload nginx\n' >/etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
+    chmod 755 /etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
+    printf 'SSL_DOMAIN=%s\n' "$dom" >/etc/bricohams/web.env
+    # API de los plugins (ficha de indicativos); credenciales de QRZ opcionales
+    {
+        echo "QRZ_USER=${QRZ_USER:-}"
+        echo "QRZ_PASS=${QRZ_PASS:-}"
+    } >/etc/bricohams/api.env
+    chown root:openwebrx /etc/bricohams/api.env; chmod 640 /etc/bricohams/api.env
+    cat >/etc/systemd/system/bricohams-api.service <<'EOF'
+[Unit]
+Description=BricoHams: API de los plugins (ficha de indicativos RadioID/QRZ)
+After=network-online.target
+
+[Service]
+User=openwebrx
+StateDirectory=bricohams
+EnvironmentFile=/etc/bricohams/api.env
+ExecStart=/usr/local/bin/bricohams-api
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now bricohams-api
+    systemctl restart bricohams-api
+    bien "nginx https://${dom:-$ip}/ · portal /bricohams/ · privacidad /bricohams/privacidad.html"
+    [ -z "$dom" ] && aviso "Sin SSL_DOMAIN: certificado autofirmado (el navegador avisará). Pon el dominio en bricohams.env y: sudo bash install.sh --solo web"
+}
+
+# =====================================================================
+#  v4 · Visitas: MQTT local + bricohams-visitas (GeoIP local, Telegram)
+# =====================================================================
+paso_visitas() {
+    if ! si "${VISITAS_ENABLE:-yes}"; then aviso "Visitas omitidas (VISITAS_ENABLE)"; return; fi
+    apt_i mosquitto python3-paho-mqtt python3-maxminddb
+    cat >/etc/mosquitto/conf.d/bricohams.conf <<'EOF'
+# BricoHams: MQTT solo para la propia Pi (avisos de OpenWebRX+ a bricohams-visitas)
+listener 1883 127.0.0.1
+allow_anonymous true
+EOF
+    systemctl enable mosquitto && systemctl restart mosquitto
+    install -m 755 "$FILES/bin/bricohams-visitas.py" /usr/local/bin/bricohams-visitas
+    install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/visitas"
+    {
+        echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}"
+        echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}"
+        echo "VISITAS_DIAS=${VISITAS_DIAS:-90}"
+        echo "VISITAS_CHAT=${VISITAS_CHAT:-yes}"
+        echo "VISITAS_AVISAR_LAN=${VISITAS_AVISAR_LAN:-no}"
+        echo "VISITAS_AVISAR_DESCONEXION=${VISITAS_AVISAR_DESCONEXION:-no}"
+        echo "VISITAS_OUT=$HTDOCS/plugins/receiver/visitas/visitas.json"
+    } >/etc/bricohams/visitas.env
+    chown root:openwebrx /etc/bricohams/visitas.env; chmod 640 /etc/bricohams/visitas.env
+    { echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}"; echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}"; } >/etc/bricohams/telegram.env
+    chmod 600 /etc/bricohams/telegram.env
+    cat >/etc/systemd/system/bricohams-visitas.service <<'EOF'
+[Unit]
+Description=BricoHams: oyentes conectados, estadísticas y avisos por Telegram
+After=mosquitto.service openwebrx.service
+Wants=mosquitto.service
+
+[Service]
+User=openwebrx
+StateDirectory=bricohams
+EnvironmentFile=/etc/bricohams/visitas.env
+ExecStart=/usr/local/bin/bricohams-visitas
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    [ -s /var/lib/bricohams/dbip-city-lite.mmdb ] || sudo -u openwebrx env STATE_DIRECTORY=/var/lib/bricohams /usr/local/bin/bricohams-visitas --geoip \
+        || aviso "Sin base GeoIP todavía (se reintenta cada mes): las visitas saldrán sin país"
+    systemctl enable --now bricohams-visitas
+    systemctl restart bricohams-visitas
+    systemctl restart openwebrx    # para que lea mqtt_enabled
+    [ -n "${TELEGRAM_TOKEN:-}" ] && bien "visitas con avisos por Telegram" || aviso "Sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID: las visitas se cuentan pero no se avisan (manual 24)"
+}
+
+# =====================================================================
+#  v4 · Tareas automáticas: cuenta de servicio «bricohams» + cron
+#  (sin contraseñas guardadas: sudoers solo le deja ejecutar bricohams-tarea)
+# =====================================================================
+paso_tareas() {
+    apt_i cron at
+    install -m 755 "$FILES/bin/bricohams-tarea" /usr/local/sbin/bricohams-tarea
+    install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    id bricohams >/dev/null 2>&1 || useradd --system --home-dir /var/lib/bricohams-svc --create-home --shell /usr/sbin/nologin \
+        --comment "BricoHams cuenta de servicio" bricohams
+    usermod -aG adm bricohams 2>/dev/null || true
+    cat >/etc/sudoers.d/bricohams <<'EOF'
+# BricoHams: la cuenta de servicio solo puede lanzar las tareas fijas de mantenimiento, sin contraseña
+bricohams ALL=(root) NOPASSWD: /usr/local/sbin/bricohams-tarea
+EOF
+    chmod 440 /etc/sudoers.d/bricohams
+    visudo -cf /etc/sudoers.d/bricohams >/dev/null || { rm -f /etc/sudoers.d/bricohams; fallo "sudoers de bricohams no válido"; }
+    local T=/usr/local/sbin/bricohams-tarea
+    cat >/etc/cron.d/bricohams <<EOF
+# BricoHams SDR · tareas automáticas (las genera install.sh, paso «tareas»; horas en $(cat /etc/timezone 2>/dev/null || echo local))
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+${CRON_COPIA:-30 4 * * *}       bricohams  sudo -n $T copia
+${CRON_ACTUALIZAR:-30 3 * * 1}       bricohams  sudo -n $T actualizar
+${CRON_REINICIO:-0 5 * * 1}        bricohams  sudo -n $T reinicio
+${CRON_SALUD:-*/30 * * * *}      bricohams  sudo -n $T salud
+${CRON_RESUMEN:-0 21 * * *}        bricohams  sudo -n $T resumen
+${CRON_GEOIP:-15 3 2 * *}        bricohams  sudo -n $T geoip
+EOF
+    if [ -n "${DUCKDNS_DOMAIN:-}" ] && [ -n "${DUCKDNS_TOKEN:-}" ]; then
+        printf 'DUCKDNS_DOMAIN=%s\nDUCKDNS_TOKEN=%s\n' "$DUCKDNS_DOMAIN" "$DUCKDNS_TOKEN" >/etc/bricohams/duckdns.env
+        chown root:bricohams /etc/bricohams/duckdns.env; chmod 640 /etc/bricohams/duckdns.env
+        echo '*/5 * * * *     bricohams  . /etc/bricohams/duckdns.env && curl -fsS -m 20 "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDNS_TOKEN}&ip=" >/dev/null' >>/etc/cron.d/bricohams
+    fi
+    chmod 644 /etc/cron.d/bricohams
+    systemctl disable --now bricohams-backup.timer 2>/dev/null || true     # la copia diaria la lleva ahora el cron
+    touch /var/log/bricohams-tareas.log
+    bien "cuenta de servicio «bricohams» + /etc/cron.d/bricohams (copia, actualización, reinicio, salud, resumen, GeoIP)"
+}
+
 # ---------------------------------------------------------------------
+if [ "$ACTUALIZAR" -eq 1 ]; then
+    if [ "$SIN_GIT" -eq 0 ] && [ "$CONTINUAR" -eq 0 ]; then info "Kit"; kit_git; fi
+    arreglar_kit
+    if [ "$SIMULAR" -eq 1 ]; then env_nuevas mostrar; else env_nuevas; fi
+    # shellcheck source=bricohams.env
+    . "$KIT/bricohams.env"
+    if [ "$SIMULAR" -eq 0 ]; then info "Copia de seguridad"; copia_previa; fi
+    if [ "$SIN_APT" -eq 0 ]; then info "Sistema"; sistema_actualizar; fi
+    info "Pasos que hay que repetir"
+    plan_actualizar
+    if [ "$SIMULAR" -eq 1 ]; then echo; info "Simulación: no se ha cambiado nada."; exit 0; fi
+    if [ ${#PLAN[@]} -le 1 ]; then
+        bien "Los pasos de la estación ya estaban al día"; PLAN=(); resumen_actualizacion; exit 0
+    fi
+    SOLO=$(IFS=,; echo "${PLAN[*]}")
+fi
+
 for PASO_ACTUAL in "${PASOS[@]}"; do
     if [ -n "$SOLO" ] && [[ ",$SOLO," != *",$PASO_ACTUAL,"* ]]; then continue; fi
     echo; info "Paso: $PASO_ACTUAL"
     "paso_$PASO_ACTUAL"
+    estado_guardar "$PASO_ACTUAL"          # huella del paso para --actualizar
 done
+
+if [ "$ACTUALIZAR" -eq 1 ]; then resumen_actualizacion; exit 0; fi
 
 echo
 info "Terminado."
@@ -807,10 +1382,12 @@ cat <<EOF
    4. Configura los LilyGO:                         sudo bricohams-lilygo meshtastic && sudo bricohams-lilygo igate
    5. Comprueba todo:                               sudo bricohams-check
 
-  Web:        http://$(hostname -I 2>/dev/null | awk '{print $1}'):8073   (admin: /settings)
+  Servicios:  bricohams-servicios        (lista con estado y direcciones)
+  Web:        https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · LAN http://$(hostname -I 2>/dev/null | awk '{print $1}'):8073 (admin: /settings)
   Meshtastic: https://$(hostname -I 2>/dev/null | awk '{print $1}'):9443
   Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
-  Aviones:    http://$(hostname -I 2>/dev/null | awk '{print $1}')/tar1090/
+  Aviones:    https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
+  Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado
 EOF
 [ "$REINICIAR" -eq 1 ] && aviso "Hay cambios de arranque (config.txt): hace falta reiniciar."
 exit 0

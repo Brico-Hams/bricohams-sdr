@@ -3,11 +3,11 @@
 set -e
 export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/.."
-echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo tools/*.sh tests/run_tests.sh
+echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo files/bin/bricohams-ft2 files/bin/bricohams-servicios files/bin/bricohams-tarea files/bin/bricohams-telegram tools/*.sh tests/run_tests.sh
 echo "== bash -n";     bash -n install.sh
-echo "== python";      python3 -m py_compile files/bin/*.py tools/*.py hardware/antenas/sim/*.py && find . -name __pycache__ -prune -exec rm -rf {} +
+echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
 echo "== javascript"
-for f in files/htdocs/plugins/receiver/{solar,meteo,camara,bricohams}/*.js files/htdocs/plugins/receiver/init.js; do
+for f in files/htdocs/plugins/receiver/{solar,meteo,camara,bricohams,banderas,dvficha,satelites,visitas}/*.js files/htdocs/plugins/receiver/init.js; do
     sed -e 's/__LAT__/38.08/;s/__LON__/-1.25/;s/__CAM_SNAPSHOT_SECONDS__/60/' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
 done
 echo "== pruebas"
@@ -19,5 +19,12 @@ python3 tests/test_viento_lluvia.py
 python3 tests/test_fan.py
 python3 tests/test_v3_hardware.py
 python3 tests/test_instalador_os.py
+python3 tests/test_pico_io.py
+python3 tests/test_satpass.py
+python3 tests/test_visitas.py
+python3 tests/test_api.py
+python3 tests/test_ft2.py
+python3 tests/test_anclajes.py
+python3 tests/test_actualizar.py
 python3 tools/marcadores.py --comprobar
 echo "TODO OK"

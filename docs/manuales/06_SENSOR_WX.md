@@ -1,5 +1,7 @@
 # 06 · Sensor BME280/BMP280 y estación WX APRS
 
+> **v4 · Con el HAT puesto la cabecera de 40 pines está ocupada.** El BME280 se conecta ahora a la **Pico «bricohams-io»** por USB: VIN → 3V3(OUT) pin 36 · GND → pin 38 · SDA → GP4 (pin 6) · SCL → GP5 (pin 7) ([manual 20](20_PICO_IO.md), [esquema 16](../esquemas/16_pico_io.png)). Lo de abajo con pines de la Pi solo vale **sin HAT** (`IO_MODE="gpio"`).
+
 ![Cableado](../esquemas/03_cableado_bme280.png)
 
 ## 1. Cableado (con la Pi apagada)

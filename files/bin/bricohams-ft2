@@ -1,0 +1,75 @@
+#!/bin/bash
+# =====================================================================
+#  bricohams-ft2 · EA5KAO · BricoHams  (v4, EXPERIMENTAL)
+#  Decodificador FT2 (IU8LMC) para OpenWebRX+:
+#    compilar  descarga Decodium 4.0 «Core Shannon» (GPLv3) y compila SOLO
+#              «decodium-rx» (decodificador de terminal) → /usr/local/bin/decodium-rx
+#              (20–40 min en la Pi 5 y ~700 MB de paquetes Qt6 de compilación)
+#    activar   añade el modo FT2 a OpenWebRX+ (bricohams-ft2-patch) y deja un
+#              «hook» de apt para volver a añadirlo tras cada actualización
+#    quitar    deshace el parche
+#    estado    dice qué hay instalado
+#    probar    decodifica el WAV de prueba del kit
+#  Uso: sudo bricohams-ft2 compilar && sudo bricohams-ft2 activar
+# =====================================================================
+set -euo pipefail
+REPO="${DECODIUM_REPO:-https://github.com/iu8lmc/Decodium-4.0-Core-Shannon}"
+SRC=/opt/bricohams/src/decodium
+KIT=/opt/bricohams/kit
+HOOK=/etc/apt/apt.conf.d/99bricohams-ft2
+
+compilar() {
+    apt-get install -y --no-install-recommends git cmake ninja-build g++ pkg-config libboost-log-dev libfftw3-dev \
+        libhamlib-dev libusb-1.0-0-dev librtlsdr-dev qt6-base-dev qt6-base-private-dev qt6-multimedia-dev \
+        qt6-serialport-dev qt6-websockets-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
+        qt6-5compat-dev qt6-shadertools-dev
+    install -d /opt/bricohams/src
+    if [ -d "$SRC/.git" ]; then git -C "$SRC" pull --ff-only || true; else git clone --depth 1 "$REPO" "$SRC"; fi
+    # Qt < 6.5 (Bookworm trae 6.4) no tiene QTimeZone::UTC: se cambia por QTimeZone::utc(), que vale en todas
+    grep -rl 'QTimeZone::UTC' "$SRC" --include='*.cpp' --include='*.hpp' --include='*.h' 2>/dev/null \
+        | xargs -r sed -i 's/QTimeZone::UTC\b/QTimeZone::utc()/g'
+    cmake -S "$SRC" -B "$SRC/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DWSJT_SKIP_MANPAGES=ON \
+        -DWSJT_GENERATE_DOCS=OFF -DDECODIUM_ENABLE_HAMDRM=OFF -DDECODIUM_ENABLE_SSTV=OFF
+    ninja -C "$SRC/build" -j "$(nproc)" decodium_rx_terminal
+    install -m 755 "$(find "$SRC/build" -name decodium-rx -type f -perm -u+x | head -1)" /usr/local/bin/decodium-rx
+    echo "✔ decodium-rx instalado en /usr/local/bin"
+}
+
+activar() {
+    command -v decodium-rx >/dev/null || { echo "✘ Falta decodium-rx: sudo bricohams-ft2 compilar"; exit 1; }
+    /usr/local/sbin/bricohams-ft2-patch
+    cat >"$HOOK" <<'H'
+// BricoHams: vuelve a añadir el modo FT2 a OpenWebRX+ tras cada actualización de paquetes
+DPkg::Post-Invoke { "if [ -x /usr/local/sbin/bricohams-ft2-patch ] && command -v decodium-rx >/dev/null; then /usr/local/sbin/bricohams-ft2-patch --silencioso || true; fi"; };
+H
+    systemctl restart openwebrx
+    echo "✔ Modo FT2 activo: en la web elige el modo «FT2» en los marcadores 🔢 FT2 (40 m: 7,052 MHz)"
+}
+
+quitar() {
+    /usr/local/sbin/bricohams-ft2-patch --quitar
+    rm -f "$HOOK"
+    systemctl restart openwebrx
+}
+
+estado() {
+    command -v decodium-rx >/dev/null && echo "✔ decodium-rx: $(command -v decodium-rx)" || echo "✘ decodium-rx no instalado"
+    grep -q BRICOHAMS-FT2 /usr/lib/python3/dist-packages/owrx/modes.py 2>/dev/null && echo "✔ modo FT2 en OpenWebRX+" || echo "✘ modo FT2 no activo"
+    [ -f "$HOOK" ] && echo "✔ se reaplica tras actualizar" || echo "· sin hook de apt"
+}
+
+probar() {
+    local w=/tmp/ft2-prueba-261004_120015.wav
+    cp "$KIT/tests/datos/ft2_261004_120015.wav" "$w"
+    bricohams-ft2-decode -d 3 "$w"
+    rm -f "$w"
+}
+
+case "${1:-}" in
+    compilar) compilar ;;
+    activar)  activar ;;
+    quitar)   quitar ;;
+    estado)   estado ;;
+    probar)   probar ;;
+    *) sed -n '2,16p' "$0"; exit 1 ;;
+esac

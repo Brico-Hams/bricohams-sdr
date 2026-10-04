@@ -1,5 +1,7 @@
 # 19 · Viento y lluvia para el WX APRS
 
+> **v4 · Con el HAT puesto la cabecera de 40 pines está ocupada.** El pluviómetro se conecta ahora a la **Pico «bricohams-io»** por USB: GP15 (pin 20) con 10 kΩ a 3V3 y 100 nF a GND; el otro hilo a GND. El viento sigue igual, por el adaptador USB-RS485 ([manual 20](20_PICO_IO.md), [esquema 16](../esquemas/16_pico_io.png)). Lo de abajo con pines de la Pi solo vale **sin HAT** (`IO_MODE="gpio"`).
+
 ![Esquema](../esquemas/14_sensores_wx.png)
 
 La estación WX de la Pi, **EA5KAO-13** (BME280, manual 06), suma ahora:
@@ -58,7 +60,8 @@ Si tu veleta da grados (0–359) en lugar de sectores (0–7), pon `WIND_DIR_MOD
 ```
 WIND_ENABLE="yes"   WIND_PORT="/dev/rs485"   WIND_BAUD="4800"
 WIND_ADDR_SPEED="1" WIND_ADDR_DIR="2"        WIND_DIR_MODE="sector8"
-RAIN_ENABLE="yes"   RAIN_GPIO="17"           RAIN_MM="0.2794"
+RAIN_ENABLE="yes"   RAIN_MM="0.2794"
+IO_MODE="pico"      # v4: el pluviómetro lo cuenta la Pico (GP15); RAIN_GPIO solo con IO_MODE="gpio"
 ```
 Después: `sudo bash install.sh --solo sensor`, o la instalación completa.
 
@@ -76,7 +79,8 @@ Después: `sudo bash install.sh --solo sensor`, o la instalación completa.
 - **Sensores de viento:** en el **brazo de 1,6 m a 1,5 m de altura**, cada uno a 0,8 m del mástil: el anemómetro hacia el N y la veleta hacia el S (plan del mástil, esquema 11). Así el mástil no les hace sombra al viento. **Orienta la marca N de la veleta al norte geográfico** (con una brújula, sumando +1° de declinación en Murcia).
 - **Pluviómetro:**
   - **no en el mástil**, porque el viento lo hace oscilar y da vuelcos falsos;
-  - **en un poste aparte**, a 1 m del suelo, nivelado con su burbuja y lejos de paredes y árboles;
+  - **en un poste aparte**, a 1 m del suelo, nivelado con su burbuja y lejos de paredes y árboles. **v4:** poste Ø40 de 1 m con la `pluvio_vaso` (abrazadera de poste) y la `pluvio_plataforma` con 3 tornillos de nivelación (manual 21 §3.7);
+  - **sensores de viento (v4):** cada uno con su `sensor_viento_brida` sobre un tubo Ø25 de 300 mm y `cruceta_brazo_tubo` (manual 21 §3.6);
   - el cable llega al PG7 «LLUVIA».
 
 ## 6. Pruebas

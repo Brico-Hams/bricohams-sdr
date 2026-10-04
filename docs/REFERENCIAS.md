@@ -64,3 +64,25 @@
 - **Repositorio de OpenWebRX+ por versión:** `bookworm/` y `trixie/`, Release firmado. Página: https://luarvique.github.io/ppa/ · Repositorio: https://github.com/luarvique/ppa
 - **meshtasticd en Debian 13:** https://meshtastic.org/docs/meshtasticd/installation/debian/
 - **MediaMTX rpiCamera** (admite Trixie y Bookworm): https://mediamtx.org/docs/publish/raspberry-pi-cameras
+
+## v4.0
+- **Pico y MicroPython (rp2):** https://docs.micropython.org/en/latest/rp2/quickref.html · pinout: https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf · mpremote: https://docs.micropython.org/en/latest/reference/mpremote.html
+- **Cámara Waveshare RPi Camera (F):** https://www.waveshare.com/wiki/RPi_Camera_(F) · cable de la Pi 5: https://www.raspberrypi.com/products/camera-cable/ · cámaras en la Pi 5: https://www.raspberrypi.com/documentation/accessories/camera.html
+- **Estación WX LoRa de CA2RXU (pines y firmware):** https://github.com/richonguzman/LoRa_APRS_Wx_Station
+- **Sensores de viento Renke RS485:** https://www.renkeer.com/product/wind-speed-sensor/
+- **0xAF plugins (doppler, show_band_plan, listeners):** https://github.com/0xAF/openwebrxplus-plugins
+- **Pases de satélites:** CelesTrak GP/OMM https://celestrak.org/NORAD/documentation/gp-data-formats.php · python-sgp4 https://pypi.org/project/sgp4/
+- **SatDump:** https://github.com/SatDump/SatDump · METEOR-M LRPT 137,9 MHz.
+- **FT2 / Decodium:** https://github.com/iu8lmc/Decodium-3.0-Codename-Raptor · https://ft2.it/
+- **Indicativos:** RadioID https://radioid.net/api · QRZ XML https://www.qrz.com/docs/xml/current_spec.html
+- **GeoIP:** DB-IP IP to City Lite (CC BY 4.0) https://db-ip.com/db/download/ip-to-city-lite — la web lleva la atribución.
+- **Telegram Bot API:** https://core.telegram.org/bots/api
+- **Mensajes de clientes de OpenWebRX+ por MQTT:** https://github.com/luarvique/openwebrx
+- **https:** Let's Encrypt https://letsencrypt.org/docs/ · certbot https://eff-certbot.readthedocs.io/ · DuckDNS https://www.duckdns.org/
+- **Privacidad y registros de visitas:** AEPD https://www.aepd.es/
+- **CB 27 MHz (CEPT, 40 canales):** https://www.fediea.org/ · **PMR446:** CEPT ECC/DEC(15)05.
+- **Radio Club Región de Murcia (RU-75, frecuencias del club):** https://www.ea5rcz.es/
+- **Aviación:** ENAIRE AIP España https://aip.enaire.es/AIP/
+- **Marina:** Salvamento Marítimo https://www.salvamentomaritimo.es/ · canales VHF marinos ITU-R M.1084.
+- **FM y DAB+:** https://radiomap.eu/es/murcia · cobertura DAB https://avancedigital.mineco.gob.es/
+- **Secreto de las comunicaciones** (por qué no hay radiotaxis ni TETRA de emergencias): Ley 11/2022 General de Telecomunicaciones, art. 60 · CE art. 18.3.

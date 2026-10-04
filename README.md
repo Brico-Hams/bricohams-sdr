@@ -14,6 +14,17 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **caja v3** en dos módulos al pie del mástil, con **ventilación controlada**;
   - **viento y lluvia** en el WX APRS;
   - **repetidores con subtono** en los marcadores y **Wifon FM** la primera.
+- **v4.0:**
+  - **Pico «bricohams-io» por USB** para sensores y ventiladores: con el HAT puesto la cabecera de 40 pines está tapada;
+  - **cámara Waveshare (F)** OV5647 NoIR con cinta 15→22 pines para el conector de la Pi 5;
+  - **anclajes impresos** (crucetas con tuercas cautivas) para la fibra 433, la quad, la ADS-B, los sensores de viento y el pluviómetro;
+  - **marcadores nuevos:** Radio Club Región de Murcia (RU-75, 145,325, 430,325, CB canal 32, PMR 5), CB 40 canales, PMR446, FM (Radio María), DAB+, FT8/FT4/FT2, modos digitales, aviación y marina de Cartagena y Mazarrón;
+  - **plugins web:** banderas en FT8/FT4/FT2, ficha QRZ/RadioID en DMR/YSF, banner de próximos pases con ▶ Escuchar (Doppler), plan de bandas, oyentes (opcional), logo más pequeño;
+  - **FT2** (experimental, decodium-rx);
+  - **https con Let's Encrypt** detrás de nginx, portal de servicios y página de privacidad;
+  - **visitas:** contador, país/ciudad e IP truncada, aviso por **Telegram**;
+  - **tareas automáticas** por cron con una **cuenta de servicio** sin contraseña.
+- **v4.1:** `sudo bash install.sh --actualizar` pone al día kit (git), `bricohams.env` (variables nuevas), sistema (apt) y solo los pasos que han cambiado, conservando tus marcadores ([manual 29](docs/manuales/29_ACTUALIZAR.md)).
 
 ![Arquitectura](docs/esquemas/01_arquitectura.png)
 
@@ -40,6 +51,12 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
 | 📦 **Caja v3** al pie del mástil: electrónica + potencia (120 W, bus de 12 V) | ASA/PETG + TPU | `hardware/caja_v3/` |
 | 🌀 Ventilación con control PWM, tacómetros y DS18B20 | 2 × 60 mm 12 V de 4 hilos | `bricohams-fan` |
 | 📡 Antenas: quad 2 m/70, discones, ADS-B + LNA, MLA-30 | aluminio, fibra, piezas impresas | `hardware/antenas/` (NEC2 + OpenSCAD) |
+| 🔌 **v4** · Sensores y ventiladores con el HAT puesto | **Raspberry Pi Pico** por USB + 2 × 2N7002 | `firmware/pico-io` + `bricohams-io` |
+| 🔩 **v4** · Anclajes al mástil y a los brazos | crucetas impresas, M6 + tuercas cautivas | `hardware/anclajes/` |
+| 🛰️ **v4** · Próximos pases y escucha con Doppler | — | `bricohams-satpass` + plugin `satelites` (+ SatDump para METEOR) |
+| 🔒 **v4** · https, portal y API de indicativos | — | nginx + certbot + `bricohams-api` |
+| 👥 **v4** · Visitas y aviso por Telegram | — | mosquitto + `bricohams-visitas` (GeoIP DB-IP Lite) |
+| ⏰ **v4** · Copias, actualización, reinicio y salud | — | `/etc/cron.d/bricohams` + cuenta `bricohams` |
 
 ## Puesta en marcha rápida
 
@@ -52,7 +69,19 @@ sudo bricohams-lilygo identificar          # una vez: nombres fijos de los LilyG
 sudo reboot
 sudo bricohams-lilygo meshtastic && sudo bricohams-lilygo igate
 sudo bricohams-check
+sudo bricohams-io --instalar               # v4: graba el firmware de la Pico (una vez)
+bricohams-servicios                        # v4: direcciones de todos los servicios web
 ```
+
+**Actualizar una estación ya instalada** (v4.1):
+
+```bash
+cd ~/bricohams-sdr
+sudo bash install.sh --actualizar --simular   # qué haría
+sudo bash install.sh --actualizar             # hacerlo
+```
+
+Desde la v4 la estación se abre en **https://&lt;tu dominio&gt;/** (router: puertos 80 y 443 a la Pi; [manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md)).
 
 El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del mástil, en el [manual 10](docs/manuales/10_CAJA_3D.md).
 
@@ -61,6 +90,12 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - [Mástil y antenas](docs/manuales/11_MASTIL_Y_ANTENAS.md) (manuales 11–16).
 - [Caja v3](docs/manuales/17_CAJA_V3.md), [ventilación](docs/manuales/18_VENTILACION.md) y [viento y lluvia](docs/manuales/19_VIENTO_Y_LLUVIA.md).
 
+**v4.0:**
+- [20 Pico IO](docs/manuales/20_PICO_IO.md) · [21 Anclajes](docs/manuales/21_ANCLAJES.md) · [22 Firmware WX LoRa](docs/manuales/22_WX_LORA_FIRMWARE.md)
+- [23 Web, SSL y servicios](docs/manuales/23_WEB_SSL_SERVICIOS.md) · [24 Visitas y Telegram](docs/manuales/24_VISITAS_TELEGRAM.md) · [25 Tareas automáticas](docs/manuales/25_TAREAS_AUTOMATICAS.md)
+- [26 Satélites](docs/manuales/26_SATELITES.md) · [27 Plugins web](docs/manuales/27_PLUGINS_WEB_V4.md) · [28 FT2](docs/manuales/28_FT2.md) · [29 Actualizar](docs/manuales/29_ACTUALIZAR.md)
+- [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
+
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).
 
 ![Caja del mástil](hardware/caja/render/montaje.png)
@@ -68,29 +103,36 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 ## Estructura
 
 ```
-install.sh                 instalador por pasos e idempotente (--lista, --solo, --backup)
+install.sh                 instalador por pasos e idempotente (--lista, --solo, --backup, --actualizar)
 bricohams.env.example      configuración de la estación SIN claves (copiar a bricohams.env)
 files/
   openwebrx/               plantilla de settings.json, marcadores, conf.d
   htdocs/plugins/          init.js y plugins web (solar, meteo, camara, bricohams + 0xAF)
   branding/                cabecera y avatar BricoHams con Murcia
-  bin/                     herramientas y servicios (check, series, lilygo, wx, meteo, camsnap, fan…)
+  bin/                     herramientas y servicios (check, series, lilygo, wx, meteo, camsnap, fan, io, satpass,
+                           visitas, api, ft2, servicios, tarea, telegram…)
+  nginx/                   v4: plantilla del sitio https
+  web/                     v4: portal /bricohams/ y página de privacidad
+firmware/pico-io/          v4: firmware MicroPython de la Pico (sensores y ventiladores)
 docs/
   ARQUITECTURA.md          decisiones de arquitectura (ADR)
   DATOS.md                 conjuntos de datos: SDR, perfiles, marcadores, puertos, servicios, I2C (generado)
   HARDWARE_Y_GPIO.md       pines GPIO, buses, USB, alimentación, antenas
   EVALUACION_MODULOS.md    evaluación de cada módulo (BME280, LX-LBU2C, WPI408, FlightStick…)
-  MEMORIA_TECNICA.md       memoria técnica v3: inventario, cables C1–C18, secuencia de instalación, BOM
+  MEMORIA_TECNICA.md       memoria técnica v3/v4: inventario, cables C1–C20, secuencia de instalación, BOM
+  CANALES_Y_FRECUENCIAS.md v4: canales y frecuencias de todos los grupos de marcadores (generado)
   REFERENCIAS.md           fuentes y documentación externa
   esquemas/                diagramas SVG/PNG (bloques, GPIO, cableado, RF, red, alimentación y caja)
   manuales/                manuales paso a paso
 hardware/caja/             caja de intemperie v2 (en el mástil): modelo OpenSCAD, STL listos para imprimir y vistas
 hardware/caja_v3/          caja v3 de dos módulos (electrónica + potencia): OpenSCAD, 30 STL, vistas
 hardware/antenas/          antenas: antenas_bricohams.scad + 30 STL, sim/ (modelos NEC2 y resultados)
-data/                      repetidores EA5 (lista EA5KGV) de los que salen los marcadores
+hardware/anclajes/         v4: crucetas y soportes impresos (16 STL) y vista de montaje
+data/                      repetidores EA5 (lista EA5KGV), marcadores_v4.json y satelites.json
 tests/                     pruebas (run_tests.sh)
 tools/                     esquemas.py, datos.py, caja.sh, caja_v3.sh, antenas.sh, mastil.py,
-                           planos_antenas.py, marcadores.py, stl_util.py
+                           planos_antenas.py, marcadores.py, stl_util.py,
+                           anclajes.sh, branding.py, canales.py (v4)
 CHANGELOG.md               historial de versiones
 ```
 
@@ -105,11 +147,14 @@ tools/caja_v3.sh               # caja v3
 tools/antenas.sh               # piezas de las antenas
 python3 hardware/antenas/sim/quad_2m70.py --final   # simulación NEC2 (requiere nec2c)
 python3 tools/mastil.py --png  # cálculo de viento del mástil
-python3 tools/marcadores.py    # repetidores → marcadores (idempotente)
+python3 tools/marcadores.py    # repetidores + marcadores_v4.json → marcadores (idempotente)
+python3 tools/canales.py       # regenera docs/CANALES_Y_FRECUENCIAS.md
+tools/anclajes.sh              # crucetas y soportes v4
 ```
 
 ## Reglas del repositorio
 
-- `bricohams.env` **nunca** se sube: está en `.gitignore`.
+- `bricohams.env` **nunca** se sube: está en `.gitignore`. Desde la v4 también guarda `TELEGRAM_TOKEN`, `QRZ_PASS`, `DUCKDNS_TOKEN` y `LISTENERS_SUPABASE_KEY`.
+- **No se ponen en los marcadores** comunicaciones privadas ni de seguridad pública (radiotaxis, TETRA de emergencias): ADR-36.
 - Toda la configuración de OpenWebRX sale de `files/openwebrx/settings.json.tmpl` + `bricohams.env`. Para cambiar perfiles, edita la plantilla y regenera `docs/DATOS.md`.
 - Lo marcado como **A VERIFICAR** (pines del HAT) se corrige en `bricohams.env`, nunca en el código.

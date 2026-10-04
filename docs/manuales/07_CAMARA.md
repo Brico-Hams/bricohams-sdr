@@ -1,9 +1,21 @@
-# 07 · Cámara del mástil (WPI408, OV5647 con IR)
+# 07 · Cámara del mástil (Waveshare RPi Camera (F) · OV5647 con visión nocturna)
 
-## 1. Conexión
-- **Cable:** de **15 a 22 pines** (la Pi 5 usa conectores CSI de 22 pines). Va al conector **CAM/DISP 0**.
-- **Montaje:** la cámara no es estanca. Ponla dentro de la caja, detrás de una ventana de policarbonato, con los LED IR fuera del reflejo.
-- **Comprobar:** `rpicam-hello --list-cameras` debe mostrar `ov5647`. Para esta prueba, para antes MediaMTX con `sudo systemctl stop mediamtx`.
+## 1. Cámara y conexión (v4)
+- **Cámara:** **Waveshare RPi Camera (F)**.
+  - OV5647 de 5 MP, enfoque manual, 50° de diagonal y dos LED IR de 850 nm.
+  - **No tiene filtro IR-CUT: es NoIR permanente.** Por eso `CAM_TUNING` usa por defecto `/usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json` para que los colores de día no salgan rosados.
+- **Por qué «no entra»:** la Pi 5 tiene conectores CSI **mini de 22 pines y 0,5 mm**, y la Waveshare trae un cable **estándar de 15 pines y 1 mm**.
+- **Qué cable comprar:** el **«Raspberry Pi 5 Camera Cable» Standard–Mini (15 → 22 pines)** de 200, 300 o 500 mm.
+  - En la cámara va el extremo ancho de 15 pines.
+  - En la Pi va el estrecho de 22 pines, en el conector **CAM/DISP 0** (o 1), con los **contactos metálicos mirando hacia el puerto Ethernet**.
+- **Con el HAT puesto:** la cinta pasa por el hueco lateral entre la Pi y el HAT. Usa la de 300 mm para sacarla por el lado de la caja hasta la ventana de la tapa.
+- **Montaje:** la cámara no es estanca. Va dentro de la caja, detrás de la ventana de policarbonato (`soporte_camara`), con los LED IR fuera del reflejo y la `visera` por fuera.
+- **Comprobar:**
+  1. Para MediaMTX: `sudo systemctl stop mediamtx`.
+  2. Lanza `rpicam-hello --list-cameras`: debe salir `ov5647`.
+  3. Haz una prueba: `rpicam-still -o prueba.jpg --tuning-file /usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json`.
+  4. Si no sale, revisa la orientación de la cinta y que `camera_auto_detect=1` esté en `config.txt`.
+- **Enfoque:** gira la lente con la herramienta que trae, mirando la imagen en `http://<pi>:8889/mastil/`.
 
 ## 2. Configuración (`/etc/mediamtx/mediamtx.yml`, la genera el paso `camara`)
 

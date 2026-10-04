@@ -24,6 +24,13 @@ window.solar_config     = { lat: __LAT__, lon: __LON__ };                   // Q
 window.meteo_config     = { url: 'static/plugins/receiver/meteo/meteo.json' };
 window.camara_config    = { live: 'auto', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · Mi QTH' };
 window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
+// v4
+window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
+window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: '/bricohams/privacidad.html' };
+window.dvficha_config   = { api: '/bricohams/api/indicativo', segundos: 20 };
+// Oyentes en tiempo real del plugin «listeners» de 0xAF: necesita un proyecto Supabase propio
+// (LISTENERS_SUPABASE_URL y LISTENERS_SUPABASE_KEY en bricohams.env). Vacío = no se carga.
+const LISTENERS = { url: '__LISTENERS_URL__', key: '__LISTENERS_KEY__' };
 
 // Pasos del plugin tune_precise (Hz)
 Plugins.tune_precise_steps = [25000, 12500, 6250, 1000, 100];
@@ -76,8 +83,17 @@ const PluginsOpcionales = [
     } catch (e) { console.warn('rig_skin', e); }
 
     // Plugins locales de EA5KAO (htdocs/plugins/receiver/<nombre>/)
-    for (const name of ['solar', 'meteo', 'camara', 'bricohams']) {
+    for (const name of ['solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha', 'satelites', 'visitas']) {
         try { await Plugins.load(name); } catch (e) { console.warn(name, e); }
+    }
+
+    // «listeners» (0xAF): quién escucha qué frecuencia, solo si hay Supabase configurado
+    if (LISTENERS.url && LISTENERS.url.indexOf('__') !== 0 && LISTENERS.key && LISTENERS.key.indexOf('__') !== 0) {
+        try {
+            await Plugins.load(rp_url + '/listeners/listeners.js');
+            await Plugins.listeners.setup({ supabaseUrl: LISTENERS.url, supabaseKey: LISTENERS.key, network: 'bricohams',
+                                           receiverName: 'EA5KAO · Mi QTH', receiverUrl: location.origin });
+        } catch (e) { console.warn('listeners', e); }
     }
 
     // Ventana de plugins para el visitante (debe ir la última)

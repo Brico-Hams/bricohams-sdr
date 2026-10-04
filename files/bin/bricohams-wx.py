@@ -220,6 +220,51 @@ def medianoche_local(ahora):
     return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
 
 
+class SensorPico:
+    """v4: el BME280 cuelga de la Pico «bricohams-io» (la cabecera la ocupa el HAT).
+    Lee la última medida que deja bricohams-io en /run/bricohams/io.json."""
+
+    def __init__(self, path='/run/bricohams/io.json', max_edad=30, esperas=15):
+        self.path, self.max_edad = path, max_edad
+        self.addr = 0
+        self.chip = 'BME280 (Pico)'
+        for _ in range(esperas):              # la Pico manda cada 2 s
+            try:
+                self.read()
+                return
+            except RuntimeError:
+                time.sleep(2)
+        self.read()
+
+    def read(self):
+        try:
+            d = json.load(open(self.path))
+            edad = time.time() - os.path.getmtime(self.path)
+        except (OSError, ValueError):
+            raise RuntimeError('sin datos de la Pico en %s (¿bricohams-io en marcha?)' % self.path)
+        b = d.get('bme') or {}
+        if edad > self.max_edad or b.get('t') is None or b.get('p') is None:
+            raise RuntimeError('la Pico no da BME280: %s' % (b.get('error') or 'datos de hace %d s' % edad))
+        self.chip = '%s (Pico)' % b.get('chip', 'BME280')
+        return float(b['t']), float(b['p']), (None if b.get('h') is None else float(b['h']))
+
+
+class PluviometroIO:
+    """v4: los vuelcos los cuenta la Pico; bricohams-io los guarda como marcas de tiempo."""
+
+    def __init__(self, mm_vuelco, estado):
+        self.mm, self.estado = mm_vuelco, estado
+
+    def resumen(self):
+        ahora = time.time()
+        try:
+            v = [float(x) for x in json.load(open(self.estado))]
+        except (OSError, ValueError):
+            v = []
+        return {'1h': lluvia_desde(v, self.mm, ahora, ahora - 3600), '24h': lluvia_desde(v, self.mm, ahora, ahora - 86400),
+                'hoy': lluvia_desde(v, self.mm, ahora, medianoche_local(ahora))}
+
+
 class Pluviometro:
     def __init__(self, gpio, mm_vuelco, estado):
         self.mm, self.estado = mm_vuelco, estado
@@ -423,7 +468,9 @@ def main():
     call = env('WX_APRS_CALLSIGN', 'EA5KAO-13')
     once = '--una' in sys.argv
 
-    sensor = Sensor(int(env('WX_I2C_BUS', '1')))
+    pico = env('IO_MODE', 'pico') == 'pico'
+    sensor = SensorPico(os.path.join(env('IO_RUN_DIR', '/run/bricohams'), 'io.json')) if pico \
+        else Sensor(int(env('WX_I2C_BUS', '1')))
     print('wx: %s en 0x%02x' % (sensor.chip, sensor.addr), flush=True)
     viento = pluvio = None
     if as_bool(env('WIND_ENABLE', 'no')):
@@ -436,9 +483,13 @@ def main():
             print('wx: sin viento (%s)' % e, file=sys.stderr, flush=True)
     if as_bool(env('RAIN_ENABLE', 'no')):
         try:
-            pluvio = Pluviometro(int(env('RAIN_GPIO', '17')), float(env('RAIN_MM', '0.2794')),
-                                 os.path.join(env('STATE_DIRECTORY', '/var/lib/bricohams'), 'lluvia.json'))
-            print('wx: pluviómetro en GPIO%s' % env('RAIN_GPIO', '17'), flush=True)
+            estado = os.path.join(env('STATE_DIRECTORY', '/var/lib/bricohams'), 'lluvia.json')
+            if pico:
+                pluvio = PluviometroIO(float(env('RAIN_MM', '0.2794')), estado)
+                print('wx: pluviómetro en la Pico (GP15)', flush=True)
+            else:
+                pluvio = Pluviometro(int(env('RAIN_GPIO', '17')), float(env('RAIN_MM', '0.2794')), estado)
+                print('wx: pluviómetro en GPIO%s' % env('RAIN_GPIO', '17'), flush=True)
         except Exception as e:
             print('wx: sin pluviómetro (%s)' % e, file=sys.stderr, flush=True)
     if once and viento:

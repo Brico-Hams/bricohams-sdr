@@ -67,7 +67,7 @@
 | `hf17` | 18 MHz  HAM 17m (solo con el V3 como HF) | 18,118 | 1,024 | 17,6572 – 18,5788 | 17,967 | hfdl | 1000 | rama Q |
 | `hf15` | 21 MHz  HAM 15m (solo con el V3 como HF) | 21,225 | 1 | 20,775 – 21,675 | 21,074 | ft8 | 1000 | rama Q |
 | `hf12` | 24 MHz  HAM 12m (solo con el V3 como HF) | 24,94 | 1,024 | 24,4792 – 25,4008 | 24,915 | ft8 | 1000 | no |
-| `hf11` | 27 MHz  CB Band 11m (solo con el V3 como HF) | 27,46 | 1 | 27,01 – 27,91 | 27,555 | usb | 1000 | no |
+| `hf11` | 27 MHz · CB 11 m · 40 canales (Radio Club: canal 32 · 27,325) (solo con el V3 como HF) | 27,185 | 1 | 26,735 – 27,635 | 27,185 | nfm | 1000 | no |
 | `hf10` | 28 MHz  HAM 10m (solo con el V3 como HF) | 28,85 | 2,4 | 27,77 – 29,93 | 28,074 | ft8 | 1000 | no |
 | `hf6` | 50-52 MHz  HAM 6m (solo con el V3 como HF) | 51 | 2,4 | 49,92 – 52,08 | 50,313 | ft8 | 1000 | no |
 
@@ -84,13 +84,13 @@
 | `sp17` | 18 MHz  HAM 17m | 18,118 | 0,384 | 17,9452 – 18,2908 | 17,967 | hfdl | 1000 |  |
 | `sp15` | 21 MHz  HAM 15m | 21,225 | 1 | 20,775 – 21,675 | 21,074 | ft8 | 1000 |  |
 | `sp12` | 24 MHz  HAM 12m | 24,94 | 0,384 | 24,7672 – 25,1128 | 24,915 | ft8 | 1000 |  |
-| `sp11` | 27 MHz  CB Band 11m | 27,46 | 1 | 27,01 – 27,91 | 27,555 | usb | 1000 |  |
+| `sp11` | 27 MHz · CB 11 m · 40 canales (Radio Club: canal 32 · 27,325) | 27,185 | 1 | 26,735 – 27,635 | 27,185 | nfm | 1000 |  |
 | `sp10` | 28 MHz  HAM 10m | 28,85 | 2 | 27,95 – 29,75 | 28,074 | ft8 | 1000 |  |
 | `sp6` | 50-52 MHz  HAM 6m | 51 | 3 | 49,65 – 52,35 | 50,313 | ft8 | 1000 |  |
 
 ## 3. Marcadores
 
-Total en el kit: **265**. Hotspots de casa y repetidores digitales de Sierra Espuña:
+Total en el kit: **374**. Hotspots de casa y repetidores digitales de Sierra Espuña:
 
 | Frecuencia (MHz) | Modo | Nombre | Descripción | Perfil que la cubre |
 |---|---|---|---|---|
@@ -110,8 +110,12 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 
 | Puerto | Servicio | Alcance |
 |---|---|---|
-| 8073/tcp | OpenWebRX+ (web, plugins, foto de la cámara, meteo, sensor) | **abrir al exterior** |
-| 80/tcp | lighttpd · tar1090 (mapa de aviones) | opcional |
+| 443/tcp | v4 · nginx https (OpenWebRX+, portal, tar1090, cámara HLS, API) | **abrir al exterior** |
+| 80/tcp | v4 · nginx: Let's Encrypt y redirección a https | **abrir al exterior** |
+| 8073/tcp | OpenWebRX+ (detrás de nginx desde v4) | LAN |
+| 8504/tcp | v4 · lighttpd · tar1090 (detrás de nginx) | 127.0.0.1 |
+| 8075/tcp | v4 · bricohams-api (indicativos) | 127.0.0.1 |
+| 1883/tcp | v4 · mosquitto (informes de clientes de OpenWebRX) | 127.0.0.1 |
 | 8889/tcp + 8189/udp | MediaMTX WebRTC (vídeo en directo) | opcional |
 | 8888/tcp | MediaMTX HLS | LAN |
 | 8554/tcp | MediaMTX RTSP `rtsp://<pi>:8554/mastil` | LAN |
@@ -142,7 +146,14 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | `readsb` | decodificador ADS-B | adsb |
 | `rbfeeder` | envío a RadarBox + MLAT | adsb |
 | `lighttpd` | tar1090 | adsb |
-| `bricohams-backup.timer` | copia diaria 04:30 | herramientas |
+| `bricohams-backup.timer` | copia diaria 04:30 (v4: desactivado, lo hace cron) | herramientas |
+| `bricohams-io` | v4 · puente USB con la Pico (sensores y ventiladores) | io |
+| `bricohams-satpass.timer` | v4 · próximos pases de satélites | satelites |
+| `nginx` | v4 · https y proxy | web |
+| `bricohams-api` | v4 · ficha de indicativos (RadioID/QRZ) | web |
+| `mosquitto` | v4 · MQTT local | visitas |
+| `bricohams-visitas` | v4 · oyentes, GeoIP y Telegram | visitas |
+| `cron (`/etc/cron.d/bricohams`)` | v4 · copias, actualización, reinicio, salud, resumen | tareas |
 
 ## 6. Bus I2C-1 (GPIO2/GPIO3)
 
@@ -200,6 +211,17 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/var/backups/bricohams/` | copias diarias (14 últimas) |
 | `/opt/bricohams/kit/` | copia del kit (sin claves) |
 | `/var/log/bricohams-install.log` | registro del instalador |
+| `/etc/bricohams/{web,api,visitas,telegram}.env` | v4 · variables de los servicios web (640) |
+| `/var/lib/bricohams/visitas.sqlite` | v4 · oyentes (IP parcial, 90 días) |
+| `/var/lib/bricohams/dbip-city-lite.mmdb` | v4 · GeoIP local (DB-IP Lite) |
+| `/var/lib/bricohams/indicativos.sqlite` | v4 · caché de RadioID/QRZ (7 días) |
+| `/var/lib/bricohams/tle.json` | v4 · elementos orbitales de CelesTrak |
+| `/etc/cron.d/bricohams, /etc/sudoers.d/bricohams` | v4 · tareas de la cuenta de servicio |
+| `/dev/bricohams-io` | v4 · Pico (udev 2e8a:0005) |
+| `/run/bricohams/io.json, fan.cmd` | v4 · lecturas de la Pico y orden de ventiladores |
+| `/var/lib/bricohams/kit-estado` | v4.1 · huellas de los pasos para `install.sh --actualizar` (600) |
+| `/var/lib/bricohams/bookmarks.kit.json` | v4.1 · marcadores del kit instalado (para conservar los propios) |
+| `/var/lib/bricohams/actualizaciones.log` | v4.1 · historial de actualizaciones |
 
 ## 10. Caja v2 (en el mástil): conectores de la cara inferior (de izquierda a derecha)
 
@@ -260,7 +282,20 @@ Origen: `N_ROWS` de `hardware/caja_v3/caja_v3.scad` (manual 17).
 | z = 56 mm | R3 | reserva |
 | z = 88 mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |
 
-## 14. GPIO v3 (ventilación y WX)
+## 14. v4 · Pico «bricohams-io» (con el HAT puesto, `IO_MODE="pico"`)
+
+| Pin Pico | GP | Uso |
+|---|---|---|
+| 6 / 7 | GP4 / GP5 | I2C0 SDA / SCL · BME280 (0x76/0x77) |
+| 29 | GP22 | DS18B20 1-Wire (4,7 kΩ a 3V3) |
+| 20 | GP15 | pluviómetro (10 kΩ a 3V3 + 100 nF) |
+| 21 / 22 | GP16 / GP17 | PWM 25 kHz ventiladores (2N7002, invertido) |
+| 24 / 25 | GP18 / GP19 | tacómetros (10 kΩ a 3V3 + 1 kΩ) |
+| 36 / 38 | 3V3(OUT) / GND | alimentación de sensores |
+
+Protocolo: una línea JSON cada 2 s; órdenes `FAN d1 d2` y `PING`; sin órdenes en 60 s → ventiladores al 100 %. Modo actual: `IO_MODE=pico`.
+
+### 14 bis. GPIO de la Pi (solo sin HAT, `IO_MODE="gpio"`)
 
 | Pin | GPIO | Uso | Variable |
 |---|---|---|---|

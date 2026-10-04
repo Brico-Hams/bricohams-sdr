@@ -57,12 +57,13 @@ La estación tiene cinco zonas:
 ### 2.3 Sensores
 | ID | Componente | Ubicación | Conexión | Manual |
 |---|---|---|---|---|
-| S1 | **BME280** (GYBMEP) en garita de 6 platos | A, brazo N 0,05 m | I2C-1 (pines 1, 3, 5, 9) · PG7 «WX» | 06 |
+| S1 | **BME280** (GYBMEP) en garita de 6 platos | A, brazo N 0,05 m | **v4: Pico GP4/GP5 (I2C0) + 3V3/GND** · PG7 «WX» | 06, 20 |
 | S2 | **Anemómetro RS485** (Modbus 1) | A, brazo N 0,8 m · 1,5 m | bus RS485 (A, B) + 12 V · PG7 «VIENTO» | 19 |
 | S3 | **Veleta RS485** (Modbus 2) | A, brazo S 0,8 m · 1,5 m | mismo bus RS485 | 19 |
-| S4 | **Pluviómetro** Misol WH-SP-RG | B, muro nivelado | GPIO17 + GND · PG7 «LLUVIA» | 19 |
-| S5 | **DS18B20** | C, junto a la bandeja | 1-Wire GPIO4 (4,7 kΩ a 3V3) | 18 |
-| S6 | Cámara: IP PoE (recomendada) o CSI | A (IP) / C (CSI, ventana de la tapa) | RTSP por la LAN / CSI 22 pines | 07 |
+| S4 | **Pluviómetro** Misol WH-SP-RG | poste Ø40 de 1 m con `pluvio_vaso` + `pluvio_plataforma` | **v4: Pico GP15** + GND (10 kΩ, 100 nF) · PG7 «LLUVIA» | 19, 20, 21 |
+| S5 | **DS18B20** | C, en el centro, colgando | **v4: Pico GP22** (4,7 kΩ a 3V3) | 18, 20 |
+| S6 | **Cámara Waveshare RPi Camera (F)** (OV5647 NoIR + IR) | C, ventana de la tapa (`soporte_camara` + `visera`) | **cable Standard–Mini 15→22 pines** a CAM/DISP 0 | 07 |
+| S7 | **Pico «bricohams-io»** + placa de 2 MOSFET | C, `pico_soporte` en la rejilla | USB a la regleta → `/dev/bricohams-io` | 20 |
 
 ### 2.4 Alimentación y control
 | ID | Componente | Ubicación | Conexión | Manual |
@@ -74,7 +75,7 @@ La estación tiene cinco zonas:
 | P5 | Portafusibles de cuchilla ×3 (2 A, 1 A, 1 A) | D | regleta, ventiladores, viento | 17 |
 | P6 | WAGO 221 (12 V y GND) | C (`soporte_wago`) | bus de 12 V | 17 |
 | P7 | **Regleta USB Vansuny** (12 V, USB 3.0) | C (`soporte_hub`) | upstream al USB 3.0 de la Pi | 17 |
-| P8 | Ventiladores 60 mm 12 V PWM ×2 + 2N7002 ×2 | C, paredes izq. (entrada) y dcha. (salida) | GPIO12/13 (PWM), GPIO22/5 (tacómetros) | 18 |
+| P8 | Ventiladores 60 mm 12 V PWM ×2 + 2N7002 ×2 | C, paredes izq. (entrada) y dcha. (salida) | **v4: Pico GP16/17 (PWM), GP18/19 (tacómetros)** | 18, 20 |
 | P9 | Adaptador USB-RS485 (CH340) | C | regleta USB → `/dev/rs485` | 19 |
 | P10 | Alimentador FX24E-120200C | repuesto | 12 V 2 A de la regleta | — |
 
@@ -100,7 +101,9 @@ La estación tiene cinco zonas:
 | C15 | Gatillo PD 12 V + fusibles (D) | WAGO 12 V (C), por el M25 «PWR» | 2 × 1 mm² | 0,5–1 m | bornes |
 | C16 | 230 V | toma con diferencial | D (PG9) | H07RN-F 2 × 1 | lo necesario | Schuko |
 | C17 | Red | router | C (M20 «LAN») | Cat6 FTP de exterior | — | RJ45 |
-| C18 | Ventiladores | WAGO 12 V y Pi | ventiladores | el suyo, 4 hilos | 30 cm | conector de 4 pines |
+| C18 | Ventiladores | WAGO 12 V y placa de la Pico | ventiladores | el suyo, 4 hilos | 30 cm | conector de 4 pines |
+| C19 | Pico «bricohams-io» | regleta USB | cable micro-USB de datos | 30 cm | USB-A – micro-USB |
+| C20 | Cámara Waveshare (F) | Pi 5 CAM/DISP 0 | cinta Standard–Mini 15→22 pines | 300 mm | FFC |
 
 **Regla de oro:** bucle de goteo en cada coaxial antes del pasamuros, conectores exteriores con `funda_n` y cinta autovulcanizante, y coaxiales sujetos al mástil cada 50 cm con `separador_coax` (separados 30 mm del tubo).
 
@@ -121,7 +124,7 @@ La estación tiene cinco zonas:
 | Mástil | Mástil Televés Ø40 × 2 (3 m) + 2 abrazaderas de pared | 1 |
 | | Collarín de vientos + 3 cables inox Ø3 + tensores + anclajes | 1 juego |
 | | Tubo de aluminio Ø25 × 2 (brazos de 1,6 m) | 3 |
-| | Abrazaderas en U inox M8 (mástil) y M6 (brazos/boom) | 12 + 12 |
+| | **v4: crucetas impresas** en lugar de U: tornillos M6 × 40/50 inox (×24), tuercas M6 (×24), arandelas (×24), autotaladrantes inox 4,8 × 19 (×12), tubos Ø25 de 300 mm (×5) y poste Ø40 de 1 m para el pluviómetro | 1 juego |
 | Quad | Tubo de aluminio cuadrado 20 × 20 × 1,5 (1,1 m) · varillas de fibra Ø8 (8 × 0,45 m) y Ø6 (8 × 0,16 m) · hilo de cobre Ø2 mm (8 m) · RG-59 (0,5 m) · insertos M3 | 1 juego |
 | Discones | Varilla de aluminio Ø4 (grande: 12 × 1,0 m + 12 × 0,32 m) · bujes de aluminio Ø70 × 12 (×2) · conector N de panel · varilla de latón M4 · tornillería inox | 1 juego por discone |
 | ADS-B | SMA de panel con brida de 4 agujeros · latón Ø2 (0,4 m) · LNA 1090 (ya lo tienes) · bias-tee SMA 5 V | 1 |
@@ -130,7 +133,22 @@ La estación tiene cinco zonas:
 | Potencia | Base Schuko de superficie · gatillo USB-C PD 12 V · portafusibles de cuchilla ×3 · WAGO 221-415 ×3 · H07RN-F 2 × 1 | — |
 | Ventilación | Ventiladores de 60 mm 12 V PWM de 4 hilos ×2 (p. ej. Noctua NF-A6x25 PWM) · 2N7002 ×2 · resistencias de 1 kΩ ×4, 10 kΩ ×2, 100 kΩ ×2, 4,7 kΩ ×1 · DS18B20 · placa perforada 5 × 3 cm | — |
 | WX | Kit anemómetro + veleta RS485 · pluviómetro Misol WH-SP-RG · adaptador USB-RS485 (CH340) · condensador de 100 nF · resistencia de 10 kΩ | — |
+| **v4 · Pico IO** | Raspberry Pi Pico (o Pico W/Pico 2) · cable micro-USB de datos · placa perforada 50 × 70 · 2N7002 ×2 · resistencias 1 kΩ ×4, 10 kΩ ×3, 100 kΩ ×2, 4,7 kΩ ×1 · 100 nF · tornillos M2 × 6 ×8 | 1 juego |
+| **v4 · Cámara** | Cable «Raspberry Pi 5 Camera Cable» Standard–Mini 15→22 pines, 300 mm | 1 |
+| **v4 · Web** | Dominio propio o DuckDNS (gratis) · bot de Telegram (gratis) · suscripción XML de QRZ (opcional, para fotos) | — |
 | Opcional | Cámara IP PoE (p. ej. Reolink RLC-510A) + inyector PoE · SDRplay RSPdx-R2 · 3.er LilyGO T3 (Wx Station LoRa) | — |
+
+## 5 bis. v4: servicios de software
+| ID | Servicio | Qué hace | Manual |
+|---|---|---|---|
+| W1 | nginx + Let's Encrypt | https, portal `/bricohams/`, privacidad, proxy de tar1090, HLS y API | 23 |
+| W2 | bricohams-api | ficha de indicativos (RadioID / QRZ) | 27 |
+| W3 | mosquitto + bricohams-visitas | oyentes, GeoIP local, Telegram, contador | 24 |
+| W4 | bricohams-satpass | próximos pases para la web (SGP4) | 26 |
+| W5 | SatDump | imágenes METEOR LRPT (servicio de fondo) | 26 |
+| W6 | decodium-rx + parche FT2 | modo FT2 en OpenWebRX+ (experimental) | 28 |
+| W7 | bricohams-io | puente USB con la Pico | 20 |
+| W8 | cron + cuenta `bricohams` | copias, actualización, reinicio, salud, resumen | 25 |
 
 ## 6. Verificaciones pendientes
 

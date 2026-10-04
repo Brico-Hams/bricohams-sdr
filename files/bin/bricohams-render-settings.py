@@ -34,6 +34,7 @@ def main(src, dst):
         '__HF_SDRPLAY__': as_bool(env('HF_SDRPLAY', 'no')),
         '__SAT_BIAS_TEE__': as_bool(env('SAT_BIAS_TEE', 'no')),
         '__SDRPLAY_ANTENNA__': env('SDRPLAY_ANTENNA'),
+        '__MQTT_ENABLED__': as_bool(env('VISITAS_ENABLE', 'yes')),   # v4: avisos de conexión (bricohams-visitas)
     }
 
     def walk(o):

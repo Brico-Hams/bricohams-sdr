@@ -190,6 +190,73 @@ def write_atomic(path, obj):
     os.replace(tmp, path)
 
 
+def io_lectura(path):
+    """Última lectura de la Pico (bricohams-io) o None si es vieja (> 20 s)."""
+    try:
+        if time.time() - os.path.getmtime(path) > 20:
+            return None
+        return json.load(open(path))
+    except (OSError, ValueError):
+        return None
+
+
+def io_temp_caja(d, ident=''):
+    lst = (d or {}).get('ds') or []
+    if ident:
+        lst = [x for x in lst if ident in x.get('id', '')] or lst
+    return lst[0]['t'] if lst and lst[0].get('t') is not None else None
+
+
+def main_pico(cfg, forzado, salida_web):
+    """v4: los ventiladores, el tacómetro y el DS18B20 cuelgan de la Pico «bricohams-io»."""
+    run = env('IO_RUN_DIR', '/run/bricohams')
+    io_json, orden = os.path.join(run, 'io.json'), os.path.join(run, 'fan.cmd')
+    fin = time.time() + 30 if forzado is not None else None
+    print('fan: ventiladores en la Pico (GP16/GP17 PWM, GP18/GP19 tacómetro, DS18B20 en GP22)', flush=True)
+    ciclo = 0
+    while True:
+        d = io_lectura(io_json)
+        tc, tb = temp_cpu(), io_temp_caja(d, env('FAN_DS18B20_ID'))
+        nuevo = forzado if forzado is not None else curva(tc, tb, cfg, ciclo)
+        if ciclo == 0 and 0 < nuevo < 60 and forzado is None:
+            nuevo_envio = 100                                 # arranque desde parado: golpe al 100 %
+        else:
+            nuevo_envio = nuevo
+        try:
+            os.makedirs(run, exist_ok=True)
+            with open(orden, 'w') as f:
+                f.write('FAN %d %d\n' % (nuevo_envio, nuevo_envio))
+        except OSError as e:
+            print('fan: no puedo dejar la orden (%s)' % e, file=sys.stderr, flush=True)
+        if nuevo_envio != nuevo:
+            time.sleep(2)
+            with open(orden, 'w') as f:
+                f.write('FAN %d %d\n' % (nuevo, nuevo))
+        ciclo = nuevo
+        time.sleep(10)
+        d = io_lectura(io_json)
+        vueltas = list(((d or {}).get('fan') or {}).get('rpm') or [])
+        auto = bool(((d or {}).get('fan') or {}).get('auto'))
+        alarma = [i for i, r in enumerate(vueltas) if ciclo >= 40 and r < 300]
+        estado = {'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S'), 't_cpu': tc, 't_caja': tb, 'ciclo': ciclo,
+                  'rpm': vueltas, 'alarma': ['entrada', 'salida'][alarma[0]] if alarma else None,
+                  'modo': 'Pico bricohams-io' + (' (sin órdenes: a tope por seguridad)' if auto else ''),
+                  'pico': d is not None}
+        if d is None:
+            estado['alarma'] = 'sin Pico'
+        for ruta in (os.path.join(run, 'caja.json'), salida_web):
+            try:
+                write_atomic(ruta, estado)
+            except OSError:
+                pass
+        if forzado is not None:
+            print('fan: ciclo %d %% · CPU %s °C · caja %s °C · rpm %s' % (ciclo, tc, tb, vueltas), flush=True)
+            if time.time() >= fin:
+                return 0
+        if estado['alarma']:
+            print('fan: AVISO %s (rpm %s, ciclo %d %%)' % (estado['alarma'], vueltas, ciclo), file=sys.stderr, flush=True)
+
+
 def main():
     cargar_env()
     if '--estado' in sys.argv:
@@ -212,6 +279,8 @@ def main():
             return 1
     fin = time.time() + 30 if forzado is not None else None   # --forzar dura 30 s y termina
     salida_web = env('FAN_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/caja.json')
+    if env('IO_MODE', 'pico') == 'pico':
+        return main_pico(cfg, forzado, salida_web)
 
     h = abrir_chip() if lgpio else None
     try:

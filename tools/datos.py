@@ -75,8 +75,12 @@ L += ['', '⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeist
       '', 'Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo), la **entrada** es donde transmites (RX del equipo).', '']
 
 L += ['## 4. Puertos de red', '', '| Puerto | Servicio | Alcance |', '|---|---|---|']
-for p, s, a in [('8073/tcp', 'OpenWebRX+ (web, plugins, foto de la cámara, meteo, sensor)', '**abrir al exterior**'),
-                ('80/tcp', 'lighttpd · tar1090 (mapa de aviones)', 'opcional'),
+for p, s, a in [('443/tcp', 'v4 · nginx https (OpenWebRX+, portal, tar1090, cámara HLS, API)', '**abrir al exterior**'),
+                ('80/tcp', 'v4 · nginx: Let\'s Encrypt y redirección a https', '**abrir al exterior**'),
+                ('8073/tcp', 'OpenWebRX+ (detrás de nginx desde v4)', 'LAN'),
+                ('8504/tcp', 'v4 · lighttpd · tar1090 (detrás de nginx)', '127.0.0.1'),
+                ('8075/tcp', 'v4 · bricohams-api (indicativos)', '127.0.0.1'),
+                ('1883/tcp', 'v4 · mosquitto (informes de clientes de OpenWebRX)', '127.0.0.1'),
                 ('8889/tcp + 8189/udp', 'MediaMTX WebRTC (vídeo en directo)', 'opcional'),
                 ('8888/tcp', 'MediaMTX HLS', 'LAN'), ('8554/tcp', 'MediaMTX RTSP `rtsp://<pi>:8554/mastil`', 'LAN'),
                 ('9997/tcp', 'MediaMTX API', '127.0.0.1'), ('9443/tcp', 'meshtasticd web (https)', 'LAN'),
@@ -95,7 +99,12 @@ for u, q, pa in [('openwebrx', 'receptor web', 'openwebrx / configuracion'), ('s
                  ('bricohams-wx', 'sensor BME280 + viento RS485 + lluvia + WX APRS', 'sensor'),
                  ('bricohams-fan', 'ventiladores de la caja v3 (PWM + tacómetros + DS18B20)', 'ventilacion'), ('readsb', 'decodificador ADS-B', 'adsb'),
                  ('rbfeeder', 'envío a RadarBox + MLAT', 'adsb'), ('lighttpd', 'tar1090', 'adsb'),
-                 ('bricohams-backup.timer', 'copia diaria 04:30', 'herramientas')]:
+                 ('bricohams-backup.timer', 'copia diaria 04:30 (v4: desactivado, lo hace cron)', 'herramientas'),
+                 ('bricohams-io', 'v4 · puente USB con la Pico (sensores y ventiladores)', 'io'),
+                 ('bricohams-satpass.timer', 'v4 · próximos pases de satélites', 'satelites'),
+                 ('nginx', 'v4 · https y proxy', 'web'), ('bricohams-api', 'v4 · ficha de indicativos (RadioID/QRZ)', 'web'),
+                 ('mosquitto', 'v4 · MQTT local', 'visitas'), ('bricohams-visitas', 'v4 · oyentes, GeoIP y Telegram', 'visitas'),
+                 ('cron (`/etc/cron.d/bricohams`)', 'v4 · copias, actualización, reinicio, salud, resumen', 'tareas')]:
     L.append('| `%s` | %s | %s |' % (u, q, pa))
 
 L += ['', '## 6. Bus I2C-1 (GPIO2/GPIO3)', '', '| Dirección | Dispositivo | Uso |', '|---|---|---|',
@@ -129,7 +138,15 @@ for r, c in [('/etc/bricohams/bricohams.env', 'configuración y claves (600 root
              ('/etc/mediamtx/mediamtx.yml', 'cámara'), ('/etc/default/readsb, /etc/rbfeeder.ini', 'ADS-B'),
              ('/etc/udev/rules.d/99-bricohams-lilygo.rules', '/dev/lilygo-mesh y /dev/lilygo-igate'),
              ('/boot/firmware/config.txt', 'bloque `# >>> BricoHams`'), ('/var/backups/bricohams/', 'copias diarias (14 últimas)'),
-             ('/opt/bricohams/kit/', 'copia del kit (sin claves)'), ('/var/log/bricohams-install.log', 'registro del instalador')]:
+             ('/opt/bricohams/kit/', 'copia del kit (sin claves)'), ('/var/log/bricohams-install.log', 'registro del instalador'),
+             ('/etc/bricohams/{web,api,visitas,telegram}.env', 'v4 · variables de los servicios web (640)'),
+             ('/var/lib/bricohams/visitas.sqlite', 'v4 · oyentes (IP parcial, 90 días)'), ('/var/lib/bricohams/dbip-city-lite.mmdb', 'v4 · GeoIP local (DB-IP Lite)'),
+             ('/var/lib/bricohams/indicativos.sqlite', 'v4 · caché de RadioID/QRZ (7 días)'), ('/var/lib/bricohams/tle.json', 'v4 · elementos orbitales de CelesTrak'),
+             ('/etc/cron.d/bricohams, /etc/sudoers.d/bricohams', 'v4 · tareas de la cuenta de servicio'), ('/dev/bricohams-io', 'v4 · Pico (udev 2e8a:0005)'),
+             ('/run/bricohams/io.json, fan.cmd', 'v4 · lecturas de la Pico y orden de ventiladores'),
+             ('/var/lib/bricohams/kit-estado', 'v4.1 · huellas de los pasos para `install.sh --actualizar` (600)'),
+             ('/var/lib/bricohams/bookmarks.kit.json', 'v4.1 · marcadores del kit instalado (para conservar los propios)'),
+             ('/var/lib/bricohams/actualizaciones.log', 'v4.1 · historial de actualizaciones')]:
     L.append('| `%s` | %s |' % (r, c))
 
 SCAD = open(os.path.join(RAIZ, 'hardware', 'caja', 'caja_bricohams.scad'), encoding='utf-8').read()
@@ -171,7 +188,13 @@ for z, nombres in FILAS:
         L.append('| z = %s mm | %s | %s |' % (z, n, DEST3.get(n, '')))
 L += ['| z = 88 mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |', '']
 
-L += ['## 14. GPIO v3 (ventilación y WX)', '', '| Pin | GPIO | Uso | Variable |', '|---|---|---|---|']
+L += ['## 14. v4 · Pico «bricohams-io» (con el HAT puesto, `IO_MODE="pico"`)', '', '| Pin Pico | GP | Uso |', '|---|---|---|']
+for pin, g, u in [('6 / 7', 'GP4 / GP5', 'I2C0 SDA / SCL · BME280 (0x76/0x77)'), ('29', 'GP22', 'DS18B20 1-Wire (4,7 kΩ a 3V3)'),
+                  ('20', 'GP15', 'pluviómetro (10 kΩ a 3V3 + 100 nF)'), ('21 / 22', 'GP16 / GP17', 'PWM 25 kHz ventiladores (2N7002, invertido)'),
+                  ('24 / 25', 'GP18 / GP19', 'tacómetros (10 kΩ a 3V3 + 1 kΩ)'), ('36 / 38', '3V3(OUT) / GND', 'alimentación de sensores')]:
+    L.append('| %s | %s | %s |' % (pin, g, u))
+L += ['', 'Protocolo: una línea JSON cada 2 s; órdenes `FAN d1 d2` y `PING`; sin órdenes en 60 s → ventiladores al 100 %%. Modo actual: `IO_MODE=%s`.' % ENV.get('IO_MODE', 'pico'), '']
+L += ['### 14 bis. GPIO de la Pi (solo sin HAT, `IO_MODE="gpio"`)', '', '| Pin | GPIO | Uso | Variable |', '|---|---|---|---|']
 fp = ENV.get('FAN_PWM_GPIOS', '12,13').split(','); ft = ENV.get('FAN_TACH_GPIOS', '22,5').split(',')
 for pin, g, u, var in [('7', ENV.get('W1_GPIO', '4'), 'DS18B20 (1-Wire)', 'W1_GPIO'), ('11', ENV.get('RAIN_GPIO', '17'), 'pluviómetro', 'RAIN_GPIO'),
                        ('15', ft[0], 'tacómetro ventilador de entrada', 'FAN_TACH_GPIOS'), ('29', ft[1], 'tacómetro ventilador de salida', 'FAN_TACH_GPIOS'),

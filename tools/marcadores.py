@@ -7,6 +7,10 @@
     no hace falta: se sintoniza su SALIDA. Por eso la entrada y el subtono (el que hay
     que transmitir para abrirlo) van en la descripción, que sale al pasar el ratón.
  2. Emisora destacada de FM comercial (Wifon FM 97,5) con estrella, la primera.
+ 3. v4: canales de data/marcadores_v4.json (Radio Club Región de Murcia, CB, PMR446,
+    aviación, marítimo de Cartagena y Mazarrón, FM, DAB+, FT8/FT4/WSPR/JS8/FT2 y
+    satélites). Si ya hay un marcador a ±6 kHz con la misma modulación (o un PMR),
+    se actualiza; si no, se añade. No se incluyen comunicaciones privadas.
 
 Uso:  python3 tools/marcadores.py          (actualiza files/openwebrx/bookmarks.json)
       python3 tools/marcadores.py --dry    (solo muestra lo que haría)
@@ -19,6 +23,7 @@ import sys
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 BM = os.path.join(RAIZ, 'files', 'openwebrx', 'bookmarks.json')
 CSV = os.path.join(RAIZ, 'data', 'repetidores_EA5KGV_zonaEA5.csv')
+V4 = os.path.join(RAIZ, 'data', 'marcadores_v4.json')
 
 FM_DESTACADA = {'name': '⭐ 97.5 Wifon FM', 'frequency': 97500000, 'modulation': 'wfm', 'scannable': True,
                 'description': 'Wifon FM · Murcia · la emisora destacada de BricoHams'}
@@ -72,7 +77,7 @@ def marcador(r):
     return {'name': nombre, 'frequency': r['f_out'], 'modulation': 'nfm', 'scannable': True, 'description': ' · '.join(partes)}
 
 
-def fusionar(bm, filas):
+def fusionar(bm, filas, protegidos=()):
     """Añade un marcador por salida de repetidor. Si ya hay uno en esa frecuencia
     (otra lista o un repetidor que comparte canal), se anota en su descripción."""
     por_f = {}
@@ -88,6 +93,8 @@ def fusionar(bm, filas):
             añadidos += 1
             continue
         b = existentes[0]
+        if b.get('name') in protegidos:
+            continue                        # marcador gestionado por data/marcadores_v4.json (ya trae sus datos)
         if r['ind'] in b['name'] and 'lista EA5KGV' in b.get('description', ''):
             continue                        # ya es el marcador generado (se puede repetir sin duplicar)
         quien = r['ind'] if r['ind'] in b['name'] else 'también %s%s' % (r['ind'], (' ' + r['ciudad']) if r['ciudad'] else '')
@@ -98,6 +105,34 @@ def fusionar(bm, filas):
     return añadidos, anotados
 
 
+def fusionar_v4(bm, entradas=None):
+    """Añade o actualiza los marcadores de data/marcadores_v4.json. Devuelve (añadidos, actualizados)."""
+    if entradas is None:
+        entradas = json.load(open(V4, encoding='utf-8'))['marcadores']
+    añadidos = actualizados = 0
+    for e in entradas:
+        f = int(round(e['mhz'] * 1e6))
+        nuevo = {'name': e['name'], 'frequency': f, 'modulation': e['modulation'],
+                 'scannable': e['modulation'] in ('nfm', 'am', 'usb', 'lsb', 'cw'), 'description': e['description']}
+        pmr = e['name'].startswith('🎙️ PMR') or 'PMR' in e['name']
+        cand = [b for b in bm if abs(b['frequency'] - f) <= 6000 and
+                (b.get('modulation') == e['modulation'] or (pmr and 'PMR' in b.get('name', '')))]
+        cand.sort(key=lambda b: abs(b['frequency'] - f))
+        if cand:
+            b = cand[0]
+            if any(b.get(k) != v for k, v in nuevo.items()):
+                b.clear()
+                b.update(nuevo)
+                actualizados += 1
+            for otro in cand[1:]:              # duplicados del mismo canal (p. ej. 121,33 y 121,325)
+                if otro['frequency'] == f or otro.get('name') == nuevo['name']:
+                    bm.remove(otro)
+        else:
+            bm.append(nuevo)
+            añadidos += 1
+    return añadidos, actualizados
+
+
 def fm_destacada(bm):
     bm[:] = [b for b in bm if b['frequency'] != FM_DESTACADA['frequency'] or b.get('modulation') != 'wfm']
     bm.insert(0, dict(FM_DESTACADA))
@@ -106,11 +141,14 @@ def fm_destacada(bm):
 def main():
     bm = json.load(open(BM, encoding='utf-8'))
     antes = len(bm)
-    a, n = fusionar(bm, leer_csv())
+    protegidos = {e['name'] for e in json.load(open(V4, encoding='utf-8'))['marcadores']}
+    a, n = fusionar(bm, leer_csv(), protegidos)
+    a4, u4 = fusionar_v4(bm)
     fm_destacada(bm)
-    print('marcadores: %d → %d (repetidores nuevos %d, anotados %d, Wifon FM destacada)' % (antes, len(bm), a, n))
+    print('marcadores: %d → %d (repetidores nuevos %d, anotados %d; v4 nuevos %d, actualizados %d; Wifon FM destacada)'
+          % (antes, len(bm), a, n, a4, u4))
     if '--comprobar' in sys.argv:   # prueba: el fichero ya está al día (idempotente) y Wifon va primera
-        assert a == 0 and n == 0 and len(bm) == antes, 'bookmarks.json no está al día: ejecuta tools/marcadores.py'
+        assert a == n == a4 == u4 == 0 and len(bm) == antes, 'bookmarks.json no está al día: ejecuta tools/marcadores.py'
         assert json.load(open(BM, encoding='utf-8'))[0]['frequency'] == FM_DESTACADA['frequency'], 'Wifon FM no es la primera'
         print('OK marcadores: al día e idempotente, Wifon FM la primera')
         return

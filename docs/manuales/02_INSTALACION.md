@@ -37,6 +37,7 @@
 sudo bash install.sh --backup ~/backup-openwebrx-2026-10-03.tar.gz   # o sin --backup en una instalación nueva
 ```
 - Tarda entre 30 y 60 minutos: compila readsb y, en Bookworm, también rtl-sdr-blog.
+- **¿Ya tienes la estación instalada?** No hace falta reinstalar: `sudo bash install.sh --actualizar` ([manual 29](29_ACTUALIZAR.md)). La primera vez desde una versión anterior a la v4.1 aplica todos los pasos, sin perder usuarios, marcadores propios ni claves.
 - **Te pedirá** la contraseña del admin de OpenWebRX (solo si no restauras `users.json` desde la copia).
 - **Te avisará** de los pasos que quedan a mano: series, LilyGO y reinicio.
 
@@ -52,7 +53,7 @@ sudo bash install.sh --backup ~/backup-openwebrx-2026-10-03.tar.gz   # o sin --b
 > sudo apt-get install --allow-downgrades librtlsdr0 librtlsdr-dev rtl-sdr
 > ```
 
-Pasos (`sudo bash install.sh --lista`, 18 en v3.0):
+Pasos (`sudo bash install.sh --lista`, 24 en v4.0):
 
 | Paso | Qué hace |
 |---|---|
@@ -67,13 +68,19 @@ Pasos (`sudo bash install.sh --lista`, 18 en v3.0):
 | configuracion | `settings.json` desde la plantilla, marcadores (fusionados con la copia), imágenes, usuarios |
 | plugins | `init.js` y plugins web |
 | meteo | `bricohams-meteo` cada 10 min |
+| io | v4: Pico «bricohams-io» por USB (sensores y ventiladores; manual 20) |
 | sensor | `bricohams-wx` (BME280 + viento RS485 + pluviómetro + WX APRS), regla udev `/dev/rs485` |
 | camara | MediaMTX (cámara CSI o IP por RTSP) + foto cada 60 s |
 | ventilacion | `bricohams-fan` (2 ventiladores PWM + DS18B20, manual 18) |
 | adsb | readsb + tar1090 + rbfeeder + MLAT |
 | meshtastic | meshtasticd en el HAT + canales del QR + posición fija |
 | lilygo | herramienta `bricohams-lilygo` (incluye `wxstation`) y CLI de Meshtastic |
+| satelites | v4: pases de satélites cada 15 min + SatDump (imágenes METEOR) |
+| ft2 | v4: compila `decodium-rx` y añade el modo FT2 (experimental, 20–40 min) |
+| web | v4: nginx + SSL (Let's Encrypt), portal `/bricohams/`, privacidad, `bricohams-api` |
+| visitas | v4: mosquitto + `bricohams-visitas` (GeoIP local, Telegram) |
 | herramientas | `bricohams-check`, `bricohams-sdr-serials`, copia diaria, kit en `/opt/bricohams/kit` |
+| tareas | v4: cuenta de servicio «bricohams», sudoers limitado y `/etc/cron.d/bricohams` (manual 25) |
 
 Para repetir pasos sueltos: `sudo bash install.sh --solo hat,meshtastic`.
 

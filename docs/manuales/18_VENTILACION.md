@@ -1,5 +1,7 @@
 # 18 · Ventilación de la caja: conexión y control
 
+> **v4 · Con el HAT puesto la cabecera de 40 pines está ocupada.** La ventilación (PWM, tacómetros y DS18B20) se conecta ahora a la **Pico «bricohams-io»** por USB: PWM GP16/GP17 por 2N7002, tacómetros GP18/GP19 con 10 kΩ a 3V3 + 1 kΩ, DS18B20 en GP22 con 4,7 kΩ. La curva y los comandos (`bricohams-fan --estado`, `--forzar`) son los mismos ([manual 20](20_PICO_IO.md), [esquema 16](../esquemas/16_pico_io.png)). Lo de abajo con pines de la Pi solo vale **sin HAT** (`IO_MODE="gpio"`).
+
 ![Esquema](../esquemas/13_ventiladores.png)
 
 **Qué hace:** dos ventiladores de 60 mm, 12 V, PWM de 4 hilos, controlados por la Raspberry según la temperatura de la CPU y la del aire de la caja (sonda DS18B20). El servicio es `bricohams-fan`.
