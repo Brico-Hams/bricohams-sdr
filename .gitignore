@@ -1,0 +1,7 @@
+# Claves de la estación: nunca al git
+bricohams.env
+*.env.local
+# Generados
+__pycache__/
+*.pyc
+tests/salida/

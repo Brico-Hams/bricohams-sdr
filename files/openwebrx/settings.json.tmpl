@@ -1,0 +1,768 @@
+{
+    "version": 8,
+    "receiver_name": "EA5KAO \u00b7 LORQU\u00cd (MURCIA) \ud83d\udef0\ufe0f\ud83d\udfe2\ud83d\udd35\ud83d\udfe1 SDR MULTIUSUARIO SIMULT\u00c1NEO",
+    "receiver_location": "Mi QTH, Murcia, SPAIN",
+    "receiver_asl": "__ASL__",
+    "receiver_admin": "__ADMIN_EMAIL__",
+    "bandplan_region": 1,
+    "receiver_country": "ES",
+    "receiver_gps": {
+        "lat": "__LAT__",
+        "lon": "__LON__"
+    },
+    "gps_updates": false,
+    "photo_title": "EA5KAO \u00b7 Lorqu\u00ed, Regi\u00f3n de Murcia \u00b7 BricoHams",
+    "photo_desc": "<b>Receptores simult\u00e1neos:</b><br>\ud83d\udef0\ufe0f <b>SAT\u00c9LITES</b> \u2013 RTL-SDR del HAT HackerGadgets (R860, TCXO) + LNA: 2 m / 70 cm / 137 MHz (ISS, SO-50, RS-44, METEOR)<br>\ud83d\udfe2 <b>RADIOAFICIONADOS</b> \u2013 Mini RTL-SDR HackerGadgets: 2 m, 70 cm, hotspots DMR/YSF, Sierra Espu\u00f1a, PMR446, LoRa 433/868, TETRA<br>\ud83d\udd35 <b>MULTIPERFIL</b> \u2013 RTL-SDR Blog V3: aviaci\u00f3n (aeropuertos de Murcia), VHF marina, costeras, AIS, FM, DAB+ y HF de 160 a 6 m<br>\u2708\ufe0f <b>ADS-B</b> \u2013 FlightStick de AirNav RadarBox dedicado a 1090 MHz, con MLAT<br>\ud83d\udce1 Meshtastic EU868 (HAT) y EU433 (LilyGO) \u00b7 iGate LoRa APRS 433.775 \u00b7 \u2600\ufe0f SOL \u00b7 \ud83c\udf21\ufe0f METEO con sensor propio BME280 y AEMET \u00b7 \ud83d\udcf7 c\u00e1mara del m\u00e1stil<br>Repetidores de la Regi\u00f3n de Murcia en los marcadores (fuente: EA5RCZ).<br><br>\ud83d\udce3 <b>BricoHams \u00b7 Radioafici\u00f3n \u00b7 Hazlo t\u00fa mismo</b> \u2013 Lorqu\u00ed, Regi\u00f3n de Murcia \u2013 canal de Telegram: <a href=\"https://t.me/bricohams\" target=\"_blank\">t.me/bricohams</a>",
+    "max_clients": 20,
+    "max_clients_per_ip": 20,
+    "keep_files": 20,
+    "session_timeout": 0,
+    "usage_policy_url": "policy",
+    "bot_ban_enabled": true,
+    "allow_chat": true,
+    "allow_audio_recording": true,
+    "allow_center_freq_changes": false,
+    "magic_key": "__MAGIC_KEY__",
+    "receiver_keys": [
+        "__RECEIVERBOOK_KEY__"
+    ],
+    "waterfall_scheme": "GoogleTurboWaterfall",
+    "fft_fps": 9,
+    "fft_size": 4096,
+    "fft_voverlap_factor": 0.3,
+    "waterfall_levels": {
+        "min": -88.0,
+        "max": -20.0
+    },
+    "waterfall_auto_levels": {
+        "min": 3.0,
+        "max": 10.0
+    },
+    "waterfall_auto_level_default_mode": true,
+    "waterfall_auto_min_range": 50,
+    "audio_compression": "adpcm",
+    "fft_compression": "adpcm",
+    "ui_theme": "default",
+    "tuning_precision": 2,
+    "eibi_bookmarks_range": 0,
+    "repeater_range": 0,
+    "map_type": "leaflet",
+    "google_maps_api_key": "",
+    "openweathermap_api_key": "__OPENWEATHERMAP_KEY__",
+    "map_position_retention_time": 7200,
+    "map_call_retention_time": 600,
+    "map_max_calls": 10,
+    "map_ignore_indirect_reports": false,
+    "map_prefer_recent_reports": true,
+    "callsign_url": "https://www.qrz.com/db/{}",
+    "vessel_url": "https://www.vesselfinder.com/vessels/details/{}",
+    "flight_url": "https://flightaware.com/live/flight/{}",
+    "modes_url": "https://flightaware.com/live/modes/{}/redirect",
+    "sonde_url": "https://sondehub.org/{}",
+    "geoip_url": "https://www.geolocation.com/?ip={}#ipresult",
+    "sdrs": {
+        "sat": {
+            "name": "\ud83d\udef0\ufe0f SAT\u00c9LITES \u00b7 HAT",
+            "type": "rtl_sdr",
+            "device": "__SERIAL_HAT__",
+            "ppm": 0,
+            "bias_tee": "__SAT_BIAS_TEE__",
+            "services": true,
+            "rf_gain": 30,
+            "profiles": {
+                "sat2m": {
+                    "name": "\ud83d\udef0\ufe0f 145,8-146 MHz \u00b7 Sat\u00e9lites 2m \u00b7 ISS \u00b7 APRS",
+                    "center_freq": 145900000,
+                    "samp_rate": 2048000,
+                    "start_freq": 145800000,
+                    "start_mod": "nfm",
+                    "tuning_step": 1000
+                },
+                "sat70": {
+                    "name": "\ud83d\udef0\ufe0f 435-438 MHz \u00b7 Sat\u00e9lites 70cm \u00b7 SO-50 \u00b7 RS-44",
+                    "center_freq": 436700000,
+                    "samp_rate": 2400000,
+                    "start_freq": 436795000,
+                    "start_mod": "nfm",
+                    "tuning_step": 1000
+                },
+                "meteor": {
+                    "name": "\ud83d\udef0\ufe0f 137 MHz \u00b7 Meteorol\u00f3gicos \u00b7 METEOR LRPT",
+                    "center_freq": 137500000,
+                    "samp_rate": 1024000,
+                    "start_freq": 137900000,
+                    "start_mod": "nfm",
+                    "tuning_step": 1000
+                }
+            },
+            "enabled": true
+        },
+        "ham": {
+            "name": "\ud83d\udfe2 RADIOAFICIONADOS \u00b7 MINI",
+            "type": "rtl_sdr",
+            "device": "__SERIAL_MINI__",
+            "enabled": true,
+            "services": true,
+            "ppm": 0,
+            "rf_gain": 35,
+            "profiles": {
+                "2m": {
+                    "name": "\ud83c\uddea\ud83c\uddf8 144-146 MHz \u00b7 HAM 2m",
+                    "center_freq": 145000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 145600000,
+                    "start_mod": "nfm",
+                    "tuning_step": 12500
+                },
+                "70rep": {
+                    "name": "\ud83c\uddea\ud83c\uddf8 438-440 MHz \u00b7 HAM 70cm Repetidores \u00b7 DMR",
+                    "center_freq": 438800000,
+                    "samp_rate": 2400000,
+                    "start_freq": 438775000,
+                    "start_mod": "nfm",
+                    "tuning_step": 12500
+                },
+                "70in": {
+                    "name": "\ud83c\uddea\ud83c\uddf8 430-432 MHz \u00b7 HAM 70cm Entradas/Enlaces",
+                    "center_freq": 431000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 431175000,
+                    "start_mod": "nfm",
+                    "tuning_step": 12500
+                },
+                "433": {
+                    "name": "\ud83d\udce1 432-434 MHz \u00b7 SSB \u00b7 LoRa APRS",
+                    "center_freq": 433200000,
+                    "samp_rate": 2400000,
+                    "start_freq": 433775000,
+                    "start_mod": "nfm",
+                    "tuning_step": 12500
+                },
+                "pmr": {
+                    "name": "\ud83c\udf99\ufe0f PMR446 / DMR446 \u00b7 Canales 1-16",
+                    "center_freq": 446100000,
+                    "samp_rate": 1024000,
+                    "start_freq": 446006250,
+                    "start_mod": "nfm",
+                    "tuning_step": 6250
+                },
+                "868": {
+                    "name": "\ud83d\udcf6 868 MHz \u00b7 Meshtastic \u00b7 LoRa \u00b7 ISM",
+                    "center_freq": 868800000,
+                    "samp_rate": 2400000,
+                    "start_freq": 869525000,
+                    "start_mod": "nfm",
+                    "tuning_step": 25000
+                },
+                "tetra": {
+                    "name": "\ud83d\udce1 420-422,4 MHz \u00b7 Scan \u00b7 TETRA",
+                    "center_freq": 421200000,
+                    "samp_rate": 2400000,
+                    "start_freq": 421200000,
+                    "start_mod": "tetra",
+                    "tuning_step": 25000
+                }
+            }
+        },
+        "multi": {
+            "name": "\ud83d\udd35 MULTIPERFIL \u00b7 AIRE \u00b7 MAR \u00b7 FM \u00b7 HF (V3)",
+            "type": "rtl_sdr",
+            "device": "__SERIAL_V3__",
+            "enabled": true,
+            "services": true,
+            "ppm": 0,
+            "rf_gain": 35,
+            "profiles": {
+                "air1": {
+                    "name": "\u2708\ufe0f 118-120,4 MHz \u00b7 AIRBAND \u00b7 LERI Alcantarilla",
+                    "center_freq": 119200000,
+                    "samp_rate": 2400000,
+                    "start_freq": 119200000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "air2": {
+                    "name": "\u2708\ufe0f 120,3-122,7 MHz \u00b7 AIRBAND \u00b7 LEMI Corvera \u00b7 121,5 Emergencia",
+                    "center_freq": 121500000,
+                    "samp_rate": 2400000,
+                    "start_freq": 121500000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "air3": {
+                    "name": "\u2708\ufe0f 122,7-125,1 MHz \u00b7 AIRBAND \u00b7 LELC San Javier \u00b7 Aer\u00f3dromos",
+                    "center_freq": 123900000,
+                    "samp_rate": 2400000,
+                    "start_freq": 123900000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "air4": {
+                    "name": "\u2708\ufe0f 125,1-127,5 MHz \u00b7 AIRBAND",
+                    "center_freq": 126300000,
+                    "samp_rate": 2400000,
+                    "start_freq": 126300000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "air5": {
+                    "name": "\u2708\ufe0f 127,5-129,9 MHz \u00b7 AIRBAND",
+                    "center_freq": 128700000,
+                    "samp_rate": 2400000,
+                    "start_freq": 128700000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "air6": {
+                    "name": "\u2708\ufe0f 129,9-132,3 MHz \u00b7 AIRBAND \u00b7 San Javier APP \u00b7 ACARS",
+                    "center_freq": 131100000,
+                    "samp_rate": 2400000,
+                    "start_freq": 131100000,
+                    "start_mod": "am",
+                    "tuning_step": 8330
+                },
+                "marina": {
+                    "name": "\u26f5 155,8-158,2 MHz \u00b7 VHF Marina",
+                    "center_freq": 157000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 156800000,
+                    "start_mod": "nfm",
+                    "tuning_step": 25000
+                },
+                "costeras": {
+                    "name": "\u2693 160,2-162,5 MHz \u00b7 Estaciones Costeras + AIS",
+                    "center_freq": 161350000,
+                    "samp_rate": 2400000,
+                    "start_freq": 161975000,
+                    "start_mod": "ais",
+                    "tuning_step": 25000
+                },
+                "fm_wifon": {
+                    "name": "\ud83c\udfb5 FM \u2b50 Wifon FM 97,5 (Murcia)",
+                    "center_freq": 97500000,
+                    "samp_rate": 2400000,
+                    "start_freq": 97500000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm1": {
+                    "name": "\ud83c\udfb5 FM 87,5-89,8 MHz",
+                    "center_freq": 88600000,
+                    "samp_rate": 2400000,
+                    "start_freq": 88600000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm2": {
+                    "name": "\ud83c\udfb5 FM 89,6-92,0 MHz",
+                    "center_freq": 90800000,
+                    "samp_rate": 2400000,
+                    "start_freq": 90800000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm3": {
+                    "name": "\ud83c\udfb5 FM 91,8-94,2 MHz",
+                    "center_freq": 93000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 93000000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm4": {
+                    "name": "\ud83c\udfb5 FM 94,0-96,4 MHz",
+                    "center_freq": 95200000,
+                    "samp_rate": 2400000,
+                    "start_freq": 95200000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm5": {
+                    "name": "\ud83c\udfb5 FM 96,2-98,6 MHz",
+                    "center_freq": 97400000,
+                    "samp_rate": 2400000,
+                    "start_freq": 97400000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm6": {
+                    "name": "\ud83c\udfb5 FM 98,4-100,8 MHz",
+                    "center_freq": 99600000,
+                    "samp_rate": 2400000,
+                    "start_freq": 99600000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm7": {
+                    "name": "\ud83c\udfb5 FM 100,6-103,0 MHz",
+                    "center_freq": 101800000,
+                    "samp_rate": 2400000,
+                    "start_freq": 101800000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm8": {
+                    "name": "\ud83c\udfb5 FM 102,8-105,2 MHz",
+                    "center_freq": 104000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 104000000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm9": {
+                    "name": "\ud83c\udfb5 FM 105,0-107,4 MHz",
+                    "center_freq": 106200000,
+                    "samp_rate": 2400000,
+                    "start_freq": 106200000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "fm10": {
+                    "name": "\ud83c\udfb5 FM 105,8-108,0 MHz",
+                    "center_freq": 107000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 107000000,
+                    "start_mod": "wfm",
+                    "tuning_step": 50000
+                },
+                "dab8C": {
+                    "name": "\ud83c\udfa7 DAB+ Bloque 8C \u00b7 199,360 MHz",
+                    "center_freq": 199360000,
+                    "samp_rate": 2048000,
+                    "start_freq": 199360000,
+                    "start_mod": "dab"
+                },
+                "dab9A": {
+                    "name": "\ud83c\udfa7 DAB+ Bloque 9A \u00b7 202,928 MHz",
+                    "center_freq": 202928000,
+                    "samp_rate": 2048000,
+                    "start_freq": 202928000,
+                    "start_mod": "dab"
+                },
+                "dab9C": {
+                    "name": "\ud83c\udfa7 DAB+ Bloque 9C \u00b7 206,352 MHz",
+                    "center_freq": 206352000,
+                    "samp_rate": 2048000,
+                    "start_freq": 206352000,
+                    "start_mod": "dab"
+                },
+                "hf160": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf81,8 MHz ****** HAM 160m \ud83c\udf1c",
+                    "center_freq": 1900000,
+                    "samp_rate": 1024000,
+                    "start_freq": 1840000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf80": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf83,5 MHz ***** HAM 80m \ud83c\udf1c",
+                    "center_freq": 2800000,
+                    "samp_rate": 2400000,
+                    "start_freq": 3573000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf60": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf85,3 MHz ****** HAM 60m",
+                    "center_freq": 5300000,
+                    "samp_rate": 1024000,
+                    "start_freq": 5357000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf40": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf87 MHz ******* HAM 40m",
+                    "center_freq": 7090000,
+                    "samp_rate": 1024000,
+                    "start_freq": 7110000,
+                    "start_mod": "lsb",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf30": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf810 MHz ****** HAM 30m",
+                    "center_freq": 10125000,
+                    "samp_rate": 1024000,
+                    "start_freq": 10136000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf20": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf814 MHz ****** HAM 20m",
+                    "center_freq": 14175000,
+                    "samp_rate": 1024000,
+                    "start_freq": 14074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf17": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf818 MHz ****** HAM 17m",
+                    "center_freq": 18118000,
+                    "samp_rate": 1024000,
+                    "start_freq": 17967000,
+                    "start_mod": "hfdl",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf15": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf821 MHz ****** HAM 15m",
+                    "center_freq": 21225000,
+                    "samp_rate": 1000000,
+                    "start_freq": 21074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 2,
+                    "_bh_hf_rtl": true
+                },
+                "hf12": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf824 MHz ****** HAM 12m",
+                    "center_freq": 24940000,
+                    "samp_rate": 1024000,
+                    "start_freq": 24915000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 0,
+                    "_bh_hf_rtl": true
+                },
+                "hf11": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf827 MHz ****** CB Band 11m",
+                    "center_freq": 27460000,
+                    "samp_rate": 1000000,
+                    "start_freq": 27555000,
+                    "start_mod": "usb",
+                    "tuning_step": 1000,
+                    "direct_sampling": 0,
+                    "_bh_hf_rtl": true
+                },
+                "hf10": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf828 MHz ****** HAM 10m",
+                    "center_freq": 28850000,
+                    "samp_rate": 2400000,
+                    "start_freq": 28074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 0,
+                    "_bh_hf_rtl": true
+                },
+                "hf6": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf850-52 MHz *** HAM 6m",
+                    "center_freq": 51000000,
+                    "samp_rate": 2400000,
+                    "start_freq": 50313000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000,
+                    "direct_sampling": 0,
+                    "_bh_hf_rtl": true
+                }
+            },
+            "direct_sampling": 0
+        },
+        "hf": {
+            "name": "\ud83d\udfe1 HF \u00b7 SDRPLAY \u00b7 160-6 m",
+            "type": "sdrplay",
+            "enabled": "__HF_SDRPLAY__",
+            "services": true,
+            "rf_gain": "auto",
+            "antenna": "__SDRPLAY_ANTENNA__",
+            "scheduler": {
+                "type": "daylight",
+                "schedule": {
+                    "day": "sp20",
+                    "greyline": "sp40",
+                    "night": "sp80"
+                }
+            },
+            "profiles": {
+                "sp160": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf81,8 MHz ****** HAM 160m \ud83c\udf1c",
+                    "center_freq": 1900000,
+                    "samp_rate": 384000,
+                    "start_freq": 1840000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp80": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf83,5 MHz ***** HAM 80m \ud83c\udf1c",
+                    "center_freq": 2800000,
+                    "samp_rate": 3000000,
+                    "start_freq": 3573000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp60": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf85,3 MHz ****** HAM 60m",
+                    "center_freq": 5360000,
+                    "samp_rate": 384000,
+                    "start_freq": 5357000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp40": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf87 MHz ******* HAM 40m",
+                    "center_freq": 7090000,
+                    "samp_rate": 384000,
+                    "start_freq": 7110000,
+                    "start_mod": "lsb",
+                    "tuning_step": 1000
+                },
+                "sp30": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf810 MHz ****** HAM 30m",
+                    "center_freq": 10125000,
+                    "samp_rate": 384000,
+                    "start_freq": 10136000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp20": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf814 MHz ****** HAM 20m",
+                    "center_freq": 14175000,
+                    "samp_rate": 500000,
+                    "start_freq": 14074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp17": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf818 MHz ****** HAM 17m",
+                    "center_freq": 18118000,
+                    "samp_rate": 384000,
+                    "start_freq": 17967000,
+                    "start_mod": "hfdl",
+                    "tuning_step": 1000
+                },
+                "sp15": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf821 MHz ****** HAM 15m",
+                    "center_freq": 21225000,
+                    "samp_rate": 1000000,
+                    "start_freq": 21074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp12": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf824 MHz ****** HAM 12m",
+                    "center_freq": 24940000,
+                    "samp_rate": 384000,
+                    "start_freq": 24915000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp11": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf827 MHz ****** CB Band 11m",
+                    "center_freq": 27460000,
+                    "samp_rate": 1000000,
+                    "start_freq": 27555000,
+                    "start_mod": "usb",
+                    "tuning_step": 1000
+                },
+                "sp10": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf828 MHz ****** HAM 10m",
+                    "center_freq": 28850000,
+                    "samp_rate": 2000000,
+                    "start_freq": 28074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "sp6": {
+                    "name": "\ud83d\udfe1 \ud83c\uddea\ud83c\uddf850-52 MHz *** HAM 6m",
+                    "center_freq": 51000000,
+                    "samp_rate": 3000000,
+                    "start_freq": 50313000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                }
+            }
+        }
+    },
+    "squelch_auto_margin": 10,
+    "digimodes_fft_size": 2048,
+    "ssb_agc_profile": "Fast",
+    "am_agc_profile": "Slow",
+    "nfm_agc_profile": "Slow",
+    "dab_output_rate": 48000,
+    "wfm_deemphasis_tau": 5e-05,
+    "wfm_rds_rbds": false,
+    "cw_showcw": false,
+    "dsc_show_errors": true,
+    "ism_report_levels": false,
+    "digital_voice_dmr_id_lookup": true,
+    "digital_voice_nxdn_id_lookup": true,
+    "rec_squelch": 20,
+    "rec_hang_time": 1000,
+    "rec_produce_silence": false,
+    "speech_url": "",
+    "speech_squelch": 20,
+    "speech_hang_time": 5000,
+    "adsb_ttl": 900,
+    "hfdl_ttl": 1800,
+    "vdl2_ttl": 1800,
+    "vdl2_ignore_acks": false,
+    "acars_ttl": 1800,
+    "acars_ignore_acks": false,
+    "lorawan_bw": "7",
+    "meshtastic_bw": "6",
+    "meshcore_bw": "6",
+    "meshcom_bw": "8",
+    "paging_charset": "US",
+    "paging_filter": true,
+    "fax_lpm": 120,
+    "fax_min_length": 200,
+    "fax_max_length": 1500,
+    "fax_postprocess": true,
+    "fax_color": true,
+    "fax_am": true,
+    "image_compress": true,
+    "image_compress_level": "7",
+    "image_compress_filter": "5",
+    "image_quantize": true,
+    "image_quantize_colors": "256",
+    "decoding_queue_workers": 2,
+    "decoding_queue_length": 10,
+    "wsjt_decoding_depth": 3,
+    "wsjt_decoding_depths": {
+        "ft8": 5,
+        "ft4": 5,
+        "jt65": 5,
+        "jt9": 5,
+        "wspr": 5,
+        "fst4": 5,
+        "fst4w": 5,
+        "q65": 5
+    },
+    "js8_decoding_depth": 3,
+    "js8_enabled_profiles": [
+        "normal",
+        "slow",
+        "fast",
+        "turbo"
+    ],
+    "fst4_enabled_intervals": [
+        15,
+        30,
+        60,
+        120,
+        300,
+        900,
+        1800
+    ],
+    "fst4w_enabled_intervals": [
+        120,
+        300,
+        900,
+        1800
+    ],
+    "q65_enabled_combinations": [
+        "A15",
+        "B15",
+        "C15",
+        "A30",
+        "B30",
+        "C30",
+        "D30",
+        "A60",
+        "B60",
+        "C60",
+        "D60",
+        "E60",
+        "A120",
+        "B120",
+        "C120",
+        "D120",
+        "E120",
+        "A300",
+        "B300",
+        "C300",
+        "D300",
+        "E300"
+    ],
+    "services_enabled": true,
+    "services_decoders": [
+        "acars",
+        "adsb",
+        "ais",
+        "audio",
+        "cwskimmer",
+        "dsc",
+        "eas",
+        "elektro-lrit",
+        "fax",
+        "fst4",
+        "fst4w",
+        "ft4",
+        "ft8",
+        "hfdl",
+        "ism",
+        "js8",
+        "jt65",
+        "jt9",
+        "lora-aprs",
+        "lora-fanet",
+        "lora-wan",
+        "meshcom",
+        "meshcore",
+        "meshtastic",
+        "meteor-lrpt",
+        "msk144",
+        "navtex",
+        "packet",
+        "page",
+        "q65",
+        "rttyskimmer",
+        "sonde-dfm17",
+        "sonde-dfm9",
+        "sonde-m10",
+        "sonde-m20",
+        "sonde-mts01",
+        "sonde-rs41",
+        "sstv",
+        "uat",
+        "vdl2",
+        "wmbus",
+        "wspr"
+    ],
+    "aprs_igate_enabled": true,
+    "aprs_callsign": "EA5KAO",
+    "aprs_igate_server": "euro.aprs2.net",
+    "aprs_igate_password": "__APRS_PASSCODE__",
+    "aprs_igate_legacy": true,
+    "aprs_igate_beacon": true,
+    "aprs_igate_symbol": "R&",
+    "aprs_igate_comment": "OpenWebRX APRS gateway",
+    "pskreporter_enabled": true,
+    "pskreporter_callsign": "EA5KAO",
+    "pskreporter_rig_information": "Dipolo",
+    "wsprnet_enabled": true,
+    "wsprnet_callsign": "EA5KAO",
+    "sondehub_enabled": true,
+    "sondehub_callsign": "EA5KAO",
+    "sondehub_antenna": "Dipolo",
+    "aisreporter_enabled": true,
+    "aisreporter_udp_hosts": "ais.vesselfinder.com",
+    "aisreporter_udp_ports": "5482",
+    "mqtt_enabled": false,
+    "report_clients": true,
+    "report_radio": true,
+    "mqtt_host": "localhost",
+    "mqtt_use_ssl": false,
+    "mqtt_chat": true,
+    "mqtt_aircraft": true,
+    "mqtt_ais": true,
+    "mqtt_aprs": true,
+    "mqtt_wsjt": true,
+    "mqtt_sonde": true,
+    "mqtt_meshtastic": true,
+    "rig_enabled": true,
+    "rig_model": 2,
+    "rig_device": "127.0.0.1:4533",
+    "rig_address": 0
+}

@@ -1,0 +1,405 @@
+# Decisiones de arquitectura
+
+Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué** se decidió, **por qué** y **qué implica**. Los datos concretos (series, perfiles, puertos) están en [DATOS.md](DATOS.md). Los pines están en [HARDWARE_Y_GPIO.md](HARDWARE_Y_GPIO.md).
+
+![Arquitectura](esquemas/01_arquitectura.png)
+
+---
+
+## ADR-01 · Raspberry Pi 5 con Raspberry Pi OS Lite 64 bits: Trixie (recomendado) o Bookworm
+- **Decisión:** placa Raspberry Pi 5 con Raspberry Pi OS Lite arm64, sin escritorio.
+  - **Debian 13 "Trixie"**: la imagen normal actual. Es la recomendada desde la v3.1.
+  - **Debian 12 "Bookworm"**: la imagen *Legacy*.
+  - El instalador detecta cuál es (`DEB`, `DEB_NUM`) y elige los repositorios de cada una.
+- **Por qué:**
+  - En la v3.0 el kit solo admitía Bookworm, porque la página del repositorio de OpenWebRX+ solo documenta Bullseye, Bookworm y Ubuntu.
+  - Al probarlo en la Pi de EA5KAO (Trixie) se comprobó que el repositorio de luarvique **sí publica `ppa/trixie`**: firmado, arm64, OpenWebRX+ 1.2.125 compilado para Python 3.13.
+  - Meshtastic tiene `Debian_13` y AirNav tiene el repositorio `apt.rb24.com trixie`.
+  - No hace falta regrabar una Pi que ya tiene Trixie.
+- **Implica:**
+
+  | Componente | Bookworm | Trixie |
+  |---|---|---|
+  | OpenWebRX+ | `luarvique.github.io/ppa/bookworm` | `luarvique.github.io/ppa/trixie` |
+  | meshtasticd | OBS `Debian_12` | OBS `Debian_13` |
+  | rbfeeder | `inst_rbfeeder.sh` | repositorio apt `apt.rb24.com trixie` |
+  | mlat-client | apt | se **compila** de `mutability/mlat-client` (necesita `python3-pyasyncore`, porque Python 3.12+ ya no trae `asyncore`) |
+  | Sensor I2C | `python3-smbus` | `python3-smbus`, o `python3-smbus2` como alternativa |
+  | Driver RTL-SDR | `rtl-sdr-blog` compilado y retenido (`apt-mark hold`) | **rtl-sdr 2.0.2 de Debian** (osmocom), sin compilar ni retener (v3.3) |
+
+  - **Por qué no se usa rtl-sdr-blog en Trixie (v3.3):**
+    - El fork es la versión 0.7.0~rtlsdrblog1. Debian 13 trae librtlsdr0 2.0.2, que es más nueva, y los módulos SoapySDR de Trixie la exigen.
+    - Mezclar las dos versiones rompe apt («rtl-sdr: Depends librtlsdr0 (= 0.7.0~rtlsdrblog1) but 2.0.2 is to be installed»).
+    - La 2.0.2 de osmocom ya incluye lo que usa la estación: bias-tee (`rtlsdr_set_bias_tee`), muestreo directo del V3 y el R820T/R860.
+    - Si quedó retenido el fork de una instalación anterior, el instalador lo cambia por el de Debian.
+  - **El resto es igual:** readsb/tar1090 de wiedehopf, MediaMTX (admite Trixie y Bookworm), NetworkManager y `/boot/firmware/config.txt`.
+  - `install.sh` se para con cualquier otra versión.
+  - La Pi 5 **no tiene codificador H.264 por hardware** (ADR-09).
+
+## ADR-02 · Un SDR por función y cada uno identificado por su número de serie
+- **Decisión:**
+
+  | Receptor | SDR | Serie |
+  |---|---|---|
+  | SATÉLITES | RTL del HAT | 00000101 |
+  | RADIOAFICIONADOS | Mini RTL-SDR | 00000102 |
+  | MULTIPERFIL | RTL-SDR Blog V3 | 00000103 |
+  | ADS-B | FlightStick de RadarBox | 00001090 |
+
+  Las series se graban en la EEPROM con `bricohams-sdr-serials`.
+- **Por qué:**
+  - Los cuatro son RTL2832U con sintonizador de la familia R820T, así que el sistema no los distingue.
+  - Por orden USB se cruzarían al reiniciar.
+  - Con la serie, OpenWebRX y readsb abren siempre el mismo SDR.
+- **Implica:** la grabación de series es interactiva (conectar de uno en uno) y solo se hace una vez.
+- **Corrección v2:** el dongle MULTIPERFIL es un **V3**, no un V4. Por eso:
+  - **En Bookworm** sigue haciendo falta el driver `rtl-sdr-blog` (bias-tee y muestreo directo del V3 y del R860), y queda fijado con `apt-mark hold`. **En Trixie** basta el rtl-sdr 2.0.2 de Debian (ADR-01).
+  - Ya no se usa la detección del sintonizador R828D.
+
+## ADR-03 · HF en el V3 por muestreo directo hasta que llegue el SDRplay
+- **Decisión:**
+  - 12 perfiles de HF con los valores de referencia de **EA7CL** (nombres, centros, modo e inicio en FT8) en el V3.
+  - De 160 a 15 m, `direct_sampling: 2` (rama Q) en cada perfil. De 12 a 6 m, sintonizador normal (el R820T2 baja hasta ~24 MHz).
+  - El SDRplay ya está en la plantilla con sus propios perfiles (`sp*`) y un **programador de luz solar** para la escucha automática: día 20 m, crepúsculo 40 m, noche 80 m (que cubre también 160 m).
+  - El SDRplay se activa con `HF_SDRPLAY=yes`. Entonces los perfiles HF salen del V3.
+- **Por qué:**
+  - El SDRplay tardará meses en llegar.
+  - Los 384 kS/s que usa EA7CL no son válidos en un RTL-SDR (rangos válidos 225–300 k y 900 k–3,2 M), así que en el V3 se usan 1,024–2,4 MS/s.
+- **Implica:**
+  - El V3 tiene un solo SMA. Para HF y VHF a la vez hace falta un **diplexor HF/VHF** (corte ~30 MHz) entre el hilo largo de HF, la discone y el V3. Ver el [esquema de RF](esquemas/04_rf_antenas_alimentacion.png).
+  - El cambio al SDRplay es una línea en `bricohams.env` más `sudo bash install.sh --solo sdrplay,configuracion` ([manual 08](manuales/08_SDRPLAY.md)).
+
+## ADR-04 · ADS-B fuera de OpenWebRX, con el FlightStick dedicado de RadarBox
+- **Decisión:**
+  - readsb (wiedehopf) abre el FlightStick por su serie y sirve Beast en `:30005`.
+  - rbfeeder trabaja en *network mode* leyendo esa salida, con MLAT activado.
+  - tar1090 da un mapa propio de aviones en `:80`.
+- **Por qué:**
+  - Alimentar RadarBox y hacer MLAT exige escuchar 1090 MHz las 24 h. Dentro de OpenWebRX ese SDR se movería de perfil con los visitantes.
+  - El FlightStick ya trae LNA y filtro de 1090.
+  - readsb permite elegir el dispositivo por serie y alimentar a otros agregadores más adelante.
+- **Implica:**
+  - El FlightStick no aparece en OpenWebRX.
+  - La clave de compartición de RadarBox se conserva en `/etc/rbfeeder.ini` (o se fija con `RADARBOX_KEY`).
+  - MLAT necesita la altura real de la antena (`ADSB_ANT_ALT`) y una hora buena (ADR-05).
+
+## ADR-05 · El GPS lo gestiona gpsd; la hora, chrony con PPS; el RTC del HAT con pila
+- **Decisión:**
+  - gpsd abre `/dev/ttyAMA0` (UART0) y `/dev/pps0` (PPS en el GPIO 6).
+  - chrony usa NMEA por SHM y el PPS como referencia principal.
+  - El RTC PCF85063A del HAT pasa a ser `/dev/rtc0`, y el RTC de la Pi 5 se desactiva con `HAT_DISABLE_PI5_RTC`.
+- **Por qué:**
+  - Un puerto serie solo puede tenerlo un programa.
+  - La hora exacta la necesitan MLAT, FT8/WSPR y los registros.
+  - El RTC con pila evita arrancar con la hora mal si no hay Internet.
+- **Implica:** meshtasticd **no** lee el GPS. Sus nodos llevan **posición fija** (la estación no se mueve).
+
+## ADR-06 · Meshtastic: nodo 868 en el HAT y nodo 433 en un LilyGO, con los mismos canales
+- **Decisión:**
+  - **Nodo 868** (SX1262 del HAT, meshtasticd): se configura con el QR de la red (`MESH_CHANNEL_URL`).
+    - Canales SFNarrow (principal), Murcia, Cartagena, Test y Alicante.
+    - Radio EU_868 a 869,618 MHz, BW 62,5 kHz, SF7, CR 4/5.
+  - **Nodo 433** (LilyGO T3 V1.6.1 por USB):
+    - Mismos canales.
+    - La radio se pasa después a EU_433 LONG_FAST, porque la frecuencia del QR no existe en 433.
+  - **Canal privado** solo en el nodo 868: índice 5, nombre `MESH868_PRIVATE_NAME` (BricoHams) y clave AES-256 de `MESH868_PRIVATE_PSK`. La clave solo vive en `bricohams.env`, nunca en el git. Se añade después del QR, así que repetir el paso no lo duplica (`--seturl` reinicia los canales).
+- **Por qué:**
+  - El SX1262 del HAT solo cubre 860–960 MHz.
+  - Con los mismos nombres y claves de canal, ambos nodos son compatibles si más adelante se unen por MQTT.
+- **Implica:**
+  - El QR pide 27 dBm; el SX1262 se queda en 22 dBm.
+  - El LilyGO 433 transmite: ver la nota de RF en ADR-07.
+
+## ADR-07 · iGate LoRa APRS solo en recepción, con su propio SSID
+- **Decisión:**
+  - LilyGO T3 V1.6.1 con el firmware **LoRa_APRS_iGate de CA2RXU (richonguzman)**, compilado y grabado desde la Pi con PlatformIO.
+  - Escucha 433,775 MHz (SF12, BW 125, CR 4/5) y sube a APRS-IS como **EA5KAO-10**, con baliza solo por APRS-IS.
+  - Sin transmisión por RF ni digipeater.
+- **Por qué:**
+  - Va en la misma caja que los SDR: transmitir en 433 a pocos centímetros satura el receptor de 70 cm.
+  - La LilyGO T3S3 de iGate actual queda libre.
+  - El SSID -10 no choca con el iGate APRS de OpenWebRX (EA5KAO, packet de 144,800).
+- **Implica:** el iGate necesita WiFi (`LILYGO_WIFI_SSID`). Su web de administración está en su propia IP.
+
+## ADR-08 · Sensor BME280/BMP280 en el I2C de la Pi, con la estación WX APRS hecha desde la Pi
+- **Decisión:**
+  - El módulo GYBMEP va a la Pi por I2C-1 (pines 1, 3, 5 y 9), en una garita en el exterior.
+  - `bricohams-wx` lee cada minuto con las fórmulas de Bosch, reconoce el chip solo y escribe `sensor.json` para la ventana METEO.
+  - Cada 10 min manda un paquete WX a APRS-IS como **EA5KAO-13**.
+- **Por qué:**
+  - Una sola lectura sirve para la web y para APRS.
+  - El firmware del iGate también admite el BME280, pero entonces la Pi no vería el dato.
+  - Un RTC (0x51) y un BME280 (0x76/0x77) conviven en el mismo bus.
+- **Implica:**
+  - Cable I2C corto (unos 2 m). Más largo: extensor P82B715 ([manual 06](manuales/06_SENSOR_WX.md)).
+  - Si el módulo es un BMP280, no hay humedad: el paquete APRS sale sin `h`.
+
+## ADR-09 · Cámara: MediaMTX con H.264 por CPU y foto servida por el puerto de OpenWebRX
+- **Decisión:**
+  - **WPI408** (OV5647, 130°, IR) por CSI, con el cable de 15 a 22 pines de la Pi 5.
+  - MediaMTX `rpiCamera` a 1280×720 y 10 fps con `softwareH264`.
+  - `bricohams-camsnap` saca una foto cada 60 s a una carpeta tmpfs dentro de los plugins.
+- **Por qué:**
+  - La Pi 5 no tiene codificador por hardware: 720p a 10 fps deja CPU para cuatro SDR.
+  - La foto por el puerto 8073 funciona para cualquier visitante sin abrir más puertos.
+  - El tmpfs no gasta la tarjeta SD.
+- **Implica:**
+  - El directo por WebRTC (8889) solo funciona en la LAN o si abres ese puerto.
+  - Si la cámara no tiene filtro IR, se usa el fichero de ajuste `ov5647_noir.json` (`CAM_TUNING`).
+
+## ADR-10 · Meteo de estaciones en el servidor, no en el navegador
+- **Decisión:** `bricohams-meteo` (temporizador de 10 min) junta en `meteo.json` dos fuentes:
+  - Observación horaria de **AEMET OpenData** de Archena 7158X, Molina 7237E, Alcantarilla 7228 y Murcia 7178I.
+  - Previsión de **Open-Meteo**.
+- **Por qué:**
+  - La clave de AEMET no sale al navegador y no hay problemas de CORS.
+  - Una sola consulta sirve a todos los visitantes.
+  - Meteoclimatic se descartó porque su robots.txt prohíbe el acceso automático.
+- **Implica:** sin `AEMET_API_KEY` (es gratuita) solo se ve el modelo.
+
+## ADR-11 · Plugins web locales e imagen BricoHams con Murcia
+- **Decisión:**
+  - Plugins propios en `htdocs/plugins/receiver/`: `solar` (NOAA), `meteo`, `camara` y `bricohams`.
+  - Orden de botones: DX (rig_skin) → SOL → temperatura → CAM.
+  - Cabecera con el skyline de Murcia: torre de la catedral, Puente de los Peligros, palmeras, el Segura y el mástil con la cámara.
+  - Avatar con franja carmesí "MURCIA" y bandera de la Región junto al nombre del receptor.
+- **Por qué:**
+  - Todo lo de la marca queda versionado.
+  - Los plugins de terceros (0xAF y rig_skin) se cargan desde su CDN y no hay que mantenerlos aquí.
+- **Implica:** si rig_skin no carga, los botones propios se colocan detrás de "Estado".
+
+## ADR-12 · Claves fuera del git
+- **Decisión:**
+  - El repositorio lleva `bricohams.env.example` sin claves. `bricohams.env` está en `.gitignore`.
+  - El instalador lo copia a `/etc/bricohams/` con permisos 600 y reparte a cada servicio solo lo que necesita (`meteo.env` y `wx.env` con permisos 640).
+- **Por qué:** el repositorio se comparte en BricoHams. Las claves de APRS, receiverbook, RadarBox, AEMET y WiFi son personales.
+
+## ADR-13 · Instalador por pasos, repetible, con copia diaria
+- **Decisión:**
+  - `install.sh` está dividido en 18 pasos (v3.0: + `ventilacion`). Se pueden lanzar sueltos con `--solo`, y cada uno se puede repetir sin efectos raros.
+  - Los ficheros del sistema se tocan en bloques marcados (`# >>> BricoHams`).
+  - Con `--backup` se restauran usuarios y marcadores, añadiendo los nuevos del kit.
+  - `bricohams-backup` guarda cada día la configuración (últimas 14 copias).
+- **Por qué:** restaurar la estación tras un fallo de tarjeta tiene que ser un solo comando.
+
+## ADR-14 · Alimentación: fuente oficial de 27 W y hub USB alimentado; el LX-LBU2C no alimenta la Pi
+> **v2.2:** en la caja del mástil, la fuente pasa a ser el cargador USB de 45 W ([ADR-16](#adr-16--alimentación-en-la-caja-un-cargador-usb-multitoma-de-45-w)). El hub alimentado y lo dicho del LX-LBU2C siguen valiendo.
+
+- **Decisión:**
+  - Fuente oficial de la Pi 5 (5 V, 5 A) con `usb_max_current_enable=1`.
+  - Hub USB 2.0 **alimentado** para los LilyGO y uno o dos SDR.
+  - El módulo de power bank LX-LBU2C no se usa para la Pi.
+- **Por qué:**
+  - Hay 6 dispositivos USB para 4 puertos, y unos 1,5 A de USB contra un límite de 1,6 A.
+  - El LX-LBU2C da 5 V a 2,4 A como máximo y corta la salida durante la carga ([evaluación](EVALUACION_MODULOS.md)).
+- **Implica:** si hace falta un SAI, usar un SAI específico de Pi 5 o una LiFePO4 de 12 V con un regulador de 5 V y 5 A.
+
+## ADR-15 · Caja de intemperie impresa en PETG, con compartimento de potencia aparte
+- **Decisión:**
+  - Caja paramétrica en OpenSCAD (`hardware/caja/caja_bricohams.scad`) de 224 × 232 × 90 mm, impresa en PETG blanco con juntas de TPU 95A en la Anycubic Kobra S1. Cada pieza cabe en 250 × 250 mm y se imprime sin soportes.
+  - **Tabique y tapa interior:** separan el compartimento de potencia (230 V, cargador y hub) de la electrónica.
+  - **LilyGO:** los dos van sobre la tapa interior.
+  - **Cara inferior:** todos los conectores (9 SMA pasamuros, PG7, M20) y las rejillas de entrada. Las de salida van arriba, bajo un tejadillo inclinado.
+  - **Cierre:** la pared entra en una ranura de la tapa con una junta de TPU. Las orejetas hacen de tope y fijan la compresión en el 25 %.
+  - **Mástil Televés:** 2 sillas en V con abrazadera de 12 mm (`MAST_D`).
+  - **Cámara:** detrás de una ventana de policarbonato con junta, aro anti-reflejos IR y visera.
+  - **BME280:** en una garita de platos aparte, a 1 m o más de la caja.
+- **Por qué:**
+  - Un solo punto en el mástil: coaxiales cortos (menos pérdidas, sobre todo en 1090 MHz y satélites) y un único cable de 230 V.
+  - Con los conectores abajo y el tejadillo arriba, el agua no entra aunque haya rejillas, y las rejillas sacan el calor por efecto chimenea.
+  - Separar los 230 V es una cuestión de seguridad: quien abra la caja para tocar un SDR no tiene nada con tensión a la vista.
+  - PETG: aguanta la intemperie y unos 75 °C. El PLA se deforma al sol de Murcia y el ABS/ASA pide cámara caliente. La Kobra S1 imprime PETG y TPU sin cambios.
+  - Todo paramétrico: si cambian el mástil, el cargador o los conectores, se ajusta una variable y se regeneran los STL (`tools/caja.sh`).
+- **Implica:**
+  - Hay que comprobar la temperatura en verano (`vcgencmd measure_temp`). Si pasa de 75 °C sostenidos, se añade un ventilador de 40 mm.
+  - Los coaxiales internos son latiguillos RG316 de 20 cm.
+  - Montaje paso a paso en el [manual 10](manuales/10_CAJA_3D.md).
+
+## ADR-16 · Alimentación en la caja: un cargador USB multitoma de 45 W
+- **Decisión:**
+  - Una sola entrada de 230 V a un cargador USB de 45 W, dentro del compartimento de potencia.
+    - **USB-C PD (5 V 3 A)** → Raspberry Pi 5.
+    - **USB-A (2,4 A)** → hub USB 2.0 alimentado, del que cuelgan Mini, V3, FlightStick y los 2 LilyGO.
+  - `PI5_USB_MAX_CURRENT="no"`.
+  - Sustituye en la caja a la fuente oficial de 27 W de la ADR-14.
+- **Por qué:**
+  - Un solo transformador y un solo cable de red en el mástil.
+  - Consumo total de 13 a 19 W: un 40 % de los 45 W, con margen para el calor y para el SDRplay.
+  - La Pi 5 solo negocia 5 A con su fuente oficial. Con cualquier otro cargador arranca a 3 A y limita sus USB a 0,6 A en total, así que los SDR **tienen** que ir al hub alimentado.
+- **Implica:**
+  - **Cable USB-C de 3 A** y corto. Si `bricohams-check` avisa de `get_throttled`, la causa es el cable o el puerto.
+  - Conexión de 230 V con diferencial de 30 mA, prensaestopas PG9 y anclaje del cable. La hace o la revisa alguien cualificado.
+
+## ADR-17 · WiFi de casa con NetworkManager: la Pi prefiere la de 5 GHz y el iGate va a la de 2,4 GHz
+- **Decisión:**
+  - El paso `red` del instalador crea dos conexiones de NetworkManager:
+    - `BiohazardIT-5G`, con prioridad 20.
+    - `biohazard-it`, con prioridad 10.
+  - País de WiFi `ES`.
+  - El iGate LilyGO usa `biohazard-it`.
+  - La clave solo está en `bricohams.env`.
+- **Por qué:**
+  - La Pi 5 tiene WiFi de 5 GHz: menos interferencias en 2,4 GHz y más caudal para el vídeo y los usuarios web. Si la de 5 GHz no llega al mástil, la Pi pasa sola a la de 2,4 GHz.
+  - El ESP32 del LilyGO solo funciona en 2,4 GHz.
+  - El prensaestopas M20 deja pasar un cable de red, que siempre tiene prioridad sobre el WiFi.
+- **Implica:**
+  - Con la caja cerrada en el mástil, comprueba la cobertura: `nmcli -f IN-USE,SSID,SIGNAL dev wifi` (lo muestra `bricohams-check`).
+  - La caja de PETG apenas atenúa, pero el mástil y los coaxiales sí: orienta la cara de la tapa hacia el punto de acceso si se puede.
+
+## ADR-18 · Antenas propias diseñadas con NEC2 y piezas impresas paramétricas
+- **Decisión:**
+  - Cada antena que se construye (quad 2 m/70 cm, dos discones y ADS-B) tiene un modelo NEC2 en `hardware/antenas/sim/` (Python + `nec2c`) que genera sus medidas, sus diagramas y un JSON de resultados.
+  - Las piezas de plástico salen de un solo fichero OpenSCAD paramétrico (`hardware/antenas/antenas_bricohams.scad`, 30 piezas). `tools/antenas.sh` las exporta y comprueba que caben en la Kobra S1.
+- **Por qué:**
+  - Las medidas «de calculadora» no tienen en cuenta el acoplo entre bandas de la quad ni la influencia del mástil. Con el modelo se ven y se corrigen antes de cortar aluminio.
+  - Si cambia un diámetro de varilla o de mástil, se cambia una variable y se reimprime.
+- **Implica:**
+  - Las cotas de los manuales 12–14 salen de `resultados/*.json`. Si se toca un modelo, hay que volver a ejecutar `--final` y los planos (`tools/planos_antenas.py`).
+  - **Comprobación final con NanoVNA siempre:** el modelo no conoce tu hilo ni tus soldaduras.
+
+## ADR-19 · HAM con una quad de doble resonancia 2 m/70 cm y un diplexor
+- **Decisión:**
+  - El receptor RADIOAFICIONADOS (Mini 00000102) va a una **cúbica de rombos, vertical**: 2 elementos en 2 m y 3 en 70 cm sobre un solo boom, fija a **205°**.
+  - Dos alimentaciones, unidas por el **diplexor 2 m/70 cm del proyecto** en la caja de aluminio de cabecera.
+  - En 2 m, adaptación con un λ/4 de RG-59.
+- **Por qué:**
+  - Es lo que pidió el usuario («RADIOAFICIONADOS fija»).
+  - 8,5 dBi en 2 m y 9,8 dBi en 70 cm, con F/B > 30 dB, es decir 6–8 dB más que la colineal. Un ancho de 75–100° a 205° cubre los repetidores de Sierra Espuña (229°), Peña Rubia (222°), Águilas (201°) y Carrascoy (176°).
+  - La polarización vertical es la de los repetidores FM.
+  - Con alimentaciones separadas, cada banda se ajusta sin tocar la otra.
+- **Implica:**
+  - Lo que queda detrás de la antena (≈ 25° al NE) se oye peor.
+  - El diplexor tiene ~0,3 dB de pérdida por rama.
+
+## ADR-20 · Plan de mástil: alturas, separaciones y vientos obligatorios
+- **Decisión:** reparto vertical en el mástil Ø40 (`tools/mastil.py`, esquema 11).
+
+  | Altura | Antenas |
+  |---|---|
+  | 2,9 m | discone grande |
+  | 1,7 m | brazo con ADS-B, GPS y Meshtastic 433 |
+  | 1,5 m | viento |
+  | 0,95 m | quad |
+  | 0,2 m | brazo con 868 e iGate 433 |
+
+  Lleva **3 vientos a 2 m** con tensores.
+- **Por qué:**
+  - **Separación entre transmisores y receptores:**
+    - TX 433 ↔ iGate: 1,5 m en vertical, unos 40 dB.
+    - TX 868 ↔ iGate: 1,6 m.
+    - Resto: ≥ 1,6 λ.
+  - **Viento:** el cálculo da **530 MPa** en el empotramiento a 130 km/h sin vientos, más que el límite del S235: el mástil **se dobla**. Con vientos, 92 MPa a 150 km/h.
+- **Implica:**
+  - Sin vientos no se monta la discone grande arriba.
+  - Si no se pueden poner vientos: mástil de Ø50 × 3 o bajar la discone.
+
+## ADR-21 · Caja v3 en dos módulos al pie del mástil (≈ 5 m)
+- **Decisión:**
+  - **Módulo de electrónica** (228 × 240 × 112) con rejilla universal de M3 cada 20 mm, 14 pasamuros N, bahía de expansión y ventilación forzada.
+  - **Módulo de potencia** (170 × 200 × 112) aparte.
+  - Los dos, a ~5 m del mástil, en pared o poste.
+- **Por qué:**
+  - Decisión del usuario («A 5 m, al pie»). No suma peso ni carga de viento al mástil (ADR-20).
+  - Se abre sin escalera y caben más SDR sin reimprimir.
+  - Los 230 V quedan en otra caja.
+- **Implica:**
+  - Bajadas de 7–8 m: LMR-400 o Hyperflex 5 en VHF/UHF/1090 y H155 en el resto.
+  - El LNA de ADS-B va en la antena.
+  - La caja v2 (ADR-15) queda como alternativa en el mástil.
+
+## ADR-22 · Alimentación v3: cargador de 120 W + bus de 12 V
+- **Decisión:**
+  - Cargador USB de 120 W en una base Schuko dentro del módulo de potencia:
+    - **USB-C 1 (PD 5 V 3 A)** → Pi 5;
+    - **USB-C 2 + gatillo PD a 12 V** → portafusibles → bus WAGO de 12 V.
+  - Del bus cuelgan la regleta Vansuny (2 A), los ventiladores (1 A) y los sensores RS485 (1 A).
+- **Por qué:**
+  - Un único transformador de 230 V.
+  - La estación consume 16–24 W, el ~20 % del cargador.
+  - Los ventiladores y los sensores de viento piden 12 V. La regleta Vansuny es de 12 V (su FX24E queda de repuesto).
+- **Implica:**
+  - **Comprobar que el cargador da 12 V por PD.** Si no, gatillo a 15 V + reductor.
+  - Con los módulos a más de 1,5 m, la Pi se alimenta con un reductor 12 → 5,1 V 5 A en el módulo de electrónica.
+
+## ADR-23 · Ventilación forzada con PWM por hardware y tacómetro
+- **Decisión:**
+  - 2 ventiladores de 60 mm de 4 hilos (entrada abajo a la izquierda, salida arriba a la derecha, con capotas).
+  - PWM0 del RP1 en GPIO12/13 a 25 kHz, invertido por 2N7002.
+  - Tacómetros en GPIO22/5 y DS18B20 en GPIO4.
+  - Servicio `bricohams-fan` con curva CPU/caja e histéresis.
+- **Por qué:**
+  - En verano el interior pasaría de 60 °C.
+  - Un ventilador de 4 hilos regula sin conmutar los 12 V, así que no mete ruido en los SDR.
+  - El PWM por hardware no gasta CPU.
+  - Los tacómetros detectan un ventilador parado antes de que se cuelgue un SDR.
+- **Implica:**
+  - Los pines 12/13/22/5/17/4 quedan reservados (HARDWARE_Y_GPIO).
+  - Hacen falta los overlays `pwm-2chan` y `w1-gpio` y un reinicio.
+
+## ADR-24 · Cámara: IP por RTSP en el mástil (recomendada) o Camera Module 3
+- **Decisión:**
+  - `CAM_SOURCE="rtsp"` hace que MediaMTX **reenvíe** el H.264 de una cámara IP PoE de exterior (p. ej. Reolink RLC-510A), sin recodificar.
+  - `CAM_SOURCE="rpi"` mantiene la cámara CSI. Si se compra una nueva, que sea la Camera Module 3 Wide NoIR.
+- **Por qué:**
+  - Con la caja al pie, una CSI solo vería el mástil desde abajo.
+  - La Pi 5 no tiene codificador H.264, y la IP le quita esa carga (0 % de CPU).
+  - Una cámara IP es estanca y tiene IR de verdad.
+- **Implica:**
+  - `CAM_RTSP_URL` lleva usuario y clave: **solo en `bricohams.env`**.
+  - `mediamtx.yml` pasa a ser `root:mediamtx 640`.
+
+## ADR-25 · Viento y lluvia: en la Pi (EA5KAO-13) y, como alternativa, en un LilyGO (EA5KAO-14)
+- **Decisión:**
+  - Anemómetro y veleta RS485 Modbus (4800 8N1, direcciones 1 y 2), por un adaptador USB que el sistema llama `/dev/rs485`.
+  - Pluviómetro de reed en GPIO17.
+  - `bricohams-wx` hace las medias APRS: viento de 1 min, dirección vectorial de 2 min, racha de 5 min y lluvia en 1 h, 24 h y desde medianoche.
+  - Alternativa: `bricohams-lilygo wxstation` graba el firmware de CA2RXU.
+- **Por qué:**
+  - El usuario pidió **las dos**.
+  - En la Pi aprovecha el BME280 y la conexión que ya hay.
+  - El LilyGO sirve para una estación aislada o de respaldo, y usa los mismos sensores que el proyecto de CA2RXU.
+- **Implica:**
+  - **Un solo maestro en el bus RS485:** o la Pi o el LilyGO.
+  - El pluviómetro va en un poste aparte, no en el mástil.
+
+## ADR-26 · Repetidores en marcadores con el subtono en la descripción; Wifon FM la primera
+- **Decisión:**
+  - `tools/marcadores.py` lee la lista de repetidores EA5 (`data/repetidores_EA5KGV_zonaEA5.csv`) y crea marcadores 🔁 nuevos o anota los que ya existen. En la descripción va «Entrada 145,05 MHz (−0,6 MHz) · Subtono 88,5 Hz para abrirlo (para escuchar no hace falta)». Es idempotente.
+  - **Wifon FM 97,5** es la primera emisora («⭐») y el primer perfil FM del MULTIPERFIL.
+- **Por qué:**
+  - Los marcadores de OpenWebRX **no tienen campo de CTCSS**: solo nombre, frecuencia, modulación, descripción y «scannable».
+  - Un receptor SDR no necesita el tono para oír el repetidor (no tiene silenciador por tono). El tono solo es útil para quien quiera transmitir, y lo lee en la descripción.
+  - El perfil va primero porque OpenWebRX ordena los perfiles por su orden en `settings.json`.
+- **Implica:** al actualizar la lista de repetidores, se vuelve a ejecutar `marcadores.py`. No duplica.
+
+## ADR-27 · HF: SDRplay RSPdx-R2 (presupuesto: RSP1B)
+- **Decisión:** el 4.º receptor de HF será un **RSPdx-R2**: antena A al MLA-30, antena B a una HF exterior futura y la C libre.
+- **Por qué:**
+  - Es el único que junta HF de calidad, 10 MHz por perfil para muchos oyentes, preselección y tres entradas, y funciona en la Pi 5.
+  - **Airspy HF+:** solo ve ~0,7 MHz.
+  - **RX888:** necesita un mini-PC.
+  - **HydraSDR:** no tiene HF.
+- **Implica:** los perfiles `sp*` y `HF_SDRPLAY` del manual 08 no cambian.
+
+## ADR-28 · Filtros y LNA: solo donde se ha medido o calculado que ayudan
+- **Decisión:**
+  - FBP-433s en el iGate (solo RX).
+  - FBP-868s en reserva, nunca en la TX de 22 dBm.
+  - LNA 1090 en la base de la antena ADS-B con bias-tee de 5 V.
+- **Por qué:**
+  - Un filtro quita 2,5 dB. Solo compensa si hay bloqueo, así que se prueba una semana con y sin filtro.
+  - El LNA solo sirve **antes** del cable.
+- **Implica:** quedan en la documentación los avisos de los errores que rompen equipos (manual 16).
+
+## Pendiente / a verificar
+1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
+2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
+3. **WPI408**: comprobar si el filtro IR es fijo o se puede quitar, para elegir `CAM_TUNING`.
+4. **SDRplay**: modelo (RSP1A/1B/dx) para `SDRPLAY_ANTENNA`.
+5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8).
+6. **Conectores de antena del HAT y de los LilyGO** (SMA o u.FL): según cuáles sean, los latiguillos a los SMA pasamuros cambian.
+7. **Diámetro del mástil Televés**: el modelo trae `MAST_D = 40`.
+8. **Pines del HAT AIO frente a GPIO 4, 5, 12, 13, 17 y 22** (ADR-23 y 25): confirmarlos cuando se publique el esquema del HAT. Se han evitado 7, 16, 23 y 27, que la guía AIO puede usar.
+9. **FBP-868s**: potencia máxima real de tu unidad (SAW, ~18 dBm).
+10. **Antenas**: ajuste final con NanoVNA (manuales 12–14).
+11. **Temperatura de la caja en verano**: medir con `bricohams-fan --estado` y ajustar la curva.
