@@ -74,7 +74,7 @@
 - **Pases de satélites:** CelesTrak GP/OMM https://celestrak.org/NORAD/documentation/gp-data-formats.php · python-sgp4 https://pypi.org/project/sgp4/
 - **SatDump:** https://github.com/SatDump/SatDump · METEOR-M LRPT 137,9 MHz.
 - **FT2 / Decodium:** https://github.com/iu8lmc/Decodium-3.0-Codename-Raptor · https://ft2.it/
-- **Indicativos:** RadioID https://radioid.net/api · QRZ XML https://www.qrz.com/docs/xml/current_spec.html
+- **Indicativos:** HamQTH API https://www.hamqth.com/developers · RadioID https://radioid.net/api · QRZ XML https://www.qrz.com/docs/xml/current_spec.html
 - **GeoIP:** DB-IP IP to City Lite (CC BY 4.0) https://db-ip.com/db/download/ip-to-city-lite — la web lleva la atribución.
 - **Telegram Bot API:** https://core.telegram.org/bots/api
 - **Mensajes de clientes de OpenWebRX+ por MQTT:** https://github.com/luarvique/openwebrx
@@ -86,3 +86,16 @@
 - **Marina:** Salvamento Marítimo https://www.salvamentomaritimo.es/ · canales VHF marinos ITU-R M.1084.
 - **FM y DAB+:** https://radiomap.eu/es/murcia · cobertura DAB https://avancedigital.mineco.gob.es/
 - **Secreto de las comunicaciones** (por qué no hay radiotaxis ni TETRA de emergencias): Ley 11/2022 General de Telecomunicaciones, art. 60 · CE art. 18.3.
+
+## v4.2
+- **OpenWebRX+ (código fuente, rutas, AudioEngine, datos):** https://github.com/luarvique/openwebrx — `owrx/http.py` (rutas con usuario), `htdocs/lib/AudioEngine.js` (audioNode → gainNode), `owrx/config/core.py` (`data_directory`), `htdocs/lib/Plugins.js` (Plugins.load, addButton).
+- **Repositorios de OpenWebRX+ por sistema:** https://luarvique.github.io/ppa/ (bullseye → `debian`, bookworm, trixie, jammy → `ubuntu`, noble).
+- **Web Audio API:** https://developer.mozilla.org/es/docs/Web/API/Web_Audio_API · BiquadFilterNode https://developer.mozilla.org/en-US/docs/Web/API/BiquadFilterNode · DynamicsCompressorNode https://developer.mozilla.org/en-US/docs/Web/API/DynamicsCompressorNode · AnalyserNode https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode
+- **Plugins de 0xAF (sin plugins de audio):** https://github.com/0xAF/openwebrxplus-plugins
+- **nginx:** `proxy_cookie_flags` https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_cookie_flags · `listen … http2` https://nginx.org/en/docs/http/ngx_http_v2_module.html
+- **HamQTH API v2** (login con token, `/api/v2/callbook/{call}`, parámetro `app`): https://www.hamqth.com/developers.php
+- **systemd EnvironmentFile (comillas):** https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=
+- **dpkg:** `/var/lib/dpkg/status`, `/var/lib/dpkg/info/<paquete>.md5sums`, `/var/lib/apt/extended_states` (paquetes automáticos): https://manpages.debian.org/dpkg
+- **openssl enc (AES-256-CBC + PBKDF2):** https://docs.openssl.org/master/man1/openssl-enc/
+- **Playwright (pruebas en Chromium real):** https://playwright.dev/python/
+

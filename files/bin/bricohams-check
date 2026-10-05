@@ -199,8 +199,18 @@ if [ -n "${SSL_DOMAIN:-}" ] && [ -s "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain
     fin=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" | cut -d= -f2)
     dias=$(( ( $(date -d "$fin" +%s) - $(date +%s) ) / 86400 ))
     [ "$dias" -gt 14 ] && bien "certificado Let's Encrypt de $SSL_DOMAIN: $dias días" || mal "el certificado de $SSL_DOMAIN caduca en $dias días: sudo certbot renew"
-else
+elif [ "${SSL_MODO:-admin}" != no ]; then
     aviso "certificado autofirmado (pon SSL_DOMAIN para Let's Encrypt)"
+fi
+case "${SSL_MODO:-admin}" in
+    admin) bien "SSL_MODO=admin: receptor por HTTP, /login y /settings forzados a HTTPS" ;;
+    todo)  bien "SSL_MODO=todo: todo por HTTPS" ;;
+    no)    aviso "SSL_MODO=no: la contraseña de administración viaja sin cifrar" ;;
+    *)     mal "SSL_MODO=${SSL_MODO} no vale (admin, todo o no)" ;;
+esac
+if [ "${SSL_MODO:-admin}" = admin ] && command -v curl >/dev/null && systemctl is-active --quiet nginx; then
+    c=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1/settings)
+    case "$c" in 301\ https://*) bien "http://…/settings redirige a HTTPS" ;; *) mal "http://…/settings no redirige a HTTPS ($c): sudo bash install.sh --solo web" ;; esac
 fi
 servicio mosquitto
 servicio bricohams-visitas
@@ -211,6 +221,17 @@ command -v satdump >/dev/null && bien "SatDump instalado (imágenes METEOR)" || 
 if grep -qs BRICOHAMS-FT2 /usr/lib/python3/dist-packages/owrx/modes.py; then bien "modo FT2 activo (experimental)"
 elif command -v decodium-rx >/dev/null; then aviso "decodium-rx instalado pero el modo FT2 no está activo: sudo bricohams-ft2 activar"
 else aviso "FT2 no instalado (FT2_ENABLE)"; fi
+
+if command -v owrx-clone >/dev/null; then
+    bien "owrx-clone $(owrx-clone --version 2>/dev/null | awk '{print $2}') (perfiles de OpenWebRX+: man owrx-clone)"
+    ultimo=$(ls -1t /var/backups/bricohams/perfil-owrx-*.owrx.tar.gz 2>/dev/null | head -1)
+    [ -n "$ultimo" ] && bien "último perfil de la copia diaria: $(basename "$ultimo")"
+else
+    aviso "owrx-clone no está instalado: sudo bash install.sh --solo herramientas"
+fi
+if [ -f /etc/bricohams/perfil-importado ]; then
+    aviso "configuración importada con owrx-clone ($(grep -m1 '^PERFIL=' /etc/bricohams/perfil-importado | cut -d= -f2-)): el instalador no regenera settings.json"
+fi
 
 titulo "Tareas automáticas"
 [ -s /etc/cron.d/bricohams ] && bien "cron: $(grep -c 'bricohams-tarea' /etc/cron.d/bricohams) tareas en /etc/cron.d/bricohams" || mal "falta /etc/cron.d/bricohams (sudo bash install.sh --solo tareas)"

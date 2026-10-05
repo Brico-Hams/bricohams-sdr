@@ -6,7 +6,7 @@
 #  /etc/sudoers.d/bricohams, que solo permite este programa. Así el cron no
 #  necesita credenciales guardadas en ningún sitio.
 #   actualizar   apt update + upgrade sin preguntas (respeta lo retenido)
-#   copia        copia de seguridad (bricohams-backup)
+#   copia        copia de seguridad (bricohams-backup) + perfil de OpenWebRX+ (owrx-clone)
 #   reinicio     reinicio preventivo (se aplaza si hay un pase de satélite en curso)
 #   salud        bricohams-check; avisa por Telegram si algo falla
 #   geoip        actualiza la base GeoIP de las visitas
@@ -30,7 +30,17 @@ case "${1:-}" in
             log "actualizar: ERROR"; tg "⚠️ La actualización semanal ha fallado: mira $LOG"
         fi ;;
     copia)
-        if /usr/local/sbin/bricohams-backup >>"$LOG" 2>&1; then log "copia: ok"; else log "copia: ERROR"; tg "⚠️ Falló la copia de seguridad"; fi ;;
+        if /usr/local/sbin/bricohams-backup >>"$LOG" 2>&1; then log "copia: ok"; else log "copia: ERROR"; tg "⚠️ Falló la copia de seguridad"; fi
+        # v4.2 · además, un perfil completo de OpenWebRX+ (owrx-clone) para llevarlo a otro equipo (7 últimos)
+        if command -v owrx-clone >/dev/null; then
+            d=/var/backups/bricohams
+            if owrx-clone exportar -o "$d/perfil-owrx-$(date +%F).owrx.tar.gz" >>"$LOG" 2>&1; then
+                log "perfil owrx-clone: ok"
+                find "$d" -maxdepth 1 -name 'perfil-owrx-*.owrx.tar.gz' -printf '%T@ %p\n' | sort -rn | tail -n +8 | cut -d' ' -f2- | xargs -r rm -f
+            else
+                log "perfil owrx-clone: ERROR"
+            fi
+        fi ;;
     reinicio)
         P=/usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json
         if [ -r "$P" ] && python3 -c "import json,time,sys;t=time.time();sys.exit(0 if any(p['aos']-300<t<p['los'] for p in json.load(open('$P'))['pases']) else 1)" 2>/dev/null; then

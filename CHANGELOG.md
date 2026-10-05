@@ -1,5 +1,40 @@
 # Historial
 
+## v4.2 · 05/10/2026
+**Arreglos de la instalación real en la Pi de EA5KAO, plugins de audio, SSL solo en la administración y owrx-clone.** Se mantiene todo lo anterior.
+
+**Arreglos**
+- **`bricohams.env: line 182: Clave2026: unbound variable`:** una clave con `$` (`QRZ_PASS`). `bricohams.env` se lee con `bricohams-env.py` sin ejecutarlo: `$` literal, comillas dobles/simples, comentarios, errores con número de línea. La copia de `/etc` y los `.env` derivados van entre comillas simples (`sq`/`envl`). ADR-38.
+- **`curl: (6) Could not resolve host: luarvique.github.io` tras el paso `red`:** `red` borraba y recreaba la conexión WiFi en uso. Ahora la modifica, `esperar_red` antes de cada paso (DNS, 2 min), `clave_apt` y `script_remoto` con reintentos y error claro (antes `bash -c "$(wget …)"` seguía con una descarga vacía). ADR-39.
+- **Revisadas y adoptadas las correcciones de EA5KAO:** `paso_web` acababa en `[ … ] && aviso` (devolvía 1 con `set -e`), redirección `/tar1090`, ficha de indicativos con **HamQTH** primero (API v2) y caché versionada. Añadido `?app=BricoHams-SDR` en HamQTH. Nueva auditoría automática de funciones que acaban en `[ … ] &&`.
+- **nginx:** `listen 443 ssl http2` (el `http2 on;` no existe en el nginx 1.22 de Bookworm). `nginx -t` fallido para el paso con el mensaje.
+- `bricohams-fan`/`bricohams-wx` entienden valores entre comillas simples.
+
+**SSL solo en la administración** (decisión de EA5KAO)
+- `SSL_MODO="admin"` (defecto): receptor y portal por HTTP; `/login`, `/settings…` y demás rutas con usuario → 301 a HTTPS; cookie `owrx-session` `Secure; HttpOnly; SameSite=Lax`; sin HSTS. También `todo` y `no`. Rutas comunes en `bricohams-sdr-rutas.conf`. `bricohams-servicios` y `bricohams-check` lo reflejan. ADR-40, manual 23, esquema 18.
+
+**Audio en el navegador** (los dos plugins pedidos)
+- `filtro_audio` (botón FILTRO): paso banda 24 dB/oct por modos, notch manual y notch automático con seguimiento, espectro.
+- `dsp_audio` (botón DSP): EQ 3 bandas, puerta de ruido, AGC (suave/medio/fuerte), limitador, preajustes y medidores.
+- `audio_cadena`: base común entre `audioNode` y `gainNode` de OpenWebRX+. Manual 30, ADR-41, esquema 20.
+
+**owrx-clone** (exportar e importar toda la configuración de un OpenWebRX+)
+- Herramienta genérica para la comunidad en `owrx-clone/`: `exportar`, `ver`, `importar`, `deshacer`, `comprobar`, `ayuda` (y en inglés). Niveles `config`, `etc`, `web`, `paquetes`, `sistema`, `parches`, `extra`; `--publico`, `--cifrar`, `--mapear`, `--simular`; SHA-256, rutas vigiladas, copia previa. README es/en, `man owrx-clone`, `instalar.sh`, licencia MIT.
+- **Revisión de seguridad independiente** (dos pasadas) antes de publicarlo. Corregido:
+  - un `data_directory` en el perfil podía llevar los ficheros a `/etc/cron.d`, `/home/pi`…;
+  - `deshacer` escribía a través de enlaces simbólicos;
+  - la copia previa se hacía antes de apt;
+  - una importación cortada no dejaba lista de lo creado;
+  - `audio_cadena` desconectaba también el osciloscopio de rig_skin;
+  - `--solo red` esperaba a una red que aún no había.
+
+  Hay una prueba de cada caso.
+- En el kit: `install.sh --exportar` (sin `bricohams.env`) y `--importar` (paso nuevo `importar`); el instalador respeta lo importado (`/etc/bricohams/perfil-importado`, `OWRX_PLANTILLA`); la copia diaria guarda un perfil. Manual 31, ADR-42, esquema 21.
+
+**Documentación y pruebas**
+- [Ayuda rápida](docs/AYUDA_RAPIDA.md), manuales 30 y 31, manuales 02, 09, 23, 25 y 27 al día, ADR-38 a ADR-42.
+- Pruebas nuevas: `test_env_red`, `test_ssl_admin` (nginx real), `test_audio_plugins`, `test_audio_navegador` (Chromium real), `test_owrx_clone`, `test_instalador_perfil`.
+
 ## v4.1 · 04/10/2026
 **Nueva función: `sudo bash install.sh --actualizar`.** Se mantiene todo lo de la v4.0.
 - **Qué hace, en orden:** git pull `--ff-only` del kit como su dueño (si llega un `install.sh` nuevo, se relanza con él) → añade a `bricohams.env` las variables nuevas del `.env.example` sin tocar las existentes → copia de seguridad → `apt upgrade` (respeta retenidos y `.conf`) → repite **solo los pasos que han cambiado** → `bricohams-check`, aviso por Telegram y aviso de reinicio.

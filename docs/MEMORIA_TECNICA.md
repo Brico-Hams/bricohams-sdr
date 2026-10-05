@@ -149,6 +149,8 @@ La estación tiene cinco zonas:
 | W6 | decodium-rx + parche FT2 | modo FT2 en OpenWebRX+ (experimental) | 28 |
 | W7 | bricohams-io | puente USB con la Pico | 20 |
 | W8 | cron + cuenta `bricohams` | copias, actualización, reinicio, salud, resumen | 25 |
+| W9 | owrx-clone | perfiles de OpenWebRX+ para clonar la estación (y en la copia diaria) | 31 |
+| W10 | plugins `filtro_audio` + `dsp_audio` | filtro y DSP de audio en el navegador de cada oyente | 30 |
 
 ## 6. Verificaciones pendientes
 

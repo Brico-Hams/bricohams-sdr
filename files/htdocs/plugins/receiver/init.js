@@ -28,6 +28,10 @@ window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
 window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
 window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: '/bricohams/privacidad.html' };
 window.dvficha_config   = { api: '/bricohams/api/indicativo', segundos: 20 };
+// v4.2 · audio en el navegador del oyente (botones FILTRO y DSP). Por defecto apagados:
+// cada oyente los enciende y sus ajustes se guardan en su navegador.
+window.filtro_audio_config = { modo: 'voz', activo: false };
+window.dsp_audio_config    = { preajuste: 'voz', activo: false };
 // Oyentes en tiempo real del plugin «listeners» de 0xAF: necesita un proyecto Supabase propio
 // (LISTENERS_SUPABASE_URL y LISTENERS_SUPABASE_KEY en bricohams.env). Vacío = no se carga.
 const LISTENERS = { url: '__LISTENERS_URL__', key: '__LISTENERS_KEY__' };
@@ -83,7 +87,9 @@ const PluginsOpcionales = [
     } catch (e) { console.warn('rig_skin', e); }
 
     // Plugins locales de EA5KAO (htdocs/plugins/receiver/<nombre>/)
-    for (const name of ['solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha', 'satelites', 'visitas']) {
+    // audio_cadena va antes que filtro_audio y dsp_audio (es su base común)
+    for (const name of ['solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha', 'satelites', 'visitas',
+                        'audio_cadena', 'filtro_audio', 'dsp_audio']) {
         try { await Plugins.load(name); } catch (e) { console.warn(name, e); }
     }
 

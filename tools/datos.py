@@ -75,8 +75,8 @@ L += ['', '⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeist
       '', 'Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo), la **entrada** es donde transmites (RX del equipo).', '']
 
 L += ['## 4. Puertos de red', '', '| Puerto | Servicio | Alcance |', '|---|---|---|']
-for p, s, a in [('443/tcp', 'v4 · nginx https (OpenWebRX+, portal, tar1090, cámara HLS, API)', '**abrir al exterior**'),
-                ('80/tcp', 'v4 · nginx: Let\'s Encrypt y redirección a https', '**abrir al exterior**'),
+for p, s, a in [('443/tcp', 'v4.2 · nginx https: /login y /settings forzados (y todo, si se quiere)', '**abrir al exterior**'),
+                ('80/tcp', 'v4.2 · nginx: receptor público por HTTP (SSL_MODO=admin), Let\'s Encrypt', '**abrir al exterior**'),
                 ('8073/tcp', 'OpenWebRX+ (detrás de nginx desde v4)', 'LAN'),
                 ('8504/tcp', 'v4 · lighttpd · tar1090 (detrás de nginx)', '127.0.0.1'),
                 ('8075/tcp', 'v4 · bricohams-api (indicativos)', '127.0.0.1'),
@@ -146,7 +146,11 @@ for r, c in [('/etc/bricohams/bricohams.env', 'configuración y claves (600 root
              ('/run/bricohams/io.json, fan.cmd', 'v4 · lecturas de la Pico y orden de ventiladores'),
              ('/var/lib/bricohams/kit-estado', 'v4.1 · huellas de los pasos para `install.sh --actualizar` (600)'),
              ('/var/lib/bricohams/bookmarks.kit.json', 'v4.1 · marcadores del kit instalado (para conservar los propios)'),
-             ('/var/lib/bricohams/actualizaciones.log', 'v4.1 · historial de actualizaciones')]:
+             ('/var/lib/bricohams/actualizaciones.log', 'v4.1 · historial de actualizaciones'),
+             ('/etc/nginx/snippets/bricohams-sdr-rutas.conf', 'v4.2 · rutas comunes HTTP/HTTPS de nginx'),
+             ('/usr/local/bin/owrx-clone, /var/backups/owrx-clone/', 'v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación'),
+             ('/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz', 'v4.2 · perfil diario de OpenWebRX+ (7 últimos)'),
+             ('/etc/bricohams/perfil-importado', 'v4.2 · marca: la configuración viene de un perfil importado')]:
     L.append('| `%s` | %s |' % (r, c))
 
 SCAD = open(os.path.join(RAIZ, 'hardware', 'caja', 'caja_bricohams.scad'), encoding='utf-8').read()

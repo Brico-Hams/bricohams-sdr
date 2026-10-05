@@ -22,7 +22,8 @@ Las copias, las actualizaciones semanales, el reinicio preventivo, la comprobaci
   - readsb y rbfeeder.
   - regla udev de los LilyGO.
   - histórico del sensor.
-- **Fuera de la Pi:** copia esas copias a otro sitio (NAS o el git interno, **sin** `bricohams.env`).
+- **v4.2 · Perfil de OpenWebRX+:** la copia diaria guarda además `/var/backups/bricohams/perfil-owrx-AAAA-MM-DD.owrx.tar.gz` (los 7 últimos), hecho con **owrx-clone**. Sirve para llevar el OpenWebRX+ tal cual a otro equipo: `sudo owrx-clone importar …` ([manual 31](31_CLONAR_OPENWEBRX.md)). Uno al momento: `sudo owrx-clone exportar --cifrar`.
+- **Fuera de la Pi:** copia esas copias a otro sitio (NAS o el git interno, **sin** `bricohams.env`). Los perfiles llevan las contraseñas de administración: guárdalos cifrados.
 
 ## Restaurar tras un fallo de tarjeta
 1. Graba una tarjeta nueva ([manual 01](01_PREPARACION.md)).
