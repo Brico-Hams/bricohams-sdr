@@ -1,0 +1,97 @@
+ident,type,name,latitude_deg,longitude_deg,elevation_ft,iso_region,municipality,icao_code,iata_code
+ES-0001,small_airport,Trebujena Airfield,36.858889,-6.139167,12,ES-AN,Trebujena,,
+ES-0002,small_airport,Vinaròs Airfield,40.519722222,0.390277778,364,ES-VC,Vinaròs,,
+ES-0010,small_airport,Aeródromo de Antela,42.1045,-7.7118,2024,ES-GA,Xinzo de Limia,,
+ES-0012,small_airport,Castriz/Cambe Airfield,43.102502,-8.7617,1200,ES-GA,Santa Comba,,
+ES-0020,small_airport,Aeròdrom de Pals,42.0069903,3.1519175,,ES-CT,,,
+ES-0024,small_airport,Ultralight Aeroclub Müller,37.26076,-1.85236,,ES-AN,Vera,,
+ES-0069,small_airport,Air Marugán,40.9111,-4.370917,3068,ES-CL,Marugán,,
+ES-0098,small_airport,Prat de la Plana Airfield,41.80016,2.112064,2264,ES-CT,Moià,,
+ES-0111,small_airport,Aeródromo Villanueva del Pardillo,40.5001069999,-3.9920997,,ES-MD,Villanueva del Pardillo,,
+ES-0123,small_airport,Aerodrom Tapioles,42.225478,2.615891,787,ES-CT,Tortellà,,
+ES-0132,small_airport,Alats Club Bellvei,41.2443358,1.5632892,302,ES-CT,Bellvei,,
+ES-0148,small_airport,Villanueva de la Cañada Airfield,40.436582,-4.024985,1985,ES-MD,Villanueva de la Cañada,,
+ES-0158,small_airport,Olocau Airfield,39.675517,-0.548855,680,ES-VC,Olocau,,
+ES-0162,small_airport,Aeródromo Loring,40.6602,-3.59489,1903,ES-MD,El Molar,,
+ES-0167,small_airport,La Llosa Airfield,39.74979,-0.181346,7,ES-VC,La Llosa,,
+ES-0175,small_airport,Aeródromo Mazaricos,42.982329,-9.005002,960,ES-GA,Fervenza,,
+ES-0178,small_airport,Aeródromo de Brunete,40.396556,-4.023712,1975,ES-MD,Brunete,,
+ES-0219,small_airport,Aeródromo de Camarenilla,40.024702,-4.071202,1742,ES-CM,Camarenilla,,
+ES-0263,small_airport,El Barranco - Sierra Morena,38.03774,-3.76585,800,ES-AN,Bailén (Jaén),,
+GCFV,large_airport,Fuerteventura Airport,28.4527,-13.8638,85,ES-CN,El Matorral,GCFV,FUE
+GCGM,small_airport,La Gomera Airport,28.0296,-17.2146,716,ES-CN,"Alajero, La Gomera Island",GCGM,GMZ
+GCHI,medium_airport,El Hierro Airport,27.8148,-17.8871,103,ES-CN,El Hierro Island,GCHI,VDE
+GCLA,medium_airport,La Palma Airport,28.626499,-17.7556,107,ES-CN,"Sta Cruz de la Palma, La Palma Island",GCLA,SPC
+GCLP,large_airport,Gran Canaria Airport,27.9319,-15.3866,78,ES-CN,Gran Canaria Island,GCLP,LPA
+GCRR,large_airport,César Manrique-Lanzarote Airport,28.945499,-13.6052,46,ES-CN,San Bartolomé,GCRR,ACE
+GCTS,large_airport,Tenerife Sur Airport,28.0445,-16.5725,209,ES-CN,Tenerife,GCTS,TFS
+GCXO,large_airport,Tenerife Norte-Ciudad de La Laguna Airport,28.482752,-16.341707,2076,ES-CN,Tenerife,GCXO,TFN
+GECE,heliport,Ceuta Heliport,35.892657,-5.306321,8,ES-CE,Ceuta,GECE,JCU
+GEML,medium_airport,Melilla Airport,35.2798,-2.95626,156,ES-ML,Melilla,GEML,MLN
+LEAB,medium_airport,Albacete Airport / Los Llanos Air Base,38.948502,-1.86352,2302,ES-CM,Albacete,LEAB,ABC
+LEAL,large_airport,Alicante-Elche Miguel Hernández Airport,38.2822,-0.558156,142,ES-VC,Alicante,LEAL,ALC
+LEAM,medium_airport,Almería Airport,36.843899,-2.3701,70,ES-AN,Almería,LEAM,LEI
+LEAS,large_airport,Asturias Airport,43.563599,-6.03462,416,ES-AS,Ranón,LEAS,OVD
+LEAX,small_airport,La Axarquía-Leoni Benabu Airfield,36.801666,-4.135556,118,ES-AN,Málaga,LEAX,
+LEBA,medium_airport,Córdoba Airport,37.841999,-4.84888,297,ES-AN,Córdoba,LEBA,ODB
+LEBB,large_airport,Bilbao Airport,43.301102,-2.91061,138,ES-PV,Bilbao,LEBB,BIO
+LEBE,small_airport,Beas de Segura Airfield,38.271949,-2.952914,1780,ES-AN,Jaén,LEBE,
+LEBG,medium_airport,Burgos Airport,42.357601,-3.62076,2962,ES-CL,Burgos,LEBG,RGS
+LEBL,large_airport,Josep Tarradellas Barcelona-El Prat Airport,41.2971,2.07846,12,ES-CT,Barcelona,LEBL,BCN
+LEBZ,medium_airport,Badajoz Airport,38.8913,-6.82133,609,ES-EX,Badajoz,LEBZ,BJZ
+LECD,small_airport,La Cerdanya Airfield,42.386398,1.86667,3586,ES-CT,Alp,,
+LECH,medium_airport,Castellón-Costa Azahar Airport,40.213889,0.073333,1182,ES-VC,Castellón de la Plana,LECH,CDT
+LECI,small_airport,Santa Cilia de Jaca Airfield,42.569199,-0.727778,2241,ES-AR,Huesca,LECI,
+LECN,small_airport,Castellon de la Plana Aerodrome,39.99836,0.026355,20,ES-VC,Castellón de la Plana,LECN,
+LECO,medium_airport,A Coruña Airport,43.302101,-8.37726,326,ES-GA,Culleredo,LECO,LCG
+LECU,medium_airport,Madrid-Cuatro Vientos Airport,40.370701,-3.78514,2269,ES-MD,Madrid,LECU,
+LEDA,medium_airport,Lleida-Alguaire Airport,41.728185,0.535023,1152,ES-CT,Lleida,LEDA,ILD
+LEFM,small_airport,Fuentemilanos Airfield,40.889137,-4.240165,3307,ES-CL,Segovia,,
+LEGA,medium_airport,Armilla Air Base,37.133202,-3.63569,2297,ES-AN,Armilla,,
+LEGE,large_airport,Girona-Costa Brava Airport,41.904639,2.761774,468,ES-CT,Girona,LEGE,GRO
+LEGR,medium_airport,F.G.L. Airport Granada-Jaén Airport,37.188702,-3.77736,1860,ES-AN,Granada,LEGR,GRX
+LEGT,medium_airport,Getafe Air Base,40.294102,-3.72383,2034,ES-MD,Getafe,LEGT,
+LEHC,small_airport,Huesca-Pirineos Airport,42.076099,-0.316667,1769,ES-AR,Monflorite/Alcalá del Obispo,LEHC,HSK
+LEIB,large_airport,Ibiza Airport,38.872898,1.37312,24,ES-IB,Ibiza (Eivissa),LEIB,IBZ
+LEIG,small_airport,Igualada/Odena Airfield,41.585602,1.65306,1080,ES-CT,Barcelona,,
+LEJR,medium_airport,Jerez Airport,36.744598,-6.06011,93,ES-AN,Jerez de la Frontera,LEJR,XRY
+LELC,medium_airport,San Javier Airport,37.775002,-0.812389,11,ES-MC,San Javier,LELC,
+LELL,small_airport,Sabadell Airfield,41.520901,2.10508,485,ES-CT,Sabadell,,
+LELN,medium_airport,León Airport,42.590709,-5.653406,3006,ES-CL,La Virgen del Camino,LELN,LEN
+LELO,medium_airport,Logroño-Agoncillo Airport,42.460953,-2.322235,1161,ES-RI,Logroño,LERJ,RJL
+LELT,small_airport,Lillo Airfield,39.7169,-3.32056,2272,ES-CM,Lillo,,
+LEMD,large_airport,Adolfo Suárez Madrid–Barajas Airport,40.493407,-3.572249,1998,ES-MD,Madrid,LEMD,MAD
+LEMG,large_airport,Málaga-Costa del Sol Airport,36.6749,-4.49911,53,ES-AN,Málaga,LEMG,AGP
+LEMH,large_airport,Menorca Airport,39.862598,4.21865,302,ES-IB,Mahón (Maó),LEMH,MAH
+LEMO,medium_airport,Moron Air Base,37.17490005493164,-5.615940093994141,285,ES-AN,Morón,LEMO,OZP
+LEMR,small_airport,La Morgal Airfield,43.429199,-5.83056,541,ES-AS,Oviedo,,
+LEMT,small_airport,Casarrubios Del Monte Airfield,40.235001,-4.02639,2050,ES-CM,Toledo,,
+LEMU,small_airport,Muchamiel Airfield,38.440601,-0.475278,427,ES-VC,Muchamiel,,
+LENA,small_airport,Benabarre Airfield,42.0228,0.482222,2450,ES-AR,Huesca,,
+LEOC,small_airport,Ocaña Airfield,39.9375,-3.50333,2405,ES-CM,Ocaña,,
+LEOS,small_airport,Aeródromo de los Oteros,42.333056,-5.451944,2620,ES-CL,Pajares de Los Oteros,,
+LEPA,large_airport,Palma de Mallorca Airport,39.551701,2.73881,27,ES-IB,Palma de Mallorca,LEPA,PMI
+LEPI,small_airport,Casas de los Pinos Airfield,39.298199,-2.37872,2370,ES-CM,Casas de los Pinos,,
+LEPP,medium_airport,Pamplona Airport,42.77,-1.64633,1504,ES-NC,Pamplona,LEPP,PNA
+LERE,small_airport,Aeródromo Requena El Rebollar,39.474701,-1.03444,2340,ES-VC,Requena,,
+LERI,medium_airport,Alcantarilla Air Base,37.951099,-1.23032,250,ES-MC,Alcantarilla,,
+LERM,small_airport,Robledillo De Mohernando Airfield,40.865299,-3.24778,3097,ES-CM,Robledillo De Mohernando,,
+LERP,small_airport,Aeródromo de Herrera de Pisuerga,42.5923,-4.2902,2958,ES-CL,Herrera de Pisuerga,LERP,
+LERS,large_airport,Reus Airport,41.147509,1.168354,233,ES-CT,Reus,LERS,REU
+LERT,medium_airport,Rota Naval Station Airport,36.645198822,-6.34946012497,86,ES-AN,Rota,LERT,ROZ
+LESA,medium_airport,Salamanca Airport,40.952099,-5.50199,2595,ES-CL,Salamanca,LESA,SLM
+LESB,small_airport,Son Bonet Airfield,39.5989,2.70278,153,ES-IB,Marratxí,LESB,
+LESL,small_airport,Sant Lluis Airfield,39.861878,4.251739,197,ES-IB,Sant Lluis,LESL,
+LESO,medium_airport,San Sebastián Airport,43.356499,-1.79061,16,ES-PV,Hondarribia,LESO,EAS
+LEST,large_airport,Santiago-Rosalía de Castro Airport,42.896301,-8.41514,1213,ES-GA,Santiago de Compostela,LEST,SCQ
+LESU,medium_airport,Pirineus - la Seu d'Urgel Airport,42.3386,1.40917,2625,ES-CT,La Seu d'Urgell Pyrenees and Andorra,LESU,LEU
+LETI,small_airport,El Tietar Airfield,40.2439,-4.79444,1401,ES-CM,La Iglesuela,,
+LETL,medium_airport,Teruel Airport,40.410269,-1.217366,3380,ES-AR,Teruel,LETL,TEV
+LETO,medium_airport,Madrid–Torrejón Airport / Torrejón Air Base,40.487875,-3.456808,2026,ES-MD,Madrid,LETO,TOJ
+LEVC,large_airport,Valencia Airport,39.489162,-0.480961,240,ES-VC,Valencia,LEVC,VLC
+LEVD,medium_airport,Valladolid Airport,41.7061,-4.85194,2776,ES-CL,Valladolid,LEVD,VLL
+LEVT,medium_airport,Vitoria Airport,42.882801,-2.72447,1682,ES-PV,Alava,LEVT,VIT
+LEVX,medium_airport,Vigo Airport,42.2318,-8.62677,856,ES-GA,Vigo,LEVX,VGO
+LEXJ,medium_airport,Seve Ballesteros-Santander Airport,43.427101,-3.82001,16,ES-CB,Santander,LEXJ,SDR
+LEZG,large_airport,Zaragoza Airport,41.666199,-1.04155,863,ES-AR,Zaragoza,LEZG,ZAZ
+LEZL,large_airport,Seville Airport,37.417999,-5.89311,112,ES-AN,Seville,LEZL,SVQ

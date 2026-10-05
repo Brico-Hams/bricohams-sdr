@@ -222,6 +222,9 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/var/lib/bricohams/kit-estado` | v4.1 · huellas de los pasos para `install.sh --actualizar` (600) |
 | `/var/lib/bricohams/bookmarks.kit.json` | v4.1 · marcadores del kit instalado (para conservar los propios) |
 | `/var/lib/bricohams/actualizaciones.log` | v4.1 · historial de actualizaciones |
+| `/var/lib/bricohams/locator/{aemet,fmdx}.json` | v4.3 · datos de zona bajados en la Pi (caché 30 días) |
+| `/usr/local/lib/bricohams/, /usr/local/bin/bricohams-locator` | v4.3 · zona por locator (manual 32) |
+| `/opt/owrx-docker/{docker-compose.yaml,etc,var,plugins}` | v4.3 · OpenWebRX+ en Docker (OWRX_BACKEND=docker, manual 33) |
 | `/etc/nginx/snippets/bricohams-sdr-rutas.conf` | v4.2 · rutas comunes HTTP/HTTPS de nginx |
 | `/usr/local/bin/owrx-clone, /var/backups/owrx-clone/` | v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación |
 | `/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz` | v4.2 · perfil diario de OpenWebRX+ (7 últimos) |

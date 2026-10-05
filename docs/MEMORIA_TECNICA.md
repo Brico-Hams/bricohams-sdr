@@ -151,6 +151,8 @@ La estación tiene cinco zonas:
 | W8 | cron + cuenta `bricohams` | copias, actualización, reinicio, salud, resumen | 25 |
 | W9 | owrx-clone | perfiles de OpenWebRX+ para clonar la estación (y en la copia diaria) | 31 |
 | W10 | plugins `filtro_audio` + `dsp_audio` | filtro y DSP de audio en el navegador de cada oyente | 30 |
+| W11 | `bricohams-locator` + `data/locator/catalogo_es.json` (v4.3) | marcadores y METEO_STATIONS de la zona según el locator: aeropuertos, AEMET, puertos, NAVTEX y FM | 32 |
+| W12 | OpenWebRX+ en Docker (`OWRX_BACKEND="docker"`, v4.3) | contenedor `slechev/openwebrxplus(-softmbe)` con volúmenes en `/opt/owrx-docker`; owrx-clone 1.1 `--docker` | 33 |
 
 ## 6. Verificaciones pendientes
 

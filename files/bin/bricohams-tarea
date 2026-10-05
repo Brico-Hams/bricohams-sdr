@@ -5,7 +5,7 @@
 #  (sin contraseña ni shell) puede ejecutarlas como root SIN clave gracias a
 #  /etc/sudoers.d/bricohams, que solo permite este programa. Así el cron no
 #  necesita credenciales guardadas en ningún sitio.
-#   actualizar   apt update + upgrade sin preguntas (respeta lo retenido)
+#   actualizar   apt update + upgrade sin preguntas (respeta lo retenido) y, en Docker, imagen nueva
 #   copia        copia de seguridad (bricohams-backup) + perfil de OpenWebRX+ (owrx-clone)
 #   reinicio     reinicio preventivo (se aplaza si hay un pase de satélite en curso)
 #   salud        bricohams-check; avisa por Telegram si algo falla
@@ -18,6 +18,10 @@ LOG=/var/log/bricohams-tareas.log
 tg() { /usr/local/bin/bricohams-telegram "$*"; }
 log() { echo "$(date '+%F %T') $*" >>"$LOG"; }
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con: sudo -n /usr/local/sbin/bricohams-tarea <verbo>"; exit 1; }
+# v4.3 · backend de OpenWebRX+ (nativo o Docker) y rutas que calcula install.sh
+# shellcheck source=/dev/null
+[ -r /etc/bricohams/bricohams.env ] && . /etc/bricohams/bricohams.env
+HTDOCS=${OWRX_HTDOCS:-/usr/lib/python3/dist-packages/htdocs}
 
 case "${1:-}" in
     actualizar)
@@ -28,13 +32,19 @@ case "${1:-}" in
             log "actualizar: ok"; tg "✅ Actualización semanal hecha${extra}"
         else
             log "actualizar: ERROR"; tg "⚠️ La actualización semanal ha fallado: mira $LOG"
+        fi
+        # v4.3 · OpenWebRX+ en Docker: imagen nueva (si la hay) y contenedor recreado con los mismos volúmenes
+        if [ "${OWRX_BACKEND:-native}" = docker ] && [[ ! "${OWRX_DOCKER_ACTUALIZAR:-yes}" =~ ^([Nn][Oo]?|0|[Ff]alse)$ ]] && [ -f "${OWRX_DOCKER_DIR:-/opt/owrx-docker}/docker-compose.yaml" ]; then
+            dc="docker compose"; docker compose version >/dev/null 2>&1 || dc=docker-compose
+            if (cd "${OWRX_DOCKER_DIR:-/opt/owrx-docker}" && $dc pull -q && $dc up -d) >>"$LOG" 2>&1; then log "actualizar docker: ok"
+            else log "actualizar docker: ERROR"; tg "⚠️ No he podido actualizar el contenedor de OpenWebRX+: mira $LOG"; fi
         fi ;;
     copia)
         if /usr/local/sbin/bricohams-backup >>"$LOG" 2>&1; then log "copia: ok"; else log "copia: ERROR"; tg "⚠️ Falló la copia de seguridad"; fi
         # v4.2 · además, un perfil completo de OpenWebRX+ (owrx-clone) para llevarlo a otro equipo (7 últimos)
         if command -v owrx-clone >/dev/null; then
             d=/var/backups/bricohams
-            if owrx-clone exportar -o "$d/perfil-owrx-$(date +%F).owrx.tar.gz" >>"$LOG" 2>&1; then
+            if owrx-clone ${OWRX_CLONE_DOCKER:+--docker "$OWRX_CLONE_DOCKER"} exportar -o "$d/perfil-owrx-$(date +%F).owrx.tar.gz" >>"$LOG" 2>&1; then
                 log "perfil owrx-clone: ok"
                 find "$d" -maxdepth 1 -name 'perfil-owrx-*.owrx.tar.gz' -printf '%T@ %p\n' | sort -rn | tail -n +8 | cut -d' ' -f2- | xargs -r rm -f
             else
@@ -42,7 +52,7 @@ case "${1:-}" in
             fi
         fi ;;
     reinicio)
-        P=/usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json
+        P=$HTDOCS/plugins/receiver/satelites/pases.json
         if [ -r "$P" ] && python3 -c "import json,time,sys;t=time.time();sys.exit(0 if any(p['aos']-300<t<p['los'] for p in json.load(open('$P'))['pases']) else 1)" 2>/dev/null; then
             log "reinicio: aplazado 20 min (pase de satélite)"; echo "/usr/local/sbin/bricohams-tarea reinicio" | at now + 20 minutes 2>/dev/null || true
             exit 0

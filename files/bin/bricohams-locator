@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""bricohams-locator · la zona de la estación según su locator (v4.3, manual 32)
+
+  bricohams-locator info [LOCATOR]          coordenadas, zona y lo más cercano de cada categoría
+  bricohams-locator coordenadas LOCATOR     centro de la cuadrícula («38.854167 -1.291667»)
+  bricohams-locator locator LAT LON         locator de unas coordenadas («IM97kx»)
+  bricohams-locator refrescar [--forzar]    baja AEMET (con AEMET_API_KEY) y las FM de la zona
+  bricohams-locator marcadores [--aplicar]  enseña los marcadores [AUTO-LOCATOR]; con --aplicar los
+                                            fusiona en bookmarks.json y reinicia OpenWebRX+
+  bricohams-locator meteo                   la METEO_STATIONS que saldría
+
+Sin LOCATOR usa STATION_LOCATOR / STATION_LAT / STATION_LON de /etc/bricohams/bricohams.env.
+"""
+import json
+import os
+import subprocess
+import sys
+
+AQUI = os.path.dirname(os.path.realpath(__file__))
+for d in (AQUI, '/usr/local/lib/bricohams'):
+    if os.path.isfile(os.path.join(d, 'bricohams_locator.py')):
+        sys.path.insert(0, d)
+        break
+import bricohams_locator as loc                      # noqa: E402
+import bricohams_locator_bookmarks as bm             # noqa: E402
+import bricohams_locator_online as online            # noqa: E402
+
+ENV = os.environ.get('BRICOHAMS_ENV', '/etc/bricohams/bricohams.env')
+ZONA_ENV = os.path.join(os.path.dirname(ENV), 'zona.env')    # copia sin secretos, legible sin sudo
+KIT = os.environ.get('BRICOHAMS_KIT', '/opt/bricohams/kit')
+CACHE = os.environ.get('BRICOHAMS_LOCATOR_CACHE', '/var/lib/bricohams/locator')
+
+
+def leer_env():
+    e = {}
+    ruta = ENV if os.access(ENV, os.R_OK) or not os.path.exists(ZONA_ENV) else ZONA_ENV
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            for linea in f:
+                linea = linea.strip()
+                if '=' in linea and not linea.startswith('#'):
+                    k, v = linea.split('=', 1)
+                    v = v.strip()
+                    if len(v) >= 2 and v[0] == v[-1] and v[0] in '\'"':
+                        v = v[1:-1].replace("'\\''", "'")
+                    e[k.strip()] = v
+    except OSError as err:
+        if os.path.exists(ENV):
+            sys.exit('No puedo leer %s (%s): prueba con sudo' % (ENV, err.strerror))
+    return e
+
+
+def qth(env, locator=None):
+    if locator:
+        lat, lon = loc.locator_to_latlon(locator)
+        return locator.upper(), lat, lon, None
+    try:
+        lat, lon = float(env.get('STATION_LAT') or 0), float(env.get('STATION_LON') or 0)
+    except ValueError:
+        lat = lon = 0.0
+    locator = env.get('STATION_LOCATOR', '')
+    if not (lat or lon):
+        if not locator:
+            sys.exit('Sin STATION_LOCATOR ni STATION_LAT/LON en %s: bricohams-locator info IM98iu' % ENV)
+        lat, lon = loc.locator_to_latlon(locator)
+        return locator.upper(), lat, lon, None
+    return (locator or loc.latlon_to_locator(lat, lon)).upper(), lat, lon, (lat, lon)
+
+
+def catalogo(env):
+    c = env.get('LOCATOR_CATALOG') or 'data/locator/catalogo_es.json'
+    return c if c.startswith('/') else os.path.join(KIT, c)
+
+
+def seleccion(env, locator, lat, lon, exacto):
+    cat = bm.cargar_catalogo(catalogo(env), CACHE if os.path.isdir(CACHE) else None, (lat, lon))
+    ambitos = tuple(x for x in (env.get('LOCATOR_RADIOS') or 'regional,local').split(',') if x)
+    return bm.seleccionar(locator, cat, float(env.get('LOCATOR_RADIUS_KM') or 100), int(env.get('LOCATOR_MAX_SITES') or 3),
+                          exacto, int(env.get('LOCATOR_RADIOS_MAX') or 30), ambitos)
+
+
+def owrx_data(env):
+    if env.get('OWRX_BACKEND') == 'docker':
+        return os.path.join(env.get('OWRX_DOCKER_DIR') or '/opt/owrx-docker', 'var')
+    return '/var/lib/openwebrx'
+
+
+def main(argv):
+    if not argv or argv[0] in ('-h', '--help', 'ayuda'):
+        print(__doc__)
+        return 0
+    env = leer_env()
+    orden, resto = argv[0], argv[1:]
+    if orden == 'coordenadas' and resto:
+        print('%.6f %.6f' % loc.locator_to_latlon(resto[0]))
+        return 0
+    if orden == 'locator' and len(resto) == 2:
+        print(loc.latlon_to_locator(float(resto[0]), float(resto[1])))
+        return 0
+    if orden == 'refrescar':
+        locator, lat, lon, _ = qth(env)
+        os.environ.setdefault('AEMET_API_KEY', env.get('AEMET_API_KEY', ''))
+        fuentes = [x for x in (env.get('LOCATOR_ONLINE') or 'aemet,fmdx').split(',') if x]
+        hechos, _ = online.refrescar(CACHE, lat, lon, fuentes, '--forzar' in resto)
+        print('datos de zona de %s: %s' % (locator, ', '.join(hechos) or 'nada nuevo'))
+        return 0
+    if orden in ('info', 'meteo', 'marcadores'):
+        arg = next((x for x in resto if not x.startswith('-')), None)
+        locator, lat, lon, exacto = qth(env, arg)
+        lat, lon, cerca = seleccion(env, locator, lat, lon, exacto)
+        if orden == 'info':
+            bm.informe(lat, lon, locator, cerca)
+            return 0
+        if orden == 'meteo':
+            print(bm.meteo_stations(cerca))
+            return 0
+        nuevos = bm.bookmarks(cerca, locator)
+        if '--aplicar' not in resto:
+            for b in nuevos:
+                print('%12.4f MHz  %-5s %s' % (b['frequency'] / 1e6, b['modulation'], b['name']))
+            print('\n%d marcadores. Para ponerlos en OpenWebRX+: sudo bricohams-locator marcadores --aplicar' % len(nuevos))
+            return 0
+        if os.geteuid() != 0:
+            sys.exit('Ejecútalo con sudo')
+        ruta = os.path.join(owrx_data(env), 'bookmarks.json')
+        existentes = json.load(open(ruta, encoding='utf-8')) if os.path.exists(ruta) else []
+        kit_bm = os.path.join(KIT, 'files/openwebrx/bookmarks.json')
+        kit = json.load(open(kit_bm, encoding='utf-8')) if os.path.exists(kit_bm) else None
+        lejos = bm.distance_km(lat, lon, *bm.KIT_ORIGEN) > float(env.get('LOCATOR_KIT_ZONA_KM') or 150)
+        final = bm.merge_bookmarks(existentes, nuevos, kit, lejos)
+        dueno = os.stat(ruta) if os.path.exists(ruta) else os.stat(os.path.dirname(ruta))
+        bm.write_json(ruta, final)
+        os.chmod(ruta, 0o664)                         # el temporal nace 600: OpenWebRX+ tiene que leerlo
+        os.chown(ruta, dueno.st_uid, dueno.st_gid)
+        if env.get('OWRX_BACKEND') == 'docker':
+            subprocess.run(['docker', 'restart', env.get('OWRX_DOCKER_CONTAINER') or 'owrx-mbe'], check=False)
+        else:
+            subprocess.run(['systemctl', 'restart', 'openwebrx'], check=False)
+        print('%s: %d marcadores (%d de la zona %s). OpenWebRX+ reiniciado.' % (ruta, len(final), len(nuevos), locator))
+        return 0
+    print(__doc__)
+    return 2
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except (ValueError, OSError) as e:
+        sys.exit('bricohams-locator: %s' % e)

@@ -59,6 +59,10 @@ fi
 
 echo "Paro OpenWebRX y readsb para liberar los SDR…"
 systemctl stop openwebrx readsb 2>/dev/null
+# v4.3 · OpenWebRX+ en Docker
+if [ "$(. /etc/bricohams/bricohams.env 2>/dev/null; echo "${OWRX_BACKEND:-native}")" = docker ]; then
+    docker stop "$(. /etc/bricohams/bricohams.env 2>/dev/null; echo "${OWRX_DOCKER_CONTAINER:-owrx-mbe}")" >/dev/null 2>&1 || true
+fi
 sleep 2
 
 asignadas=" "
@@ -93,3 +97,4 @@ done
 echo
 echo "Hecho. Las series nuevas se leen al volver a enchufar: reinicia (sudo reboot)"
 echo "o desenchufa y enchufa los dongles, y luego: sudo systemctl start openwebrx readsb"
+echo "(con OpenWebRX+ en Docker: sudo docker start owrx-mbe, o el nombre de OWRX_DOCKER_CONTAINER)"

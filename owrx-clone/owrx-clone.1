@@ -1,8 +1,11 @@
 .\" -*- coding: UTF-8 -*-
-.TH OWRX-CLONE 1 "octubre 2026" "owrx-clone 1.0.0" "Herramientas de OpenWebRX+"
+.TH OWRX-CLONE 1 "octubre 2026" "owrx-clone 1.1.0" "Herramientas de OpenWebRX+"
 .SH NOMBRE
 owrx-clone \- clona una instalación de OpenWebRX+ (configuración, plugins, sistema y paquetes) a otro equipo
 .SH SINOPSIS
+.RB [ \-\-docker
+.IR contenedor ]
+.br
 .B owrx-clone exportar
 .RB [ \-o
 .IR fichero ]
@@ -44,7 +47,7 @@ owrx-clone \- clona una instalación de OpenWebRX+ (configuración, plugins, sis
 .B owrx-clone comprobar
 .br
 .B owrx-clone ayuda
-.RI [ niveles | seguridad | dispositivos | migrar | problemas ]
+.RI [ niveles | seguridad | dispositivos | migrar | docker | problemas ]
 .SH DESCRIPCIÓN
 .B owrx-clone
 guarda en un único fichero
@@ -128,6 +131,24 @@ a través de un enlace simbólico. Un directorio de datos distinto al de este eq
 incluye sistema y parches, que ejecutan código como root. Los niveles
 .BR web ", " sistema " y " parches
 contienen código: importa solo perfiles de confianza.
+.SH DOCKER
+Con
+.BI \-\-docker " contenedor"
+(antes de la orden) o
+.B OWRX_CLONE_DOCKER
+owrx-clone trabaja con OpenWebRX+ en Docker: localiza con
+.B docker inspect
+las carpetas de este equipo montadas en
+.IR /var/lib/openwebrx " (config), " /etc/openwebrx " (etc) y " /usr/lib/python3/dist\-packages/htdocs/plugins " (web)"
+y lee o escribe ahí; para y arranca el contenedor con
+.BR "docker stop" / start .
+Sin los dos primeros volúmenes se para (se perdería todo al recrear el contenedor).
+No instala paquetes (van en la imagen, que queda apuntada en el perfil) ni aplica
+.BR parches ;
+.B sistema
+(udev, modprobe) sí, porque es del equipo. Vale para pasar de nativo a Docker y al revés.
+.B deshacer
+sabe si la importación fue en un contenedor.
 .SH FICHEROS
 .TP
 .I /var/backups/owrx-clone/copia\-FECHA.tar.gz
@@ -136,6 +157,9 @@ copia previa de cada importación (y su lista de ficheros creados).
 .TP
 .B OWRX_CLONE_CLAVE
 contraseña de los perfiles cifrados (si no, se pide).
+.TP
+.B OWRX_CLONE_DOCKER
+contenedor de OpenWebRX+ (lo mismo que \-\-docker).
 .TP
 .B NO_COLOR
 salida sin colores.
@@ -148,11 +172,14 @@ owrx\-clone ver estacion.owrx.tar.gz.enc
 sudo owrx\-clone importar estacion.owrx.tar.gz.enc \-\-simular
 sudo owrx\-clone importar estacion.owrx.tar.gz.enc \-\-todo \-\-mapear "serial=00000101=>serial=1234"
 sudo owrx\-clone deshacer
+sudo owrx\-clone \-\-docker owrx\-mbe importar estacion.owrx.tar.gz.enc
+sudo owrx\-clone \-\-docker owrx\-mbe exportar \-o desde\-docker.owrx.tar.gz
 .fi
 .SH AUTOR
 EA5KAO · BricoHams (Mi QTH, Región de Murcia). Licencia MIT.
 .SH VÉASE TAMBIÉN
 .BR apt (8),
 .BR systemctl (1),
+.BR docker (1),
 .BR SoapySDRUtil (1),
 .BR rtl_eeprom (1)

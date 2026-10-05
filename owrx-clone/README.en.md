@@ -61,6 +61,20 @@ To roll back, run `sudo owrx-clone undo`.
 
 **Different SDRs on the new machine:** use `--mapear "serial=OLD=>serial=NEW"`.
 
+## OpenWebRX+ in Docker (1.1)
+
+Put `--docker CONTAINER` before the command (or set `OWRX_CLONE_DOCKER=CONTAINER`):
+
+```bash
+sudo owrx-clone --docker owrx-mbe export -o from-docker.owrx.tar.gz
+sudo owrx-clone --docker owrx-mbe import profile.owrx.tar.gz --simular
+```
+
+- **Where it writes:** `docker inspect` finds the host folders mounted on `/var/lib/openwebrx` (config), `/etc/openwebrx` (etc) and `/usr/lib/python3/dist-packages/htdocs/plugins` (web). Without the first two it stops: anything inside the container is lost when it is recreated.
+- **What it skips:** no apt packages (OpenWebRX+ and the SDR drivers come with the image, which is recorded in the profile) and no `parches`. `sistema` (udev, modprobe) still applies, as it belongs to the host.
+- **Native ⇄ Docker:** a native profile can be imported into a container and the other way round. Web files outside `plugins/` do not fit in Docker and are reported.
+- **Service:** the container is stopped and started (`docker stop/start`); `undo` knows it was a container.
+
 ## Security
 
 - **Passwords are included by default:** a normal profile holds admin password hashes and API keys. Treat the file like a password, or use `--cifrar` (AES-256 with PBKDF2).
@@ -69,6 +83,6 @@ To roll back, run `sudo owrx-clone undo`.
 - **Restricted paths:** each level writes only to its own directories, never to `/etc/shadow`, `/etc/sudoers`, `/root`, `/boot`, cron, systemd, PAM, `ld.so` or `~/.ssh` (not even `extra`). A profile may only use this machine's data directory or a new `/var/lib/openwebrx…` / `/srv/openwebrx…` owned by the `openwebrx` user; anything else is rejected. `--todo` includes `sistema` and `parches`, which run code as root: use it only with your own or trusted profiles.
 - **No symlinks:** nothing is ever written through a symlink, either on import or on undo. An interrupted import records what it wrote and restarts OpenWebRX+, so `undo` can clean up.
 
-More: `owrx-clone help {niveles,seguridad,dispositivos,migrar,problemas}` and `man owrx-clone`.
+More: `owrx-clone help {niveles,seguridad,dispositivos,migrar,docker,problemas}` and `man owrx-clone`.
 
 *EA5KAO · BricoHams · 2026*

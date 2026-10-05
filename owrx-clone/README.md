@@ -8,7 +8,7 @@
 - tener una **copia completa** de la estación lista para restaurar;
 - **compartir** una configuración con otros radioaficionados (sin contraseñas, con `--publico`).
 
-Un solo fichero Python 3, sin dependencias: solo la biblioteca estándar (y `openssl` para cifrar). Funciona en **Debian 11/12/13, Ubuntu 22.04/24.04 y Raspberry Pi OS**, en amd64, arm64 y armhf. Licencia MIT.
+Un solo fichero Python 3, sin dependencias: solo la biblioteca estándar (y `openssl` para cifrar). Funciona en **Debian 11/12/13, Ubuntu 22.04/24.04 y Raspberry Pi OS**, en amd64, arm64 y armhf, con OpenWebRX+ **instalado como paquete o en Docker** (versión 1.1). Licencia MIT.
 
 ## Instalar
 
@@ -65,6 +65,22 @@ sudo owrx-clone importar perfil.owrx.tar.gz --mapear "serial=00000101=>serial=12
 
 O graba en el RTL-SDR nuevo la serie antigua: `rtl_eeprom -d 0 -s 00000101`.
 
+## OpenWebRX+ en Docker (1.1)
+
+Pon `--docker CONTENEDOR` delante de la orden (o `OWRX_CLONE_DOCKER=CONTENEDOR`):
+
+```bash
+sudo owrx-clone --docker owrx-mbe exportar -o desde-docker.owrx.tar.gz
+sudo owrx-clone --docker owrx-mbe importar perfil.owrx.tar.gz --simular
+sudo owrx-clone --docker owrx-mbe comprobar
+```
+
+- **Dónde escribe:** con `docker inspect` busca las carpetas de este equipo montadas en `/var/lib/openwebrx` (config), `/etc/openwebrx` (etc) y `/usr/lib/python3/dist-packages/htdocs/plugins` (web), y trabaja ahí. Si faltan las dos primeras se para: lo de dentro del contenedor se pierde al recrearlo.
+- **Qué no hace:** no instala paquetes con apt (OpenWebRX+ y los SDR van en la imagen, que queda apuntada en el perfil) ni aplica `parches`. `sistema` (udev, modprobe) sí, porque es del equipo.
+- **Nativo ⇄ Docker:** un perfil de una instalación nativa se importa en un contenedor y al revés. Lo de la web que no esté en `plugins/` no cabe en Docker y se avisa.
+- **Servicio:** para y arranca el contenedor (`docker stop/start`). `deshacer` sabe que era un contenedor.
+- **Contenedor recomendado:** imagen `slechev/openwebrxplus` (o `-softmbe`) con `-v ./etc:/etc/openwebrx -v ./var:/var/lib/openwebrx -v ./plugins:/usr/lib/python3/dist-packages/htdocs/plugins`. Más: `owrx-clone ayuda docker`.
+
 ## Seguridad
 
 - Un perfil **normal lleva contraseñas**: el hash de las cuentas de administración y las claves de `settings.json`. Trátalo como una contraseña o usa `--cifrar` (AES-256, openssl, PBKDF2). La contraseña se pide o se toma de `OWRX_CLONE_CLAVE`.
@@ -90,7 +106,7 @@ archivos/<nivel>/…       los ficheros. {DATA} = directorio de datos y {HTDOCS}
 
 ```bash
 owrx-clone --help
-owrx-clone ayuda niveles | seguridad | dispositivos | migrar | problemas
+owrx-clone ayuda niveles | seguridad | dispositivos | migrar | docker | problemas
 man owrx-clone
 ```
 

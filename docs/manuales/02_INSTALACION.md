@@ -19,6 +19,8 @@ Antes de instalar, copia `bricohams.env.example` a `bricohams.env`. El ejemplo n
   | Variable | Qué es |
   |---|---|
   | `STATION_QTH`, `STATION_COUNTRY`, `STATION_LAT`, `STATION_LON`, `STATION_ASL` | nombre/país y coordenadas de tu estación; país ISO de dos letras |
+  | `STATION_LOCATOR`, `LOCATOR_*` (v4.3) | locator Maidenhead: da las coordenadas si están a 0 y elige aeropuertos, AEMET, puertos, NAVTEX y FM de tu zona ([manual 32](32_ZONA_LOCATOR.md)) |
+  | `OWRX_BACKEND`, `OWRX_DOCKER_*` (v4.3) | `native` (paquete) o `docker` (imagen oficial con `docker-compose.yaml` generado, [manual 33](33_OPENWEBRX_DOCKER.md)) |
   | `WIFI_COUNTRY`, `WIFI_SSID_1`, `WIFI_SSID_2`, `WIFI_PASS` | código regulatorio y redes WiFi propias; deja los SSID vacíos si usas Ethernet |
   | `LILYGO_WIFI_SSID`, `LILYGO_WIFI_PASS` | WiFi de 2,4 GHz del ESP32, si instalas el iGate |
   | `CALLSIGN`, `IGATE_CALLSIGN`, `WX_APRS_CALLSIGN`, `WXLORA_CALLSIGN` | usa indicativos tuyos y con sufijos asignados; no dejes los valores de muestra |
@@ -31,9 +33,9 @@ Antes de instalar, copia `bricohams.env.example` a `bricohams.env`. El ejemplo n
 - Revisa también las series `SERIAL_*`, los pines `HAT_*`, `IO_MODE`, `CAM_SOURCE` y los interruptores `*_ENABLE`. El QR `MESH_CHANNEL_URL` y los marcadores son de la red de referencia: sustitúyelos por los de tu región/red.
 
 ## Alcance y compatibilidad
-El instalador solo admite **Raspberry Pi OS arm64 Bookworm (Debian 12) o Trixie (Debian 13)** y está diseñado alrededor de Raspberry Pi 5. La receta completa espera el HAT HackerGadgets, SDR USB con sus series configuradas, FlightStick RadarBox, dispositivos LilyGO, Pico y periféricos descritos en los manuales. No está validado para Raspberry Pi anteriores, Docker ni otras distribuciones.
+El instalador solo admite **Raspberry Pi OS arm64 Bookworm (Debian 12) o Trixie (Debian 13)** y está diseñado alrededor de Raspberry Pi 5. La receta completa espera el HAT HackerGadgets, SDR USB con sus series configuradas, FlightStick RadarBox, dispositivos LilyGO, Pico y periféricos descritos en los manuales. No está validado para Raspberry Pi anteriores ni otras distribuciones. Desde la v4.3, OpenWebRX+ puede ir en Docker en la misma Pi (`OWRX_BACKEND="docker"`, manual 33); lo demás del kit sigue en el sistema.
 
-Los archivos `files/openwebrx/settings.json.tmpl`, `files/openwebrx/bookmarks.json`, branding y datos de radio incluyen decisiones/perfiles de EA5KAO y Murcia. Indicativo, QTH y país del receptor ya se toman de `bricohams.env`, pero debes revisar y reemplazar los marcadores, servicios regionales, imágenes y cualquier hotspot propio. `--solo` evita pasos seleccionados; no adapta el cableado ni la configuración de hardware. Si no tienes un periférico, desactiva su función en `bricohams.env` y comprueba sus dependencias antes de ejecutar la receta completa.
+Los archivos `files/openwebrx/settings.json.tmpl`, `files/openwebrx/bookmarks.json`, branding y datos de radio incluyen decisiones/perfiles de EA5KAO y Murcia. Indicativo, QTH y país del receptor ya se toman de `bricohams.env`. Desde la v4.3, con `STATION_LOCATOR` los marcadores de aeropuertos, puertos, NAVTEX y FM y las estaciones AEMET salen de tu zona, y lejos de Mi QTH se quitan los de Murcia (manual 32). Revisa aun así imágenes y cualquier hotspot propio. `--solo` evita pasos seleccionados; no adapta el cableado ni la configuración de hardware. Si no tienes un periférico, desactiva su función en `bricohams.env` y comprueba sus dependencias antes de ejecutar la receta completa.
 
 ## 2. Lanzar el instalador
 

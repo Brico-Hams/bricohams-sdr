@@ -85,7 +85,16 @@ titulo "OpenWebRX+"
 servicio openwebrx
 if curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8073/; then bien "web en http://$(hostname -I | awk '{print $1}'):8073"; else mal "la web no responde en el puerto 8073"; fi
 [ -s "$OWRX_DATA/settings.json" ] && bien "settings.json ($(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(len(d["sdrs"]),"receptores,",sum(len(s["profiles"]) for s in d["sdrs"].values()),"perfiles")' "$OWRX_DATA/settings.json"))" || mal "falta $OWRX_DATA/settings.json"
-[ -s "$OWRX_DATA/users.json" ] && bien "usuario administrador creado" || mal "no hay usuario admin: revisa el contenedor OpenWebRX+"
+[ -s "$OWRX_DATA/users.json" ] && bien "usuario administrador creado" || mal "no hay usuario admin: $([ "${OWRX_BACKEND:-native}" = docker ] && echo "sudo docker exec -it ${OWRX_DOCKER_CONTAINER:-owrx-mbe} openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}" || echo "sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}")"
+if [ "${OWRX_BACKEND:-native}" = docker ]; then     # v4.3
+    img=$(docker inspect --format '{{.Config.Image}}' "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" 2>/dev/null) && bien "imagen $img" || mal "no encuentro el contenedor ${OWRX_DOCKER_CONTAINER:-owrx-mbe}: sudo bash install.sh --solo openwebrx"
+    systemctl is-active --quiet openwebrx 2>/dev/null && mal "el OpenWebRX+ nativo también está en marcha (choca con el de Docker): sudo systemctl disable --now openwebrx"
+fi
+# v4.3 · zona del locator
+if [ -n "${STATION_QTH_LOCATOR:-}" ]; then
+    n=$(python3 -c 'import json,sys;print(sum("[AUTO-LOCATOR]" in (b.get("description") or "") for b in json.load(open(sys.argv[1]))))' "$OWRX_DATA/bookmarks.json" 2>/dev/null || echo 0)
+    [ "$n" -gt 0 ] && bien "zona $STATION_QTH_LOCATOR: $n marcadores de la zona · bricohams-locator info" || aviso "zona $STATION_QTH_LOCATOR sin marcadores de zona: sudo bricohams-locator marcadores --aplicar"
+fi
 
 titulo "SDR"
 lsmod | grep -q dvb_usb_rtl28xxu && mal "el módulo DVB dvb_usb_rtl28xxu está cargado (bloquea los RTL-SDR)" || bien "módulo DVB bloqueado"

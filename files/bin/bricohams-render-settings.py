@@ -23,7 +23,7 @@ def main(src, dst):
     callsign = env('CALLSIGN', 'N0CALL').upper()
     station_lat = float(env('STATION_LAT', '0.0'))
     station_lon = float(env('STATION_LON', '0.0'))
-    if env('STATION_LOCATOR'):
+    if env('STATION_LOCATOR') and not (station_lat or station_lon):    # v4.3 · las coordenadas, si están, mandan
         station_lat, station_lon = locator_to_latlon(env('STATION_LOCATOR'))
     station_country = env('STATION_COUNTRY', 'ES').upper()
     if len(station_country) != 2 or not station_country.isascii() or not station_country.isalpha():
