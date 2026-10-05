@@ -35,6 +35,7 @@ window.dsp_audio_config    = { preajuste: 'voz', activo: false };
 // Oyentes en tiempo real del plugin «listeners» de 0xAF: necesita un proyecto Supabase propio
 // (LISTENERS_SUPABASE_URL y LISTENERS_SUPABASE_KEY en bricohams.env). Vacío = no se carga.
 const LISTENERS = { url: '__LISTENERS_URL__', key: '__LISTENERS_KEY__' };
+const LISTENERS_COUNTRY = '__LISTENERS_COUNTRY__';
 
 // Pasos del plugin tune_precise (Hz)
 Plugins.tune_precise_steps = [25000, 12500, 6250, 1000, 100];
@@ -61,6 +62,25 @@ const PluginsOpcionales = [
 (async () => {
     await Plugins.load(rp_url + '/utils/utils.js');
     await new Promise(resolve => Plugins.utils.on_ready(resolve));   // esperar a que el receptor esté listo
+
+    function activarPerfilEnlace() {
+        const url = new URL(location.href);
+        const profileKey = url.searchParams.get('bh_profile');
+        const select = document.getElementById('openwebrx-sdr-profiles-listbox');
+        if (!profileKey || !select || !Array.from(select.options).some(option => option.value === profileKey)) return;
+        if (select.value !== profileKey) {
+            select.value = profileKey;
+            if (typeof window.sdr_profile_changed === 'function') window.sdr_profile_changed();
+            else $(select).trigger('change');
+        }
+        url.searchParams.delete('bh_profile');
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+        $(document).off('server:profiles:after.bh_listeners_profile', activarPerfilEnlace);
+    }
+    if (new URL(location.href).searchParams.has('bh_profile')) {
+        $(document).on('server:profiles:after.bh_listeners_profile', activarPerfilEnlace);
+        setTimeout(activarPerfilEnlace, 0);
+    }
 
     // Plugins integrados de OpenWebRX+ (no se cargan con Plugins.load)
     const builtin = (name) => { try { if (typeof window[name] !== 'undefined') window[name].init(); } catch (e) { console.warn(name, e); } };
@@ -97,6 +117,62 @@ const PluginsOpcionales = [
     if (LISTENERS.url && LISTENERS.url.indexOf('__') !== 0 && LISTENERS.key && LISTENERS.key.indexOf('__') !== 0) {
         try {
             await Plugins.load(rp_url + '/listeners/listeners.js');
+            const listeners = Plugins.listeners;
+            const capture = listeners._capture;
+            listeners._capture = function () {
+                const presence = capture.apply(this, arguments);
+                if (presence && /^[A-Z]{2}$/.test(LISTENERS_COUNTRY)) presence.country = LISTENERS_COUNTRY;
+                return presence;
+            };
+            const validPresence = listeners._validPresence;
+            listeners._validPresence = function (presence) {
+                const valid = validPresence.call(this, presence);
+                if (valid) valid.country = this._shortText(presence.country, 40);
+                return valid;
+            };
+            const groups = listeners._groups;
+            listeners._groups = function () {
+                const receivers = groups.call(this);
+                this.state.presences.forEach(function (presence) {
+                    if (receivers[presence.receiver_id] && presence.country && !receivers[presence.receiver_id].country) {
+                        receivers[presence.receiver_id].country = presence.country;
+                    }
+                });
+                return receivers;
+            };
+            const renderReceiver = listeners._renderReceiver;
+            listeners._renderReceiver = function (receiver, local) {
+                const section = renderReceiver.call(this, receiver, local);
+                if (receiver.country) {
+                    const flag = Plugins.banderas && Plugins.banderas.bandera
+                        ? Plugins.banderas.bandera(receiver.country)
+                        : '';
+                    section.find('.owrx-listeners__receiver-heading').append(
+                        $('<span class="owrx-listeners__country"></span>')
+                            .attr('title', receiver.country)
+                            .text([flag, receiver.country].filter(Boolean).join(' '))
+                    );
+                }
+                if (!local && receiver.url) {
+                    const profileKeys = Object.keys(receiver.profiles).sort(function (a, b) {
+                        return receiver.profiles[a].name.localeCompare(receiver.profiles[b].name);
+                    });
+                    section.find('.owrx-listeners__profile').each(function (index) {
+                        const profile = receiver.profiles[profileKeys[index]];
+                        const profileUrl = new URL(receiver.url, location.href);
+                        profileUrl.searchParams.set('bh_profile', profile.key || profile.name);
+                        $(this).find('.owrx-listeners__tuning').attr({ role: 'link', tabindex: '0', title: 'Abrir perfil remoto' })
+                            .on('click', function () { window.open(profileUrl.href, '_blank', 'noopener,noreferrer'); })
+                            .on('keydown', function (event) {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    window.open(profileUrl.href, '_blank', 'noopener,noreferrer');
+                                }
+                            });
+                        });
+                }
+                return section;
+            };
             await Plugins.listeners.setup({ supabaseUrl: LISTENERS.url, supabaseKey: LISTENERS.key, network: 'bricohams',
                                            receiverName: 'EA5KAO · Mi QTH', receiverUrl: location.origin });
         } catch (e) { console.warn('listeners', e); }

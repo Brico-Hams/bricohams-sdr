@@ -46,7 +46,8 @@ for k, s in T['sdrs'].items():
         notas.append('escucha automática: día %s · crepúsculo %s · noche %s' % (sc['day'], sc['greyline'], sc['night']))
     if 'direct_sampling' in s:
         notas.append('muestreo directo por perfil (HF)')
-    L.append('| `%s` | %s | %s | %s | %d | %s | %s |' % (k, limpio(s['name']), s['type'], serie, len(s['profiles']), activo, '; '.join(notas)))
+    nombre = limpio(s['name']).replace('__CALLSIGN__', ENV.get('CALLSIGN', 'CALLSIGN'))
+    L.append('| `%s` | %s | %s | %s | %d | %s | %s |' % (k, nombre, s['type'], serie, len(s['profiles']), activo, '; '.join(notas)))
 L += ['| — | ADS-B (fuera de OpenWebRX) | readsb rtlsdr | %s | — | ADSB_ENABLE | FlightStick de RadarBox: Beast :30005 → rbfeeder + MLAT |' % ENV['SERIAL_ADSB'], '']
 
 for k, s in T['sdrs'].items():
@@ -111,8 +112,8 @@ L += ['', '## 6. Bus I2C-1 (GPIO2/GPIO3)', '', '| Dirección | Dispositivo | Uso
       '| 0x51 | PCF85063A (HAT) | RTC, `dtoverlay=i2c-rtc,pcf85063a` → /dev/rtc0 |',
       '| 0x76 / 0x77 | BME280 (ID 0x60) o BMP280 (ID 0x58) | `bricohams-wx` |', '']
 
-L += ['## 7. Indicativos y SSID', '', '| Indicativo | Qué es | Dónde |', '|---|---|---|',
-      '| EA5KAO | iGate APRS de OpenWebRX (packet 144,800) | settings.json `aprs_callsign` |',
+L += ['## 7. Indicativos y WiFi', '', '| Indicativo | Qué es | Dónde |', '|---|---|---|',
+    '| %s | iGate APRS de OpenWebRX (packet 144,800) | settings.json `aprs_callsign` |' % ENV.get('CALLSIGN', 'CALLSIGN'),
       '| %s | iGate LoRa APRS 433,775 (LilyGO, solo RX) | `IGATE_CALLSIGN` |' % ENV['IGATE_CALLSIGN'],
       '| %s | Estación meteorológica (BME280 + viento + lluvia) | `WX_APRS_CALLSIGN` |' % ENV['WX_APRS_CALLSIGN'],
       '| %s | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |' % ENV.get('WXLORA_CALLSIGN', 'EA5KAO-14'),

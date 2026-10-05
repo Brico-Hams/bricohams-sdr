@@ -11,9 +11,8 @@
 ```ini
 [client]
 network_mode = true
-lat = 0.0
-lon = 0.0
-alt = 205          ; altura de la ANTENA sobre el nivel del mar (ADSB_ANT_ALT)
+# El instalador rellena lat/lon desde STATION_LAT/STATION_LON.
+alt = tu_altitud    ; altura de la ANTENA sobre el nivel del mar (ADSB_ANT_ALT)
 key = …            ; se conserva la que haya
 
 [network]

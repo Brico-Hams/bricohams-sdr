@@ -68,9 +68,10 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
 ## Puesta en marcha rápida
 
 ```bash
-git clone <git-interno>/bricohams-sdr.git && cd bricohams-sdr
-cp bricohams.env.example bricohams.env && nano bricohams.env     # claves (no se suben al git)
-sudo bash install.sh --backup ~/backup-openwebrx-2026-10-03.tar.gz   # "bash install.sh" funciona aunque se pierda el permiso +x
+git clone https://github.com/anatolbricoham/bricohams-sdr.git && cd bricohams-sdr
+cp bricohams.env.example bricohams.env && nano bricohams.env     # identidad, QTH, hardware y claves
+sudo bash install.sh                                               # instalación nueva
+# solo al restaurar una estación: sudo bash install.sh --backup copia.tar.gz
 sudo bricohams-sdr-serials --grabar        # una vez: series de los 4 RTL-SDR
 sudo bricohams-lilygo identificar          # una vez: nombres fijos de los LilyGO
 sudo reboot
@@ -96,6 +97,12 @@ sudo bash install.sh --actualizar             # hacerlo
 ```
 
 Desde la v4 la estación se abre en **https://&lt;tu dominio&gt;/** (router: puertos 80 y 443 a la Pi; [manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md)).
+
+### Alcance para otros equipos
+
+Este repositorio es un **kit de instalación de referencia**, no un instalador universal de Linux. Está probado para Raspberry Pi 5, arm64, Raspberry Pi OS Bookworm o Trixie y el conjunto de receptores/periféricos descrito arriba. El arranque, HAT, GPIO, serie USB, ADS-B, Meshtastic, Pico, cámara y ventilación presuponen hardware compatible; `--solo` omite pasos, pero no convierte un equipo distinto en compatible.
+
+Antes de instalar en otra estación, personaliza `bricohams.env` (indicativo, QTH, coordenadas, país, WiFi, números de serie y servicios habilitados). La plantilla de perfiles y los marcadores de radio de `files/openwebrx/` son de Murcia/EA5KAO: cambia frecuencias, repetidores, branding y descripciones que no correspondan a tu zona. No habilites APRS ni conectes nodos transmisores hasta configurar tus propios indicativos, claves y parámetros de radio. El [manual 02](docs/manuales/02_INSTALACION.md) contiene la lista previa y los límites soportados.
 
 El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del mástil, en el [manual 10](docs/manuales/10_CAJA_3D.md).
 

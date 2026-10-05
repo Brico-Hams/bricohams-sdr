@@ -162,16 +162,16 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | 0x51 | PCF85063A (HAT) | RTC, `dtoverlay=i2c-rtc,pcf85063a` → /dev/rtc0 |
 | 0x76 / 0x77 | BME280 (ID 0x60) o BMP280 (ID 0x58) | `bricohams-wx` |
 
-## 7. Indicativos y SSID
+## 7. Indicativos y WiFi
 
 | Indicativo | Qué es | Dónde |
 |---|---|---|
-| EA5KAO | iGate APRS de OpenWebRX (packet 144,800) | settings.json `aprs_callsign` |
-| EA5KAO-10 | iGate LoRa APRS 433,775 (LilyGO, solo RX) | `IGATE_CALLSIGN` |
-| EA5KAO-13 | Estación meteorológica (BME280 + viento + lluvia) | `WX_APRS_CALLSIGN` |
-| EA5KAO-14 | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |
-| EA5KAO BricoHams Mi QTH / BH5K | Nodo Meshtastic 868 (HAT) | `MESH_LONG_NAME` |
-| EA5KAO BricoHams 433 / BH43 | Nodo Meshtastic 433 (LilyGO) | `MESH433_LONG_NAME` |
+| N0CALL | iGate APRS de OpenWebRX (packet 144,800) | settings.json `aprs_callsign` |
+| N0CALL-10 | iGate LoRa APRS 433,775 (LilyGO, solo RX) | `IGATE_CALLSIGN` |
+| N0CALL-13 | Estación meteorológica (BME280 + viento + lluvia) | `WX_APRS_CALLSIGN` |
+| N0CALL-14 | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |
+| N0CALL SDR / BH5K | Nodo Meshtastic 868 (HAT) | `MESH_LONG_NAME` |
+| N0CALL SDR 433 / BH43 | Nodo Meshtastic 433 (LilyGO) | `MESH433_LONG_NAME` |
 
 ## 8. Canales Meshtastic (QR de la red)
 
@@ -258,9 +258,9 @@ Origen: `SMA_LABELS` de `hardware/caja/caja_bricohams.scad`.
 
 | Conexión | SSID | Prioridad | Quién |
 |---|---|---|---|
-| bricohams-wifi-1 | `BiohazardIT-5G` | 20 | Raspberry Pi (5 GHz) |
-| bricohams-wifi-2 | `biohazard-it` | 10 | Raspberry Pi (respaldo 2,4 GHz) |
-| — | `biohazard-it` | — | iGate LilyGO (solo 2,4 GHz) |
+| bricohams-wifi-1 | `WIFI_SSID_1` | 20 | Raspberry Pi (5 GHz) |
+| bricohams-wifi-2 | `WIFI_SSID_2` | 10 | Raspberry Pi (respaldo 2,4 GHz) |
+| — | `LILYGO_WIFI_SSID` | — | iGate LilyGO (solo 2,4 GHz) |
 
 La contraseña solo está en `bricohams.env` (`WIFI_PASS`, `LILYGO_WIFI_PASS`).
 

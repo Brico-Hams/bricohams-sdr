@@ -30,9 +30,9 @@ assert wx.lluvia_desde(v, 0.2794, ahora, ahora - 3600) == round(3 * 0.2794, 2)
 assert wx.lluvia_desde(v, 0.2794, ahora, ahora - 86400) == round(5 * 0.2794, 2)
 
 # paquete completo: dirección 225°, 5 m/s (11 mph), racha 9 m/s (20 mph), lluvia 1,1 mm/1 h (r004), 5,6 mm/24 h (p022)
-pk = wx.aprs_wx_packet('EA5KAO-13', 0.0, 0.0, 22.4, 55.2, 1014.27, 'WX BricoHams',
+pk = wx.aprs_wx_packet('N0CALL-13', 40.0, -3.0, 22.4, 55.2, 1014.27, 'Synthetic WX',
                        wind_dir=225, wind_ms=5.0, gust_ms=9.0, rain_1h=1.1, rain_24h=5.6, rain_mid=2.0)
-assert pk == 'EA5KAO-13>APZBHW,TCPIP*:!3804.94N/00115.21W_225/011g020t072r004p022P008h55b10143WX BricoHams', pk
+assert pk == 'N0CALL-13>APZBHW,TCPIP*:!4000.00N/00300.00W_225/011g020t072r004p022P008h55b10143Synthetic WX', pk
 # norte se escribe 360 (000 = sin dato en algunos programas)
 assert '_360/' in wx.aprs_wx_packet('X', 0, 0, 10, None, 1000, '', wind_dir=0, wind_ms=1)
 print('OK test_viento_lluvia: Modbus CRC, respuestas, dirección media, lluvia 1 h/24 h y paquete APRS completo')

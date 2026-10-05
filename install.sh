@@ -55,6 +55,7 @@ FILES="$KIT/files"
 LOG=/var/log/bricohams-install.log
 HTDOCS=/usr/lib/python3/dist-packages/htdocs
 OWRX_DATA=/var/lib/openwebrx
+OWRX_ETC=/etc/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
@@ -68,6 +69,7 @@ IMPORTAR=""; EXPORTAR=""; EXPORTAR_A=""      # v4.2 · perfiles de OpenWebRX+ (o
 PERFIL_IMPORTADO=/etc/bricohams/perfil-importado
 ESTADO_KIT=/var/lib/bricohams/kit-estado      # huella de cada paso aplicado (v4.1)
 KIT_ANTES="${BRICOHAMS_KIT_ANTES:-}"; KIT_DESPUES=""; PLAN=()
+LOCATOR_CATALOG_PATH=""
 
 c_ok=$'\e[32m'; c_ko=$'\e[31m'; c_av=$'\e[33m'; c_b=$'\e[1m'; c_0=$'\e[0m'
 info()  { printf '%s==>%s %s\n' "$c_b" "$c_0" "$*"; }
@@ -125,6 +127,62 @@ cargar_env() {
     command -v python3 >/dev/null || fallo "Falta python3 (viene con Raspberry Pi OS): sudo apt install python3"
     salida=$(python3 "$FILES/bin/bricohams-env.py" --shell "$1") || fallo "$1 tiene un error de sintaxis (arriba). Revisa las comillas de esa línea."
     eval "$salida"
+    if [ -n "${STATION_LOCATOR:-}" ]; then
+        local coordenadas
+        coordenadas=$(python3 "$FILES/bin/bricohams_locator.py" "$STATION_LOCATOR") || fallo "STATION_LOCATOR no es un locator Maidenhead válido"
+        read -r STATION_LAT STATION_LON <<<"$coordenadas"
+        export STATION_LAT STATION_LON
+    fi
+    LOCATOR_CATALOG_PATH=""
+    if [ -n "${LOCATOR_CATALOG:-}" ]; then
+        [ -n "${STATION_LOCATOR:-}" ] || fallo "LOCATOR_CATALOG requiere STATION_LOCATOR"
+        if [[ "$LOCATOR_CATALOG" = /* ]]; then LOCATOR_CATALOG_PATH=$LOCATOR_CATALOG
+        else LOCATOR_CATALOG_PATH=$KIT/$LOCATOR_CATALOG; fi
+        [ -r "$LOCATOR_CATALOG_PATH" ] || fallo "No puedo leer LOCATOR_CATALOG=$LOCATOR_CATALOG_PATH"
+        local estaciones
+        estaciones=$(python3 "$FILES/bin/bricohams_locator_bookmarks.py" --locator "$STATION_LOCATOR" \
+            --catalog "$LOCATOR_CATALOG_PATH" --radius-km "${LOCATOR_RADIUS_KM:-100}" \
+            --max-sites "${LOCATOR_MAX_SITES:-3}" --meteo-stations) \
+            || fallo "No pude seleccionar servicios cercanos desde LOCATOR_CATALOG"
+        if [ -n "$estaciones" ]; then METEO_STATIONS=$estaciones; export METEO_STATIONS; fi
+    fi
+    case "${OWRX_BACKEND:-native}" in
+        native) HTDOCS=/usr/lib/python3/dist-packages/htdocs; OWRX_DATA=/var/lib/openwebrx; OWRX_ETC=/etc/openwebrx ;;
+        docker)
+            OWRX_DOCKER_DIR=${OWRX_DOCKER_DIR:-/opt/owrx-docker}
+            HTDOCS=$OWRX_DOCKER_DIR
+            OWRX_DATA=$OWRX_DOCKER_DIR/var
+            OWRX_ETC=$OWRX_DOCKER_DIR/etc
+            ;;
+        *) fallo "OWRX_BACKEND debe ser native o docker" ;;
+    esac
+}
+owrx_control() {
+    local action=$1
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        docker "$action" "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" >/dev/null
+    else
+        systemctl "$action" openwebrx
+    fi
+}
+owrx_owner() {
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        docker exec "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" chown -R openwebrx:openwebrx \
+            /var/lib/openwebrx /etc/openwebrx /usr/lib/python3/dist-packages/htdocs/plugins
+    else
+        chown -R openwebrx:openwebrx "$OWRX_DATA"
+    fi
+}
+owrx_admin_adduser() {
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        docker exec -it "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" openwebrx admin adduser "$1"
+    else
+        openwebrx admin adduser "$1"
+    fi
+}
+owrx_docker_mount() {
+    docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$1\"}}{{.Source}}{{end}}{{end}}" \
+        "${OWRX_DOCKER_CONTAINER:-owrx-mbe}"
 }
 # copia en /etc ya «limpia» (comillas simples): la pueden leer bash y systemd sin sorpresas
 instalar_env() {   # el temporal también es 600: lleva todas las claves
@@ -615,6 +673,28 @@ paso_rtlsdr() {
 }
 
 paso_openwebrx() {
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        local container=${OWRX_DOCKER_CONTAINER:-owrx-mbe} mounts target source expected
+        command -v docker >/dev/null || fallo "OWRX_BACKEND=docker requiere Docker CLI"
+        docker inspect "$container" >/dev/null 2>&1 || fallo "No existe el contenedor '$container'; ajusta OWRX_DOCKER_CONTAINER"
+        [ "$(docker inspect --format '{{.State.Running}}' "$container")" = true ] || fallo "El contenedor '$container' debe estar en ejecución"
+        mounts=$(docker inspect --format '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$container")
+        for target in /etc/openwebrx /var/lib/openwebrx /usr/lib/python3/dist-packages/htdocs/plugins; do
+            printf '%s\n' "$mounts" | grep -Fxq "$target" || fallo "Falta el volumen Docker persistente '$target' (Compose oficial)"
+            source=$(owrx_docker_mount "$target")
+            case "$target" in
+                /etc/openwebrx) expected=$OWRX_ETC ;;
+                /var/lib/openwebrx) expected=$OWRX_DATA ;;
+                *) expected=$HTDOCS/plugins ;;
+            esac
+            [ "$(realpath -m "$source")" = "$(realpath -m "$expected")" ] \
+                || fallo "El mount Docker de $target apunta a '$source', no a '$expected' (revisa OWRX_DOCKER_DIR)"
+        done
+        [ -d "$OWRX_ETC" ] && [ -d "$OWRX_DATA" ] && [ -d "$HTDOCS/plugins" ] \
+            || fallo "No encuentro etc/, var/ y plugins/ bajo OWRX_DOCKER_DIR=$OWRX_DOCKER_DIR"
+        bien "OpenWebRX+ Docker '$container' activo y con volúmenes persistentes"
+        return 0
+    fi
     clave_apt https://luarvique.github.io/ppa/openwebrx-plus.gpg /etc/apt/trusted.gpg.d/openwebrx-plus.gpg
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/openwebrx-plus.gpg] https://luarvique.github.io/ppa/$DEB ./" >/etc/apt/sources.list.d/openwebrx-plus.list
     apt_update
@@ -645,8 +725,13 @@ paso_sdrplay() {
 }
 
 paso_configuracion() {
-    systemctl stop openwebrx 2>/dev/null || true
-    install -d -o openwebrx -g openwebrx "$OWRX_DATA"
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        :   # el contenedor sigue activo mientras se actualizan sus volúmenes bind
+        mkdir -p "$OWRX_DATA" "$OWRX_ETC" "$HTDOCS/plugins"
+    else
+        systemctl stop openwebrx 2>/dev/null || true
+        install -d -o openwebrx -g openwebrx "$OWRX_DATA"
+    fi
     local stamp; stamp=$(date +%Y%m%d-%H%M%S)
     [ -f "$OWRX_DATA/settings.json" ] && cp "$OWRX_DATA/settings.json" "$OWRX_DATA/settings.json.antes-$stamp"
     # settings.json desde la plantilla + bricohams.env
@@ -656,8 +741,13 @@ paso_configuracion() {
     if [ -f "$PERFIL_IMPORTADO" ] && ! si "${OWRX_PLANTILLA:-no}"; then
         aviso "Configuración importada de un perfil ($(grep -m1 '^PERFIL=' "$PERFIL_IMPORTADO" | cut -d= -f2-)): no regenero settings.json ni los marcadores."
         aviso "Para volver a la plantilla de BricoHams: OWRX_PLANTILLA=\"yes\" en bricohams.env y sudo bash install.sh --solo configuracion"
-        chown -R openwebrx:openwebrx "$OWRX_DATA"
-        systemctl start openwebrx
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then
+            owrx_owner
+            owrx_control restart
+        else
+            chown -R openwebrx:openwebrx "$OWRX_DATA"
+            systemctl start openwebrx
+        fi
         return 0
     fi
     python3 "$FILES/bin/bricohams-render-settings.py" "$FILES/openwebrx/settings.json.tmpl" "$OWRX_DATA/settings.json"
@@ -672,11 +762,22 @@ paso_configuracion() {
     else
         install -m 644 "$FILES/openwebrx/bookmarks.json" "$OWRX_DATA/bookmarks.json"
     fi
+    if [ -n "$LOCATOR_CATALOG_PATH" ]; then
+        local bm_locator
+        bm_locator=$(mktemp --suffix=.json)
+        python3 "$FILES/bin/bricohams_locator_bookmarks.py" --locator "$STATION_LOCATOR" \
+            --catalog "$LOCATOR_CATALOG_PATH" --radius-km "${LOCATOR_RADIUS_KM:-100}" \
+            --max-sites "${LOCATOR_MAX_SITES:-3}" --merge-existing "$OWRX_DATA/bookmarks.json" \
+            --output "$bm_locator" || { rm -f "$bm_locator"; fallo "No pude generar bookmarks cercanos al locator"; }
+        install -m 664 "$bm_locator" "$OWRX_DATA/bookmarks.json"
+        rm -f "$bm_locator"
+        bien "bookmarks locales actualizados para $STATION_LOCATOR"
+    fi
     install -D -m 644 "$FILES/openwebrx/bookmarks.json" "$bm_kit"
     install -m 664 "$FILES/branding/receiver_avatar.png" "$OWRX_DATA/receiver_avatar.png"
     install -m 664 "$FILES/branding/receiver_top_photo.png" "$OWRX_DATA/receiver_top_photo.png"
-    install -d /etc/openwebrx/openwebrx.conf.d
-    install -m 644 "$FILES"/openwebrx/conf.d/*.conf /etc/openwebrx/openwebrx.conf.d/
+    install -d "$OWRX_ETC/openwebrx.conf.d"
+    install -m 644 "$FILES"/openwebrx/conf.d/*.conf "$OWRX_ETC/openwebrx.conf.d/"
     # restaurar desde una copia (usuarios y marcadores)
     if [ -n "$BACKUP" ]; then
         [ -r "$BACKUP" ] || fallo "No puedo leer la copia $BACKUP"
@@ -695,15 +796,33 @@ paso_configuracion() {
         aviso "Sin usuario de administración todavía: lo trae el perfil que se importa al final"
     elif [ ! -s "$OWRX_DATA/users.json" ]; then
         info "Crea la contraseña del administrador '$OWRX_ADMIN_USER' de OpenWebRX:"
-        openwebrx admin adduser "$OWRX_ADMIN_USER" </dev/tty || aviso "Crea el usuario luego: sudo openwebrx admin adduser $OWRX_ADMIN_USER"
-        chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then
+            docker exec -it "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" openwebrx admin adduser "$OWRX_ADMIN_USER" </dev/tty \
+                || aviso "Crea el usuario luego: docker exec -it ${OWRX_DOCKER_CONTAINER:-owrx-mbe} openwebrx admin adduser $OWRX_ADMIN_USER"
+        else
+            openwebrx admin adduser "$OWRX_ADMIN_USER" </dev/tty || aviso "Crea el usuario luego: sudo openwebrx admin adduser $OWRX_ADMIN_USER"
+            chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true
+        fi
     fi
-    systemctl start openwebrx
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        owrx_owner
+        owrx_control restart
+    else
+        chown -R openwebrx:openwebrx "$OWRX_DATA"
+        systemctl start openwebrx
+    fi
     bien "OpenWebRX configurado: receptores, marcadores, imágenes BricoHams/Murcia"
 }
 
 paso_plugins() {
     local R="$HTDOCS/plugins/receiver"
+    local listeners_country=${LISTENERS_COUNTRY:-${STATION_COUNTRY:-}}
+    if [[ ! "$listeners_country" =~ ^[A-Za-z]{2}$ ]]; then
+        [ -z "$listeners_country" ] || aviso "LISTENERS_COUNTRY debe ser un código ISO de dos letras; no muestro bandera en LST"
+        listeners_country=""
+    else
+        listeners_country=${listeners_country^^}
+    fi
     [ -d "$HTDOCS" ] || fallo "No existe $HTDOCS (¿OpenWebRX instalado?)"
     [ -f "$R/init.js" ] && cp "$R/init.js" "$R/init.js.antes-$(date +%Y%m%d-%H%M%S)"
     local guardar=()
@@ -715,8 +834,14 @@ paso_plugins() {
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     sed -i -e "s/__LAT__/${STATION_LAT}/" -e "s/__LON__/${STATION_LON}/" \
         -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" \
-        -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" "$R/init.js"
-    install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
+        -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" \
+        -e "s#__LISTENERS_COUNTRY__#${listeners_country}#" "$R/init.js"
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        mkdir -p "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
+        owrx_owner
+    else
+        install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
+    fi
     bien "plugins: rig_skin (DX), solar, meteo, cámara, BricoHams y los de 0xAF"
 }
 
@@ -1429,7 +1554,7 @@ EOF
         || aviso "Sin base GeoIP todavía (se reintenta cada mes): las visitas saldrán sin país"
     systemctl enable --now bricohams-visitas
     systemctl restart bricohams-visitas
-    systemctl restart openwebrx    # para que lea mqtt_enabled
+    owrx_control restart           # para que lea mqtt_enabled
     [ -n "${TELEGRAM_TOKEN:-}" ] && bien "visitas con avisos por Telegram" || aviso "Sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID: las visitas se cuentan pero no se avisan (manual 24)"
 }
 
@@ -1455,14 +1580,20 @@ paso_importar() {
     # lo que BricoHams necesita de settings.json: el informe MQTT de las visitas
     if si "${VISITAS_ENABLE:-yes}" && [ -s "$OWRX_DATA/settings.json" ]; then
         python3 "$FILES/bin/bricohams-mqtt-settings.py" "$OWRX_DATA/settings.json"
-        chown openwebrx:openwebrx "$OWRX_DATA/settings.json"
-        systemctl restart openwebrx
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then owrx_owner; else chown openwebrx:openwebrx "$OWRX_DATA/settings.json"; fi
+        owrx_control restart
     fi
     # un perfil público (o --sin-usuarios) no trae administrador: se crea aquí
     if [ ! -s "$OWRX_DATA/users.json" ] || [ "$(wc -c <"$OWRX_DATA/users.json")" -lt 5 ]; then
         info "El perfil no trae usuario de administración: crea la contraseña de '${OWRX_ADMIN_USER:-admin}':"
-        openwebrx admin adduser "${OWRX_ADMIN_USER:-admin}" </dev/tty || aviso "Créalo luego: sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}"
-        chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true     # lo crea root: el servicio tiene que leerlo
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then
+            docker exec -it "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" openwebrx admin adduser "${OWRX_ADMIN_USER:-admin}" </dev/tty \
+                || aviso "Créalo luego dentro del contenedor ${OWRX_DOCKER_CONTAINER:-owrx-mbe}"
+            owrx_owner
+        else
+            openwebrx admin adduser "${OWRX_ADMIN_USER:-admin}" </dev/tty || aviso "Créalo luego: sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}"
+            chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true
+        fi
     fi
     install -d -m 755 /etc/bricohams
     { envl PERFIL "$IMPORTAR"; envl FECHA "$(date '+%F %T')"; envl NIVELES "$niveles"; } >"$PERFIL_IMPORTADO"

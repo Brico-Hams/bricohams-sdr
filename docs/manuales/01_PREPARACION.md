@@ -23,7 +23,7 @@
    - **Si tu Pi ya tiene Trixie o Bookworm, no hace falta regrabar.** Compruébalo con `grep VERSION_CODENAME /etc/os-release`.
 2. En la configuración avanzada (⚙️):
    - Nombre de equipo `bricohams-sdr` y usuario `pi`.
-   - WiFi `BiohazardIT-5G` (país ES) o cable. El instalador añade después las dos redes de casa (paso `red`).
+   - WiFi propio o cable. Si usarás WiFi, configura tus redes en `bricohams.env`; el instalador las añade en el paso `red`.
    - **Activar SSH.**
    - Zona horaria Europe/Madrid.
 3. Graba y arranca la Pi **sin el HAT** la primera vez. Comprueba que entras por SSH: `ssh pi@bricohams-sdr.local`.
