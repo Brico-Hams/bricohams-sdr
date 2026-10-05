@@ -20,9 +20,9 @@ rh = wx.compensate(h, 519888, 415148, 27000)[2]
 assert 0 <= rh <= 100
 
 assert round(wx.sea_level(990.0, 20.0, 202), 1) == 1013.5
-assert wx.aprs_pos(0.0, 0.0) == ('3804.94N', '00115.21W')
-pk = wx.aprs_wx_packet('EA5KAO-13', 0.0, 0.0, 22.4, 55.2, 1014.27, 'WX BricoHams Mi QTH · BME280')
-assert pk == 'EA5KAO-13>APZBHW,TCPIP*:!3804.94N/00115.21W_.../...g...t072h55b10143WX BricoHams Mi QTH - BME280', pk
+assert wx.aprs_pos(40.0, -3.0) == ('4000.00N', '00300.00W')
+pk = wx.aprs_wx_packet('N0CALL-13', 40.0, -3.0, 22.4, 55.2, 1014.27, 'Synthetic WX')
+assert pk == 'N0CALL-13>APZBHW,TCPIP*:!4000.00N/00300.00W_.../...g...t072h55b10143Synthetic WX', pk
 assert 't003' in wx.aprs_wx_packet('X', 0, 0, -16.0, None, 1000, '')   # -16 °C = 3 °F
 assert 'h00' in wx.aprs_wx_packet('X', 0, 0, 10, 100, 1000, '')         # 100 % = h00
 print('OK test_wx_bme280: T=%.2f °C, p=%.2f Pa (datasheet), paquete APRS WX correcto' % (t, p))

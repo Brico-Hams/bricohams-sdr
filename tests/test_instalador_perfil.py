@@ -57,7 +57,7 @@ os.chmod(fake, 0o755)
 marca = os.path.join(T, 'perfil-importado')
 script = '''set -Eeuo pipefail
 bien() { echo "BIEN $*"; }; aviso() { echo "AVISO $*"; }; fallo() { echo "FALLO $*"; exit 1; }; info() { echo "INFO $*"; }
-install() { :; }; systemctl() { echo "systemctl $*"; }; chown() { :; }; openwebrx() { echo "openwebrx $*"; }
+install() { :; }; systemctl() { echo "systemctl $*"; }; owrx_control() { systemctl "$1" openwebrx; }; owrx_owner() { :; }; chown() { :; }; openwebrx() { echo "openwebrx $*"; }
 %s
 %s
 %s

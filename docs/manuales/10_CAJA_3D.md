@@ -199,7 +199,7 @@ Caja para el mástil Televés con toda la estación dentro. Por dentro tiene dos
 1. **Tensión:** conecta los 230 V con el diferencial y espera al arranque (2–3 min).
 2. **Diagnóstico:** `sudo bricohams-check` debe acabar en **0 fallos**. Mira en especial:
    - `alimentación correcta (sin bajadas de tensión)`: si sale `get_throttled` distinto de 0x0, la Pi no está en el USB-C PD o el cable no es de 3 A.
-   - Red WiFi `BiohazardIT-5G` (o `biohazard-it`) conectada.
+   - La red WiFi configurada en `bricohams.env` está conectada, si no usas Ethernet.
    - Los 4 SDR por número de serie, los 2 LilyGO y el sensor.
 3. **Temperatura:** a pleno sol, mide `vcgencmd measure_temp`. Con más de 75 °C sostenidos:
    - Comprueba que las rejillas de abajo y de arriba no están tapadas.

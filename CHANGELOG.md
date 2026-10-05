@@ -174,7 +174,7 @@
   - Junta de TPU en ranura con tope de compresión, ventana de la cámara con policarbonato, aro anti-reflejos IR y visera.
   - Sillas en V con abrazadera para el mástil y garita de 6 platos para el BME280.
   - `tools/caja.sh`: exporta los STL, comprueba que caben en 250 × 250 × 250 mm y genera las vistas.
-- **WiFi de casa:** nuevo paso `red` del instalador (son 17 pasos). La Pi prefiere `BiohazardIT-5G` y pasa a `biohazard-it` si no la ve. El iGate usa `biohazard-it` (2,4 GHz). La clave solo está en `bricohams.env`.
+- **WiFi configurable:** nuevo paso `red` del instalador (son 17 pasos). La Pi prioriza `WIFI_SSID_1` y usa `WIFI_SSID_2` como respaldo; el iGate usa `LILYGO_WIFI_SSID` (2,4 GHz). Los SSID y claves se configuran localmente en `bricohams.env`.
 - `bricohams-check` muestra la red activa y la señal WiFi.
 - Esquemas 06 (alimentación en la caja) y 07 (distribución y conectores). Manual 10 (caja paso a paso). ADR-15 (caja), ADR-16 (cargador de 45 W) y ADR-17 (WiFi).
 

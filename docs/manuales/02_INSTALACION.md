@@ -1,27 +1,39 @@
 # 02 · Instalación
 
-## 1. Rellenar `bricohams.env`
-- **Claves obligatorias:**
+## 1. Personalizar `bricohams.env`
+Antes de instalar, copia `bricohams.env.example` a `bricohams.env`. El ejemplo no contiene contraseñas y deja vacíos el correo y las redes WiFi. Cambia como mínimo el indicativo, QTH, país, latitud, longitud y altitud; usa `N0CALL` y `0,0` solo como valores de muestra, nunca para emitir.
+
+- **Claves según los servicios que habilites:**
 
   | Variable | Qué es |
   |---|---|
-  | `APRS_PASSCODE` | código de APRS-IS de EA5KAO |
-  | `MAGIC_KEY` | clave mágica de OpenWebRX |
-  | `RECEIVERBOOK_KEY` | clave de receiverbook |
-  | `OPENWEATHERMAP_KEY` | clave de OpenWeatherMap |
+  | `APRS_PASSCODE` | código APRS-IS de tu indicativo; necesario para `WX_APRS` y el iGate APRS |
+  | `APRS_IGATE_ENABLE` | vacío = activar el iGate de OpenWebRX solo si hay indicativo propio y passcode; `yes/no` lo fuerza |
+  | `MAGIC_KEY` | clave opcional de OpenWebRX+ |
+  | `RECEIVERBOOK_KEY` | clave opcional de Receiverbook |
+  | `OPENWEATHERMAP_KEY` | clave opcional para las capas de OpenWeatherMap |
+  | `ADMIN_EMAIL` / `SSL_EMAIL` | correo para Let's Encrypt; opcional con certificado autofirmado |
 
-- **Recomendadas:**
+- **Ajustes de la estación:**
 
   | Variable | Qué es |
   |---|---|
-  | `AEMET_API_KEY` | clave de AEMET, gratis en https://opendata.aemet.es/centrodedescargas/altaUsuario |
-  | `WIFI_SSID_1` / `WIFI_SSID_2` / `WIFI_PASS` | WiFi de casa para la Pi: `BiohazardIT-5G` (preferida) y `biohazard-it` |
-  | `LILYGO_WIFI_SSID` / `LILYGO_WIFI_PASS` | WiFi para el iGate: `biohazard-it` (el ESP32 solo ve 2,4 GHz) |
+  | `STATION_QTH`, `STATION_COUNTRY`, `STATION_LAT`, `STATION_LON`, `STATION_ASL` | nombre/país y coordenadas de tu estación; país ISO de dos letras |
+  | `WIFI_COUNTRY`, `WIFI_SSID_1`, `WIFI_SSID_2`, `WIFI_PASS` | código regulatorio y redes WiFi propias; deja los SSID vacíos si usas Ethernet |
+  | `LILYGO_WIFI_SSID`, `LILYGO_WIFI_PASS` | WiFi de 2,4 GHz del ESP32, si instalas el iGate |
+  | `CALLSIGN`, `IGATE_CALLSIGN`, `WX_APRS_CALLSIGN`, `WXLORA_CALLSIGN` | usa indicativos tuyos y con sufijos asignados; no dejes los valores de muestra |
+  | `LISTENERS_COUNTRY` | código ISO del país del receptor para la bandera de LST; vacío usa `STATION_COUNTRY` |
   | `RADARBOX_KEY` | clave de compartición si ya tienes una estación en RadarBox |
+  | `AEMET_API_KEY` | opcional, gratis en https://opendata.aemet.es/centrodedescargas/altaUsuario |
   | `MESH868_PRIVATE_PSK` | clave AES-256 (base64) del canal privado del nodo Meshtastic 868 |
   | `HAMQTH_USER` / `HAMQTH_PASS` | cuenta gratuita HamQTH para la ficha de indicativos |
 
-- **Revisa también:** las coordenadas (`STATION_*`), las series de los SDR, las variables `HAT_*` (A VERIFICAR) y `MESH_CHANNEL_URL` (ya trae los canales de la red).
+- Revisa también las series `SERIAL_*`, los pines `HAT_*`, `IO_MODE`, `CAM_SOURCE` y los interruptores `*_ENABLE`. El QR `MESH_CHANNEL_URL` y los marcadores son de la red de referencia: sustitúyelos por los de tu región/red.
+
+## Alcance y compatibilidad
+El instalador solo admite **Raspberry Pi OS arm64 Bookworm (Debian 12) o Trixie (Debian 13)** y está diseñado alrededor de Raspberry Pi 5. La receta completa espera el HAT HackerGadgets, SDR USB con sus series configuradas, FlightStick RadarBox, dispositivos LilyGO, Pico y periféricos descritos en los manuales. No está validado para Raspberry Pi anteriores, Docker ni otras distribuciones.
+
+Los archivos `files/openwebrx/settings.json.tmpl`, `files/openwebrx/bookmarks.json`, branding y datos de radio incluyen decisiones/perfiles de EA5KAO y Murcia. Indicativo, QTH y país del receptor ya se toman de `bricohams.env`, pero debes revisar y reemplazar los marcadores, servicios regionales, imágenes y cualquier hotspot propio. `--solo` evita pasos seleccionados; no adapta el cableado ni la configuración de hardware. Si no tienes un periférico, desactiva su función en `bricohams.env` y comprueba sus dependencias antes de ejecutar la receta completa.
 
 ## 2. Lanzar el instalador
 
@@ -35,7 +47,8 @@
 > **Nombre del equipo:** `HOSTNAME_NEW=""` deja el nombre actual (`sdr`). Pon un nombre solo si quieres cambiarlo.
 
 ```bash
-sudo bash install.sh --backup ~/backup-openwebrx-2026-10-03.tar.gz   # o sin --backup en una instalación nueva
+sudo bash install.sh                         # instalación nueva
+sudo bash install.sh --backup copia.tar.gz   # solo para restaurar usuarios/marcadores existentes
 ```
 - Tarda entre 30 y 60 minutos: compila readsb y, en Bookworm, también rtl-sdr-blog.
 - **¿Ya tienes la estación instalada?** No hace falta reinstalar: `sudo bash install.sh --actualizar` ([manual 29](29_ACTUALIZAR.md)). La primera vez desde una versión anterior a la v4.1 aplica todos los pasos, sin perder usuarios, marcadores propios ni claves.

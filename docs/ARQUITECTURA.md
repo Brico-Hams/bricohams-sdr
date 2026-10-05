@@ -230,13 +230,13 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **Cable USB-C de 3 A** y corto. Si `bricohams-check` avisa de `get_throttled`, la causa es el cable o el puerto.
   - Conexión de 230 V con diferencial de 30 mA, prensaestopas PG9 y anclaje del cable. La hace o la revisa alguien cualificado.
 
-## ADR-17 · WiFi de casa con NetworkManager: la Pi prefiere la de 5 GHz y el iGate va a la de 2,4 GHz
+## ADR-17 · WiFi configurable con NetworkManager: la Pi prioriza 5 GHz y el iGate usa 2,4 GHz
 - **Decisión:**
   - El paso `red` del instalador crea dos conexiones de NetworkManager:
-    - `BiohazardIT-5G`, con prioridad 20.
-    - `biohazard-it`, con prioridad 10.
-  - País de WiFi `ES`.
-  - El iGate LilyGO usa `biohazard-it`.
+    - `WIFI_SSID_1`, con prioridad 20.
+    - `WIFI_SSID_2`, con prioridad 10.
+  - País de WiFi `WIFI_COUNTRY`.
+  - El iGate LilyGO usa `LILYGO_WIFI_SSID` (2,4 GHz).
   - La clave solo está en `bricohams.env`.
 - **Por qué:**
   - La Pi 5 tiene WiFi de 5 GHz: menos interferencias en 2,4 GHz y más caudal para el vídeo y los usuarios web. Si la de 5 GHz no llega al mástil, la Pi pasa sola a la de 2,4 GHz.

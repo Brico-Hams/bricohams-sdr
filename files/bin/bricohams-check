@@ -10,13 +10,32 @@ set -u
 ENV=/etc/bricohams/bricohams.env
 # shellcheck source=/dev/null
 [ -r "$ENV" ] && . "$ENV"
-HTDOCS=/usr/lib/python3/dist-packages/htdocs
+if [ "${OWRX_BACKEND:-native}" = docker ]; then
+    OWRX_DOCKER_DIR=${OWRX_DOCKER_DIR:-/opt/owrx-docker}
+    OWRX_DATA=$OWRX_DOCKER_DIR/var
+    HTDOCS=$OWRX_DOCKER_DIR
+else
+    OWRX_DATA=/var/lib/openwebrx
+    HTDOCS=/usr/lib/python3/dist-packages/htdocs
+fi
 OK=0; KO=0; AV=0
 bien()  { printf '  \e[32m✔\e[0m %s\n' "$*"; OK=$((OK + 1)); }
 mal()   { printf '  \e[31m✘\e[0m %s\n' "$*"; KO=$((KO + 1)); }
 aviso() { printf '  \e[33m!\e[0m %s\n' "$*"; AV=$((AV + 1)); }
 titulo() { printf '\n\e[1m%s\e[0m\n' "$*"; }
-servicio() { if systemctl is-active --quiet "$1"; then bien "servicio $1 activo"; else mal "servicio $1 NO activo (journalctl -u $1 -n 50)"; fi; }
+servicio() {
+    if [ "$1" = openwebrx ] && [ "${OWRX_BACKEND:-native}" = docker ]; then
+        if docker inspect --format '{{.State.Running}}' "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" 2>/dev/null | grep -qx true; then
+            bien "contenedor OpenWebRX+ ${OWRX_DOCKER_CONTAINER:-owrx-mbe} activo"
+        else
+            mal "contenedor OpenWebRX+ ${OWRX_DOCKER_CONTAINER:-owrx-mbe} no está activo"
+        fi
+    elif systemctl is-active --quiet "$1"; then
+        bien "servicio $1 activo"
+    else
+        mal "servicio $1 NO activo (journalctl -u $1 -n 50)"
+    fi
+}
 edad() { local f=$1; [ -e "$f" ] || { echo 999999; return; }; echo $(( $(date +%s) - $(stat -c %Y "$f") )); }
 
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
@@ -27,8 +46,12 @@ case "${VERSION_CODENAME:-}" in
     trixie|bookworm) bien "Raspberry Pi OS $VERSION_CODENAME ($(uname -m))" ;;
     *) aviso "Sistema $PRETTY_NAME: el kit funciona en Trixie o Bookworm" ;;
 esac
-grep -qs "ppa/${VERSION_CODENAME:-x} " /etc/apt/sources.list.d/openwebrx-plus.list && bien "repositorio OpenWebRX+ de $VERSION_CODENAME" \
-    || { [ -f /etc/apt/sources.list.d/openwebrx-plus.list ] && mal "el repositorio de OpenWebRX+ no es el de $VERSION_CODENAME: sudo bash install.sh --solo openwebrx"; }
+if [ "${OWRX_BACKEND:-native}" = docker ]; then
+    command -v docker >/dev/null && bien "backend Docker" || mal "OWRX_BACKEND=docker pero falta Docker CLI"
+else
+    grep -qs "ppa/${VERSION_CODENAME:-x} " /etc/apt/sources.list.d/openwebrx-plus.list && bien "repositorio OpenWebRX+ de $VERSION_CODENAME" \
+        || { [ -f /etc/apt/sources.list.d/openwebrx-plus.list ] && mal "el repositorio de OpenWebRX+ no es el de $VERSION_CODENAME: sudo bash install.sh --solo openwebrx"; }
+fi
 grep -q 'Raspberry Pi 5' /proc/device-tree/model 2>/dev/null && bien "$(tr -d '\0' </proc/device-tree/model)" || aviso "No es una Raspberry Pi 5"
 t=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2); [ -n "$t" ] && bien "temperatura CPU $t"
 th=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
@@ -61,8 +84,8 @@ getent hosts opendata.aemet.es >/dev/null && bien "DNS e Internet" || mal "sin D
 titulo "OpenWebRX+"
 servicio openwebrx
 if curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8073/; then bien "web en http://$(hostname -I | awk '{print $1}'):8073"; else mal "la web no responde en el puerto 8073"; fi
-[ -s /var/lib/openwebrx/settings.json ] && bien "settings.json ($(python3 -c 'import json;d=json.load(open("/var/lib/openwebrx/settings.json"));print(len(d["sdrs"]),"receptores,",sum(len(s["profiles"]) for s in d["sdrs"].values()),"perfiles")'))" || mal "falta /var/lib/openwebrx/settings.json"
-[ -s /var/lib/openwebrx/users.json ] && bien "usuario administrador creado" || mal "no hay usuario admin: sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}"
+[ -s "$OWRX_DATA/settings.json" ] && bien "settings.json ($(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(len(d["sdrs"]),"receptores,",sum(len(s["profiles"]) for s in d["sdrs"].values()),"perfiles")' "$OWRX_DATA/settings.json"))" || mal "falta $OWRX_DATA/settings.json"
+[ -s "$OWRX_DATA/users.json" ] && bien "usuario administrador creado" || mal "no hay usuario admin: revisa el contenedor OpenWebRX+"
 
 titulo "SDR"
 lsmod | grep -q dvb_usb_rtl28xxu && mal "el módulo DVB dvb_usb_rtl28xxu está cargado (bloquea los RTL-SDR)" || bien "módulo DVB bloqueado"
@@ -150,7 +173,7 @@ if [ "${WX_ENABLE:-yes}" = yes ]; then
     [ "${WX_APRS:-no}" = yes ] && bien "WX APRS como ${WX_APRS_CALLSIGN:-EA5KAO-13}: https://aprs.fi/#!call=${WX_APRS_CALLSIGN:-EA5KAO-13}"
 fi
 
-sj="/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/sensor.json"
+sj="$HTDOCS/plugins/receiver/meteo/sensor.json"
 if [ -s "$sj" ]; then
     vl=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));v=d.get("viento");l=d.get("lluvia");print(("viento %s m/s de %s°, racha %s" % (v["vel_ms"], v["dir"], v["racha_ms"])) if v else "sin viento", "·", ("lluvia 1 h %s mm, hoy %s mm" % (l["1h"], l["hoy"])) if l else "sin pluviómetro")' "$sj")
     bien "$vl"
