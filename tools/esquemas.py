@@ -54,7 +54,7 @@ def arrow(x1, y1, x2, y2, color=C['line'], label='', dash=False, w=2):
 def markers(colors):
     return '<defs>' + ''.join(
         f"<marker id='a{c[1:]}' markerWidth='10' markerHeight='8' refX='9' refY='4' orient='auto'><path d='M0,0 L10,4 L0,8 z' fill='{c}'/></marker>"
-        for c in set(colors)) + '</defs>'
+        for c in sorted(set(colors))) + '</defs>'
 
 
 # ---------------------------------------------------------------------
@@ -656,10 +656,14 @@ def red_servicios():
     """Esquema 18: servicios web, SSL, MQTT, Telegram y tareas automáticas."""
     W, H = 1500, 900
     b = markers([C['net'], C['ink'], C['or'], C['pi'], C['sdr']])
-    b += caja_s(40, 110, 220, 70, 'Internet (oyentes)', 'https://SSL_DOMAIN', C['net'], '#e0f2f1')
+    b += caja_s(40, 110, 220, 70, 'Internet (oyentes)', 'http(s)://SSL_DOMAIN', C['net'], '#e0f2f1')
     b += caja_s(40, 240, 220, 80, 'Router de casa', 'abrir SOLO 80 y 443 TCP', C['cam'])
-    b += arrow(150, 180, 150, 240, C['net'], 'HTTPS')
-    b += caja_s(360, 230, 260, 100, 'nginx (80 → 443)', 'Let\'s Encrypt · X-Forwarded-For', C['or'], '#fff3e0')
+    b += arrow(150, 180, 150, 240, C['net'], 'HTTP + HTTPS')
+    b += caja_s(360, 210, 260, 140, 'nginx · SSL_MODO=admin', '', C['or'], '#fff3e0', arriba=True)
+    b += txt(490, 262, 'HTTP :80  → receptor público', 10.5, C['ink'], False, 'middle')
+    b += txt(490, 282, 'HTTPS :443 → /login, /settings…', 10.5, C['cr'], True, 'middle')
+    b += txt(490, 302, '(http://…/settings → 301 https)', 10, C['mute'], False, 'middle')
+    b += txt(490, 322, 'cookie owrx-session: Secure', 10, C['mute'], False, 'middle')
     b += arrow(260, 280, 360, 280, C['net'])
     dest = [('/  → OpenWebRX+ 127.0.0.1:8073', 120, C['pi']), ('/tar1090/ → lighttpd 127.0.0.1:8504', 200, C['sdr']),
             ('/camara/ → MediaMTX HLS 127.0.0.1:8888', 280, C['cam']), ('/bricohams/ → portal y privacidad', 360, C['ink']),
@@ -681,8 +685,9 @@ def red_servicios():
     b += txt(60, 700, 'sudo -n /usr/local/sbin/bricohams-tarea <verbo>  (sudoers: solo ese programa, sin contraseña)', 10, C['mute'])
     b += arrow(600, 675, 760, 675, C['pi'])
     b += txt(40, 780, '• Desde casa sigue funcionando http://IP:8073 sin nginx (la ficha DMR/YSF y el portal necesitan nginx).', 11.2)
+    b += txt(40, 828, '• v4.2: el certificado protege la administración; SSL_MODO=todo pone todo en HTTPS y SSL_MODO=no lo quita (solo LAN).', 11.2)
     b += txt(40, 804, '• Solo LAN: Meshtastic https://IP:9443, API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
-    return svg(W, H, b, 'Servicios web, SSL, visitas y tareas automáticas')
+    return svg(W, H, b, 'Servicios web, SSL (solo administración), visitas y tareas automáticas')
 
 
 def actualizar():
@@ -734,6 +739,89 @@ def actualizar():
     return svg(W, H, b, 'Actualizar la estación: install.sh --actualizar')
 
 
+def audio_navegador():
+    """Esquema 20: plugins de audio en el navegador (v4.2)."""
+    W, H = 1500, 760
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net']])
+    b += caja_s(30, 90, 300, 110, 'Raspberry Pi · OpenWebRX+', 'demodula y decodifica (FT8, DMR, APRS…)', C['pi'], '#edf7ee', arriba=True)
+    b += txt(180, 172, 'el audio va comprimido al navegador', 10, C['mute'], False, 'middle')
+    b += arrow(330, 145, 400, 145, C['net']) + txt(335, 135, 'websocket', 10, C['net'])
+    b += caja_s(400, 80, 1070, 380, 'Navegador de CADA oyente (Web Audio API)', '', C['sdr'], '#f4f8fd', arriba=True)
+    b += caja_s(420, 125, 150, 60, 'AudioWorklet', 'audioNode', C['ink'])
+    etapas = [('2× pasa-altos', 'corte bajo'), ('2× pasa-bajos', 'corte alto'), ('notch manual', 'Hz · Q'), ('notch auto', 'sigue el pitido')]
+    x = 600
+    b += txt(x, 222, 'FILTRO · filtro_audio (orden 10)', 11.5, C['or'], True)
+    for i, (t, sub) in enumerate(etapas):
+        b += caja_s(x + i * 112, 125, 104, 60, t, sub, C['or'], '#fff3e0')
+        if i:
+            b += arrow(x + i * 112 - 8, 155, x + i * 112, 155, C['or'], w=1.5)
+    b += arrow(570, 155, 600, 155, C['ink'])
+    y2 = 270
+    dsp = [('graves', '250 Hz'), ('medios', '1,2 kHz'), ('agudos', '3 kHz'), ('puerta', '−30 dB'), ('AGC', 'compresor'), ('compensa', '+dB'), ('limitador', '−1 dBFS')]
+    b += txt(470, y2 + 92, 'DSP · dsp_audio (orden 20)', 11.5, C['cr'], True)
+    for i, (t, sub) in enumerate(dsp):
+        b += caja_s(470 + i * 118, y2, 108, 60, t, sub, C['cr'], '#fdecee')
+        if i:
+            b += arrow(470 + i * 118 - 10, y2 + 30, 470 + i * 118, y2 + 30, C['cr'], w=1.5)
+    b += linea(1032, 185, 1032, 230, C['ink']) + linea(1032, 230, 525, 230, C['ink']) + arrow(525, 230, 525, y2, C['ink'])
+    b += caja_s(1300, 380, 150, 60, 'volumen', 'gainNode', C['ink'])
+    b += linea(1290, y2 + 30, 1375, y2 + 30, C['ink']) + arrow(1375, y2 + 30, 1375, 380, C['ink'])
+    b += caja_s(1300, 470, 150, 50, 'altavoz', '', C['pi'], '#edf7ee')
+    b += arrow(1375, 440, 1375, 470, C['ink'])
+    b += txt(420, 420, 'audio_cadena: mete las etapas ACTIVAS entre audioNode y volumen, por orden. Todo apagado = audio original.', 11)
+    b += txt(420, 442, 'Mover un deslizador solo cambia parámetros (sin recablear, sin chasquidos).', 11, C['mute'])
+    b += caja_s(30, 520, 1180, 190, 'Lo que NO cambia', '', C['mute'], '#fafafa', arriba=True)
+    for k, t in enumerate(['La Raspberry no hace nada más: cada oyente procesa su propio audio en su navegador.',
+                           'Los demás oyentes oyen lo suyo: los ajustes se guardan en el navegador de cada uno (localStorage).',
+                           'Los decodificadores (FT8, DMR, APRS, ADS-B…) van en el servidor con la señal original.',
+                           'La grabación del botón REC guarda el audio original, sin procesar.',
+                           'Botones FILTRO y DSP en la barra superior; apagados por defecto (init.js: activo: true para encenderlos).']):
+        b += txt(55, 575 + k * 26, '• ' + t, 11.2)
+    return svg(W, H, b, 'Audio en el navegador: filtro_audio y dsp_audio (v4.2)')
+
+
+def clonar_openwebrx():
+    """Esquema 21: owrx-clone (v4.2)."""
+    W, H = 1500, 900
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net']])
+    b += caja_s(30, 90, 420, 360, 'Equipo de ORIGEN', 'sudo owrx-clone exportar [--cifrar] [--publico]', C['pi'], '#edf7ee', arriba=True)
+    niveles = [('config', '/var/lib/openwebrx: settings, users, bookmarks, imágenes'), ('etc', '/etc/openwebrx entero'),
+               ('web', 'htdocs: plugins e init.js añadidos'), ('paquetes', 'SDR y decodificadores instalados a mano'),
+               ('sistema', 'udev, modprobe rtl/dvb, systemd, codecserver'), ('parches', 'ficheros del paquete retocados (md5)'),
+               ('extra', '--incluir RUTA')]
+    for i, (n, d) in enumerate(niveles):
+        c = C['pi'] if i < 4 else C['cr']
+        b += txt(50, 165 + i * 36, n, 12, c, True) + txt(140, 165 + i * 36, d, 10.5)
+    b += txt(50, 430, 'verde: se importan por defecto · rojo: solo pidiéndolos (código como root)', 9.8, C['mute'])
+    b += arrow(450, 270, 560, 270, C['ink'], 'perfil')
+    b += caja_s(560, 160, 380, 230, 'perfil .owrx.tar.gz(.enc)', '', C['or'], '#fff3e0', arriba=True)
+    for k, t in enumerate(['manifiesto.json: origen, niveles, receptores,', '   paquetes y SHA-256 de cada fichero',
+                           'LEEME.txt', 'archivos/<nivel>/… ({DATA}, {HTDOCS})', 'cifrado opcional: AES-256 + PBKDF2',
+                           '--publico: sin users.json ni claves']):
+        b += txt(580, 215 + k * 26, t, 11)
+    b += arrow(940, 270, 1050, 270, C['ink'], 'copiar')
+    b += caja_s(1050, 90, 420, 520, 'Equipo de DESTINO', 'sudo owrx-clone importar perfil [--simular] [--todo]', C['sdr'], '#eef4fb', arriba=True)
+    pasos = ['1  comprueba SHA-256 y rutas (nada fuera de su sitio)', '2  repositorio luarvique de ESTE sistema',
+             '   (bookworm · trixie · noble · jammy · bullseye)', '3  apt install de los paquetes del perfil',
+             '4  COPIA de lo que se sobrescribe', '   → /var/backups/owrx-clone/copia-FECHA', '5  para OpenWebRX+ y copia los ficheros',
+             '   (modo y dueño: users.json 600, openwebrx)', '6  --mapear serial=VIEJO=>serial=NUEVO', '7  arranca y espera /status.json',
+             '8  avisa de los SDR que no ve conectados']
+    for k, t in enumerate(pasos):
+        b += txt(1070, 160 + k * 30, t, 11)
+    b += caja_s(1050, 640, 420, 90, 'sudo owrx-clone deshacer', 'devuelve lo sobrescrito y borra lo creado', C['cr'], '#fdecee')
+    b += arrow(1260, 610, 1260, 640, C['cr'])
+    b += caja_s(30, 500, 940, 230, 'Dentro del kit BricoHams', '', C['ink'], '#fafafa', arriba=True)
+    for k, t in enumerate(['sudo bash install.sh --exportar [fichero]       (no necesita bricohams.env)',
+                           'sudo bash install.sh --importar perfil.owrx.tar.gz   → paso «importar» (IMPORTAR_NIVELES)',
+                           'marca /etc/bricohams/perfil-importado: «configuracion» no regenera settings.json y «plugins» no pisa init.js',
+                           'OWRX_PLANTILLA="yes" vuelve a la plantilla de BricoHams',
+                           'copia diaria: /var/backups/bricohams/perfil-owrx-FECHA.owrx.tar.gz (7 últimos)']):
+        b += txt(50, 555 + k * 30, '• ' + t, 11)
+    b += txt(30, 800, 'owrx-clone es genérico: cualquier OpenWebRX+ en Debian 11-13, Ubuntu 22.04/24.04 o Raspberry Pi OS (amd64, arm64, armhf).', 11.5)
+    b += txt(30, 826, 'Un solo fichero Python 3 sin dependencias · README es/en · man owrx-clone · owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,problemas} · MIT', 11, C['mute'])
+    return svg(W, H, b, 'Clonar OpenWebRX+ a otro equipo: owrx-clone (v4.2)')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -745,7 +833,8 @@ def main():
                      ('06_alimentacion_caja', alimentacion), ('07_caja_distribucion', caja),
                      ('12_cadena_rf', rf_completo), ('13_ventiladores', ventiladores), ('14_sensores_wx', sensores_wx),
                      ('15_alimentacion_v3', alimentacion_v3), ('16_pico_io', pico_io), ('17_filtros_lna', filtros_lna),
-                     ('18_red_servicios', red_servicios), ('19_actualizar', actualizar)]:
+                     ('18_red_servicios', red_servicios), ('19_actualizar', actualizar),
+                     ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

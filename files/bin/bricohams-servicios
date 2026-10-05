@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  bricohams-servicios · EA5KAO · BricoHams (v4)
+#  bricohams-servicios · EA5KAO · BricoHams (v4.2: según SSL_MODO)
 #  Lista los servicios web y de radio de la estación, si están en marcha y
 #  cómo entrar a cada uno (red local y, con SSL, desde Internet).
 #  Uso: bricohams-servicios        (no hace falta sudo)
@@ -8,19 +8,23 @@
 [ -r /etc/bricohams/web.env ] && . /etc/bricohams/web.env
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 DOM=${SSL_DOMAIN:-}
+MODO=${SSL_MODO:-admin}
+PUB=http; [ "$MODO" = todo ] && PUB=https          # receptor público
+ADM=https; [ "$MODO" = no ] && ADM=http            # administración (/login, /settings)
 v='\e[32m'; r='\e[31m'; g='\e[90m'; n='\e[0m'
 est() { systemctl is-active --quiet "$1" 2>/dev/null && printf "${v}● activo${n}" || printf "${r}○ parado${n}"; }
 fila() { printf '%-22s %-24b %-38s %s\n' "$1" "$(est "$2")" "$3" "$4"; }
-echo "BricoHams SDR · servicios · $(hostname) · LAN ${IP:-?} · dominio ${DOM:-(sin SSL)}"
-printf '%-22s %-15s %-38s %s\n' "Servicio" "Estado" "Red local" "Internet (https)"
-fila "Receptor OpenWebRX+" openwebrx "http://$IP:8073/" "${DOM:+https://$DOM/}"
-fila "Portal de servicios" nginx "https://$IP/bricohams/" "${DOM:+https://$DOM/bricohams/}"
-fila "Mapa aviones tar1090" lighttpd "http://127.0.0.1:8504/tar1090/ *" "${DOM:+https://$DOM/tar1090/}"
+echo "BricoHams SDR · servicios · $(hostname) · LAN ${IP:-?} · dominio ${DOM:-(ninguno)} · SSL_MODO=$MODO"
+printf '%-22s %-15s %-38s %s\n' "Servicio" "Estado" "Red local" "Internet"
+fila "Receptor OpenWebRX+" openwebrx "http://$IP:8073/" "${DOM:+$PUB://$DOM/}"
+fila "Administración" openwebrx "$ADM://$IP/settings" "${DOM:+$ADM://$DOM/settings}"
+fila "Portal de servicios" nginx "$PUB://$IP/bricohams/" "${DOM:+$PUB://$DOM/bricohams/}"
+fila "Mapa aviones tar1090" lighttpd "http://127.0.0.1:8504/tar1090/ *" "${DOM:+$PUB://$DOM/tar1090/}"
 fila "ADS-B readsb" readsb "Beast 127.0.0.1:30005" "-"
 fila "AirNav rbfeeder" rbfeeder "sudo rbfeeder --showkey" "airnavradar.com"
-fila "Cámara MediaMTX" mediamtx "rtsp://$IP:8554/mastil · http://$IP:8888/mastil/" "${DOM:+https://$DOM/camara/mastil/}"
+fila "Cámara MediaMTX" mediamtx "rtsp://$IP:8554/mastil · http://$IP:8888/mastil/" "${DOM:+$PUB://$DOM/camara/mastil/}"
 fila "Meshtastic 868" meshtasticd "https://$IP:9443/ · API $IP:4403" "solo LAN"
-fila "API plugins" bricohams-api "127.0.0.1:8075" "${DOM:+https://$DOM/bricohams/api/salud}"
+fila "API plugins" bricohams-api "127.0.0.1:8075" "${DOM:+$PUB://$DOM/bricohams/api/salud}"
 fila "Visitas + Telegram" bricohams-visitas "MQTT 127.0.0.1:1883 (openwebrx/#)" "-"
 fila "MQTT mosquitto" mosquitto "127.0.0.1:1883" "-"
 fila "Estación WX" bricohams-wx "sensor.json en la web" "aprs.fi"
@@ -28,4 +32,5 @@ fila "Pico IO (sensores)" bricohams-io "/dev/bricohams-io" "-"
 fila "Ventiladores" bricohams-fan "sudo bricohams-fan --estado" "-"
 fila "Pases satélites" bricohams-satpass.timer "cada 15 min" "-"
 echo -e "${g}* tar1090 escucha solo en 127.0.0.1: desde fuera se entra por nginx (/tar1090/).${n}"
-echo -e "${g}Router: abrir SOLO 80 y 443 TCP hacia $IP (no 8073 ni 9443). Tareas automáticas: cat /etc/cron.d/bricohams${n}"
+if [ "$MODO" = no ]; then puertos="80"; else puertos="80 y 443"; fi
+echo -e "${g}Router: abrir SOLO $puertos TCP hacia $IP (no 8073 ni 9443). Tareas automáticas: cat /etc/cron.d/bricohams${n}"

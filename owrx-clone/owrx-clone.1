@@ -1,0 +1,158 @@
+.\" -*- coding: UTF-8 -*-
+.TH OWRX-CLONE 1 "octubre 2026" "owrx-clone 1.0.0" "Herramientas de OpenWebRX+"
+.SH NOMBRE
+owrx-clone \- clona una instalación de OpenWebRX+ (configuración, plugins, sistema y paquetes) a otro equipo
+.SH SINOPSIS
+.B owrx-clone exportar
+.RB [ \-o
+.IR fichero ]
+.RB [ \-\-niveles
+.IR lista ]
+.RB [ \-\-publico ]
+.RB [ \-\-sin\-usuarios ]
+.RB [ \-\-cifrar ]
+.RB [ \-\-incluir
+.IR ruta ]...
+.RB [ \-\-excluir
+.IR patrón ]...
+.RB [ \-\-nota
+.IR texto ]
+.br
+.B owrx-clone ver
+.I perfil
+.RB [ \-\-todo ]
+.RB [ \-\-json ]
+.br
+.B owrx-clone importar
+.I perfil
+.RB [ \-\-simular ]
+.RB [ \-\-niveles
+.IR lista " | " \-\-todo ]
+.RB [ \-\-mapear
+.IR VIEJO=>NUEVO ]...
+.RB [ \-\-sin\-paquetes ]
+.RB [ \-\-sin\-usuarios ]
+.RB [ \-\-forzar\-parches ]
+.RB [ \-\-no\-arrancar ]
+.RB [ \-\-detalle ]
+.RB [ \-\-si ]
+.br
+.B owrx-clone deshacer
+.RI [ copia ]
+.RB [ \-\-si ]
+.br
+.B owrx-clone comprobar
+.br
+.B owrx-clone ayuda
+.RI [ niveles | seguridad | dispositivos | migrar | problemas ]
+.SH DESCRIPCIÓN
+.B owrx-clone
+guarda en un único fichero
+.RI ( perfil ,
+.IR .owrx.tar.gz )
+todo lo que hace única a una estación OpenWebRX+ y lo aplica en otro equipo.
+Al importar instala OpenWebRX+ si falta (repositorio de luarvique), reinstala los
+paquetes de SDR, copia cada fichero en su sitio con sus permisos, arranca el servicio
+y comprueba que responde. Antes guarda una copia de lo que va a cambiar en
+.IR /var/backups/owrx-clone ,
+y
+.B owrx-clone deshacer
+lo deja como estaba.
+.PP
+Las órdenes también tienen nombre en inglés:
+.BR export ", " show ", " import ", " undo ", " check ", " help .
+.SH NIVELES
+.TP
+.B config
+settings.json (receptores y perfiles), users.json, bookmarks.json, imágenes de cabecera y el resto
+del directorio de datos (sin las cachés eibi/receivers/repeaters/meshtastic).
+.TP
+.B etc
+/etc/openwebrx entero (openwebrx.conf, openwebrx.conf.d, bandas, bookmarks.d, markers.d).
+.TP
+.B web
+ficheros añadidos a htdocs que no vienen en el paquete: plugins, init.js, temas.
+.TP
+.B paquetes
+paquetes de SDR y decodificadores instalados a mano; se reinstalan con apt.
+.TP
+.B sistema
+reglas udev, /etc/modprobe.d de rtl/dvb/sdr, openwebrx.service.d y /etc/codecserver.
+.TP
+.B parches
+ficheros del paquete openwebrx modificados a mano; solo con la misma versión.
+.TP
+.B extra
+rutas añadidas con \-\-incluir.
+.PP
+Al importar, por defecto:
+.BR config ", " etc ", " web ", " paquetes .
+.BR sistema " y " parches
+se piden con
+.B \-\-niveles
+o
+.BR \-\-todo ;
+.B extra
+solo con
+.BR "\-\-niveles extra" .
+.SH OPCIONES DE EXPORTAR
+.TP
+.BI \-o " fichero"
+nombre del perfil (por defecto owrx\-perfil\-EQUIPO\-FECHA.owrx.tar.gz, permisos 600).
+.TP
+.B \-\-publico
+para compartirlo: sin users.json y con las claves de settings.json en blanco.
+.TP
+.B \-\-cifrar
+cifra el perfil con AES\-256 (openssl, PBKDF2). La contraseña se pide o se toma de
+.BR OWRX_CLONE_CLAVE .
+.SH OPCIONES DE IMPORTAR
+.TP
+.B \-\-simular
+enseña el plan (repositorio, paquetes, ficheros nuevos y sobrescritos) sin cambiar nada.
+.TP
+.BI \-\-mapear " VIEJO=>NUEVO"
+cambia el «device» de un SDR, p. ej. "serial=00000101=>serial=12345678". Repetible.
+.TP
+.B \-\-forzar\-parches
+aplica los parches aunque la versión de openwebrx del destino sea otra.
+.SH SEGURIDAD
+Un perfil normal lleva contraseñas (hash de users.json y claves de settings.json): guárdalo
+como una contraseña o usa
+.BR \-\-cifrar .
+Cada fichero lleva su SHA\-256; un perfil manipulado no se importa. Cada nivel solo puede escribir
+en sus carpetas, nunca en /etc/shadow, /etc/sudoers, /root, /boot, /bin, cron, systemd, PAM ni ~/.ssh, y nunca
+a través de un enlace simbólico. Un directorio de datos distinto al de este equipo solo se acepta si es
+/var/lib/openwebrx… o /srv/openwebrx… del usuario openwebrx; si no, la importación se para.
+.B \-\-todo
+incluye sistema y parches, que ejecutan código como root. Los niveles
+.BR web ", " sistema " y " parches
+contienen código: importa solo perfiles de confianza.
+.SH FICHEROS
+.TP
+.I /var/backups/owrx-clone/copia\-FECHA.tar.gz
+copia previa de cada importación (y su lista de ficheros creados).
+.SH ENTORNO
+.TP
+.B OWRX_CLONE_CLAVE
+contraseña de los perfiles cifrados (si no, se pide).
+.TP
+.B NO_COLOR
+salida sin colores.
+.SH SALIDA
+0 si todo va bien; 1 si hay un error (o problemas en comprobar); 2 uso incorrecto.
+.SH EJEMPLOS
+.nf
+sudo owrx\-clone exportar \-\-cifrar \-o estacion.owrx.tar.gz
+owrx\-clone ver estacion.owrx.tar.gz.enc
+sudo owrx\-clone importar estacion.owrx.tar.gz.enc \-\-simular
+sudo owrx\-clone importar estacion.owrx.tar.gz.enc \-\-todo \-\-mapear "serial=00000101=>serial=1234"
+sudo owrx\-clone deshacer
+.fi
+.SH AUTOR
+EA5KAO · BricoHams (Mi QTH, Región de Murcia). Licencia MIT.
+.SH VÉASE TAMBIÉN
+.BR apt (8),
+.BR systemctl (1),
+.BR SoapySDRUtil (1),
+.BR rtl_eeprom (1)

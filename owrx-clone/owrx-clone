@@ -1,0 +1,1416 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# =====================================================================
+#  owrx-clone · clonar una instalación de OpenWebRX+ a otro equipo
+#  Copyright (c) 2026 EA5KAO · BricoHams (Mi QTH, Región de Murcia) · licencia MIT
+#
+#  Exporta TODO lo que hace única a una estación OpenWebRX+ (receptores y
+#  perfiles, marcadores, usuarios, imágenes, plugins de la web, archivos de
+#  /etc/openwebrx, retoques del paquete, reglas udev, paquetes de SDR…) a un
+#  único fichero «perfil», y lo importa en otro servidor: instala OpenWebRX+
+#  si falta, pone los paquetes, copia cada cosa en su sitio con sus permisos,
+#  arranca el servicio y comprueba que responde. Antes de tocar nada guarda
+#  una copia, y «owrx-clone deshacer» lo deja como estaba.
+#
+#  Uso rápido (ayuda completa: owrx-clone ayuda · man owrx-clone):
+#    sudo owrx-clone exportar                      # en el equipo de origen
+#    owrx-clone ver mi-perfil.owrx.tar.gz          # qué lleva
+#    sudo owrx-clone importar mi-perfil.owrx.tar.gz --simular   # qué haría
+#    sudo owrx-clone importar mi-perfil.owrx.tar.gz             # hacerlo
+#    sudo owrx-clone deshacer                      # volver atrás
+#    sudo owrx-clone comprobar                     # ¿está todo bien?
+#  Funciona en Debian 11-13, Ubuntu 22.04/24.04 y Raspberry Pi OS (amd64, arm64, armhf).
+#  Solo usa la biblioteca estándar de Python 3 (y openssl para --cifrar).
+# =====================================================================
+import argparse
+import configparser
+import datetime
+import fnmatch
+import getpass
+import grp
+import hashlib
+import io
+import json
+import os
+import platform
+import pwd
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import urllib.request
+
+VERSION = '1.0.0'
+FORMATO = 1
+
+# Pruebas: OWRX_CLONE_RAIZ=/ruta hace que todas las rutas del sistema cuelguen de ahí y
+# OWRX_CLONE_SIMULAR_ORDENES=1 apunta las órdenes (apt, systemctl…) en vez de ejecutarlas.
+RAIZ = os.environ.get('OWRX_CLONE_RAIZ', '').rstrip('/')
+SIMULAR_ORDENES = os.environ.get('OWRX_CLONE_SIMULAR_ORDENES') == '1'
+ORDENES = []          # registro de órdenes (para pruebas y para el informe)
+
+NIVELES = ['config', 'etc', 'web', 'paquetes', 'sistema', 'parches', 'extra']
+NIVELES_DEFECTO_IMPORTAR = ['config', 'etc', 'web', 'paquetes']
+DESC_NIVEL = {
+    'config':   'settings.json (receptores, perfiles, ajustes), usuarios, marcadores, imágenes de cabecera',
+    'etc':      '/etc/openwebrx: openwebrx.conf y conf.d, bandas, marcadores y marcas del sistema',
+    'web':      'plugins y ficheros añadidos a la web (htdocs/plugins, init.js, temas…)',
+    'paquetes': 'paquetes de SDR y decodificadores instalados a mano (se reinstalan con apt)',
+    'sistema':  'reglas udev, módulos en lista negra (rtl/dvb), ajustes de systemd de openwebrx, codecserver',
+    'parches':  'ficheros DEL PAQUETE openwebrx modificados a mano (solo con la misma versión)',
+    'extra':    'rutas añadidas con --incluir',
+}
+CACHES = {'eibi.json', 'receivers.json', 'repeaters.json', 'meshtastic.json'}      # se descargan solas
+EXCLUIR_DEFECTO = ['*.pyc', '*/__pycache__/*', '*.antes-*', '*~', '*.swp', '*.tmp', '*.lock']
+MAX_FICHERO = 20 * 1024 * 1024
+PATRON_SDR = re.compile(r'^(openwebrx|soapysdr|soapy|rtl|librtlsdr|airspy|hackrf|sdrplay|codecserver|mbelib|digiham|'
+                        r'csdr|pycsdr|pydigiham|js8|wsjtx|direwolf|dump1090|readsb|dream|m17|freedv|codec2|nrsc5|'
+                        r'multimon|acarsdec|dumphfdl|dumpvdl2|satdump|msk144|redsea|rtl-433|rtl433|perseus|bladerf|'
+                        r'limesuite|uhd|fcdpp|runds|sddc|hpsdr|plutosdr|libiio|iio|aprs|dsd|ka9q|sdrangel|'
+                        r'cwskimmer|fldigi|hfdl|ais|rtlamr|lame|sox|ffmpeg)')
+SECRETO = re.compile(r'(passw|passcode|_key$|^key$|_keys$|token|secret|apikey|api_key)', re.I)
+RUTAS_SISTEMA = ['/etc/udev/rules.d', '/etc/modprobe.d', '/etc/systemd/system/openwebrx.service.d', '/etc/codecserver']
+# Nunca se escribe aquí, sea cual sea el nivel (ni con «extra»): claves, arranque, tareas
+# programadas, servicios, PAM, cargador dinámico, binarios del sistema…
+PROHIBIDAS = ['/etc/shadow', '/etc/gshadow', '/etc/passwd', '/etc/group', '/etc/sudoers', '/etc/sudoers.d', '/root',
+              '/boot', '/proc', '/sys', '/dev', '/run', '/etc/ssh', '/bin', '/sbin', '/lib', '/lib64', '/usr/bin', '/usr/sbin',
+              '/usr/lib/systemd', '/lib/systemd', '/etc/systemd', '/etc/cron.d', '/etc/cron.daily', '/etc/cron.hourly',
+              '/etc/cron.weekly', '/etc/cron.monthly', '/etc/crontab', '/var/spool/cron', '/etc/profile', '/etc/profile.d',
+              '/etc/bash.bashrc', '/etc/environment', '/etc/ld.so.preload', '/etc/ld.so.conf', '/etc/ld.so.conf.d',
+              '/etc/pam.d', '/etc/security', '/etc/apt', '/etc/polkit-1', '/etc/rc.local', '/etc/init.d', '/etc/hosts',
+              '/etc/resolv.conf', '/etc/fstab', '/etc/modules', '/etc/modules-load.d', '/var/lib/dpkg', '/usr/local/bin',
+              '/usr/local/sbin']
+# Un directorio de datos distinto al de este equipo (core.data_directory del perfil) solo se acepta si es
+# /var/lib/openwebrx… o /srv/openwebrx…, y si ya existe tiene que ser del usuario openwebrx
+BASES_DATOS = ['/var/lib/openwebrx', '/srv/openwebrx']
+COPIAS = '/var/backups/owrx-clone'
+
+C = {'ok': '\033[32m', 'av': '\033[33m', 'ko': '\033[31m', 'b': '\033[1m', 'g': '\033[90m', '0': '\033[0m'}
+if not sys.stdout.isatty() or os.environ.get('NO_COLOR'):
+    C = {k: '' for k in C}
+
+
+class Error(Exception):
+    pass
+
+
+def info(m): print('%s==>%s %s' % (C['b'], C['0'], m))
+def bien(m): print('  %s✔%s %s' % (C['ok'], C['0'], m))
+def aviso(m): print('  %s!%s %s' % (C['av'], C['0'], m))
+def gris(m): print('    %s%s%s' % (C['g'], m, C['0']))
+
+
+def R(p):
+    """Ruta real en este equipo (con OWRX_CLONE_RAIZ en las pruebas)."""
+    return RAIZ + p if RAIZ else p
+
+
+def sin_raiz(p):
+    return p[len(RAIZ):] if RAIZ and p.startswith(RAIZ) else p
+
+
+def ejecutar(orden, comprobar=True, entrada=None, timeout=None):
+    ORDENES.append(' '.join(orden))
+    if SIMULAR_ORDENES:
+        return subprocess.CompletedProcess(orden, 0, '', '')
+    r = subprocess.run(orden, input=entrada, capture_output=True, text=True, timeout=timeout)
+    if comprobar and r.returncode != 0:
+        raise Error('falló «%s»: %s' % (' '.join(orden), (r.stderr or r.stdout).strip()[-400:]))
+    return r
+
+
+def sha256(datos=None, ruta=None):
+    h = hashlib.sha256()
+    if ruta:
+        with open(ruta, 'rb') as f:
+            for b in iter(lambda: f.read(1 << 16), b''):
+                h.update(b)
+    else:
+        h.update(datos)
+    return h.hexdigest()
+
+
+def md5(ruta):
+    h = hashlib.md5()
+    with open(ruta, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 16), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def necesita_root():
+    if not RAIZ and os.geteuid() != 0:
+        raise Error('hace falta root: sudo owrx-clone %s' % ' '.join(sys.argv[1:]))
+
+
+# ---------------------------------------------------------------------
+#  lo que hay en este equipo
+# ---------------------------------------------------------------------
+def leer_os():
+    d = {}
+    try:
+        for l in open(R('/etc/os-release'), encoding='utf-8'):
+            k, _, v = l.strip().partition('=')
+            if k:
+                d[k] = v.strip().strip('"')
+    except OSError:
+        pass
+    return {'id': d.get('ID', ''), 'like': d.get('ID_LIKE', ''), 'codename': d.get('VERSION_CODENAME', ''),
+            'ubuntu_codename': d.get('UBUNTU_CODENAME', ''), 'nombre': d.get('PRETTY_NAME', '?')}
+
+
+def arquitectura():
+    if os.environ.get('OWRX_CLONE_ARCH'):
+        return os.environ['OWRX_CLONE_ARCH']
+    try:
+        return subprocess.run(['dpkg', '--print-architecture'], capture_output=True, text=True).stdout.strip() or '?'
+    except OSError:
+        return {'x86_64': 'amd64', 'aarch64': 'arm64', 'armv7l': 'armhf'}.get(platform.machine(), platform.machine())
+
+
+def conf_openwebrx(base=None):
+    """data_directory y puerto según openwebrx.conf + openwebrx.conf.d/*.conf (como OpenWebRX+)."""
+    base = base or R('/etc/openwebrx')
+    cp = configparser.ConfigParser()
+    cp.read_dict({'core': {'data_directory': '/var/lib/openwebrx'}, 'web': {'port': '8073'}})
+    fs = [os.path.join(base, 'openwebrx.conf')]
+    if os.path.isfile(fs[0]):
+        fs += sorted(os.path.join(base, 'openwebrx.conf.d', f) for f in os.listdir(os.path.join(base, 'openwebrx.conf.d'))
+                     if f.endswith('.conf')) if os.path.isdir(os.path.join(base, 'openwebrx.conf.d')) else []
+    try:
+        cp.read(fs)
+    except configparser.Error as e:
+        aviso('openwebrx.conf no se puede leer (%s): uso los valores por defecto' % e)
+    try:
+        puerto = int(cp.get('web', 'port'))
+    except ValueError:
+        puerto = 8073
+    return {'data': cp.get('core', 'data_directory').rstrip('/') or '/var/lib/openwebrx', 'puerto': puerto}
+
+
+def paquetes_instalados():
+    """{nombre: versión} de /var/lib/dpkg/status (sin llamar a dpkg: así funciona igual en pruebas)."""
+    r, cur = {}, {}
+    try:
+        texto = open(R('/var/lib/dpkg/status'), encoding='utf-8', errors='replace').read()
+    except OSError:
+        return r
+    for bloque in texto.split('\n\n'):
+        cur = {}
+        for l in bloque.splitlines():
+            if l and not l.startswith(' ') and ':' in l:
+                k, _, v = l.partition(':')
+                cur[k] = v.strip()
+        if cur.get('Package') and cur.get('Status', '').endswith('installed') and 'not-installed' not in cur.get('Status', ''):
+            r[cur['Package']] = cur.get('Version', '')
+    return r
+
+
+def paquetes_automaticos():
+    auto, nombre = set(), None
+    try:
+        for l in open(R('/var/lib/apt/extended_states'), encoding='utf-8', errors='replace'):
+            if l.startswith('Package:'):
+                nombre = l.split(':', 1)[1].strip()
+            elif l.startswith('Auto-Installed:') and l.split(':', 1)[1].strip() == '1' and nombre:
+                auto.add(nombre)
+    except OSError:
+        pass
+    return auto
+
+
+def ficheros_paquete(pkg='openwebrx'):
+    """{ruta absoluta: md5} del paquete (md5sums de dpkg)."""
+    for n in (pkg, pkg + ':all', pkg + ':' + arquitectura()):
+        p = R('/var/lib/dpkg/info/%s.md5sums' % n)
+        if os.path.isfile(p):
+            r = {}
+            for l in open(p, encoding='utf-8', errors='replace'):
+                partes = l.rstrip('\n').split(None, 1)
+                if len(partes) == 2:
+                    r['/' + partes[1].lstrip('/')] = partes[0]
+            return r
+    return {}
+
+
+def ruta_htdocs(md5s):
+    for p in md5s:
+        if p.endswith('/htdocs/index.html'):
+            return os.path.dirname(p)
+    for p in ('/usr/lib/python3/dist-packages/htdocs', '/usr/local/lib/python3/dist-packages/htdocs'):
+        if os.path.isdir(R(p)):
+            return p
+    return '/usr/lib/python3/dist-packages/htdocs'
+
+
+def equipo():
+    pk = paquetes_instalados()
+    md5s = ficheros_paquete()
+    c = conf_openwebrx()
+    return {'hostname': socket.gethostname(), 'so': leer_os(), 'arch': arquitectura(),
+            'openwebrx': pk.get('openwebrx', ''), 'data': c['data'], 'puerto': c['puerto'],
+            'htdocs': ruta_htdocs(md5s), 'paquetes': pk, 'md5s': md5s}
+
+
+def receptores(settings):
+    """Resumen de los SDR de un settings.json."""
+    out = []
+    for i, s in (settings.get('sdrs') or {}).items():
+        out.append({'id': i, 'nombre': s.get('name', i), 'tipo': s.get('type', '?'), 'device': str(s.get('device', '')),
+                    'activo': s.get('enabled', True), 'perfiles': len(s.get('profiles') or {})})
+    return out
+
+
+def quitar_secretos(obj, ruta='', quitados=None):
+    quitados = [] if quitados is None else quitados
+    if isinstance(obj, dict):
+        for k in list(obj):
+            if SECRETO.search(k) and isinstance(obj[k], (str, int, list, dict)) and obj[k] not in ('', None, [], {}):
+                obj[k] = '' if isinstance(obj[k], (str, int)) else type(obj[k])()
+                quitados.append(ruta + k)
+            else:
+                quitar_secretos(obj[k], ruta + k + '.', quitados)
+    elif isinstance(obj, list):
+        for i, x in enumerate(obj):
+            quitar_secretos(x, ruta + '%d.' % i, quitados)
+    return quitados
+
+
+# ---------------------------------------------------------------------
+#  exportar
+# ---------------------------------------------------------------------
+def _recorrer(base):
+    if os.path.isfile(base):
+        yield base
+        return
+    for d, subs, fs in os.walk(base):
+        subs.sort()
+        for f in sorted(fs):
+            p = os.path.join(d, f)
+            if os.path.isfile(p) and not os.path.islink(p):
+                yield p
+
+
+def _excluido(logica, patrones):
+    return any(fnmatch.fnmatch(logica, p) or fnmatch.fnmatch(os.path.basename(logica), p) for p in patrones)
+
+
+def recoger(eq, niveles, excluir=(), incluir=(), sin_usuarios=False):
+    """Lista de (nivel, ruta lógica, ruta real) a exportar."""
+    excl = list(EXCLUIR_DEFECTO) + list(excluir)
+    out, vistos = [], set()
+
+    def poner(nivel, logica, real):
+        if logica in vistos or _excluido(logica, excl):
+            return
+        try:
+            if os.path.getsize(real) > MAX_FICHERO:
+                aviso('%s pesa más de %d MB: no lo exporto' % (logica, MAX_FICHERO >> 20))
+                return
+        except OSError:
+            return
+        vistos.add(logica)
+        out.append((nivel, logica, real))
+
+    if 'config' in niveles and os.path.isdir(R(eq['data'])):
+        for real in _recorrer(R(eq['data'])):
+            rel = os.path.relpath(real, R(eq['data']))
+            if rel in CACHES or (sin_usuarios and rel == 'users.json'):
+                continue
+            poner('config', '{DATA}/' + rel, real)
+    if 'etc' in niveles and os.path.isdir(R('/etc/openwebrx')):
+        for real in _recorrer(R('/etc/openwebrx')):
+            poner('etc', sin_raiz(real), real)
+    if 'web' in niveles and os.path.isdir(R(eq['htdocs'])):
+        for real in _recorrer(R(eq['htdocs'])):
+            if sin_raiz(real) not in eq['md5s']:
+                poner('web', '{HTDOCS}/' + os.path.relpath(real, R(eq['htdocs'])), real)
+    if 'parches' in niveles:
+        for ruta, suma in sorted(eq['md5s'].items()):
+            real = R(ruta)
+            if os.path.isfile(real) and not os.path.islink(real) and md5(real) != suma:
+                poner('parches', ruta, real)
+    if 'sistema' in niveles:
+        for base in RUTAS_SISTEMA:
+            if not os.path.isdir(R(base)):
+                continue
+            for real in _recorrer(R(base)):
+                if base == '/etc/modprobe.d':
+                    try:
+                        if not re.search(r'rtl|dvb|sdr|airspy|hackrf|r82|e4000', open(real, errors='replace').read(), re.I):
+                            continue
+                    except OSError:
+                        continue
+                poner('sistema', sin_raiz(real), real)
+    if 'extra' in niveles:
+        for p in incluir:
+            p = os.path.abspath(p)
+            if any(p == x or p.startswith(x + '/') for x in PROHIBIDAS):
+                raise Error('--incluir %s: esa ruta no se puede clonar (sistema o claves)' % p)
+            if not os.path.exists(R(p)):
+                raise Error('--incluir %s: no existe' % p)
+            for real in _recorrer(R(p)):
+                poner('extra', sin_raiz(real), real)
+    return out
+
+
+def _info_fichero(real):
+    st = os.stat(real)
+    try:
+        u = pwd.getpwuid(st.st_uid).pw_name
+    except KeyError:
+        u = str(st.st_uid)
+    try:
+        g = grp.getgrgid(st.st_gid).gr_name
+    except KeyError:
+        g = str(st.st_gid)
+    return {'modo': '%04o' % (st.st_mode & 0o7777), 'dueno': u, 'grupo': g}
+
+
+def arc_de(nivel, logica):
+    return 'archivos/%s/%s' % (nivel, logica.replace('{', '').replace('}', '').lstrip('/'))
+
+
+def exportar(a):
+    necesita_root()
+    eq = equipo()
+    niveles = _lista_niveles(a.niveles, NIVELES[:-1] + (['extra'] if a.incluir else []))
+    if a.incluir and 'extra' not in niveles:
+        niveles.append('extra')
+    if not eq['openwebrx']:
+        aviso('el paquete openwebrx no está instalado aquí: exporto lo que encuentre')
+    info('Exportando OpenWebRX+ %s de %s (%s, %s)' % (eq['openwebrx'] or '?', eq['hostname'], eq['so']['nombre'], eq['arch']))
+    lista = recoger(eq, niveles, a.excluir, a.incluir, a.sin_usuarios or a.publico)
+    entradas, contenido, quitados = [], {}, []
+    for nivel, logica, real in lista:
+        datos = open(real, 'rb').read()
+        if a.publico and logica == '{DATA}/settings.json':
+            try:
+                j = json.loads(datos)
+                quitados = quitar_secretos(j)
+                datos = json.dumps(j, indent=4, ensure_ascii=False).encode()
+            except ValueError:
+                aviso('settings.json no es JSON válido: va tal cual')
+        e = {'nivel': nivel, 'ruta': logica, 'arc': arc_de(nivel, logica), 'sha256': sha256(datos), 'tam': len(datos)}
+        e.update(_info_fichero(real))
+        entradas.append(e)
+        contenido[e['arc']] = datos
+    settings = {}
+    if os.path.isfile(R(eq['data'] + '/settings.json')):
+        try:
+            settings = json.load(open(R(eq['data'] + '/settings.json'), encoding='utf-8'))
+        except ValueError:
+            aviso('settings.json no es JSON válido')
+    auto = paquetes_automaticos()
+    paqs = []
+    if 'paquetes' in niveles:
+        paqs = [{'nombre': p, 'version': v} for p, v in sorted(eq['paquetes'].items())
+                if (p == 'openwebrx' or (PATRON_SDR.match(p) and p not in auto)) and not p.endswith('-dev')]
+    repos = []
+    for f in sorted(_glob(R('/etc/apt/sources.list.d'), ('*.list', '*.sources'))):
+        for l in open(f, errors='replace'):
+            if re.search(r'luarvique|openwebrx', l) and not l.lstrip().startswith('#'):
+                repos.append(l.strip())
+    avisos = []
+    if os.path.exists(R('/usr/local/lib/libsdrplay_api.so')) or _glob(R('/usr/local/lib'), ('libsdrplay_api.so*',)):
+        avisos.append('Hay una API de SDRplay instalada a mano: en el destino instálala desde sdrplay.com (licencia propia).')
+    if any(e['nivel'] == 'parches' for e in entradas):
+        avisos.append('Lleva ficheros del paquete openwebrx retocados: solo se aplican en el destino con la versión %s.' % eq['openwebrx'])
+    m = {
+        'formato': FORMATO, 'herramienta': 'owrx-clone ' + VERSION,
+        'creado': datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+        'origen': {'hostname': eq['hostname'], 'so': eq['so'], 'arch': eq['arch'], 'openwebrx': eq['openwebrx'],
+                   'data': eq['data'], 'htdocs': eq['htdocs'], 'puerto': eq['puerto']},
+        'niveles': niveles, 'secretos': 'quitados' if a.publico else 'incluidos',
+        'secretos_quitados': quitados, 'usuarios': any(e['ruta'] == '{DATA}/users.json' for e in entradas),
+        'receptores': receptores(settings), 'nombre_receptor': settings.get('receiver_name', ''),
+        'paquetes': paqs, 'repos': repos, 'avisos': avisos, 'ficheros': entradas,
+        'nota': a.nota or '',
+    }
+    destino = a.salida or 'owrx-perfil-%s-%s.owrx.tar.gz' % (re.sub(r'[^A-Za-z0-9_.-]', '_', eq['hostname']),
+                                                             datetime.datetime.now().strftime('%Y%m%d-%H%M'))
+    if a.cifrar and not destino.endswith('.enc'):
+        destino += '.enc'
+    _escribir_perfil(destino, m, contenido, a.cifrar)
+    por = {}
+    for e in entradas:
+        por[e['nivel']] = por.get(e['nivel'], 0) + 1
+    bien('perfil: %s (%s)' % (destino, _tam(os.path.getsize(destino))))
+    for n in niveles:
+        gris('%-9s %4d fichero(s) · %s' % (n, len(paqs) if n == 'paquetes' else por.get(n, 0), DESC_NIVEL[n]))
+    gris('receptores: %d · usuarios: %s · claves: %s%s' % (
+        len(m['receptores']), 'sí' if m['usuarios'] else 'no', m['secretos'],
+        ' (%d quitadas)' % len(quitados) if a.publico else ''))
+    for x in avisos:
+        aviso(x)
+    if not a.publico:
+        aviso('El perfil lleva contraseñas y claves (usuarios, settings.json). Guárdalo como una contraseña'
+              + ('' if a.cifrar else ' o usa --cifrar') + '. Para compartirlo: --publico.')
+    return 0
+
+
+def _glob(base, patrones):
+    if not os.path.isdir(base):
+        return []
+    return [os.path.join(base, f) for f in os.listdir(base) if any(fnmatch.fnmatch(f, p) for p in patrones)]
+
+
+def _tam(n):
+    for u in ('B', 'kB', 'MB', 'GB'):
+        if n < 1024:
+            return '%.0f %s' % (n, u)
+        n /= 1024.0
+    return '%.1f TB' % n
+
+
+def _clave(confirmar):
+    k = os.environ.get('OWRX_CLONE_CLAVE')
+    if k:
+        return k
+    if not sys.stdin.isatty():
+        raise Error('perfil cifrado: pon la contraseña en OWRX_CLONE_CLAVE o ejecútalo en un terminal')
+    k = getpass.getpass('Contraseña del perfil: ')
+    if confirmar and getpass.getpass('Repítela: ') != k:
+        raise Error('las contraseñas no coinciden')
+    if len(k) < 8:
+        raise Error('la contraseña debe tener al menos 8 caracteres')
+    return k
+
+
+def _escribir_perfil(destino, m, contenido, cifrar):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode='w:gz') as t:
+        def add(nombre, datos, modo=0o644):
+            ti = tarfile.TarInfo(nombre)
+            ti.size, ti.mode, ti.mtime = len(datos), modo, int(time.time())
+            t.addfile(ti, io.BytesIO(datos))
+        add('manifiesto.json', json.dumps(m, indent=2, ensure_ascii=False).encode())
+        add('LEEME.txt', _leeme(m).encode())
+        for e in m['ficheros']:
+            add(e['arc'], contenido[e['arc']], 0o600)
+    datos = buf.getvalue()
+    if cifrar:
+        clave = _clave(True)
+        r = subprocess.run(['openssl', 'enc', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-salt', '-pass', 'env:OWRX_CLONE_CLAVE_INT'],
+                           input=datos, capture_output=True, env=dict(os.environ, OWRX_CLONE_CLAVE_INT=clave))
+        if r.returncode != 0:
+            raise Error('openssl no ha podido cifrar: %s' % r.stderr.decode(errors='replace'))
+        datos = r.stdout
+    fd = os.open(destino, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as f:
+        f.write(datos)
+    os.chmod(destino, 0o600)
+    if os.environ.get('SUDO_UID') and not RAIZ:
+        try:
+            os.chown(destino, int(os.environ['SUDO_UID']), int(os.environ.get('SUDO_GID', os.environ['SUDO_UID'])))
+        except OSError:
+            pass
+
+
+def _leeme(m):
+    o = m['origen']
+    l = ['Perfil de OpenWebRX+ hecho con %s el %s' % (m['herramienta'], m['creado']),
+         'Origen: %s · %s · %s · OpenWebRX+ %s' % (o['hostname'], o['so'].get('nombre', '?'), o['arch'], o['openwebrx'] or '?'),
+         'Receptor: %s' % (m.get('nombre_receptor') or '?'), '', 'Niveles: ' + ', '.join(m['niveles']),
+         'Claves: ' + m['secretos'], '', 'Para verlo:     owrx-clone ver ESTE_FICHERO',
+         'Para probarlo:  sudo owrx-clone importar ESTE_FICHERO --simular',
+         'Para aplicarlo: sudo owrx-clone importar ESTE_FICHERO', '']
+    if m.get('nota'):
+        l += ['Nota: ' + m['nota'], '']
+    return '\n'.join(l)
+
+
+# ---------------------------------------------------------------------
+#  leer un perfil
+# ---------------------------------------------------------------------
+def abrir_perfil(ruta):
+    """Devuelve (manifiesto, dir_temporal) tras comprobar sumas y nombres."""
+    if not os.path.isfile(ruta):
+        raise Error('no existe el perfil %s' % ruta)
+    datos = open(ruta, 'rb').read()
+    if datos[:8] == b'Salted__':
+        clave = _clave(False)
+        r = subprocess.run(['openssl', 'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-iter', '200000', '-pass', 'env:OWRX_CLONE_CLAVE_INT'],
+                           input=datos, capture_output=True, env=dict(os.environ, OWRX_CLONE_CLAVE_INT=clave))
+        if r.returncode != 0:
+            raise Error('no he podido descifrar el perfil: ¿contraseña equivocada?')
+        datos = r.stdout
+    tmp = tempfile.mkdtemp(prefix='owrx-clone-')
+    try:
+        with tarfile.open(fileobj=io.BytesIO(datos), mode='r:gz') as t:
+            for mi in t.getmembers():
+                n = mi.name
+                if not mi.isfile() or n.startswith('/') or '..' in n.split('/') or not (n in ('manifiesto.json', 'LEEME.txt') or n.startswith('archivos/')):
+                    raise Error('el perfil tiene una entrada no permitida: %s' % n)
+                dst = os.path.join(tmp, n)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, 'wb') as f:
+                    f.write(t.extractfile(mi).read())
+    except (tarfile.TarError, OSError, EOFError) as e:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise Error('el fichero no es un perfil válido (%s)' % e)
+    try:
+        m = json.load(open(os.path.join(tmp, 'manifiesto.json'), encoding='utf-8'))
+    except (OSError, ValueError):
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise Error('al perfil le falta manifiesto.json o está dañado')
+    if m.get('formato', 0) > FORMATO:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise Error('perfil de formato %s: actualiza owrx-clone (este entiende hasta el %d)' % (m.get('formato'), FORMATO))
+    for e in m.get('ficheros', []):
+        p = os.path.join(tmp, e['arc'])
+        if e['arc'] != arc_de(e['nivel'], e['ruta']) or not os.path.isfile(p) or sha256(ruta=p) != e['sha256']:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise Error('el perfil está dañado o manipulado: %s no cuadra con su suma SHA-256' % e['ruta'])
+    return m, tmp
+
+
+def ver(a):
+    m, tmp = abrir_perfil(a.perfil)
+    shutil.rmtree(tmp, ignore_errors=True)
+    if a.json:
+        print(json.dumps(m, indent=2, ensure_ascii=False))
+        return 0
+    o = m['origen']
+    info('Perfil %s' % a.perfil)
+    gris('hecho el %s con %s' % (m['creado'], m['herramienta']))
+    gris('origen: %s · %s · %s · OpenWebRX+ %s' % (o['hostname'], o['so'].get('nombre', '?'), o['arch'], o['openwebrx'] or '?'))
+    if m.get('nota'):
+        gris('nota: ' + m['nota'])
+    print()
+    print('  Receptor «%s» · %d SDR:' % (m.get('nombre_receptor') or '?', len(m['receptores'])))
+    for s in m['receptores']:
+        print('    %-18s %-10s %-34s %3d perfiles%s' % (s['nombre'][:18], s['tipo'], s['device'][:34], s['perfiles'], '' if s['activo'] else ' (apagado)'))
+    print()
+    por = {}
+    for e in m['ficheros']:
+        por.setdefault(e['nivel'], []).append(e)
+    for n in m['niveles']:
+        if n == 'paquetes':
+            print('  %-9s %d: %s' % (n, len(m['paquetes']), ', '.join(p['nombre'] for p in m['paquetes'])[:300]))
+            continue
+        fs = por.get(n, [])
+        print('  %-9s %d fichero(s) · %s' % (n, len(fs), DESC_NIVEL[n]))
+        if a.todo:
+            for e in fs:
+                gris('%-60s %8s %s' % (e['ruta'], _tam(e['tam']), e['modo']))
+    print()
+    gris('claves: %s · usuarios de administración: %s' % (m['secretos'], 'sí' if m['usuarios'] else 'no'))
+    for x in m.get('avisos', []):
+        aviso(x)
+    return 0
+
+
+# ---------------------------------------------------------------------
+#  importar
+# ---------------------------------------------------------------------
+def repo_openwebrx(so, arch):
+    """(línea deb, clave, repositorio extra de OpenWebRX original o None) para este sistema."""
+    cn = so['codename']
+    es_ubuntu = so['id'] == 'ubuntu' or 'ubuntu' in so['like']
+    if es_ubuntu:
+        cn = so['ubuntu_codename'] or cn
+    clave = 'https://luarvique.github.io/ppa/openwebrx-plus.gpg'
+    extra = None
+    if cn in ('bookworm', 'trixie', 'noble'):
+        ruta = cn
+    elif cn == 'bullseye':
+        ruta = 'debian'
+        extra = 'deb [signed-by=/usr/share/keyrings/openwebrx.gpg] https://repo.openwebrx.de/debian/ bullseye main'
+    elif cn == 'jammy':
+        ruta = 'ubuntu'
+        extra = 'deb [signed-by=/usr/share/keyrings/openwebrx.gpg] https://repo.openwebrx.de/ubuntu/ jammy main'
+    else:
+        raise Error('sistema %s (%s) sin repositorio de OpenWebRX+: soportados Debian bullseye/bookworm/trixie, '
+                    'Ubuntu jammy/noble y Raspberry Pi OS. Instala OpenWebRX+ a mano y repite con --niveles sin «paquetes».' % (so['nombre'], cn or '?'))
+    if arch not in ('amd64', 'arm64', 'armhf'):
+        raise Error('arquitectura %s sin paquetes de OpenWebRX+ (amd64, arm64, armhf)' % arch)
+    return ('deb [signed-by=/etc/apt/trusted.gpg.d/openwebrx-plus.gpg] https://luarvique.github.io/ppa/%s ./' % ruta, clave, extra)
+
+
+def _bajar(url, destino_gpg):
+    ORDENES.append('bajar %s → %s' % (url, destino_gpg))
+    if SIMULAR_ORDENES:
+        return
+    for intento in range(5):
+        try:
+            datos = urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'owrx-clone/' + VERSION}), timeout=30).read()
+            break
+        except OSError as e:
+            if intento == 4:
+                raise Error('no puedo bajar %s: %s' % (url, e))
+            time.sleep(3)
+    r = subprocess.run(['gpg', '--yes', '--dearmor', '-o', R(destino_gpg)], input=datos, capture_output=True)
+    if r.returncode != 0:
+        raise Error('la clave de %s no es válida' % url)
+
+
+def destino_de(e, eq_dest, data_dest, htdocs_dest):
+    r = e['ruta']
+    if r.startswith('{DATA}/'):
+        return data_dest + r[6:]
+    if r.startswith('{HTDOCS}/'):
+        return htdocs_dest + r[8:]
+    return r
+
+
+def prohibida(n):
+    if '/.ssh/' in n + '/' or n.endswith('/.ssh'):
+        return True
+    return any(n == x or n.startswith(x.rstrip('/') + '/') for x in PROHIBIDAS)
+
+
+def permitido(e, dest, data_dest, htdocs_dest, md5_dest):
+    n = os.path.normpath(dest)
+    if not dest.startswith('/') or n != dest.rstrip('/') or '..' in dest.split('/'):
+        return False
+    dentro = lambda base: n.startswith(base.rstrip('/') + '/')  # noqa: E731
+    if e['nivel'] == 'sistema':                 # sus carpetas fijas (alguna cuelga de /etc/systemd)
+        return any(dentro(b) for b in RUTAS_SISTEMA)
+    if prohibida(n):
+        return False
+    if e['nivel'] == 'config':
+        return dentro(data_dest)
+    if e['nivel'] == 'etc':
+        return dentro('/etc/openwebrx')
+    if e['nivel'] == 'web':
+        return dentro(htdocs_dest)
+    if e['nivel'] == 'parches':
+        return n in md5_dest
+    if e['nivel'] == 'extra':
+        return True
+    return False
+
+
+def camino_seguro(ruta, base=None):
+    """Ninguna carpeta del camino de «ruta» por DEBAJO de «base» es un enlace simbólico (los crearía el
+    usuario openwebrx dentro de sus carpetas para desviar una escritura de root). La propia base sí puede
+    serlo (p. ej. /var/lib/openwebrx movido a un USB por el administrador). Sin base: todo el camino."""
+    d = os.path.dirname(os.path.normpath(R(ruta)))
+    tope = os.path.normpath(R(base)) if base else (RAIZ or '/')
+    while d and d != tope and d != '/' and d != (RAIZ or '/'):
+        if os.path.islink(d):
+            return False
+        d = os.path.dirname(d)
+    return True
+
+
+def base_de(e, data_dest, htdocs_dest):
+    n = e['nivel']
+    if n == 'config':
+        return data_dest
+    if n == 'etc':
+        return '/etc/openwebrx'
+    if n == 'web':
+        return htdocs_dest
+    if n == 'sistema':
+        return next((b for b in RUTAS_SISTEMA if e['ruta'].startswith(b + '/')), None)
+    return None
+
+
+def escribir_seguro(ruta, datos, modo, dueno, base=None):
+    """Escribe con un temporal en la misma carpeta y os.replace (nunca a través de un enlace)."""
+    real = R(ruta)
+    if not camino_seguro(ruta, base):
+        raise Error('%s: hay un enlace simbólico en el camino; no escribo por seguridad' % ruta)
+    os.makedirs(os.path.dirname(real), exist_ok=True)
+    fd, tmpf = tempfile.mkstemp(dir=os.path.dirname(real), prefix='.owrx-clone-')
+    try:
+        with os.fdopen(fd, 'wb') as f:
+            f.write(datos)
+        os.chmod(tmpf, modo & 0o7777)
+        _chown(tmpf, dueno)
+        os.replace(tmpf, real)          # sustituye el fichero (o un enlace) sin seguirlo
+    except BaseException:
+        try:
+            os.unlink(tmpf)
+        except OSError:
+            pass
+        raise
+
+
+def _lista_niveles(texto, defecto):
+    if not texto:
+        return list(defecto)
+    ns = [x.strip() for x in texto.split(',') if x.strip()]
+    malos = [x for x in ns if x not in NIVELES]
+    if malos:
+        raise Error('niveles desconocidos: %s (valen: %s)' % (', '.join(malos), ', '.join(NIVELES)))
+    return [n for n in NIVELES if n in ns]
+
+
+def importar(a):
+    necesita_root()
+    m, tmp = abrir_perfil(a.perfil)
+    try:
+        return _importar(a, m, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _importar(a, m, tmp):
+    eq = equipo()
+    o = m['origen']
+    disponibles = m['niveles']
+    if a.todo:                  # todo menos «extra» (puede escribir en cualquier sitio permitido): ese hay que pedirlo
+        niveles = [n for n in disponibles if n != 'extra'] + (['extra'] if a.niveles and 'extra' in a.niveles.split(',') else [])
+    else:
+        niveles = [n for n in _lista_niveles(a.niveles, NIVELES_DEFECTO_IMPORTAR) if n in disponibles]
+    if a.sin_paquetes and 'paquetes' in niveles:
+        niveles.remove('paquetes')
+    info('Importando el perfil de %s (OpenWebRX+ %s, %s) en %s (%s, %s)' % (
+        o['hostname'], o['openwebrx'] or '?', o['arch'], eq['hostname'], eq['so']['nombre'], eq['arch']))
+    no_elegidos = [n for n in disponibles if n not in niveles]
+    if no_elegidos:
+        gris('niveles del perfil que NO se aplican: %s (añádelos con --niveles o --todo)' % ', '.join(no_elegidos))
+
+    # ---- 1. paquetes (antes que los ficheros: deciden dónde está htdocs) ----
+    instalar, repo = [], None
+    if 'paquetes' in niveles:
+        pedidos = [p['nombre'] for p in m['paquetes'] if PATRON_SDR.match(p['nombre'])]
+        if 'openwebrx' not in pedidos:
+            pedidos.insert(0, 'openwebrx')
+        instalar = [p for p in pedidos if p not in eq['paquetes']]
+        if not eq['openwebrx'] and not os.path.exists(R('/etc/apt/trusted.gpg.d/openwebrx-plus.gpg')):
+            repo = repo_openwebrx(eq['so'], eq['arch'])
+    elif not eq['openwebrx']:
+        aviso('OpenWebRX+ no está instalado y el nivel «paquetes» no se aplica: solo copio ficheros')
+
+    # ---- 2. plan de ficheros ----
+    data_dest = eq['data']
+    if 'etc' in niveles:     # si el perfil cambia data_directory, manda el del perfil… si es un sitio razonable
+        base = os.path.join(tmp, 'archivos/etc/etc/openwebrx')
+        if os.path.isfile(os.path.join(base, 'openwebrx.conf')):
+            propuesto = os.path.normpath(conf_openwebrx(base)['data'])
+            if propuesto != data_dest:
+                ow = _usuario('openwebrx')
+                existe = os.path.lexists(R(propuesto))
+                bueno = (any(propuesto == b or propuesto.startswith(b) and '/' not in propuesto[len(b):] for b in BASES_DATOS)
+                         and not prohibida(propuesto) and not os.path.islink(R(propuesto))
+                         and (not existe or (ow and _dueno(R(propuesto)) == ow)))
+                if not bueno:
+                    raise Error('el perfil pone el directorio de datos en %s. Solo se acepta el de este equipo (%s) '
+                                'o uno nuevo /var/lib/openwebrx… o /srv/openwebrx… del usuario openwebrx. '
+                                'No lo importo (¿perfil manipulado?)' % (propuesto, data_dest))
+                aviso('el perfil usa otro directorio de datos: %s (aquí era %s)' % (propuesto, data_dest))
+                data_dest = propuesto
+    htdocs_dest = eq['htdocs']
+    md5_dest = eq['md5s']
+    ver_dest = eq['openwebrx']
+    plan, saltados = [], []
+    for e in m['ficheros']:
+        if e['nivel'] not in niveles:
+            continue
+        if a.sin_usuarios and e['ruta'] == '{DATA}/users.json':
+            saltados.append((e['ruta'], 'sin usuarios (--sin-usuarios)'))
+            continue
+        if e['nivel'] == 'parches' and not ver_dest:
+            saltados.append((e['ruta'], 'OpenWebRX+ aún no está instalado aquí: repite luego con --niveles parches'))
+            continue
+        if e['nivel'] == 'parches' and not a.forzar_parches and ver_dest != o['openwebrx']:
+            saltados.append((e['ruta'], 'parche para %s y aquí hay %s (usa --forzar-parches)' % (o['openwebrx'], ver_dest)))
+            continue
+        dest = destino_de(e, eq, data_dest, htdocs_dest)
+        if not permitido(e, dest, data_dest, htdocs_dest, md5_dest):
+            saltados.append((e['ruta'], 'ruta no permitida para el nivel %s' % e['nivel']))
+            continue
+        if not camino_seguro(dest, base_de(e, data_dest, htdocs_dest)):
+            raise Error('hay un enlace simbólico en el camino de %s: no importo nada por seguridad (revísalo a mano)' % dest)
+        plan.append((e, dest))
+    if not plan and any(e['nivel'] in niveles for e in m['ficheros']):
+        raise Error('ningún fichero del perfil se puede aplicar aquí (mira los avisos de arriba)')
+
+    # ---- 3. informe y confirmación ----
+    print()
+    if repo:
+        print('  Repositorio de OpenWebRX+: %s' % repo[0])
+    if instalar:
+        print('  Paquetes a instalar (%d): %s' % (len(instalar), ', '.join(instalar)))
+    elif 'paquetes' in niveles:
+        print('  Paquetes: ya están todos')
+    por = {}
+    for e, d in plan:
+        por.setdefault(e['nivel'], []).append(d)
+    for n in NIVELES:
+        if n in por:
+            print('  %-9s %3d fichero(s) · %s' % (n, len(por[n]), DESC_NIVEL[n]))
+            if a.simular or a.detalle:
+                for d in por[n]:
+                    gris(('(nuevo) ' if not os.path.exists(R(d)) else '') + d)
+    for r, por_que in saltados:
+        aviso('no se aplica %s: %s' % (r, por_que))
+    mapas = [x.split('=>', 1) for x in a.mapear]
+    if any(len(x) != 2 or not x[0] for x in mapas):
+        raise Error('--mapear se escribe «VIEJO=>NUEVO», p. ej. --mapear "serial=00000101=>serial=12345678"')
+    for viejo, nuevo in mapas:
+        print('  dispositivo: «%s» → «%s»' % (viejo, nuevo))
+    print('  Receptores del perfil:')
+    for s in m['receptores']:
+        print('    %-18s %-10s %s' % (s['nombre'][:18], s['tipo'], _mapear_texto(s['device'], mapas)))
+    if 'web' in niveles and por.get('web'):
+        aviso('Los plugins de la web son JavaScript que se ejecuta en el navegador de tus oyentes: importa solo perfiles de confianza.')
+    if a.simular:
+        print()
+        info('Simulación: no se ha cambiado nada.')
+        return 0
+    if not a.si:
+        if not sys.stdin.isatty():
+            raise Error('falta confirmar: añade --si (o ejecútalo en un terminal)')
+        if input('\n¿Aplicar el perfil? Se guarda antes una copia para «owrx-clone deshacer» [s/N] ').strip().lower() not in ('s', 'si', 'sí', 'y', 'yes'):
+            info('Cancelado: no se ha cambiado nada.')
+            return 1
+
+    # ---- 4. paquetes ----
+    if repo:
+        info('Repositorio de OpenWebRX+')
+        os.makedirs(R('/etc/apt/trusted.gpg.d'), exist_ok=True)
+        _bajar(repo[1], '/etc/apt/trusted.gpg.d/openwebrx-plus.gpg')
+        os.makedirs(R('/etc/apt/sources.list.d'), exist_ok=True)
+        with open(R('/etc/apt/sources.list.d/openwebrx-plus.list'), 'w') as f:
+            f.write(repo[0] + '\n')
+        if repo[2]:
+            os.makedirs(R('/usr/share/keyrings'), exist_ok=True)
+            _bajar('https://repo.openwebrx.de/debian/key.gpg.txt', '/usr/share/keyrings/openwebrx.gpg')
+            with open(R('/etc/apt/sources.list.d/openwebrx.list'), 'w') as f:
+                f.write(repo[2] + '\n')
+    if instalar:
+        info('Paquetes')
+        _apt_update()
+        env = dict(os.environ, DEBIAN_FRONTEND='noninteractive')
+        r = _apt_install(instalar, env)
+        for p in r['fallidos']:
+            aviso('no he podido instalar %s (¿no existe en este sistema?)' % p)
+        if r['instalados']:
+            bien('instalados: %s' % ', '.join(r['instalados']))
+        if 'openwebrx' in instalar and 'openwebrx' in r['fallidos']:
+            raise Error('no se ha podido instalar openwebrx: mira «apt-get install openwebrx»')
+        eq2 = equipo()                   # el paquete recién instalado puede cambiar htdocs
+        if eq2['htdocs'] != htdocs_dest:
+            plan = [(e, destino_de(e, eq2, data_dest, eq2['htdocs'])) for e, _ in plan]
+            htdocs_dest = eq2['htdocs']
+        ver_dest = eq2['openwebrx']
+
+    # ---- 5. copia previa (para deshacer): DESPUÉS de apt, así guarda también lo que trae el paquete ----
+    copia = copia_previa([(d, base_de(e, data_dest, htdocs_dest)) for e, d in plan])
+    bien('copia previa: %s' % copia)
+
+    # ---- 6. ficheros: si algo falla a medias, se apunta lo creado y OpenWebRX+ vuelve a arrancar ----
+    info('Ficheros')
+    hay_servicio = bool(ver_dest) or SIMULAR_ORDENES
+    if hay_servicio:
+        servicio('stop')
+    creados, hechos = [], 0
+    dueno_data = _usuario('openwebrx')                     # los datos de OpenWebRX+ son del usuario openwebrx
+    data_nuevo = not os.path.lexists(R(data_dest))
+    if not _usuario('openwebrx'):
+        aviso('no existe el usuario «openwebrx» (¿falta el paquete?): los datos quedan de root; al instalarlo: sudo chown -R openwebrx: %s' % data_dest)
+    try:
+        for e, d in plan:
+            if not os.path.lexists(R(d)):
+                creados.append(d)
+            datos = open(os.path.join(tmp, e['arc']), 'rb').read()
+            if d == data_dest + '/settings.json' and mapas:
+                datos = _mapear_settings(datos, mapas)
+            try:
+                modo = int(e.get('modo', '0644'), 8)
+            except ValueError:
+                modo = 0o644
+            if e['nivel'] == 'config':
+                dueno = dueno_data
+            elif e['nivel'] in ('etc', 'web', 'parches', 'sistema'):
+                dueno = (0, 0)
+            else:
+                dueno = _usuario(e.get('dueno')) or (0, 0)
+            escribir_seguro(d, datos, modo, dueno, base_de(e, data_dest, htdocs_dest))
+            hechos += 1
+        if data_nuevo and dueno_data and os.path.isdir(R(data_dest)):    # solo la carpeta que hemos creado nosotros
+            _chown(R(data_dest), dueno_data)
+    finally:
+        _anotar_creados(copia, creados)
+        if hechos < len(plan):
+            aviso('la importación se ha cortado (%d de %d ficheros): sudo owrx-clone deshacer lo deja como antes' % (hechos, len(plan)))
+            if hay_servicio and not a.no_arrancar:
+                servicio('start', comprobar=False)
+    bien('%d ficheros en su sitio (%d nuevos)' % (len(plan), len(creados)))
+    if any(e['nivel'] == 'sistema' for e, _ in plan):
+        ejecutar(['udevadm', 'control', '--reload'], comprobar=False)
+        ejecutar(['udevadm', 'trigger'], comprobar=False)
+        ejecutar(['systemctl', 'daemon-reload'], comprobar=False)
+        aviso('Se han tocado reglas udev o módulos: si un SDR no aparece, desenchúfalo y vuelve a enchufarlo (o reinicia)')
+
+    # ---- 7. arrancar y comprobar ----
+    if not hay_servicio:
+        aviso('OpenWebRX+ no está instalado: ficheros copiados, pero no hay servicio que arrancar (instálalo y: sudo systemctl start openwebrx)')
+    elif a.no_arrancar:
+        aviso('OpenWebRX+ queda parado (--no-arrancar): sudo systemctl start openwebrx')
+    else:
+        servicio('enable', comprobar=False)
+        servicio('start')
+        puerto = conf_openwebrx()['puerto']
+        if esperar_web(puerto):
+            bien('OpenWebRX+ responde en http://%s:%d/' % (_ip(), puerto))
+        else:
+            aviso('OpenWebRX+ no responde todavía en el puerto %d: journalctl -u openwebrx -n 50' % puerto)
+    usuarios = R(data_dest + '/users.json')
+    if 'config' in niveles and (not os.path.isfile(usuarios) or os.path.getsize(usuarios) < 5):
+        aviso('No hay usuario de administración (perfil público o --sin-usuarios): sudo openwebrx admin adduser admin')
+    _informe_dispositivos(m, mapas)
+    if m.get('usuarios') and not a.sin_usuarios and 'config' in niveles:
+        aviso('Los usuarios y contraseñas de administración son los del equipo de origen')
+    if m['secretos'] == 'quitados':
+        aviso('Perfil público: rellena las claves en Ajustes (%s)' % ', '.join(m.get('secretos_quitados', [])[:8]))
+    for x in m.get('avisos', []):
+        aviso(x)
+    print()
+    info('Hecho. Para volver atrás: sudo owrx-clone deshacer')
+    return 0
+
+
+def _apt_update():
+    ejecutar(['apt-get', 'update'], timeout=900)
+
+
+def _apt_install(paqs, env):
+    hechos, malos = [], []
+    base = ['apt-get', 'install', '-y', '--no-install-recommends', '-o', 'Dpkg::Options::=--force-confold']
+    ORDENES.append(' '.join(base + paqs))
+    if SIMULAR_ORDENES:
+        return {'instalados': list(paqs), 'fallidos': []}
+    r = subprocess.run(base + paqs, capture_output=True, text=True, env=env)
+    if r.returncode == 0:
+        return {'instalados': list(paqs), 'fallidos': []}
+    for p in paqs:              # uno a uno: que un paquete que no existe aquí no tumbe a los demás
+        rr = subprocess.run(base + [p], capture_output=True, text=True, env=env)
+        (hechos if rr.returncode == 0 else malos).append(p)
+    return {'instalados': hechos, 'fallidos': malos}
+
+
+def _mapear_texto(t, mapas):
+    for v, n in mapas:
+        t = t.replace(v, n)
+    return t
+
+
+def _mapear_settings(datos, mapas):
+    try:
+        j = json.loads(datos)
+    except ValueError:
+        aviso('settings.json no es JSON: no aplico --mapear')
+        return datos
+    n = 0
+    for s in (j.get('sdrs') or {}).values():
+        if isinstance(s.get('device'), str):
+            nuevo = _mapear_texto(s['device'], mapas)
+            n += nuevo != s['device']
+            s['device'] = nuevo
+    bien('--mapear: %d dispositivo(s) cambiado(s) en settings.json' % n)
+    return json.dumps(j, indent=4, ensure_ascii=False).encode()
+
+
+def _usuario(nombre):
+    try:
+        p = pwd.getpwnam(nombre)
+        return (p.pw_uid, p.pw_gid)
+    except (KeyError, TypeError):
+        return None
+
+
+def _dueno(ruta):
+    try:
+        st = os.stat(ruta)
+        return (st.st_uid, st.st_gid)
+    except OSError:
+        return None
+
+
+def _chown(ruta, ug):
+    if not ug:
+        return
+    try:
+        os.chown(ruta, ug[0], ug[1])
+    except (OSError, PermissionError):
+        pass
+
+
+def _ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('192.0.2.1', 9))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return '127.0.0.1'
+
+
+def servicio(accion, comprobar=True):
+    ejecutar(['systemctl', accion, 'openwebrx'], comprobar=comprobar and accion != 'stop')
+
+
+def esperar_web(puerto, segundos=60):
+    if SIMULAR_ORDENES:
+        return True
+    fin = time.time() + segundos
+    while time.time() < fin:
+        try:
+            urllib.request.urlopen('http://127.0.0.1:%d/status.json' % puerto, timeout=3).read()
+            return True
+        except OSError:
+            time.sleep(2)
+    return False
+
+
+def _detectar_sdr():
+    """Números de serie de los SDR conectados (SoapySDR y, si no, rtl_test)."""
+    if SIMULAR_ORDENES:
+        return set(filter(None, os.environ.get('OWRX_CLONE_SERIES', '').split(','))), True
+    for orden in (['SoapySDRUtil', '--find'], ['rtl_test', '-t']):
+        if shutil.which(orden[0]):
+            try:
+                r = subprocess.run(orden, capture_output=True, text=True, timeout=25)
+                txt = r.stdout + r.stderr
+                return set(re.findall(r'serial\s*[=:]\s*([^\s,]+)', txt, re.I) + re.findall(r'SN:\s*(\S+)', txt)), True
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+    return set(), False
+
+
+def _informe_dispositivos(m, mapas):
+    series, pude = _detectar_sdr()
+    if not pude:
+        aviso('No puedo listar los SDR (falta SoapySDRUtil): revisa los receptores en Ajustes → SDR')
+        return
+    faltan = []
+    for s in m['receptores']:
+        dev = _mapear_texto(s['device'], mapas)
+        mm = re.search(r'serial=([^,\s]+)', dev)
+        serie = mm.group(1) if mm else (dev if re.fullmatch(r'[0-9A-Za-z]{6,}', dev) else None)
+        if s['activo'] and serie and serie not in series:
+            faltan.append('%s (%s)' % (s['nombre'], serie))
+    if faltan:
+        aviso('SDR del perfil que no veo conectados: %s. Si son otros, usa --mapear "serial=VIEJO=>serial=NUEVO" '
+              'o cámbialos en Ajustes → SDR' % ', '.join(faltan))
+    else:
+        bien('los SDR con número de serie del perfil están conectados')
+
+
+# ---------------------------------------------------------------------
+#  copia previa y deshacer
+# ---------------------------------------------------------------------
+def copia_previa(destinos):
+    """destinos: [(ruta, base)]. Guarda lo que existe (los enlaces, como enlaces) y la base de cada ruta."""
+    os.makedirs(R(COPIAS), mode=0o700, exist_ok=True)
+    nombre = R(COPIAS + '/copia-%s.tar.gz' % datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+    existentes = [d for d, _ in destinos if os.path.isfile(R(d)) or os.path.islink(R(d))]
+    meta = {'herramienta': 'owrx-clone ' + VERSION, 'creada': datetime.datetime.now().isoformat(timespec='seconds'),
+            'sobrescritos': existentes, 'creados': [], 'bases': {d: b for d, b in destinos if b}}
+    fd = os.open(nombre, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as f, tarfile.open(fileobj=f, mode='w:gz') as t:
+        for d in existentes:
+            t.add(R(d), arcname='ficheros' + d)
+        datos = json.dumps(meta, indent=2).encode()
+        ti = tarfile.TarInfo('copia.json')
+        ti.size = len(datos)
+        t.addfile(ti, io.BytesIO(datos))
+    return sin_raiz(nombre)
+
+
+def _anotar_creados(copia, creados):
+    with open(R(copia) + '.creados.json', 'w') as f:
+        json.dump(creados, f, indent=2)
+    os.chmod(R(copia) + '.creados.json', 0o600)
+
+
+def deshacer(a):
+    necesita_root()
+    copias = sorted(f for f in _glob(R(COPIAS), ('copia-*.tar.gz',)))
+    if a.copia:
+        if '/' not in a.copia:
+            copia = R(COPIAS + '/' + a.copia)
+        else:
+            copia = a.copia if (not RAIZ or a.copia.startswith(RAIZ)) else R(a.copia)
+    elif copias:
+        copia = copias[-1]
+    else:
+        raise Error('no hay copias en %s: no hay nada que deshacer' % COPIAS)
+    if not os.path.isfile(copia):
+        raise Error('no existe la copia %s' % copia)
+    creados = []
+    if os.path.isfile(copia + '.creados.json'):
+        creados = json.load(open(copia + '.creados.json'))
+    with tarfile.open(copia, 'r:gz') as t:
+        meta = json.load(t.extractfile('copia.json'))
+        info('Deshaciendo la importación con la copia %s (%s)' % (sin_raiz(copia), meta['creada']))
+        gris('%d fichero(s) vuelven a como estaban · %d fichero(s) nuevos se borran' % (len(meta['sobrescritos']), len(creados)))
+        if not a.si:
+            if not sys.stdin.isatty():
+                raise Error('falta confirmar: añade --si')
+            if input('¿Seguir? [s/N] ').strip().lower() not in ('s', 'si', 'sí', 'y', 'yes'):
+                return 1
+        bases = meta.get('bases', {})
+        servicio('stop', comprobar=False)
+        saltados = []
+        try:
+            for mi in t.getmembers():
+                if not mi.name.startswith('ficheros/') or '..' in mi.name.split('/'):
+                    continue
+                d = '/' + mi.name[len('ficheros/'):]
+                if d not in meta['sobrescritos']:
+                    continue
+                if not camino_seguro(d, bases.get(d)):
+                    saltados.append(d)
+                    continue
+                if mi.issym():
+                    os.makedirs(os.path.dirname(R(d)), exist_ok=True)
+                    if os.path.lexists(R(d)):
+                        os.unlink(R(d))
+                    os.symlink(mi.linkname, R(d))
+                elif mi.isfile():
+                    escribir_seguro(d, t.extractfile(mi).read(), mi.mode, (mi.uid, mi.gid), bases.get(d))
+            for d in creados:
+                if d not in meta['sobrescritos'] and os.path.lexists(R(d)):
+                    if camino_seguro(d, bases.get(d)):
+                        os.unlink(R(d))
+                    else:
+                        saltados.append(d)
+        finally:
+            ejecutar(['systemctl', 'daemon-reload'], comprobar=False)
+            ejecutar(['udevadm', 'control', '--reload'], comprobar=False)
+            servicio('start', comprobar=False)
+    for d in saltados:
+        aviso('no toco %s: hay un enlace simbólico en su camino (revísalo a mano)' % d)
+    os.replace(copia, copia + '.usada')
+    if os.path.isfile(copia + '.creados.json'):
+        os.replace(copia + '.creados.json', copia + '.usada.creados.json')
+    bien('hecho: la estación está como antes de importar (los paquetes instalados se quedan)')
+    return 0
+
+
+# ---------------------------------------------------------------------
+#  comprobar
+# ---------------------------------------------------------------------
+def comprobar(a):
+    eq = equipo()
+    malos = 0
+    info('Comprobando OpenWebRX+ en %s (%s, %s)' % (eq['hostname'], eq['so']['nombre'], eq['arch']))
+    if eq['openwebrx']:
+        bien('paquete openwebrx %s' % eq['openwebrx'])
+    else:
+        aviso('el paquete openwebrx no está instalado'); malos += 1
+    for f in ('settings.json', 'users.json', 'bookmarks.json'):
+        p = R(eq['data'] + '/' + f)
+        if not os.path.isfile(p):
+            aviso('%s no existe en %s' % (f, eq['data']))
+            malos += f == 'settings.json'
+            continue
+        try:
+            j = json.load(open(p, encoding='utf-8'))
+            if f == 'settings.json':
+                bien('settings.json válido · %d receptor(es) · «%s»' % (len(j.get('sdrs') or {}), j.get('receiver_name', '')))
+            else:
+                bien('%s válido (%d)' % (f, len(j)))
+        except PermissionError:
+            aviso('%s: sin permiso para leerlo (usa sudo)' % f)
+        except ValueError as e:
+            aviso('%s NO es JSON válido: %s' % (f, e)); malos += 1
+    init = R(eq['htdocs'] + '/plugins/receiver/init.js')
+    if os.path.isfile(init):
+        t = open(init, encoding='utf-8', errors='replace').read()
+        # plugins LOCALES: Plugins.load('nombre') y bucles «for (const x of ['a', 'b']) … Plugins.load(x)»
+        nombres = set(re.findall(r"Plugins\.load\(\s*['\"]([a-z0-9_]+)['\"]", t))
+        for var, lista in re.findall(r"for\s*\(\s*(?:const|let|var)\s+(\w+)\s+of\s+\[([^\]]*)\]\s*\)\s*\{[^}]{0,200}?Plugins\.load\(\s*\w+\s*\)", t):
+            nombres |= set(re.findall(r"'([a-z0-9_]+)'", lista))
+        faltan = sorted(n for n in nombres if not os.path.isdir(R(eq['htdocs'] + '/plugins/receiver/' + n)))
+        if faltan:
+            aviso('init.js carga plugins locales que no están: %s' % ', '.join(faltan)); malos += 1
+        else:
+            bien('init.js y sus plugins locales')
+    retocados = [p for p, s in eq['md5s'].items() if os.path.isfile(R(p)) and md5(R(p)) != s]
+    if retocados:
+        aviso('%d fichero(s) del paquete retocados a mano (se pierden al actualizar el paquete): %s' % (
+            len(retocados), ', '.join(os.path.basename(x) for x in retocados[:6])))
+    if not SIMULAR_ORDENES:
+        r = subprocess.run(['systemctl', 'is-active', 'openwebrx'], capture_output=True, text=True)
+        if r.stdout.strip() == 'active':
+            bien('servicio openwebrx activo')
+        else:
+            aviso('servicio openwebrx %s' % (r.stdout.strip() or '?')); malos += 1
+        if esperar_web(eq['puerto'], 5):
+            bien('responde en http://%s:%d/' % (_ip(), eq['puerto']))
+        else:
+            aviso('no responde en el puerto %d' % eq['puerto']); malos += 1
+    print()
+    (info if not malos else aviso)('%s' % ('todo bien' if not malos else '%d problema(s)' % malos))
+    return 1 if malos else 0
+
+
+# ---------------------------------------------------------------------
+#  ayuda por temas
+# ---------------------------------------------------------------------
+AYUDA = {
+    'niveles': '''NIVELES: qué se copia
+  config    settings.json (receptores, perfiles, nombre, ubicación, decodificadores, mapa…), users.json
+            (cuentas de administración), bookmarks.json (marcadores), receiver_avatar / receiver_top_photo
+            y el resto de /var/lib/openwebrx (sin las cachés eibi/receivers/repeaters/meshtastic).
+  etc       /etc/openwebrx entero: openwebrx.conf y openwebrx.conf.d, bands*.json, bookmarks.d, markers.d.
+  web       todo lo AÑADIDO a htdocs (no viene en el paquete): plugins/receiver/init.js, plugins
+            propios o de terceros, temas, imágenes.
+  paquetes  paquetes de SDR/decodificadores instalados a mano (soapysdr-module-*, rtl-sdr, codecserver,
+            dump1090, wsjtx…). Se reinstalan con apt; las dependencias vienen solas.
+  sistema   /etc/udev/rules.d, los /etc/modprobe.d que hablan de rtl/dvb/sdr, los ajustes de systemd de
+            openwebrx (openwebrx.service.d) y /etc/codecserver.
+  parches   ficheros DEL PAQUETE openwebrx que alguien ha cambiado a mano (md5 distinto al del paquete).
+            Solo se aplican si el destino tiene la MISMA versión de openwebrx (o con --forzar-parches).
+  extra     lo que añadas con --incluir RUTA al exportar.
+Al importar, por defecto: config, etc, web y paquetes. «sistema» y «parches» ejecutan cosas como
+root o cambian código: hay que pedirlos (--niveles … o --todo). «extra» solo entra nombrándolo:
+--niveles extra (ni siquiera con --todo).''',
+    'seguridad': '''SEGURIDAD
+  - Un perfil normal lleva las contraseñas: users.json (hash de las cuentas de administración) y las
+    claves de settings.json (passcode APRS, claves de receiverbook/PSKreporter, magic key…).
+    Trátalo como una contraseña. «--cifrar» lo cifra con AES-256 (openssl, PBKDF2 200 000 vueltas).
+  - Para compartirlo con otros: «--publico» quita users.json y deja en blanco toda clave cuyo nombre
+    tenga pass, passcode, key, token o secret. «owrx-clone ver» dice cuáles ha quitado.
+  - Cada fichero lleva su SHA-256 en el manifiesto: si alguien cambia algo, la importación se para.
+  - El perfil solo puede escribir en sitios fijos por nivel (/var/lib/openwebrx, /etc/openwebrx, htdocs,
+    ficheros del paquete…). Nunca en /etc/shadow, /etc/sudoers, /root, /boot, /bin, cron, systemd, PAM,
+    /etc/profile.d, ld.so, ~/.ssh… ni siquiera con «extra». El directorio de datos del perfil solo se
+    acepta si es el de este equipo o uno nuevo /var/lib/openwebrx… o /srv/openwebrx… (si no, se para).
+  - --todo incluye «sistema» y «parches»: ejecutan código como root. Solo con perfiles tuyos o de confianza.
+  - No escribe nunca a través de un enlace simbólico (ni al importar ni al deshacer).
+  - Si se corta a medias, apunta lo que llevaba y vuelve a arrancar OpenWebRX+: «deshacer» lo arregla.
+  - Los plugins de la web son JavaScript que corre en el navegador de tus oyentes, y «sistema» y
+    «parches» corren como root: importa solo perfiles de gente de confianza y mira antes «ver».''',
+    'dispositivos': '''DISPOSITIVOS (los SDR)
+  settings.json apunta a cada SDR por su número de serie («device»: "serial=00000101" o "00000101").
+  En otro equipo, con otros SDR, cambia los números con --mapear al importar:
+      sudo owrx-clone importar perfil.owrx.tar.gz --mapear "serial=00000101=>serial=12345678"
+  Repite --mapear para cada SDR. Para ver las series conectadas: SoapySDRUtil --find  o  rtl_test -t.
+  Para grabar una serie en un RTL-SDR: rtl_eeprom -d 0 -s 00000101 (y desenchufar/enchufar).
+  Al final de la importación se avisa de los SDR del perfil que no se ven conectados.''',
+    'migrar': '''MIGRAR A OTRO EQUIPO (paso a paso)
+  1. En el viejo:   sudo owrx-clone exportar --cifrar -o estacion.owrx.tar.gz.enc
+  2. Copia el fichero al nuevo (scp, pendrive…).
+  3. En el nuevo (Debian/Ubuntu/Raspberry Pi OS recién instalado, con Internet):
+        sudo apt install python3 openssl          # casi siempre ya están
+        sudo ./instalar.sh                         # instala owrx-clone (o cópialo a /usr/local/bin)
+        sudo owrx-clone importar estacion.owrx.tar.gz.enc --simular
+        sudo owrx-clone importar estacion.owrx.tar.gz.enc --todo
+  4. Conecta los SDR (o usa --mapear si son otros) y entra en http://IP:8073/
+  5. sudo owrx-clone comprobar
+  Si algo sale mal: sudo owrx-clone deshacer''',
+    'problemas': '''PROBLEMAS FRECUENTES
+  «hace falta root»                 → sudo owrx-clone …
+  «sin repositorio de OpenWebRX+»   → tu sistema no está en la lista: instala openwebrx a mano y usa
+                                      --niveles config,etc,web
+  «parche para X y aquí hay Y»      → la versión de openwebrx es otra: actualiza las dos o --forzar-parches
+                                      (bajo tu responsabilidad) o deja fuera «parches»
+  «no cuadra con su suma SHA-256»   → el fichero se ha dañado al copiarlo: vuelve a copiarlo
+  «contraseña equivocada»           → perfil cifrado: OWRX_CLONE_CLAVE=… o escríbela cuando la pida
+  OpenWebRX+ no responde            → journalctl -u openwebrx -n 50 ; sudo owrx-clone comprobar
+  Un SDR no aparece                 → desenchufa y enchufa, o reinicia (reglas udev / lista negra dvb)
+  Quiero volver atrás               → sudo owrx-clone deshacer  (o deshacer COPIA concreta de /var/backups/owrx-clone)''',
+}
+
+
+def ayuda(a):
+    if a.tema and a.tema in AYUDA:
+        print(AYUDA[a.tema])
+    else:
+        PARSER.print_help()
+        print('\nTemas de ayuda: owrx-clone ayuda {%s}' % ','.join(AYUDA))
+    return 0
+
+
+# ---------------------------------------------------------------------
+#  línea de órdenes
+# ---------------------------------------------------------------------
+def parser():
+    p = argparse.ArgumentParser(prog='owrx-clone', formatter_class=argparse.RawDescriptionHelpFormatter,
+                                description='Clona una instalación de OpenWebRX+ (configuración, plugins, sistema y paquetes) a otro equipo.',
+                                epilog='Ejemplos:\n'
+                                       '  sudo owrx-clone exportar --cifrar\n'
+                                       '  owrx-clone ver owrx-perfil-sdr-20261005-1200.owrx.tar.gz.enc\n'
+                                       '  sudo owrx-clone importar perfil.owrx.tar.gz --simular\n'
+                                       '  sudo owrx-clone importar perfil.owrx.tar.gz --todo --mapear "serial=00000101=>serial=1234"\n'
+                                       '  sudo owrx-clone deshacer\n'
+                                       'Más: owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,problemas} · man owrx-clone')
+    p.add_argument('--version', action='version', version='owrx-clone ' + VERSION)
+    p.add_argument('--raiz', help=argparse.SUPPRESS)
+    sp = p.add_subparsers(dest='orden', metavar='ORDEN')
+
+    e = sp.add_parser('exportar', aliases=['export'], help='crea un perfil con la estación de este equipo')
+    e.add_argument('-o', '--salida', help='fichero de salida (por defecto owrx-perfil-EQUIPO-FECHA.owrx.tar.gz)')
+    e.add_argument('--niveles', help='qué exportar, separado por comas (por defecto todos): ' + ','.join(NIVELES[:-1]))
+    e.add_argument('--publico', action='store_true', help='para compartir: sin usuarios y con las claves en blanco')
+    e.add_argument('--sin-usuarios', action='store_true', help='no incluir users.json')
+    e.add_argument('--cifrar', action='store_true', help='cifrar con contraseña (AES-256, openssl)')
+    e.add_argument('--incluir', action='append', default=[], metavar='RUTA', help='añadir un fichero o carpeta (nivel «extra»)')
+    e.add_argument('--excluir', action='append', default=[], metavar='PATRÓN', help='no incluir lo que encaje (p. ej. "*.mp3")')
+    e.add_argument('--nota', help='texto libre que se guarda en el perfil')
+    e.set_defaults(fn=exportar)
+
+    v = sp.add_parser('ver', aliases=['show'], help='muestra qué lleva un perfil (no cambia nada)')
+    v.add_argument('perfil')
+    v.add_argument('--todo', action='store_true', help='lista también cada fichero')
+    v.add_argument('--json', action='store_true', help='el manifiesto completo en JSON')
+    v.set_defaults(fn=ver)
+
+    i = sp.add_parser('importar', aliases=['import'], help='aplica un perfil en este equipo')
+    i.add_argument('perfil')
+    i.add_argument('--niveles', help='qué aplicar (por defecto %s)' % ','.join(NIVELES_DEFECTO_IMPORTAR))
+    i.add_argument('--todo', action='store_true', help='aplicar todos los niveles menos «extra», incluidos sistema y parches (ejecutan código como root: solo perfiles propios o de confianza)')
+    i.add_argument('--simular', action='store_true', help='enseña lo que haría sin cambiar nada')
+    i.add_argument('--detalle', action='store_true', help='lista cada fichero')
+    i.add_argument('--si', action='store_true', help='no preguntar')
+    i.add_argument('--sin-paquetes', action='store_true', help='no instalar paquetes')
+    i.add_argument('--sin-usuarios', action='store_true', help='conservar los usuarios de este equipo')
+    i.add_argument('--mapear', action='append', default=[], metavar='VIEJO=>NUEVO', help='cambiar el «device» de un SDR (repetible)')
+    i.add_argument('--forzar-parches', action='store_true', help='aplicar los parches aunque la versión de openwebrx sea otra')
+    i.add_argument('--no-arrancar', action='store_true', help='dejar OpenWebRX+ parado al terminar')
+    i.set_defaults(fn=importar)
+
+    d = sp.add_parser('deshacer', aliases=['undo'], help='vuelve a como estaba antes de la última importación')
+    d.add_argument('copia', nargs='?', help='copia concreta de %s (por defecto la última)' % COPIAS)
+    d.add_argument('--si', action='store_true', help='no preguntar')
+    d.set_defaults(fn=deshacer)
+
+    c = sp.add_parser('comprobar', aliases=['check'], help='revisa la instalación de OpenWebRX+ de este equipo')
+    c.set_defaults(fn=comprobar)
+
+    h = sp.add_parser('ayuda', aliases=['help'], help='ayuda por temas: ' + ', '.join(AYUDA))
+    h.add_argument('tema', nargs='?', choices=list(AYUDA))
+    h.set_defaults(fn=ayuda)
+    return p
+
+
+PARSER = parser()
+
+
+def main(argv=None):
+    global RAIZ
+    a = PARSER.parse_args(argv)
+    if a.raiz:
+        RAIZ = a.raiz.rstrip('/')
+    if not getattr(a, 'fn', None):
+        PARSER.print_help()
+        return 2
+    try:
+        return a.fn(a)
+    except Error as e:
+        print('%s✘ %s%s' % (C['ko'], e, C['0']), file=sys.stderr)
+        return 1
+    except OSError as e:          # disco lleno, permisos…: mensaje claro en vez de una traza
+        print('%s✘ %s: %s%s' % (C['ko'], getattr(e, 'filename', '') or 'error del sistema', e.strerror or e, C['0']), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print('\ncancelado', file=sys.stderr)
+        return 130
+
+
+if __name__ == '__main__':
+    sys.exit(main())

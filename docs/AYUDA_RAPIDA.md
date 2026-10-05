@@ -1,0 +1,67 @@
+# Ayuda rápida · BricoHams SDR (v4.2)
+
+Todas las órdenes del kit en una página. El detalle de cada una está en su manual (`docs/manuales/NN_…`).
+
+## Instalar, actualizar, clonar
+| Quiero… | Orden | Manual |
+|---|---|---|
+| Instalar desde cero | `sudo bash install.sh` | 02 |
+| Instalar y restaurar usuarios y marcadores de una copia | `sudo bash install.sh --backup copia.tar.gz` | 09 |
+| Ver los pasos | `sudo bash install.sh --lista` | 02 |
+| Repetir pasos sueltos | `sudo bash install.sh --solo web,plugins` | 02 |
+| Ver qué haría una actualización | `sudo bash install.sh --actualizar --simular` | 29 |
+| Actualizar (git + apt + pasos cambiados) | `sudo bash install.sh --actualizar` | 29 |
+| Exportar mi OpenWebRX+ a un fichero | `sudo owrx-clone exportar --cifrar` (o `sudo bash install.sh --exportar`) | 31 |
+| Ver qué lleva un perfil | `owrx-clone ver perfil.owrx.tar.gz` | 31 |
+| Importar un perfil en otro equipo | `sudo owrx-clone importar perfil.owrx.tar.gz --simular` y luego `--todo` | 31 |
+| Instalar BricoHams y aplicar un perfil | `sudo bash install.sh --importar perfil.owrx.tar.gz` | 31 |
+| Deshacer la última importación | `sudo owrx-clone deshacer` | 31 |
+| Compartir mi configuración sin claves | `sudo owrx-clone exportar --publico --niveles config,etc,web` | 31 |
+
+## Comprobar y diagnosticar
+| Quiero… | Orden |
+|---|---|
+| Revisar toda la estación | `sudo bricohams-check` |
+| Revisar solo OpenWebRX+ | `sudo owrx-clone comprobar` |
+| Ver servicios y direcciones | `bricohams-servicios` |
+| Registro del instalador | `less /var/log/bricohams-install.log` |
+| Registro de las tareas | `less /var/log/bricohams-tareas.log` |
+| Registro de OpenWebRX+ | `journalctl -u openwebrx -n 100` |
+| SDR conectados y series | `SoapySDRUtil --find` · `rtl_test -t` · `sudo bricohams-sdr-serials` |
+| Sensores y ventiladores (Pico) | `sudo bricohams-io estado` · `sudo bricohams-fan --estado` |
+| Pases de satélites | `cat /usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json` |
+| Visitas de hoy | `sudo -u openwebrx bricohams-visitas --resumen` |
+
+## Web
+| Qué | Dónde |
+|---|---|
+| Receptor público | `http://DOMINIO/` (o `http://IP:8073/` en casa) |
+| Administración (siempre HTTPS) | `https://DOMINIO/settings` |
+| Portal de servicios | `http://DOMINIO/bricohams/` |
+| Cambiar el modo SSL | `SSL_MODO` (admin, todo o no) en `bricohams.env` + `sudo bash install.sh --solo web` (manual 23) |
+| Filtro y DSP de audio | botones **FILTRO** y **DSP** de la barra superior (manual 30) |
+
+## bricohams.env: claves con símbolos
+- **Lo más claro:** comillas simples, `QRZ_PASS='abc$def!'`.
+- **También valen:** las dobles con `\$` (`"abc\$def"`), y desde la v4.2 un `$` suelto entre dobles se toma literal (con aviso).
+- **Comprobar el fichero:** `python3 files/bin/bricohams-env.py --comprobar bricohams.env`
+- **Nunca se sube al git:** está en `.gitignore`.
+
+## Errores conocidos y arreglo
+| Mensaje | Arreglo |
+|---|---|
+| `sudo: ./install.sh: command not found` | `sudo bash install.sh` |
+| `…bricohams.env: line N: X: unbound variable` | resuelto en v4.2 (clave con `$`); usa comillas simples |
+| `Could not resolve host: luarvique.github.io` | resuelto en v4.2 (el paso `red` cortaba la WiFi); relanza el instalador |
+| `Network is unreachable` con `2a00:…` | IPv6 sin salida: lo arregla el instalador (v3.2) |
+| `rtl-sdr : Depends: librtlsdr0 (= 0.7.0~rtlsdrblog1)` | resuelto en v3.3 |
+| `nginx no acepta la configuración` | mira el mensaje de `nginx -t` encima; `sudo nginx -t` |
+| `git pull no puede avanzar el kit` | `git stash`, actualiza y `git stash pop` (manual 29) |
+
+## Ayuda integrada
+```bash
+sudo bash install.sh --help
+owrx-clone --help ; owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,problemas} ; man owrx-clone
+bricohams-io --help ; bricohams-fan --help ; bricohams-ft2 ; sudo bricohams-tarea
+python3 files/bin/bricohams-env.py
+```

@@ -13,9 +13,16 @@ S = open(os.path.join(RAIZ, 'install.sh'), encoding='utf-8').read()
 assert 'ppa/bookworm' not in S and 'ppa/trixie' not in S, 'repositorio de OpenWebRX+ fijado a una versión'
 assert 'https://luarvique.github.io/ppa/$DEB ./' in S
 assert 'Debian_12' not in S and 'Debian_$DEB_NUM' in S, 'repositorio de Meshtastic fijado a Debian 12'
+# v4.2: las rutas comunes a HTTP y HTTPS están en bricohams-sdr-rutas.conf
+nginx = open(os.path.join(RAIZ, 'files/nginx/bricohams-sdr-rutas.conf'), encoding='utf-8').read()
+assert 'location = /tar1090 { return 301 /tar1090/; }' in nginx, 'tar1090 sin barra debe redirigir a la ruta del proxy'
 assert 'apt.rb24.com/ trixie main' in S and 'inst_rbfeeder.sh' in S, 'rbfeeder: falta la vía de Trixie o la de Bookworm'
 assert 'python3-pyasyncore' in S, 'mlat-client en Trixie necesita python3-pyasyncore'
 assert 'python3-smbus2' in S
+# v4.2: el paso web debe terminar correctamente con dominio SSL configurado;
+# un && aviso deja estado 1 cuando la condición es falsa bajo set -e.
+web = re.search(r'^paso_web\(\) \{.*?^\}', S, re.S | re.M).group(0)
+assert re.search(r'if (\[ "\$modo" != no \] && )?\[ -z "\$dom" \]; then', web) and '[ -z "$dom" ] && aviso' not in web
 # v3.2: todo apt-get update pasa por apt_update (reintento con IPv4)
 fuera = [l for l in S.splitlines() if 'apt-get update' in l and not l.lstrip().startswith('#')
          and 'apt_update' not in l and 'aviso' not in l and 'fallo' not in l]

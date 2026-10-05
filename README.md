@@ -1,6 +1,6 @@
 # BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
 
-Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v3.1):
+Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.2):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT.
@@ -24,6 +24,13 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **https con Let's Encrypt** detrás de nginx, portal de servicios y página de privacidad;
   - **visitas:** contador, país/ciudad e IP truncada, aviso por **Telegram**;
   - **tareas automáticas** por cron con una **cuenta de servicio** sin contraseña.
+- **v4.2:**
+  - **owrx-clone:** exporta todo tu OpenWebRX+ (configuración, plugins, sistema y paquetes) a un fichero y lo importa en cualquier otro equipo. Es genérico, para la comunidad ([owrx-clone/](owrx-clone/README.md), [manual 31](docs/manuales/31_CLONAR_OPENWEBRX.md));
+  - **FILTRO y DSP de audio** en el navegador de cada oyente: paso banda, notch automático, ecualizador, puerta de ruido y AGC ([manual 30](docs/manuales/30_AUDIO_DSP.md));
+  - **SSL solo en la administración:** el receptor por HTTP y `/login` y `/settings` forzados a HTTPS (`SSL_MODO`);
+  - **ficha DMR/YSF con HamQTH** primero (aportación de EA5KAO);
+  - **arreglos de la instalación real:** claves con `$` en `bricohams.env`, cortes de red tras el paso `red`, descargas sin reintento;
+  - [ayuda rápida](docs/AYUDA_RAPIDA.md) con todas las órdenes.
 - **v4.1:** `sudo bash install.sh --actualizar` pone al día kit (git), `bricohams.env` (variables nuevas), sistema (apt) y solo los pasos que han cambiado, conservando tus marcadores ([manual 29](docs/manuales/29_ACTUALIZAR.md)).
 
 ![Arquitectura](docs/esquemas/01_arquitectura.png)
@@ -73,6 +80,13 @@ sudo bricohams-io --instalar               # v4: graba el firmware de la Pico (u
 bricohams-servicios                        # v4: direcciones de todos los servicios web
 ```
 
+**Llevar tu OpenWebRX+ a otro equipo** (v4.2, [manual 31](docs/manuales/31_CLONAR_OPENWEBRX.md)):
+
+```bash
+sudo owrx-clone exportar --cifrar                         # en el viejo
+sudo owrx-clone importar perfil.owrx.tar.gz.enc --todo    # en el nuevo (o: sudo bash install.sh --importar …)
+```
+
 **Actualizar una estación ya instalada** (v4.1):
 
 ```bash
@@ -94,6 +108,7 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - [20 Pico IO](docs/manuales/20_PICO_IO.md) · [21 Anclajes](docs/manuales/21_ANCLAJES.md) · [22 Firmware WX LoRa](docs/manuales/22_WX_LORA_FIRMWARE.md)
 - [23 Web, SSL y servicios](docs/manuales/23_WEB_SSL_SERVICIOS.md) · [24 Visitas y Telegram](docs/manuales/24_VISITAS_TELEGRAM.md) · [25 Tareas automáticas](docs/manuales/25_TAREAS_AUTOMATICAS.md)
 - [26 Satélites](docs/manuales/26_SATELITES.md) · [27 Plugins web](docs/manuales/27_PLUGINS_WEB_V4.md) · [28 FT2](docs/manuales/28_FT2.md) · [29 Actualizar](docs/manuales/29_ACTUALIZAR.md)
+- v4.2: [30 Audio FILTRO y DSP](docs/manuales/30_AUDIO_DSP.md) · [31 Clonar OpenWebRX+](docs/manuales/31_CLONAR_OPENWEBRX.md) · [Ayuda rápida](docs/AYUDA_RAPIDA.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).
@@ -103,7 +118,8 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 ## Estructura
 
 ```
-install.sh                 instalador por pasos e idempotente (--lista, --solo, --backup, --actualizar)
+install.sh                 instalador por pasos e idempotente (--lista, --solo, --backup, --actualizar, --exportar, --importar)
+owrx-clone/                v4.2: herramienta genérica para clonar OpenWebRX+ (README es/en, man, instalar.sh, MIT)
 bricohams.env.example      configuración de la estación SIN claves (copiar a bricohams.env)
 files/
   openwebrx/               plantilla de settings.json, marcadores, conf.d
@@ -111,7 +127,7 @@ files/
   branding/                cabecera y avatar BricoHams con Murcia
   bin/                     herramientas y servicios (check, series, lilygo, wx, meteo, camsnap, fan, io, satpass,
                            visitas, api, ft2, servicios, tarea, telegram…)
-  nginx/                   v4: plantilla del sitio https
+  nginx/                   v4: plantilla del sitio y rutas comunes (v4.2: SSL_MODO)
   web/                     v4: portal /bricohams/ y página de privacidad
 firmware/pico-io/          v4: firmware MicroPython de la Pico (sensores y ventiladores)
 docs/
@@ -154,7 +170,7 @@ tools/anclajes.sh              # crucetas y soportes v4
 
 ## Reglas del repositorio
 
-- `bricohams.env` **nunca** se sube: está en `.gitignore`. Desde la v4 también guarda `TELEGRAM_TOKEN`, `QRZ_PASS`, `DUCKDNS_TOKEN` y `LISTENERS_SUPABASE_KEY`.
+- `bricohams.env` **nunca** se sube: está en `.gitignore`. Desde la v4 también guarda `TELEGRAM_TOKEN`, las credenciales opcionales de HamQTH/QRZ, `DUCKDNS_TOKEN` y `LISTENERS_SUPABASE_KEY`.
 - **No se ponen en los marcadores** comunicaciones privadas ni de seguridad pública (radiotaxis, TETRA de emergencias): ADR-36.
 - Toda la configuración de OpenWebRX sale de `files/openwebrx/settings.json.tmpl` + `bricohams.env`. Para cambiar perfiles, edita la plantilla y regenera `docs/DATOS.md`.
 - Lo marcado como **A VERIFICAR** (pines del HAT) se corrige en `bricohams.env`, nunca en el código.

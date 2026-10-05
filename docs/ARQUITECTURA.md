@@ -438,6 +438,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **Implica:**
   - Meshtastic web (9443), RTSP y MQTT quedan solo en la LAN.
   - `bricohams-check` vigila la caducidad del certificado.
+  - **v4.2:** por decisión de EA5KAO, el HTTPS se usa solo para la administración (ADR-40).
 
 ## ADR-33 · Visitas: MQTT de OpenWebRX+ + GeoIP local + Telegram, con IP truncada
 - **Decisión:**
@@ -498,6 +499,88 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - Si cambia la versión de bash, `declare -f` puede formatear distinto y repetir todos los pasos una vez (inofensivo).
   - `settings.json` sigue saliendo de la plantilla: los cambios hechos en `/settings` se pierden (queda copia `.antes-FECHA`).
 
+## ADR-38 · bricohams.env se LEE, no se ejecuta
+- **Decisión:**
+  - `install.sh` ya no hace `. bricohams.env`.
+  - `files/bin/bricohams-env.py` lo interpreta sin ejecutar nada:
+    - comillas dobles con escapes ``\" \\ \$ \` ``;
+    - comillas simples literales;
+    - comentarios;
+    - un `$` suelto es **literal** y da un aviso.
+  - La copia de `/etc/bricohams/bricohams.env` y los `.env` derivados (api, telegram, duckdns, web, meteo, wx) se escriben con **comillas simples** (`sq`/`envl`). Así los leen igual bash, systemd `EnvironmentFile` y los lectores de Python.
+- **Por qué:** en la Pi de EA5KAO, `QRZ_PASS="…$Ejemplo99"` paró el instalador con «unbound variable». Sin `set -u` habría sido peor: la clave se habría guardado recortada sin avisar. Una contraseña no tiene por qué saber de sintaxis de bash.
+- **Implica:**
+  - Hace falta python3 desde el primer paso (viene en Raspberry Pi OS).
+  - Las sustituciones `${VAR}` dentro de `bricohams.env` ya no se expanden. El `.example` no las usa: `test_env_red` comprueba que da lo mismo que bash.
+  - Los errores de sintaxis se paran con el número de línea.
+
+## ADR-39 · La red no se corta a sí misma y nada se baja sin reintento
+- **Decisión:**
+  - **Paso `red`:** si la conexión `bricohams-wifi-N` ya existe, se modifica (`nmcli connection modify`); antes se borraba y se volvía a crear.
+  - **`esperar_red`:** antes de cada paso espera DNS (hasta 2 min) y, si no llega, se para con el estado de la red.
+  - **Claves de repositorios (`clave_apt`) e instaladores de terceros (`script_remoto`):** se bajan con `curl --retry 5 --retry-all-errors` y fallan con un mensaje claro.
+  - **`nginx -t`:** si falla, para el paso y enseña el error.
+- **Por qué:** en la segunda ejecución en la Pi de EA5KAO, `red` tumbó la WiFi por la que estaba conectada. El paso `openwebrx` falló con «Could not resolve host» y `gpg: no valid OpenPGP data` (había llegado una clave vacía por la tubería). Con `bash -c "$(wget …)"`, una descarga fallida ejecutaba un texto vacío y el paso seguía sin readsb.
+- **Implica:** relanzar el instalador sigue donde se quedó. La auditoría de `test_env_red` impide funciones que acaben en `[ … ] && …`, que devuelven 1 con `set -e` (el fallo de `paso_web` que corrigió EA5KAO).
+
+## ADR-40 · HTTPS solo para la administración (SSL_MODO)
+- **Decisión (de EA5KAO: «el certificado SSL es solo para la página de settings»):** `SSL_MODO="admin"` por defecto.
+  - **En el 80:** nginx sirve el receptor y el portal por HTTP.
+  - **Rutas de OpenWebRX+ con usuario:** `/login`, `/logout`, `/pwchange`, `/settings…`, `/imageupload`, `/clients`, `/services`, `/ban`, `/unban`, `/broadcast` y `/files/delete` reciben un 301 a HTTPS.
+  - **En el 443:** sirve todo, con la cookie `owrx-session` marcada `Secure; HttpOnly; SameSite=Lax` y sin HSTS.
+  - **Otros modos:** `todo` (todo HTTPS + HSTS) y `no` (sin certificado, solo LAN).
+  - Las rutas se separan en `/etc/nginx/snippets/bricohams-sdr-rutas.conf`, y la plantilla se monta con marcas `#@ADMIN@ #@TODO@ #@HTTP@ #@SSL>…<`.
+- **Por qué:** lo que hay que proteger es la contraseña y la sesión del administrador. El receptor público por HTTP funciona en cualquier navegador y dispositivo, y en directorios de receptores que esperan `http://`.
+  - **Por qué `Secure`:** sin él, la sesión abierta en HTTPS viajaría en claro al volver al receptor por HTTP.
+  - **Por qué sin HSTS:** con HSTS, el navegador ya no volvería nunca a HTTP.
+- **Implica:**
+  - En el receptor por HTTP no se ve la sesión de admin; quien la necesite allí entra por `https://`.
+  - `bricohams-check` prueba que `http://127.0.0.1/settings` redirige.
+  - `test_ssl_admin` arranca un nginx real con los tres modos.
+  - `listen 443 ssl http2` en vez de `http2 on;`, que no existe en el nginx 1.22 de Bookworm.
+
+## ADR-41 · Filtro y DSP de audio en el navegador del oyente
+- **Decisión:** el plugin base `audio_cadena` inserta etapas Web Audio entre `audioNode` y `gainNode` del `AudioEngine` de OpenWebRX+, por orden.
+  - `filtro_audio` (orden 10): paso banda de 24 dB/oct con modos, notch manual y notch automático con seguimiento.
+  - `dsp_audio` (orden 20): EQ de 3 bandas, puerta de ruido, AGC y limitador.
+  - Apagados por defecto; los ajustes de cada oyente se guardan en su navegador.
+- **Por qué:**
+  - En la Pi, un DSP por oyente multiplicaría la CPU y cambiaría lo que oyen todos.
+  - En el navegador cuesta cero al servidor y cada uno lo ajusta a su oído.
+  - No hay plugins de audio en el repositorio de 0xAF (los enlaces que mencionó EA5KAO no llegaron; eligió que se hicieran).
+- **Implica:**
+  - Los decodificadores y la grabación (REC) usan la señal original.
+  - El notch automático exige dos detecciones seguidas y un pico estrecho (<120 Hz a −6 dB) para no tomar la voz por un pitido.
+  - Probado en Chromium real con `tests/test_audio_navegador.py`: el 1 kHz baja más de 20 dB (en la práctica, unos 40) y la voz no cambia.
+
+## ADR-42 · owrx-clone: perfiles portables de OpenWebRX+, por niveles y con copia previa
+- **Decisión:** herramienta genérica e independiente (`owrx-clone/`, Python 3 sin dependencias, MIT, README es/en, `man`), que el kit también usa.
+  - **Niveles:** `config`, `etc`, `web`, `paquetes`, `sistema`, `parches`, `extra`.
+  - **Rutas lógicas:** `{DATA}`/`{HTDOCS}`.
+  - **Integridad:** SHA-256 por fichero.
+  - **Cifrado y publicación:** cifrado opcional con openssl (AES-256 + PBKDF2) y modo `--publico`.
+  - **Importar:** repositorio luarvique según el sistema y paquetes por apt.
+  - **Copia previa:** lo sobrescrito y lista de lo creado, para `deshacer`.
+- **Por qué:**
+  - Que cualquiera pueda llevar su OpenWebRX+ a otro equipo con todas sus personalizaciones, y la comunidad pueda compartir configuraciones.
+  - **Qué es «personalización»:** sale de dpkg. Lo que no es del paquete (`web`) o lo que difiere de sus MD5 (`parches`), sin listas a mano.
+  - **Archivos fuera de su sitio:** un perfil de terceros no puede escribir fuera de las carpetas de su nivel.
+  - **Niveles con código como root:** `sistema` y `parches` ejecutan código como root y no entran sin pedirlos; `extra` solo con `--niveles extra`.
+  - **Revisión de seguridad independiente (v4.2):** la revisión encontró que un `data_directory` del perfil podía llevar los ficheros a `/etc/cron.d`, y que `deshacer` seguía enlaces simbólicos. Arreglos:
+    - `data_directory` del perfil: solo el del equipo o uno nuevo `/var/lib/openwebrx…`/`/srv/openwebrx…` del usuario openwebrx (una segunda revisión descartó `/home`, `/opt` y `/var/lib` en general);
+    - lista de rutas prohibidas para todos los niveles;
+    - escritura por temporal + `os.replace` sin enlaces en el camino;
+    - copia previa tras apt;
+    - `try/finally` con OpenWebRX+ rearrancado y la lista de lo creado.
+    Hay una prueba de cada ataque en `test_owrx_clone`.
+  - **`parches`:** solo con la misma versión del paquete.
+- **Implica:**
+  - **En el kit:** `install.sh --exportar` (sin `bricohams.env`) y `--importar` (paso `importar`).
+  - **Marca:** `/etc/bricohams/perfil-importado` hace que `configuracion` y `plugins` respeten lo importado (`OWRX_PLANTILLA="yes"` vuelve a la plantilla).
+  - **Copia diaria:** guarda además un perfil (7 últimos).
+  - **No se deshacen:** los paquetes instalados.
+  - **Sistemas:** solo los que tienen repositorio de OpenWebRX+.
+
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
 2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
@@ -516,3 +599,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
     - **Medir** el Ø del tubo de la antena de fibra (`FIBRA_D`) y la brida de los sensores de viento.
     - **Cable de cámara de Pi 5:** comprar el Standard–Mini (15 → 22 pines).
     - **Primera compilación de FT2 en la Pi**, todavía sin probar en arm64.
+13. **v4.2:**
+    - **Probar en la Pi** los plugins FILTRO y DSP con audio real (los navegadores móviles pueden limitar Web Audio).
+    - **Primera migración real con owrx-clone** (Pi → Pi o Pi → PC) y revisar la lista de paquetes que propone.
+    - **SSL_MODO=admin:** comprobar que el directorio de receptores (receiverbook) acepta la URL `http://`.

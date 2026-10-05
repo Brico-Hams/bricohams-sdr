@@ -28,8 +28,10 @@
 #     nginx + SSL, portal de servicios, privacidad; visitas por MQTT con avisos
 #     por Telegram; cuenta de servicio «bricohams» y tareas en cron.
 #   - v4.1: «--actualizar»: kit (git) + bricohams.env + apt + solo los pasos cambiados.
+#   - v4.2: bricohams.env leído sin ejecutarse, espera de red, SSL solo en la administración
+#     (SSL_MODO), plugins de audio FILTRO y DSP, perfiles de OpenWebRX+ con owrx-clone.
 #   - Herramientas: bricohams-check, bricohams-sdr-serials, bricohams-lilygo,
-#     bricohams-servicios, bricohams-io, bricohams-ft2.
+#     bricohams-servicios, bricohams-io, bricohams-ft2, owrx-clone.
 #
 #  Uso:
 #    sudo bash install.sh                      # todo (vale aunque falte el permiso de ejecución)
@@ -41,6 +43,8 @@
 #                                                 # repite SOLO los pasos que han cambiado
 #    sudo bash install.sh --actualizar --simular  # enseña qué haría, sin cambiar nada
 #       opciones de --actualizar: --sin-git  --sin-apt  --todo (repite todos los pasos)
+#    sudo bash install.sh --exportar [fichero]     # v4.2: perfil de este OpenWebRX+ (owrx-clone)
+#    sudo bash install.sh --importar perfil.owrx.tar.gz   # v4.2: instala y aplica un perfil
 #  Se puede repetir sin miedo: cada paso deja el sistema igual.
 #  Registro: /var/log/bricohams-install.log
 # =====================================================================
@@ -54,12 +58,14 @@ OWRX_DATA=/var/lib/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo satelites ft2 web visitas herramientas tareas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo satelites ft2 web visitas herramientas importar tareas)
 BACKUP=""
 SOLO=""
 REINICIAR=0
 ARGS=("$@")                     # para volver a lanzarse si --actualizar trae un install.sh nuevo
 ACTUALIZAR=0; SIMULAR=0; TODO=0; SIN_GIT=0; SIN_APT=0; CONTINUAR=0; OWRX_CAMBIO=0
+IMPORTAR=""; EXPORTAR=""; EXPORTAR_A=""      # v4.2 · perfiles de OpenWebRX+ (owrx-clone)
+PERFIL_IMPORTADO=/etc/bricohams/perfil-importado
 ESTADO_KIT=/var/lib/bricohams/kit-estado      # huella de cada paso aplicado (v4.1)
 KIT_ANTES="${BRICOHAMS_KIT_ANTES:-}"; KIT_DESPUES=""; PLAN=()
 
@@ -81,6 +87,10 @@ while [ $# -gt 0 ]; do
         --sin-git)    SIN_GIT=1; shift ;;
         --sin-apt)    SIN_APT=1; shift ;;
         --continuar)  CONTINUAR=1; shift ;;     # interno: segunda vuelta tras bajar un install.sh nuevo
+        --importar)   [ -n "${2:-}" ] || fallo "--importar necesita el fichero del perfil"
+                      IMPORTAR=$(readlink -f -- "$2" || echo "$2"); shift 2 ;;
+        --exportar)   EXPORTAR=1; shift
+                      if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then EXPORTAR_A=$1; shift; fi ;;
         -h|--help) awk 'NR>2 && /^# =====/{exit} NR>2' "$0"; exit 0 ;;
         *) fallo "Opción desconocida: $1" ;;
     esac
@@ -88,22 +98,55 @@ done
 
 { [ "$SIMULAR" -eq 0 ] && [ "$TODO" -eq 0 ] && [ "$SIN_GIT" -eq 0 ] && [ "$SIN_APT" -eq 0 ]; } || [ "$ACTUALIZAR" -eq 1 ] \
     || fallo "--simular, --todo, --sin-git y --sin-apt van con --actualizar"
-[ "$ACTUALIZAR" -eq 0 ] || [ -z "$BACKUP$SOLO" ] || fallo "--actualizar no se combina con --backup ni --solo"
+[ "$ACTUALIZAR" -eq 0 ] || [ -z "$BACKUP$SOLO$IMPORTAR" ] || fallo "--actualizar no se combina con --backup, --solo ni --importar"
+[ -z "$IMPORTAR" ] || [ -r "$IMPORTAR" ] || fallo "No puedo leer el perfil $IMPORTAR"
 [ "$(id -u)" -eq 0 ] || fallo "Ejecútalo con sudo: sudo bash $0"
 # Si el kit se copió por Windows, un móvil, un pendrive FAT o un unzip que no guarda
 # permisos, los scripts pierden el bit de ejecución ("sudo: ./install.sh: command not found")
 # y los ficheros de texto pueden traer finales de línea CRLF. Se reparan aquí.
 arreglar_kit() {
     local f
-    chmod +x "$KIT/install.sh" "$FILES"/bin/* "$KIT"/tools/*.sh "$KIT"/tests/*.sh 2>/dev/null || true
-    for f in "$KIT/bricohams.env" "$KIT/install.sh" "$FILES"/bin/*; do
+    chmod +x "$KIT/install.sh" "$FILES"/bin/* "$KIT"/tools/*.sh "$KIT"/tests/*.sh "$KIT"/owrx-clone/owrx-clone "$KIT"/owrx-clone/instalar.sh 2>/dev/null || true
+    for f in "$KIT/bricohams.env" "$KIT/install.sh" "$FILES"/bin/* "$KIT"/owrx-clone/owrx-clone "$KIT"/owrx-clone/instalar.sh; do
         if [ -f "$f" ] && grep -q $'\r' "$f"; then sed -i 's/\r$//' "$f"; fi
     done
 }
 arreglar_kit
+# v4.2 · exportar no necesita bricohams.env: vale en cualquier OpenWebRX+ (owrx-clone)
+if [ -n "$EXPORTAR" ]; then
+    exec python3 "$KIT/owrx-clone/owrx-clone" exportar ${EXPORTAR_A:+-o "$EXPORTAR_A"}
+fi
 [ -r "$KIT/bricohams.env" ] || fallo "Falta $KIT/bricohams.env: cp bricohams.env.example bricohams.env y rellena las claves (docs/manuales/02_INSTALACION.md)"
-# shellcheck source=bricohams.env
-. "$KIT/bricohams.env"
+# v4.2 · bricohams.env se LEE, no se ejecuta: un «$» dentro de una clave
+# (QRZ_PASS="abc$Ejemplo99") paraba el instalador con «unbound variable».
+# bricohams-env.py entiende comillas dobles, simples y comentarios, y toma el «$» literal.
+cargar_env() {
+    local salida
+    command -v python3 >/dev/null || fallo "Falta python3 (viene con Raspberry Pi OS): sudo apt install python3"
+    salida=$(python3 "$FILES/bin/bricohams-env.py" --shell "$1") || fallo "$1 tiene un error de sintaxis (arriba). Revisa las comillas de esa línea."
+    eval "$salida"
+}
+# copia en /etc ya «limpia» (comillas simples): la pueden leer bash y systemd sin sorpresas
+instalar_env() {   # el temporal también es 600: lleva todas las claves
+    local tmp; tmp=$(umask 077; mktemp "$1.XXXXXX")
+    python3 "$FILES/bin/bricohams-env.py" --normalizar "$KIT/bricohams.env" >"$tmp" || { rm -f "$tmp"; fallo "bricohams.env tiene un error (arriba)"; }
+    chmod 600 "$tmp"; mv -f "$tmp" "$1"
+}
+# NOMBRE='valor' para los .env derivados (systemd EnvironmentFile y bash los leen igual)
+sq() { local s=${1//\'/\'\\\'\'}; printf "'%s'" "$s"; }
+envl() { printf '%s=%s\n' "$1" "$(sq "${2-}")"; }
+# nginx_sitio MODO DOMINIO CERT KEY < plantilla: activa o borra las líneas «#@X@» de la plantilla
+nginx_sitio() {
+    local m=$1 dom=$2 cert=$3 key=$4 e=()
+    case "$m" in
+        admin) e=(-e 's/^#@ADMIN@//' -e 's/^#@HTTP@//' -e '/^#@TODO@/d' -e '/^#@SSL[<>]/d') ;;
+        todo)  e=(-e 's/^#@TODO@//' -e '/^#@ADMIN@/d' -e '/^#@HTTP@/d' -e '/^#@SSL[<>]/d') ;;
+        no)    e=(-e 's/^#@HTTP@//' -e '/^#@ADMIN@/d' -e '/^#@TODO@/d' -e '/^#@SSL>/,/^#@SSL</d') ;;
+        *) return 1 ;;
+    esac
+    sed "${e[@]}" -e "s#__DOMINIO__#${dom}#g" -e "s#__CERT__#${cert}#" -e "s#__KEY__#${key}#"
+}
+cargar_env "$KIT/bricohams.env"
 DEB=$(. /etc/os-release && echo "${VERSION_CODENAME:-}")   # bookworm | trixie: elige los repositorios
 DEB_NUM=$([ "$DEB" = trixie ] && echo 13 || echo 12)
 # al volver a lanzarse (--actualizar con install.sh nuevo) la salida ya va al registro
@@ -125,6 +168,50 @@ apt_update() {
         aviso "apt-get update: intento $i fallido; espero 10 s"; sleep 10
     done
     fallo "apt-get update sigue fallando. Prueba la red: getent ahostsv4 archive.raspberrypi.com · curl -4 -sI http://archive.raspberrypi.com/debian/dists/$DEB/Release"
+}
+# v4.2 · Red: espera a que haya DNS y salida antes de bajar nada. En la Pi de EA5KAO el
+# paso «red» reactivaba el WiFi y el paso «openwebrx» fallaba con «Could not resolve host».
+esperar_red() {
+    local i
+    for i in $(seq 1 24); do
+        if getent hosts luarvique.github.io >/dev/null 2>&1 && getent hosts deb.debian.org >/dev/null 2>&1; then
+            if [ "$i" -gt 1 ]; then bien "red disponible tras $(( (i - 1) * 5 )) s"; fi
+            return 0
+        fi
+        [ "$i" -gt 1 ] || aviso "Esperando a la red (DNS)…"
+        sleep 5
+    done
+    aviso "Sin DNS tras 2 minutos. Estado de la red:"
+    nmcli -t -f DEVICE,STATE,CONNECTION device 2>/dev/null | sed 's/^/    /' || true
+    grep -E '^nameserver' /etc/resolv.conf 2>/dev/null | sed 's/^/    /' || true
+    fallo "No se resuelve luarvique.github.io ni deb.debian.org. Comprueba el WiFi/cable y repite: el instalador sigue donde se quedó"
+}
+# ¿El paso baja algo? (apt, curl, git, pip…): solo esos esperan a la red. «red» y «comprobar» la miran ellos.
+necesita_red() {
+    case "$1" in red|comprobar) return 1 ;; esac
+    declare -f "paso_$1" | grep -qE 'apt_i|apt_update|apt-get|CURL|curl |wget|git (clone|pull|fetch)|pipx|pip3? install|script_remoto|clave_apt|certbot|owrx-clone'
+}
+# curl con reintentos (cortes de red, DNS que tarda, GitHub lento)
+CURL=(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20)
+# script_remoto URL [args]: baja un instalador de terceros y lo ejecuta. Antes era
+# «bash -c $(wget …)»: si la descarga fallaba, bash ejecutaba un texto vacío y
+# el paso seguía como si nada (sin readsb, sin tar1090…).
+script_remoto() {
+    local url=$1 tmp r; shift
+    tmp=$(mktemp --suffix=.sh)
+    esperar_red
+    "${CURL[@]}" -o "$tmp" "$url" && [ -s "$tmp" ] || { rm -f "$tmp"; echo "No pude bajar $url" >&2; return 1; }
+    r=0; bash "$tmp" "$@" || r=$?
+    rm -f "$tmp"; return "$r"
+}
+# clave_apt URL DESTINO: baja una clave de repositorio y la convierte a formato gpg binario
+clave_apt() {
+    local tmp; tmp=$(mktemp)
+    esperar_red
+    "${CURL[@]}" -o "$tmp" "$1" || { rm -f "$tmp"; fallo "No pude bajar la clave $1 (¿red?). Repite el instalador: sigue donde se quedó"; }
+    [ -s "$tmp" ] || { rm -f "$tmp"; fallo "La clave $1 ha llegado vacía"; }
+    gpg --yes --dearmor -o "$2" "$tmp" || { rm -f "$tmp"; fallo "La clave $1 no es una clave OpenPGP válida"; }
+    rm -f "$tmp"
 }
 # v3.3 · Trixie: el rtl-sdr de Debian 13 (osmocom 2.0.2) es MÁS NUEVO que el fork rtl-sdr-blog
 # (0.7.0~rtlsdrblog1) y los módulos SoapySDR de Trixie lo exigen. Si quedó instalado/retenido el
@@ -352,6 +439,7 @@ resumen_actualizacion() {
 
 # ---------------------------------------------------------------------
 paso_comprobar() {
+    esperar_red
     . /etc/os-release
     [ "$(uname -m)" = aarch64 ] || fallo "Hace falta Raspberry Pi OS de 64 bits (arm64)."
     case "${VERSION_CODENAME:-}" in
@@ -384,7 +472,7 @@ paso_base() {
     fi
     timedatectl set-timezone Europe/Madrid
     install -d -m 755 "$ETC_BH"
-    install -m 600 "$KIT/bricohams.env" "$ETC_BH/bricohams.env"
+    instalar_env "$ETC_BH/bricohams.env"
     bien "paquetes base y $ETC_BH/bricohams.env"
 }
 
@@ -442,12 +530,22 @@ paso_red() {
         v="WIFI_SSID_$i"; ssid=${!v:-}
         prio=$(( 30 - i * 10 ))
         [ -n "$ssid" ] || continue
-        nmcli connection delete "bricohams-wifi-$i" >/dev/null 2>&1 || true
-        nmcli connection add type wifi con-name "bricohams-wifi-$i" ifname wlan0 ssid "$ssid" \
-            wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PASS" \
-            connection.autoconnect yes connection.autoconnect-priority "$prio" >/dev/null
-        bien "WiFi '$ssid' (prioridad $prio)"
+        # v4.2: si ya existe se MODIFICA. Antes se borraba y se volvía a crear: si la Pi
+        # estaba conectada por esa misma conexión, se quedaba sin red unos segundos y
+        # el paso siguiente fallaba («Could not resolve host»).
+        if nmcli -t -f NAME connection show 2>/dev/null | grep -qx "bricohams-wifi-$i"; then
+            nmcli connection modify "bricohams-wifi-$i" 802-11-wireless.ssid "$ssid" \
+                wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PASS" \
+                connection.autoconnect yes connection.autoconnect-priority "$prio" >/dev/null
+            bien "WiFi '$ssid' (prioridad $prio, actualizada sin desconectar)"
+        else
+            nmcli connection add type wifi con-name "bricohams-wifi-$i" ifname wlan0 ssid "$ssid" \
+                wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PASS" \
+                connection.autoconnect yes connection.autoconnect-priority "$prio" >/dev/null
+            bien "WiFi '$ssid' (prioridad $prio)"
+        fi
     done
+    esperar_red
 }
 
 paso_hat() {
@@ -517,7 +615,7 @@ paso_rtlsdr() {
 }
 
 paso_openwebrx() {
-    curl -fsSL https://luarvique.github.io/ppa/openwebrx-plus.gpg | gpg --yes --dearmor -o /etc/apt/trusted.gpg.d/openwebrx-plus.gpg
+    clave_apt https://luarvique.github.io/ppa/openwebrx-plus.gpg /etc/apt/trusted.gpg.d/openwebrx-plus.gpg
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/openwebrx-plus.gpg] https://luarvique.github.io/ppa/$DEB ./" >/etc/apt/sources.list.d/openwebrx-plus.list
     apt_update
     apt_i openwebrx
@@ -552,8 +650,16 @@ paso_configuracion() {
     local stamp; stamp=$(date +%Y%m%d-%H%M%S)
     [ -f "$OWRX_DATA/settings.json" ] && cp "$OWRX_DATA/settings.json" "$OWRX_DATA/settings.json.antes-$stamp"
     # settings.json desde la plantilla + bricohams.env
-    install -d -m 755 "$ETC_BH"; install -m 600 "$KIT/bricohams.env" "$ETC_BH/bricohams.env"
-    set -a; . "$KIT/bricohams.env"; set +a
+    install -d -m 755 "$ETC_BH"; instalar_env "$ETC_BH/bricohams.env"
+    cargar_env "$KIT/bricohams.env"          # exporta todas (las lee bricohams-render-settings)
+    # v4.2 · con un perfil importado (install.sh --importar) manda el perfil, no la plantilla
+    if [ -f "$PERFIL_IMPORTADO" ] && ! si "${OWRX_PLANTILLA:-no}"; then
+        aviso "Configuración importada de un perfil ($(grep -m1 '^PERFIL=' "$PERFIL_IMPORTADO" | cut -d= -f2-)): no regenero settings.json ni los marcadores."
+        aviso "Para volver a la plantilla de BricoHams: OWRX_PLANTILLA=\"yes\" en bricohams.env y sudo bash install.sh --solo configuracion"
+        chown -R openwebrx:openwebrx "$OWRX_DATA"
+        systemctl start openwebrx
+        return 0
+    fi
     python3 "$FILES/bin/bricohams-render-settings.py" "$FILES/openwebrx/settings.json.tmpl" "$OWRX_DATA/settings.json"
     # marcadores (v4.1): si ya hay, se conservan los que añadiste desde la web y se ponen al día los del kit
     local bm_kit=/var/lib/bricohams/bookmarks.kit.json bm_ant
@@ -585,7 +691,9 @@ paso_configuracion() {
         rm -rf "$tmp"
     fi
     chown -R openwebrx:openwebrx "$OWRX_DATA"
-    if [ ! -s "$OWRX_DATA/users.json" ]; then
+    if [ ! -s "$OWRX_DATA/users.json" ] && [ -n "$IMPORTAR" ]; then
+        aviso "Sin usuario de administración todavía: lo trae el perfil que se importa al final"
+    elif [ ! -s "$OWRX_DATA/users.json" ]; then
         info "Crea la contraseña del administrador '$OWRX_ADMIN_USER' de OpenWebRX:"
         openwebrx admin adduser "$OWRX_ADMIN_USER" </dev/tty || aviso "Crea el usuario luego: sudo openwebrx admin adduser $OWRX_ADMIN_USER"
         chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true
@@ -598,8 +706,13 @@ paso_plugins() {
     local R="$HTDOCS/plugins/receiver"
     [ -d "$HTDOCS" ] || fallo "No existe $HTDOCS (¿OpenWebRX instalado?)"
     [ -f "$R/init.js" ] && cp "$R/init.js" "$R/init.js.antes-$(date +%Y%m%d-%H%M%S)"
+    local guardar=()
+    if [ -f "$PERFIL_IMPORTADO" ] && ! si "${OWRX_PLANTILLA:-no}"; then
+        guardar=(--exclude 'receiver/init.js')       # v4.2: el init.js del perfil importado manda
+        aviso "Perfil importado: conservo su plugins/receiver/init.js (los plugins de BricoHams quedan copiados, pero sin cargar)"
+    fi
     rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
-        "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
+        "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     sed -i -e "s/__LAT__/${STATION_LAT}/" -e "s/__LON__/${STATION_LON}/" \
         -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" \
         -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" "$R/init.js"
@@ -610,7 +723,7 @@ paso_plugins() {
 paso_meteo() {
     install -m 755 "$FILES/bin/bricohams-meteo.py" /usr/local/bin/bricohams-meteo
     cat >"$ETC_BH/meteo.env" <<EOF
-AEMET_API_KEY=${AEMET_API_KEY}
+AEMET_API_KEY=$(sq "${AEMET_API_KEY:-}")
 METEO_STATIONS=${METEO_STATIONS}
 STATION_LAT=${STATION_LAT}
 STATION_LON=${STATION_LON}
@@ -651,11 +764,11 @@ paso_camara() {
     # MediaMTX (última versión para arm64)
     if ! command -v mediamtx >/dev/null; then
         local url tmp
-        url=$(curl -fsSL https://api.github.com/repos/bluenviron/mediamtx/releases/latest \
+        url=$("${CURL[@]}" https://api.github.com/repos/bluenviron/mediamtx/releases/latest \
             | jq -r '.assets[].browser_download_url' | grep -E 'linux_arm64(v8)?\.tar\.gz$' | head -1)
         [ -n "$url" ] || fallo "No encuentro MediaMTX para arm64"
         tmp=$(mktemp -d)
-        curl -fsSL "$url" | tar -xz -C "$tmp"
+        "${CURL[@]}" "$url" | tar -xz -C "$tmp"
         install -m 755 "$tmp/mediamtx" /usr/local/bin/mediamtx
         rm -rf "$tmp"
     fi
@@ -767,8 +880,8 @@ WX_SENSOR_HEIGHT=${WX_SENSOR_HEIGHT}
 WX_TEMP_OFFSET=${WX_TEMP_OFFSET}
 WX_APRS=${WX_APRS}
 WX_APRS_CALLSIGN=${WX_APRS_CALLSIGN}
-WX_APRS_COMMENT=${WX_APRS_COMMENT}
-APRS_PASSCODE=${APRS_PASSCODE}
+WX_APRS_COMMENT=$(sq "${WX_APRS_COMMENT:-}")
+APRS_PASSCODE=$(sq "${APRS_PASSCODE:-}")
 WX_OUT=${HTDOCS}/plugins/receiver/meteo/sensor.json
 WIND_ENABLE=${WIND_ENABLE:-no}
 WIND_PORT=${WIND_PORT:-/dev/rs485}
@@ -868,7 +981,8 @@ paso_adsb() {
     if ! si "$ADSB_ENABLE"; then aviso "ADS-B omitido (ADSB_ENABLE)"; return; fi
     # 1) readsb (wiedehopf) con el FlightStick, elegido por su número de serie
     if ! command -v readsb >/dev/null; then
-        bash -c "$(wget -nv -O - https://github.com/wiedehopf/adsb-scripts/raw/master/readsb-install.sh)"
+        script_remoto https://github.com/wiedehopf/adsb-scripts/raw/master/readsb-install.sh \
+            || fallo "No pude instalar readsb (wiedehopf). Repite el instalador: sigue donde se quedó"
     fi
     local biast=""
     si "$ADSB_BIAS_TEE" && biast=" --enable-biastee"
@@ -876,19 +990,19 @@ paso_adsb() {
     if command -v readsb-set-location >/dev/null; then readsb-set-location "$STATION_LAT" "$STATION_LON" || true; fi
     # 2) mapa propio tar1090
     if si "$ADSB_TAR1090" && [ ! -d /usr/local/share/tar1090 ]; then
-        bash -c "$(wget -nv -O - https://github.com/wiedehopf/tar1090/raw/master/install.sh)" || aviso "No pude instalar tar1090"
+        script_remoto https://github.com/wiedehopf/tar1090/raw/master/install.sh || aviso "No pude instalar tar1090"
     fi
     # 3) AirNav RadarBox (rbfeeder) leyendo la salida Beast de readsb, con MLAT
     if ! command -v rbfeeder >/dev/null; then
         if [ "$DEB" = trixie ]; then
             # Trixie: repositorio de AirNav por apt (su script inst_rbfeeder.sh es para Bookworm)
             install -d -m 755 /etc/apt/keyrings
-            curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF2A8428D3C354953" | gpg --yes --dearmor -o /etc/apt/keyrings/rb24.gpg
+            clave_apt "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF2A8428D3C354953" /etc/apt/keyrings/rb24.gpg
             echo "deb [signed-by=/etc/apt/keyrings/rb24.gpg] https://apt.rb24.com/ trixie main" >/etc/apt/sources.list.d/rb24.list
             apt_update
             apt_i rbfeeder || aviso "No pude instalar rbfeeder desde apt.rb24.com (trixie)"
         else
-            bash -c "$(wget -O - http://apt.rb24.com/inst_rbfeeder.sh)" </dev/null || aviso "Fallo del instalador de rbfeeder"
+            script_remoto http://apt.rb24.com/inst_rbfeeder.sh </dev/null || aviso "Fallo del instalador de rbfeeder"
         fi
     fi
     if ! dpkg -s mlat-client >/dev/null 2>&1; then
@@ -931,7 +1045,7 @@ paso_lilygo() {
 paso_meshtastic() {
     if ! dpkg -s meshtasticd >/dev/null 2>&1; then
         echo "deb http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_$DEB_NUM/ /" >/etc/apt/sources.list.d/network:Meshtastic:beta.list
-        curl -fsSL "https://download.opensuse.org/repositories/network:Meshtastic:beta/Debian_$DEB_NUM/Release.key" | gpg --yes --dearmor -o /etc/apt/trusted.gpg.d/network_Meshtastic_beta.gpg
+        clave_apt "https://download.opensuse.org/repositories/network:Meshtastic:beta/Debian_$DEB_NUM/Release.key" /etc/apt/trusted.gpg.d/network_Meshtastic_beta.gpg
         apt_update
         apt_i meshtasticd
     fi
@@ -996,6 +1110,9 @@ paso_herramientas() {
     install -m 755 "$FILES/bin/bricohams-lilygo" /usr/local/bin/bricohams-lilygo
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    # v4.2 · owrx-clone: exportar/importar perfiles de OpenWebRX+ (también lo usa la copia diaria)
+    install -m 755 "$KIT/owrx-clone/owrx-clone" /usr/local/bin/owrx-clone
+    install -D -m 644 "$KIT/owrx-clone/owrx-clone.1" /usr/local/share/man/man1/owrx-clone.1
     # copia del kit en la Raspberry para restaurar sin la tarjeta original
     install -d /opt/bricohams
     rsync -a --delete --exclude 'bricohams.env' "$KIT/" /opt/bricohams/kit/
@@ -1134,12 +1251,12 @@ EOF
     systemctl enable --now bricohams-satpass.timer
     if si "${SATDUMP_ENABLE:-yes}" && ! command -v satdump >/dev/null; then
         local url tmp
-        url=$(curl -fsSL https://api.github.com/repos/SatDump/SatDump/releases/latest 2>/dev/null \
+        url=$("${CURL[@]}" https://api.github.com/repos/SatDump/SatDump/releases/latest 2>/dev/null \
             | jq -r --arg d "$DEB" '[.assets[].browser_download_url | select(test("(arm64|aarch64).*\\.deb$"; "i"))] as $a
                 | ([$a[] | select(test($d; "i"))] + $a)[0] // empty')
         if [ -n "$url" ]; then
             tmp=$(mktemp -d)
-            if curl -fsSL -o "$tmp/satdump.deb" "$url" && apt-get install -y "$tmp/satdump.deb"; then
+            if "${CURL[@]}" -o "$tmp/satdump.deb" "$url" && apt-get install -y "$tmp/satdump.deb"; then
                 bien "SatDump instalado (imágenes METEOR LRPT en «Files»)"
             else
                 aviso "No pude instalar SatDump ($url): las imágenes METEOR no se decodificarán"
@@ -1176,9 +1293,11 @@ paso_web() {
     apt_i nginx certbot openssl
     install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
-    local ip dom cert key
+    local ip dom cert key modo
     ip=$(hostname -I | awk '{print $1}')
     dom=${SSL_DOMAIN:-}
+    modo=${SSL_MODO:-admin}
+    case "$modo" in admin|todo|no) ;; *) fallo "SSL_MODO=\"$modo\" no vale: admin, todo o no" ;; esac
     # tar1090 (lighttpd) deja el puerto 80 a nginx y solo escucha en local
     if [ -f /etc/lighttpd/lighttpd.conf ]; then
         sed -i -E 's/^server\.port\s*=.*/server.port = 8504/' /etc/lighttpd/lighttpd.conf
@@ -1193,21 +1312,24 @@ paso_web() {
         "$FILES/web/index.html.tmpl" >/var/www/bricohams/index.html
     # certificado: primero uno autofirmado para que nginx arranque
     install -d -m 700 /etc/bricohams/ssl
-    if [ ! -s /etc/bricohams/ssl/autofirmado.crt ]; then
+    if [ "$modo" != no ] && [ ! -s /etc/bricohams/ssl/autofirmado.crt ]; then
         openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=${dom:-$(hostname)}" \
             -keyout /etc/bricohams/ssl/autofirmado.key -out /etc/bricohams/ssl/autofirmado.crt 2>/dev/null
     fi
     cert=/etc/bricohams/ssl/autofirmado.crt; key=/etc/bricohams/ssl/autofirmado.key
     [ -n "$dom" ] && [ -s "/etc/letsencrypt/live/$dom/fullchain.pem" ] && { cert="/etc/letsencrypt/live/$dom/fullchain.pem"; key="/etc/letsencrypt/live/$dom/privkey.pem"; }
+    # v4.2 · SSL_MODO: admin = receptor por HTTP y administración por HTTPS (decisión de EA5KAO)
     escribir_nginx() {
-        sed -e "s#__DOMINIO__#${dom:-$(hostname)}#g" -e "s#__CERT__#$1#" -e "s#__KEY__#$2#" \
-            "$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
+        install -d /etc/nginx/snippets
+        install -m 644 "$FILES/nginx/bricohams-sdr-rutas.conf" /etc/nginx/snippets/bricohams-sdr-rutas.conf
+        nginx_sitio "$modo" "${dom:-$(hostname)}" "$1" "$2" <"$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
         ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr
         rm -f /etc/nginx/sites-enabled/default
-        nginx -t >/dev/null 2>&1 && systemctl reload-or-restart nginx
+        nginx -t || fallo "nginx no acepta la configuración (mensaje de arriba): /etc/nginx/sites-available/bricohams-sdr"
+        systemctl reload-or-restart nginx
     }
     escribir_nginx "$cert" "$key"
-    if [ -n "$dom" ] && [ ! -s "/etc/letsencrypt/live/$dom/fullchain.pem" ]; then
+    if [ "$modo" != no ] && [ -n "$dom" ] && [ ! -s "/etc/letsencrypt/live/$dom/fullchain.pem" ]; then
         local correo=(--register-unsafely-without-email)
         [ -n "${SSL_EMAIL:-${ADMIN_EMAIL:-}}" ] && correo=(-m "${SSL_EMAIL:-${ADMIN_EMAIL:-}}")
         if certbot certonly --webroot -w /var/www/letsencrypt -d "$dom" "${correo[@]}" --agree-tos -n >>"$LOG" 2>&1; then
@@ -1220,16 +1342,18 @@ paso_web() {
     install -d /etc/letsencrypt/renewal-hooks/deploy
     printf '#!/bin/sh\nsystemctl reload nginx\n' >/etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
     chmod 755 /etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
-    printf 'SSL_DOMAIN=%s\n' "$dom" >/etc/bricohams/web.env
-    # API de los plugins (ficha de indicativos); credenciales de QRZ opcionales
+    { envl SSL_DOMAIN "$dom"; envl SSL_MODO "${SSL_MODO:-admin}"; } >/etc/bricohams/web.env
+    # API de los plugins (ficha de indicativos); HamQTH principal y QRZ opcional
     {
-        echo "QRZ_USER=${QRZ_USER:-}"
-        echo "QRZ_PASS=${QRZ_PASS:-}"
+        envl HAMQTH_USER "${HAMQTH_USER:-}"
+        envl HAMQTH_PASS "${HAMQTH_PASS:-}"
+        envl QRZ_USER "${QRZ_USER:-}"
+        envl QRZ_PASS "${QRZ_PASS:-}"
     } >/etc/bricohams/api.env
     chown root:openwebrx /etc/bricohams/api.env; chmod 640 /etc/bricohams/api.env
     cat >/etc/systemd/system/bricohams-api.service <<'EOF'
 [Unit]
-Description=BricoHams: API de los plugins (ficha de indicativos RadioID/QRZ)
+Description=BricoHams: API de indicativos (HamQTH/RadioID/QRZ)
 After=network-online.target
 
 [Service]
@@ -1246,8 +1370,14 @@ EOF
     systemctl daemon-reload
     systemctl enable --now bricohams-api
     systemctl restart bricohams-api
-    bien "nginx https://${dom:-$ip}/ · portal /bricohams/ · privacidad /bricohams/privacidad.html"
-    [ -z "$dom" ] && aviso "Sin SSL_DOMAIN: certificado autofirmado (el navegador avisará). Pon el dominio en bricohams.env y: sudo bash install.sh --solo web"
+    case "$modo" in
+        admin) bien "nginx: receptor http://${dom:-$ip}/ · administración https://${dom:-$ip}/settings (forzada) · portal /bricohams/" ;;
+        todo)  bien "nginx: todo por https://${dom:-$ip}/ · portal /bricohams/" ;;
+        no)    aviso "nginx sin SSL (SSL_MODO=no): la contraseña de /settings viaja sin cifrar. Úsalo solo en la LAN" ;;
+    esac
+    if [ "$modo" != no ] && [ -z "$dom" ]; then
+        aviso "Sin SSL_DOMAIN: certificado autofirmado (el navegador avisará). Pon el dominio en bricohams.env y: sudo bash install.sh --solo web"
+    fi
 }
 
 # =====================================================================
@@ -1266,8 +1396,8 @@ EOF
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
     install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/visitas"
     {
-        echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}"
-        echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}"
+        envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
+        envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"
         echo "VISITAS_DIAS=${VISITAS_DIAS:-90}"
         echo "VISITAS_CHAT=${VISITAS_CHAT:-yes}"
         echo "VISITAS_AVISAR_LAN=${VISITAS_AVISAR_LAN:-no}"
@@ -1275,7 +1405,7 @@ EOF
         echo "VISITAS_OUT=$HTDOCS/plugins/receiver/visitas/visitas.json"
     } >/etc/bricohams/visitas.env
     chown root:openwebrx /etc/bricohams/visitas.env; chmod 640 /etc/bricohams/visitas.env
-    { echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}"; echo "TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}"; } >/etc/bricohams/telegram.env
+    { envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"; envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"; } >/etc/bricohams/telegram.env
     chmod 600 /etc/bricohams/telegram.env
     cat >/etc/systemd/system/bricohams-visitas.service <<'EOF'
 [Unit]
@@ -1307,6 +1437,38 @@ EOF
 #  v4 · Tareas automáticas: cuenta de servicio «bricohams» + cron
 #  (sin contraseñas guardadas: sudoers solo le deja ejecutar bricohams-tarea)
 # =====================================================================
+# =====================================================================
+#  v4.2 · Importar un perfil de OpenWebRX+ (sudo bash install.sh --importar perfil.owrx.tar.gz)
+#  Lo aplica owrx-clone (copia previa, sumas SHA-256, deshacer). Después el instalador
+#  respeta lo importado: «configuracion» no regenera settings.json y «plugins» no pisa init.js.
+# =====================================================================
+paso_importar() {
+    if [ -z "$IMPORTAR" ]; then
+        if [ -f "$PERFIL_IMPORTADO" ]; then bien "perfil importado antes: $(grep -m1 '^PERFIL=' "$PERFIL_IMPORTADO" | cut -d= -f2-)"
+        else bien "sin perfil que importar (sudo bash install.sh --importar FICHERO)"; fi
+        return 0
+    fi
+    local oc=${OWRX_CLONE_BIN:-/usr/local/bin/owrx-clone} niveles=${IMPORTAR_NIVELES:-config,etc,web,paquetes}
+    [ -n "${OWRX_CLONE_BIN:-}" ] || install -m 755 "$KIT/owrx-clone/owrx-clone" "$oc"
+    "$oc" importar "$IMPORTAR" --si --niveles "$niveles" \
+        || fallo "owrx-clone no ha podido importar $IMPORTAR (mensaje de arriba). Para volver atrás: sudo owrx-clone deshacer"
+    # lo que BricoHams necesita de settings.json: el informe MQTT de las visitas
+    if si "${VISITAS_ENABLE:-yes}" && [ -s "$OWRX_DATA/settings.json" ]; then
+        python3 "$FILES/bin/bricohams-mqtt-settings.py" "$OWRX_DATA/settings.json"
+        chown openwebrx:openwebrx "$OWRX_DATA/settings.json"
+        systemctl restart openwebrx
+    fi
+    # un perfil público (o --sin-usuarios) no trae administrador: se crea aquí
+    if [ ! -s "$OWRX_DATA/users.json" ] || [ "$(wc -c <"$OWRX_DATA/users.json")" -lt 5 ]; then
+        info "El perfil no trae usuario de administración: crea la contraseña de '${OWRX_ADMIN_USER:-admin}':"
+        openwebrx admin adduser "${OWRX_ADMIN_USER:-admin}" </dev/tty || aviso "Créalo luego: sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}"
+        chown openwebrx:openwebrx "$OWRX_DATA/users.json" 2>/dev/null || true     # lo crea root: el servicio tiene que leerlo
+    fi
+    install -d -m 755 /etc/bricohams
+    { envl PERFIL "$IMPORTAR"; envl FECHA "$(date '+%F %T')"; envl NIVELES "$niveles"; } >"$PERFIL_IMPORTADO"
+    bien "perfil $(basename "$IMPORTAR") importado (niveles: $niveles). Deshacer: sudo owrx-clone deshacer"
+}
+
 paso_tareas() {
     apt_i cron at
     install -m 755 "$FILES/bin/bricohams-tarea" /usr/local/sbin/bricohams-tarea
@@ -1334,7 +1496,7 @@ ${CRON_RESUMEN:-0 21 * * *}        bricohams  sudo -n $T resumen
 ${CRON_GEOIP:-15 3 2 * *}        bricohams  sudo -n $T geoip
 EOF
     if [ -n "${DUCKDNS_DOMAIN:-}" ] && [ -n "${DUCKDNS_TOKEN:-}" ]; then
-        printf 'DUCKDNS_DOMAIN=%s\nDUCKDNS_TOKEN=%s\n' "$DUCKDNS_DOMAIN" "$DUCKDNS_TOKEN" >/etc/bricohams/duckdns.env
+        { envl DUCKDNS_DOMAIN "$DUCKDNS_DOMAIN"; envl DUCKDNS_TOKEN "$DUCKDNS_TOKEN"; } >/etc/bricohams/duckdns.env
         chown root:bricohams /etc/bricohams/duckdns.env; chmod 640 /etc/bricohams/duckdns.env
         echo '*/5 * * * *     bricohams  . /etc/bricohams/duckdns.env && curl -fsS -m 20 "https://www.duckdns.org/update?domains=${DUCKDNS_DOMAIN}&token=${DUCKDNS_TOKEN}&ip=" >/dev/null' >>/etc/cron.d/bricohams
     fi
@@ -1349,8 +1511,7 @@ if [ "$ACTUALIZAR" -eq 1 ]; then
     if [ "$SIN_GIT" -eq 0 ] && [ "$CONTINUAR" -eq 0 ]; then info "Kit"; kit_git; fi
     arreglar_kit
     if [ "$SIMULAR" -eq 1 ]; then env_nuevas mostrar; else env_nuevas; fi
-    # shellcheck source=bricohams.env
-    . "$KIT/bricohams.env"
+    cargar_env "$KIT/bricohams.env"
     if [ "$SIMULAR" -eq 0 ]; then info "Copia de seguridad"; copia_previa; fi
     if [ "$SIN_APT" -eq 0 ]; then info "Sistema"; sistema_actualizar; fi
     info "Pasos que hay que repetir"
@@ -1365,6 +1526,7 @@ fi
 for PASO_ACTUAL in "${PASOS[@]}"; do
     if [ -n "$SOLO" ] && [[ ",$SOLO," != *",$PASO_ACTUAL,"* ]]; then continue; fi
     echo; info "Paso: $PASO_ACTUAL"
+    if necesita_red "$PASO_ACTUAL"; then esperar_red; fi   # v4.2: no empezar sin red un paso que baja cosas
     "paso_$PASO_ACTUAL"
     estado_guardar "$PASO_ACTUAL"          # huella del paso para --actualizar
 done
@@ -1383,10 +1545,10 @@ cat <<EOF
    5. Comprueba todo:                               sudo bricohams-check
 
   Servicios:  bricohams-servicios        (lista con estado y direcciones)
-  Web:        https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · LAN http://$(hostname -I 2>/dev/null | awk '{print $1}'):8073 (admin: /settings)
+  Web:        http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · admin https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings (SSL_MODO=${SSL_MODO:-admin})
   Meshtastic: https://$(hostname -I 2>/dev/null | awk '{print $1}'):9443
   Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
-  Aviones:    https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
+  Aviones:    http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
   Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado
 EOF
 [ "$REINICIAR" -eq 1 ] && aviso "Hay cambios de arranque (config.txt): hace falta reiniciar."

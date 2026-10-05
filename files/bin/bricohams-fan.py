@@ -15,6 +15,7 @@
 import glob
 import json
 import os
+import shlex
 import sys
 import tempfile
 import time
@@ -33,12 +34,24 @@ def as_bool(v):
     return str(v).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
 
 
+def quitar_comillas(v):
+    """VALOR, "VALOR" o 'VALOR' (v4.2: el instalador escribe comillas simples, como 'a'\\''b')."""
+    v = v.strip()
+    try:
+        partes = shlex.split(v, comments=True)
+        if len(partes) == 1:
+            return partes[0]
+    except ValueError:
+        pass
+    return v.strip('"\'')
+
+
 def cargar_env(path='/etc/bricohams/fan.env'):
     try:
         for ln in open(path, encoding='utf-8'):
             k, sep, v = ln.strip().partition('=')
             if sep and k and not k.startswith('#'):
-                os.environ.setdefault(k, v.strip().strip('"'))
+                os.environ.setdefault(k, quitar_comillas(v))
     except OSError:
         pass
 
@@ -258,6 +271,10 @@ def main_pico(cfg, forzado, salida_web):
 
 
 def main():
+    if '-h' in sys.argv or '--help' in sys.argv:          # v4.2: la ayuda no arranca el servicio
+        print('uso: bricohams-fan [--estado | --forzar 0-100 (30 s, con el servicio parado)]\n'
+              '     sin argumentos: servicio (lo lanza systemd: bricohams-fan.service)')
+        return 0
     cargar_env()
     if '--estado' in sys.argv:
         try:

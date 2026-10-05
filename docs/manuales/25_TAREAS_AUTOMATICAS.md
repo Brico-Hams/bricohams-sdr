@@ -18,7 +18,7 @@
 ## 2. Calendario (se cambia en `bricohams.env`)
 | Variable | Por defecto | Tarea |
 |---|---|---|
-| `CRON_COPIA` | `30 4 * * *` (cada día, 04:30) | copia en `/var/backups/bricohams` (14 últimas); aviso solo si falla |
+| `CRON_COPIA` | `30 4 * * *` (cada día, 04:30) | copia en `/var/backups/bricohams` (14 últimas) y, desde la v4.2, perfil de OpenWebRX+ con owrx-clone (7 últimos); aviso solo si falla |
 | `CRON_ACTUALIZAR` | `30 3 * * 1` (lunes, 03:30) | `apt update` + `upgrade`, sin preguntas y respetando lo retenido; aviso al terminar |
 | `CRON_REINICIO` | `0 5 * * 1` (lunes, 05:00) | reinicio preventivo; **se aplaza 20 min si hay un pase de satélite** |
 | `CRON_SALUD` | `*/30 * * * *` | `bricohams-check`; avisa por Telegram si aparece un fallo y cuando se arregla (sin repetir) |

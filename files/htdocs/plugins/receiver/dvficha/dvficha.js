@@ -9,8 +9,8 @@
  * Datos:
  *   1. DMR/NXDN: OpenWebRX+ ya consulta RadioID por el número DMR («additional»).
  *   2. Para YSF/D-Star (y para completar DMR) pregunta al servicio bricohams-api
- *      (/bricohams/api/indicativo?call=…): RadioID por indicativo y, si se han
- *      puesto credenciales de QRZ XML en bricohams.env, la foto y el nombre de QRZ.
+ *      (/bricohams/api/indicativo?call=…): HamQTH es la fuente principal y RadioID
+ *      y QRZ XML son complementarias si faltan datos.
  *      Si la web se abre sin nginx (puerto 8073) solo sale lo que dé OpenWebRX+.
  * Ajustes: window.dvficha_config = { api: '/bricohams/api/indicativo', segundos: 20 };
  */

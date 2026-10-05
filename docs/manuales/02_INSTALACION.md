@@ -19,6 +19,7 @@
   | `LILYGO_WIFI_SSID` / `LILYGO_WIFI_PASS` | WiFi para el iGate: `biohazard-it` (el ESP32 solo ve 2,4 GHz) |
   | `RADARBOX_KEY` | clave de compartición si ya tienes una estación en RadarBox |
   | `MESH868_PRIVATE_PSK` | clave AES-256 (base64) del canal privado del nodo Meshtastic 868 |
+  | `HAMQTH_USER` / `HAMQTH_PASS` | cuenta gratuita HamQTH para la ficha de indicativos |
 
 - **Revisa también:** las coordenadas (`STATION_*`), las series de los SDR, las variables `HAT_*` (A VERIFICAR) y `MESH_CHANNEL_URL` (ya trae los canales de la red).
 
@@ -47,13 +48,22 @@ sudo bash install.sh --backup ~/backup-openwebrx-2026-10-03.tar.gz   # o sin --b
 > sudo bash install.sh
 > ```
 
+> **¿`bricohams.env: line 182: Ejemplo99: unbound variable`?** Una clave lleva un `$` entre comillas dobles (`QRZ_PASS="abc$Ejemplo99"`) y bash lo tomaba por una variable. **Desde la v4.2** el instalador LEE `bricohams.env` sin ejecutarlo: el `$` es literal y solo avisa. Aun así, lo más claro para claves con símbolos es usar **comillas simples**: `QRZ_PASS='abc$Ejemplo99'` (o escapar: `"abc\$Ejemplo99"`, que también vale).
+
+> **¿`curl: (6) Could not resolve host: luarvique.github.io` / `gpg: no valid OpenPGP data found` en el paso `openwebrx`?** Pasaba justo después del paso `red`: al volver a lanzar el instalador, `red` **borraba y volvía a crear** la conexión WiFi por la que estaba conectada la Pi, que se quedaba sin red unos segundos. **Desde la v4.2:**
+> - `red` modifica la conexión sin cortarla;
+> - antes de cada paso el instalador espera a que haya DNS (hasta 2 min) y, si no llega, se para con el estado de la red;
+> - las claves de los repositorios y los instaladores de terceros se bajan con reintentos y, si fallan, se para con un mensaje claro en vez de seguir a medias.
+>
+> Basta con volver a lanzar `sudo bash install.sh`: sigue donde se quedó.
+
 > **¿`rtl-sdr : Depends: librtlsdr0 (= 0.7.0~rtlsdrblog1) but 2.0.2-2+b1 is to be installed`?** En la Pi quedó el driver rtl-sdr-blog de una instalación anterior, retenido, y en Trixie choca con el de Debian. La v3.3 lo arregla sola. A mano:
 > ```bash
 > sudo apt-mark unhold librtlsdr0 librtlsdr-dev rtl-sdr
 > sudo apt-get install --allow-downgrades librtlsdr0 librtlsdr-dev rtl-sdr
 > ```
 
-Pasos (`sudo bash install.sh --lista`, 24 en v4.0):
+Pasos (`sudo bash install.sh --lista`, 25 desde la v4.2):
 
 | Paso | Qué hace |
 |---|---|
@@ -77,9 +87,10 @@ Pasos (`sudo bash install.sh --lista`, 24 en v4.0):
 | lilygo | herramienta `bricohams-lilygo` (incluye `wxstation`) y CLI de Meshtastic |
 | satelites | v4: pases de satélites cada 15 min + SatDump (imágenes METEOR) |
 | ft2 | v4: compila `decodium-rx` y añade el modo FT2 (experimental, 20–40 min) |
-| web | v4: nginx + SSL (Let's Encrypt), portal `/bricohams/`, privacidad, `bricohams-api` |
+| web | v4: nginx + Let's Encrypt (v4.2: `SSL_MODO`, por defecto HTTPS solo en la administración), portal `/bricohams/`, privacidad, `bricohams-api` |
 | visitas | v4: mosquitto + `bricohams-visitas` (GeoIP local, Telegram) |
-| herramientas | `bricohams-check`, `bricohams-sdr-serials`, copia diaria, kit en `/opt/bricohams/kit` |
+| herramientas | `bricohams-check`, `bricohams-sdr-serials`, `owrx-clone`, copia diaria, kit en `/opt/bricohams/kit` |
+| importar | v4.2: solo con `--importar perfil.owrx.tar.gz`: aplica un perfil de OpenWebRX+ con owrx-clone (manual 31) |
 | tareas | v4: cuenta de servicio «bricohams», sudoers limitado y `/etc/cron.d/bricohams` (manual 25) |
 
 Para repetir pasos sueltos: `sudo bash install.sh --solo hat,meshtastic`.

@@ -19,6 +19,7 @@
 import json
 import math
 import os
+import shlex
 import socket
 import sys
 import tempfile
@@ -437,13 +438,25 @@ def write_atomic(path, obj):
     os.replace(tmp, path)
 
 
+def quitar_comillas(v):
+    """VALOR, "VALOR" o 'VALOR' (v4.2: el instalador escribe comillas simples, como 'a'\\''b')."""
+    v = v.strip()
+    try:
+        partes = shlex.split(v, comments=True)
+        if len(partes) == 1:
+            return partes[0]
+    except ValueError:
+        pass
+    return v.strip('"\'')
+
+
 def cargar_env(path='/etc/bricohams/wx.env'):
     """Para probar a mano (sudo bricohams-wx --una) sin el EnvironmentFile de systemd."""
     try:
         for ln in open(path, encoding='utf-8'):
             k, sep, v = ln.strip().partition('=')
             if sep and k and not k.startswith('#'):
-                os.environ.setdefault(k, v.strip().strip('"'))
+                os.environ.setdefault(k, quitar_comillas(v))
     except OSError:
         pass
 
