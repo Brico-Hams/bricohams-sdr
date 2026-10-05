@@ -822,6 +822,94 @@ def clonar_openwebrx():
     return svg(W, H, b, 'Clonar OpenWebRX+ a otro equipo: owrx-clone (v4.2)')
 
 
+def zona_locator():
+    """Esquema 22: marcadores y meteo de la zona según el locator (v4.3)."""
+    W, H = 1500, 900
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net'], C['rf']])
+    b += caja_s(30, 90, 330, 250, 'bricohams.env', '', C['or'], '#fff3e0', arriba=True)
+    for k, t in enumerate(['STATION_LOCATOR="IM97kx"', 'STATION_LAT / STATION_LON  (si están, mandan)',
+                           'LOCATOR_CATALOG=data/locator/catalogo_es.json', 'LOCATOR_RADIUS_KM=100 · LOCATOR_MAX_SITES=3',
+                           'LOCATOR_ONLINE=aemet,fmdx', 'LOCATOR_RADIOS=regional,local (MAX 30)', 'LOCATOR_METEO=yes · LOCATOR_KIT_ZONA_KM=150']):
+        b += txt(45, 140 + k * 26, t, 10.8)
+    b += caja_s(30, 380, 330, 300, 'Catálogo de España (en el kit)', 'tools/locator_catalogo.py', C['pi'], '#edf7ee', arriba=True)
+    for k, t in enumerate(['aeropuertos: OurAirports (dominio público)', '   frecuencias; 8,33 kHz → frecuencia real',
+                           'estaciones AEMET: 150 indicativos', 'puertos: interés general + deportivos',
+                           '   canales 9 / 12 / 14 / 16', 'NAVTEX 518 y 490 kHz (alcance 550 km)']):
+        b += txt(45, 440 + k * 30, t, 10.8)
+    b += caja_s(30, 710, 330, 110, 'En la Pi, al instalar (caché 30 días)', '', C['net'], '#e0f2f1', arriba=True)
+    b += txt(45, 760, 'AEMET OpenData: todas las estaciones', 10.8) + txt(45, 784, 'maps.fmdx.org (FMLIST): FM de la zona', 10.8)
+    b += arrow(360, 215, 470, 330, C['ink'])
+    b += arrow(360, 530, 470, 410, C['ink'])
+    b += arrow(360, 765, 470, 450, C['net'], dash=True)
+    b += caja_s(470, 230, 470, 330, 'bricohams_locator_bookmarks.py', 'paso «configuracion» · bricohams-locator', C['sdr'], '#eef4fb', arriba=True)
+    for k, t in enumerate(['1  locator → coordenadas (o las exactas del env)', '2  distancia a cada sitio del catálogo',
+                           '3  los 3 más cercanos de cada categoría en 100 km', '   (aeropuerto y AEMET: al menos uno, hasta 250 km)',
+                           '4  FM: regionales y locales que mejor se oyen', '   (potencia / distancia², una por frecuencia)',
+                           '5  canales repetidos juntos: Canal 16 · A / B', '6  etiqueta [AUTO-LOCATOR] y distancia en km',
+                           '7  lejos de Mi QTH: fuera los del kit de Murcia']):
+        b += txt(490, 290 + k * 28, t, 10.8)
+    b += arrow(940, 330, 1060, 200, C['ink']) + txt(950, 245, 'marcadores', 10.5, C['ink'])
+    b += arrow(940, 420, 1060, 470, C['ink']) + txt(948, 425, 'METEO', 10.5, C['ink'])
+    b += arrow(940, 500, 1060, 700, C['ink']) + txt(1000, 570, 'informe', 10.5, C['ink'])
+    b += caja_s(1060, 90, 410, 270, 'OpenWebRX+ · bookmarks.json', '', C['rf'], '#f3e5f5', arriba=True)
+    for k, t in enumerate(['los tuyos: nunca se tocan', 'los del kit: se quedan (en la zona de Murcia)',
+                           '   o se adaptan (lejos: Canal 12 · Cartagena → Canal 12)', '[AUTO-LOCATOR]: se sustituyen en cada pasada',
+                           '   (misma frecuencia que uno tuyo: gana el tuyo)', 'sudo bricohams-locator marcadores --aplicar']):
+        b += txt(1075, 140 + k * 34, t, 10.8)
+    b += caja_s(1060, 400, 410, 170, 'Meteo (bricohams-meteo)', '', C['pi'], '#edf7ee', arriba=True)
+    for k, t in enumerate(['meteo.env: METEO_STATIONS de la zona', 'LOCATOR_METEO="no" conserva la tuya', 'plugin METEO de la web: tiempo real AEMET']):
+        b += txt(1075, 450 + k * 30, t, 10.8)
+    b += caja_s(1060, 610, 410, 210, 'bricohams-locator info', '', C['ink'], '#fafafa', arriba=True)
+    for k, t in enumerate(['QTH IM97kx · 38.08, -1.25 · península', 'aeropuertos, AEMET, puertos, FM y NAVTEX', 'con su distancia',
+                           'refrescar · meteo · coordenadas · locator', 'bricohams-check: «zona … N marcadores»']):
+        b += txt(1075, 660 + k * 28, t, 10.8)
+    b += txt(30, 860, 'Vale para cualquier locator de España: IN, IM, JN, JM (península y Baleares), IL (Canarias), IM75 (Ceuta) e IM85 (Melilla). '
+                      'Fuera de España avisa. Manual 32 · ADR-43.', 11, C['mute'])
+    return svg(W, H, b, 'Zona de la estación por locator: aeropuertos, AEMET, puertos y FM (v4.3)')
+
+
+def openwebrx_docker():
+    """Esquema 23: OpenWebRX+ en Docker (v4.3)."""
+    W, H = 1500, 900
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net']])
+    b += caja_s(30, 90, 360, 300, 'bricohams.env', '', C['or'], '#fff3e0', arriba=True)
+    for k, t in enumerate(['OWRX_BACKEND="docker"', 'OWRX_DOCKER_IMAGE=slechev/openwebrxplus-softmbe', 'OWRX_DOCKER_CONTAINER="owrx-mbe"',
+                           'OWRX_DOCKER_DIR="/opt/owrx-docker"', 'OWRX_DOCKER_RED="host" (o bridge + PORT)', 'OWRX_DOCKER_PRIVILEGED="no"',
+                           'OWRX_DOCKER_DESPLEGAR / _ACTUALIZAR="yes"']):
+        b += txt(45, 140 + k * 32, t, 10.8)
+    b += arrow(390, 240, 480, 240, C['ink']) + txt(435, 228, 'paso', 10, C['ink'], a='middle')
+    b += caja_s(480, 90, 470, 300, 'install.sh → docker_preparar', '', C['sdr'], '#eef4fb', arriba=True)
+    for k, t in enumerate(['1  docker.io + docker compose si faltan', '2  para y desactiva el OpenWebRX+ nativo', '3  usuario openwebrx del sistema (servicios)',
+                           '4  /opt/owrx-docker/{etc,var,plugins}', '5  docker-compose.yaml (bricohams-docker-compose.py)',
+                           '6  docker compose pull · up -d', '7  espera /status.json · comprueba los volúmenes']):
+        b += txt(495, 140 + k * 32, t, 10.8)
+    b += arrow(950, 240, 1040, 240, C['ink'])
+    b += caja_s(1040, 90, 430, 420, 'Contenedor owrx-mbe', 'red host · restart unless-stopped', C['net'], '#e0f2f1', arriba=True)
+    vols = [('./etc', '/etc/openwebrx'), ('./var', '/var/lib/openwebrx'), ('./plugins', '…/htdocs/plugins'), ('/dev/bus/usb', '/dev/bus/usb (c 189:* rmw)')]
+    for k, (a, d) in enumerate(vols):
+        b += txt(1055, 165 + k * 34, a, 11, C['sdr'], True) + txt(1175, 165 + k * 34, '→ ' + d, 10.8)
+    for k, t in enumerate(['OpenWebRX+ corre como root dentro', 'SDRplay y codecs (softmbe) en la imagen', ':8073 en la Pi (red host)',
+                           'MQTT a 127.0.0.1:1883 (visitas)']):
+        b += txt(1055, 330 + k * 30, '• ' + t, 10.8)
+    b += caja_s(30, 440, 920, 250, 'Lo demás de BricoHams sigue en la Pi (sin cambios)', '', C['pi'], '#edf7ee', arriba=True)
+    for k, t in enumerate(['configuracion · plugins · meteo · cámara · visitas · satélites escriben en /opt/owrx-docker/{var,plugins}',
+                           '   (HTDOCS=/opt/owrx-docker, OWRX_DATA=…/var: install.sh las guarda en /etc/bricohams/bricohams.env)',
+                           'se reinicia el contenedor (docker restart) en vez de systemctl restart openwebrx',
+                           'nginx, SSL, ADS-B, Meshtastic, LilyGO, WX: igual que en la instalación nativa',
+                           'no aplican en Docker: FT2 (parche del código) · API de SDRplay en el host · repositorio luarvique',
+                           'copia diaria: /opt/owrx-docker y un perfil owrx-clone --docker · tarea actualizar: compose pull + up']):
+        b += txt(45, 495 + k * 30, '• ' + t, 10.8)
+    b += caja_s(1040, 550, 430, 270, 'owrx-clone 1.1 --docker owrx-mbe', '', C['cr'], '#fdecee', arriba=True)
+    for k, t in enumerate(['volúmenes por docker inspect', 'config → ./var · etc → ./etc · web → ./plugins', 'sin apt (la imagen) ni parches',
+                           'nativo → Docker y Docker → nativo', 'deshacer: docker stop / start', 'sin volumen de /etc o /var: se para']):
+        b += txt(1055, 600 + k * 32, '• ' + t, 10.8)
+    b += caja_s(30, 720, 920, 100, 'Pasar de nativo a Docker (manual 33)', '', C['ink'], '#fafafa', arriba=True)
+    b += txt(45, 770, 'sudo owrx-clone exportar -o p.owrx.tar.gz  →  OWRX_BACKEND="docker"  →  sudo bash install.sh --actualizar', 10.8)
+    b += txt(45, 795, '→  sudo owrx-clone --docker owrx-mbe importar p.owrx.tar.gz', 10.8)
+    b += txt(30, 860, 'Imagen oficial de OpenWebRX+ en Docker Hub: slechev/openwebrxplus (y -softmbe). Manual 33 · ADR-44 y ADR-45.', 11, C['mute'])
+    return svg(W, H, b, 'OpenWebRX+ en Docker desde bricohams.env (v4.3)')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -834,7 +922,8 @@ def main():
                      ('12_cadena_rf', rf_completo), ('13_ventiladores', ventiladores), ('14_sensores_wx', sensores_wx),
                      ('15_alimentacion_v3', alimentacion_v3), ('16_pico_io', pico_io), ('17_filtros_lna', filtros_lna),
                      ('18_red_servicios', red_servicios), ('19_actualizar', actualizar),
-                     ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx)]:
+                     ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx),
+                     ('22_zona_locator', zona_locator), ('23_openwebrx_docker', openwebrx_docker)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

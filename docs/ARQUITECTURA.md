@@ -581,6 +581,89 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **No se deshacen:** los paquetes instalados.
   - **Sistemas:** solo los que tienen repositorio de OpenWebRX+.
 
+## ADR-43 · Zona de la estación por locator con un catálogo nacional en el kit (v4.3)
+- **Decisión:** `STATION_LOCATOR` (o `STATION_LAT/LON`) + `LOCATOR_CATALOG` (por defecto `data/locator/catalogo_es.json`) eligen lo más cercano de cada categoría y lo convierten en marcadores `[AUTO-LOCATOR]` y en `METEO_STATIONS`.
+  - **Categorías:** `airport`, `weather`, `port`, `radio`, `other`.
+  - **Catálogo:** generado por `tools/locator_catalogo.py` desde CSV con fuente (`data/locator/fuentes`).
+  - **Selección:** `files/bin/bricohams_locator_bookmarks.py`, el selector que empezó EA5KAO en su V4.3, conservado y ampliado.
+  - **Paso `configuracion`:** lo usa, y `bricohams-locator` lo deja a mano.
+- **Por qué:**
+  - **Cualquier estación de España**, no solo Mi QTH. Los marcadores y la meteo dependen del sitio; el kit traía los de Murcia.
+  - **Catálogo en el kit, no consultas en vivo:**
+    - la instalación funciona sin Internet y es reproducible;
+    - se prueba (`test_locator_es`: 895 puntos de toda España con aeropuerto, AEMET y, en la costa, canal 16);
+    - cada dato tiene su fuente y su licencia (OurAirports es de dominio público).
+  - **Las coordenadas exactas mandan sobre el centro del locator:** con 6 caracteres el centro puede estar a 4 km, y `STATION_LAT/LON` también alimentan el mapa y el APRS.
+  - **8,33 kHz:** el «canal» no es la frecuencia (121,330 → 121,325 MHz). Se convierte, porque OpenWebRX+ sintoniza la frecuencia.
+  - **Mínimo garantizado:** aeropuerto y AEMET, al menos el más cercano (hasta 2,5 × radio). Así ningún sitio de interior queda sin meteo.
+  - **Una entrada por frecuencia:** los canales 12/14/16 son iguales en todos los puertos; se juntan con los nombres de los puertos.
+  - **Los marcadores de Murcia del kit lejos de Mi QTH** (más de `LOCATOR_KIT_ZONA_KM`):
+    - se quitan los locales: FM y DAB de Murcia, aeropuertos, repetidores EA5;
+    - se dejan genéricos los que solo llevaban el nombre de Murcia, y el genérico cede ante el de la zona;
+    - lo tuyo no se toca: solo se adapta lo que es idéntico a un marcador del kit (nombre, frecuencia y modo).
+- **Implica:**
+  - **Variables nuevas:** `LOCATOR_ONLINE`, `LOCATOR_RADIOS(_MAX)`, `LOCATOR_METEO`, `LOCATOR_KIT_ZONA_KM`.
+  - **En `/etc/bricohams/bricohams.env`:** van las calculadas (`STATION_LAT/LON` si salen del locator, `METEO_STATIONS`, `STATION_QTH_LOCATOR`).
+  - **`meteo.env`:** lleva `METEO_STATIONS` entre comillas (los nombres llevan espacios).
+  - **`--actualizar`:** repite `configuracion` si cambia el catálogo.
+
+## ADR-44 · OpenWebRX+ en Docker desde bricohams.env, con red host y volúmenes en carpetas de la Pi (v4.3)
+- **Decisión:** `OWRX_BACKEND="docker"` (lo introdujo EA5KAO en su V4.3: rutas, `owrx_control`, comprobación de volúmenes). El kit lo completa así:
+  - **Despliegue (`docker_preparar`):**
+    - `docker.io` y `docker-compose` de Debian si faltan;
+    - para el OpenWebRX+ nativo;
+    - crea el usuario de sistema `openwebrx` para los servicios del host;
+    - `docker-compose.yaml` generado (`bricohams-docker-compose.py`): imagen `slechev/openwebrxplus-softmbe`, `network_mode: host`, `./etc` `./var` `./plugins` como bind mounts, `/dev/bus/usb` con `device_cgroup_rules: c 189:* rmw`, `tmpfs /tmp`, `restart: unless-stopped`;
+    - `compose pull` + `up -d`.
+  - **Pasos adaptados:**
+    - `comprobar` sin luarvique;
+    - `sdrplay` y `ft2` se saltan con aviso;
+    - tarea semanal con `compose pull`;
+    - copia diaria con `/opt/owrx-docker`;
+    - `bricohams-check`, `bricohams-servicios` y `bricohams-sdr-serials` entienden el contenedor.
+- **Por qué:**
+  - **Red `host`:** el resto del kit habla con OpenWebRX+ por 127.0.0.1 (nginx, MQTT de visitas, rtl_tcp). En `bridge` 127.0.0.1 sería el propio contenedor. `bridge` queda como opción con `OWRX_DOCKER_PORT`.
+  - **Bind mounts en una carpeta de la Pi, no volúmenes con nombre:** los servicios del host (meteo, cámara, visitas, satélites, ventiladores) escriben en `plugins/`. Además se copian, se inspeccionan y owrx-clone los encuentra.
+  - **Seed:** el `run.sh` de la imagen siembra `/etc/openwebrx` y `/var/lib/openwebrx` vacíos con `cp -n`, así que el bind mount vacío arranca.
+  - **USB sin `--privileged`:** con `/dev/bus/usb` montado y la regla del grupo 189 se ven los SDR enchufados después. `OWRX_DOCKER_PRIVILEGED="yes"` queda para SDRplay o casos raros.
+  - **Formato 2.4:** lo entienden `docker-compose` 1.29 (Bookworm) y `docker compose` 2.x (Trixie); `docker compose config` lo valida en las pruebas.
+  - **Sin contraseñas en el compose:** `OPENWEBRX_ADMIN_PASSWORD` dejaría la clave en un fichero 644. El administrador se crea con `docker exec -it … openwebrx admin adduser`.
+  - **OpenWebRX+ corre como root dentro:** el dueño en la Pi es el usuario `openwebrx` de la Pi (para los servicios), no el del contenedor (`owrx_owner` hace el `chown` en el host).
+- **Implica:**
+  - **FT2 no está disponible en Docker:** parchea el código del paquete.
+  - **La instalación nativa queda desactivada, no borrada:** se pasa con owrx-clone (manual 33).
+  - **`instalar_env`:** guarda en `/etc` `OWRX_DATA/OWRX_ETC/OWRX_HTDOCS` y `OWRX_CLONE_DOCKER`, para `bricohams-tarea` y los scripts.
+
+## ADR-45 · owrx-clone 1.1: el mismo perfil para nativo y Docker (v4.3)
+- **Decisión:**
+  - **`--docker CONTENEDOR` (o `OWRX_CLONE_DOCKER`):** `docker inspect` da las carpetas montadas en `/var/lib/openwebrx`, `/etc/openwebrx` y `htdocs/plugins`, y los niveles leen y escriben ahí.
+  - **Formato:** sin cambios (`FORMATO 1`): rutas lógicas `{DATA}`, `/etc/openwebrx/…` y `{HTDOCS}/plugins/…`.
+  - **En Docker:** sin apt ni parches; `docker stop/start` en vez de systemctl; la copia previa apunta el contenedor para `deshacer`.
+- **Por qué:**
+  - **Pasar de nativo a Docker y al revés** sin perder receptores, usuarios, marcadores ni plugins, y que la copia diaria funcione igual.
+  - **Sin volumen de config o etc, se para:** escribir dentro del contenedor se perdería al recrearlo.
+  - **Directorio de datos:** tiene que ser el del volumen. Si no, el contenedor no vería los datos.
+  - **Fuera de plugins:** lo de `htdocs` que no está en `plugins` no tiene sitio en Docker; se avisa y se salta.
+- **Implica:**
+  - **El instalador pasa `--docker` solo:** en `--exportar`, en el paso `importar` y en la copia diaria.
+  - **Pruebas:** `test_owrx_clone_docker`, con una orden `docker` de mentira.
+
+## ADR-46 · Datos de zona que cambian se bajan en la Pi, con caché, y nunca paran la instalación (v4.3)
+- **Decisión:**
+  - **`bricohams_locator_online.py`:**
+    - baja la lista completa de estaciones AEMET con coordenadas (`/observacion/convencional/todas`, con `AEMET_API_KEY`);
+    - baja las emisoras de FM alrededor del QTH de maps.fmdx.org (datos de FMLIST).
+  - **Caché:** `/var/lib/bricohams/locator`, 30 días. Las FM valen mientras la estación no se mueva más de 25 km.
+  - **Cualquier fallo es un aviso:** se usa la caché o el catálogo del kit.
+- **Por qué:**
+  - **La FM cambia demasiado para un catálogo en el git**, y no hay un listado oficial descargable con coordenadas. fmdx.org es lo que usa FM-DX Webserver con el mismo fin: identificar emisoras desde un QTH.
+  - **AEMET publica la lista con coordenadas exactas** pero pide clave. La clave ya está para la meteo y se pasa por entorno, nunca por la línea de órdenes ni a la caché.
+  - **Clasificación por el nombre** (regional / nacional / local) para cumplir «radios regionales y locales». Las nacionales se añaden con `LOCATOR_RADIOS`. De cada frecuencia, la que mejor se oye: potencia/distancia².
+- **Implica:**
+  - **Si fmdx cambia su formato:** el parser es tolerante. Si falla, no hay FM nuevas y se avisa.
+  - **Verificación:** con la Pi real (aquí no hay salida a esos servicios).
+  - **`LOCATOR_ONLINE="no"`:** desactiva las dos fuentes.
+
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
 2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
@@ -593,6 +676,9 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 9. **FBP-868s**: potencia máxima real de tu unidad (SAW, ~18 dBm).
 10. **Antenas**: ajuste final con NanoVNA (manuales 12–14).
 11. **Temperatura de la caja en verano**: medir con `bricohams-fan --estado` y ajustar la curva.
+12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
+13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
+14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.
 12. **v4:**
     - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
     - **Token y chat de Telegram.**

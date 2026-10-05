@@ -1,5 +1,66 @@
 # Historial
 
+## v4.3 · 05/10/2026
+**OpenWebRX+ en Docker desde `bricohams.env` y zona de la estación por locator para cualquier sitio de España.** Se mantiene todo lo anterior. Parte de la V4.3 que empezó EA5KAO (revisada y adoptada): `OWRX_BACKEND`, `owrx_control`, comprobación de volúmenes, selector por locator, plantilla genérica `N0CALL`, indicativo/QTH/país en `settings.json`, `APRS_IGATE_ENABLE`, `LISTENERS_COUNTRY` y enlace a perfiles remotos en el plugin de oyentes.
+
+**Docker** (manual 33, esquema 23, ADR-44 y ADR-45)
+- **Despliegue desde `bricohams.env`:**
+  - instala Docker si falta;
+  - desactiva el OpenWebRX+ nativo;
+  - crea el usuario `openwebrx` para los servicios del host;
+  - genera `docker-compose.yaml` (imagen `slechev/openwebrxplus-softmbe`, red `host`, volúmenes `./etc` `./var` `./plugins`, USB en caliente sin `--privileged`);
+  - `compose pull` + `up -d`.
+- **Variables:** `OWRX_DOCKER_IMAGE`, `_RED`, `_PORT`, `_PRIVILEGED`, `_DESPLEGAR`, `_ACTUALIZAR`.
+- **Pasos:** `comprobar` sin repositorio de luarvique; `sdrplay` y `ft2` se saltan con aviso.
+- **Mantenimiento:**
+  - la tarea semanal actualiza la imagen;
+  - la copia diaria incluye `/opt/owrx-docker`;
+  - `bricohams-check`, `bricohams-servicios` y `bricohams-sdr-serials` entienden el contenedor.
+- **owrx-clone 1.1 `--docker CONTENEDOR`:** exporta e importa en los volúmenes del contenedor (sin apt ni parches), pasa de nativo a Docker y al revés, `deshacer` con `docker stop/start`, y `ayuda docker`. El instalador lo usa solo en `--exportar`, `importar` y la copia diaria.
+- **Rutas en `/etc`:** `instalar_env` añade a `/etc/bricohams/bricohams.env` las calculadas (`OWRX_DATA`, `OWRX_HTDOCS`, `OWRX_CLONE_DOCKER`). En Docker, `owrx_owner` cambia el dueño en la Pi.
+
+**Zona por locator** (manual 32, esquema 22, ADR-43 y ADR-46)
+- **Catálogo de España en el kit** (`data/locator`, `tools/locator_catalogo.py`):
+  - 232 frecuencias de 96 aeropuertos (OurAirports, 8,33 kHz convertidos);
+  - 150 estaciones AEMET (indicativos validados);
+  - 48 puertos con canales 9/12/14/16;
+  - NAVTEX 518/490 kHz.
+- **Selección:** por categoría con mínimo garantizado de aeropuerto y AEMET. Los canales repetidos se juntan. Etiqueta `[AUTO-LOCATOR]` con distancia.
+- **Las coordenadas exactas mandan sobre el locator:** sin locator, se calcula de las coordenadas; si no cuadran o se sale de España, avisa.
+- **En la Pi, al instalar** (`LOCATOR_ONLINE`, caché de 30 días, nunca para la instalación): lista completa de AEMET y emisoras de FM regionales y locales de maps.fmdx.org.
+- **`METEO_STATIONS`:** sale de la zona (`LOCATOR_METEO`).
+- **Lejos de Mi QTH:** se quitan los marcadores del kit propios de Murcia y los canales con nombre de Cartagena vuelven al genérico. Los tuyos no se tocan.
+- **`bricohams-locator`:** `info`, `refrescar`, `marcadores [--aplicar]`, `meteo`, `coordenadas`, `locator`. `bricohams-check` muestra la zona.
+
+**Arreglos sobre la V4.3 de partida**
+- **El locator ya no pisa coordenadas exactas** (instalador y `settings.json`).
+- **`METEO_STATIONS` de la zona llegaba solo al instalador:** ahora va también a `/etc` y a `meteo.env`, entre comillas.
+- **Docker:** `owrx_owner` hacía `chown openwebrx` *dentro* del contenedor, donde OpenWebRX+ corre como root y ese usuario puede no existir. Ahora se cambia el dueño en la Pi, que es quien lo necesita.
+- **`LOCATOR_CATALOG` sin locator:** paraba la instalación; ahora avisa. El resumen de la herramienta ya no se mezcla con el JSON por la salida estándar.
+
+**Revisión independiente** (antes de entregar). Corregido:
+- **Coordenadas a 0 en `/etc`:** las coordenadas sacadas del locator se perdían de `/etc/bricohams/bricohams.env` al pasar por `meteo`; el iGate y los LilyGO habrían quedado en 0,0.
+- **Volver a nativo:** el contenedor seguía en marcha y se quedaba el 8073 y los SDR. Ahora se para y pierde el arranque automático.
+- **`--actualizar` tras cambiar el backend:** no repetía meteo, cámara, visitas, satélites…; ahora su huella incluye `OWRX_BACKEND` y `OWRX_DOCKER_DIR`.
+- **Contenedor propio sin el usuario `openwebrx` en la Pi:** `OWRX_DOCKER_DESPLEGAR="no"` paraba la instalación.
+- **`--backup` con una copia de una estación Docker:** no restauraba usuarios ni marcadores.
+- **`bricohams-locator` sin sudo:** no podía leer el `.env`. Ahora usa `/etc/bricohams/zona.env` (644, sin claves).
+- **Entradas raras de fmdx o una caché rota:** ya no tumban la selección.
+- **owrx-clone:** no usa un volumen montado desde una carpeta del sistema (`/etc`, `/var`…).
+
+**Pruebas nuevas:**
+- `test_locator_es`:
+  - 895 puntos de España;
+  - locator ida y vuelta;
+  - datos en línea con respuestas de prueba;
+  - kit lejos de Mi QTH;
+  - `bricohams-locator`;
+  - zona del instalador;
+  - paso `configuracion` de punta a punta en Docker.
+- `test_owrx_clone_docker`.
+- `test_instalador_docker` ampliado: despliegue, `docker compose config`, pasos saltados y `.env` de `/etc`.
+- `locator_catalogo.py --comprobar`.
+
 ## v4.2 · 05/10/2026
 **Arreglos de la instalación real en la Pi de EA5KAO, plugins de audio, SSL solo en la administración y owrx-clone.** Se mantiene todo lo anterior.
 

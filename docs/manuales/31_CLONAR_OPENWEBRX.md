@@ -112,6 +112,28 @@ sudo owrx-clone deshacer /var/backups/owrx-clone/copia-20261005-120000.tar.gz   
 
 Para volver a la configuración de BricoHams: `OWRX_PLANTILLA="yes"` en `bricohams.env` y `sudo bash install.sh --solo configuracion,plugins`.
 
+## 6 bis. OpenWebRX+ en Docker (owrx-clone 1.1, v4.3)
+Pon `--docker CONTENEDOR` delante de la orden (o `OWRX_CLONE_DOCKER`). En el kit lo hace solo el instalador cuando `OWRX_BACKEND="docker"`: `--exportar`, paso `importar` y copia diaria (manual 33).
+
+```bash
+sudo owrx-clone --docker owrx-mbe exportar -o desde-docker.owrx.tar.gz
+sudo owrx-clone --docker owrx-mbe importar perfil.owrx.tar.gz --simular
+sudo owrx-clone --docker owrx-mbe comprobar
+```
+| Nivel | En Docker |
+|---|---|
+| `config` | en la carpeta del equipo montada en `/var/lib/openwebrx` (la localiza `docker inspect`) |
+| `etc` | en la montada en `/etc/openwebrx` |
+| `web` | solo `htdocs/plugins` (la montada); lo demás de `htdocs` se salta con aviso |
+| `paquetes` | no se instala nada: OpenWebRX+ va en la imagen, que queda apuntada en el perfil |
+| `parches` | no se aplican (el código va en la imagen) |
+| `sistema` | igual que en nativo: udev y modprobe son del equipo |
+
+- **Sin volumen para `/etc/openwebrx` o `/var/lib/openwebrx`:** se para, porque se perdería al recrear el contenedor.
+- **Directorio de datos:** tiene que ser `/var/lib/openwebrx` (el volumen).
+- **Servicio:** se para y arranca el contenedor. `deshacer` sabe que fue en un contenedor.
+- **Nativo ⇄ Docker:** los perfiles valen en los dos sentidos.
+
 ## 7. Formato del perfil
 Un `tar.gz`, o ese mismo `tar.gz` cifrado con `openssl enc -aes-256-cbc -pbkdf2 -iter 200000` (empieza por `Salted__`). Dentro:
 
@@ -124,7 +146,7 @@ Un `tar.gz`, o ese mismo `tar.gz` cifrado con `openssl enc -aes-256-cbc -pbkdf2 
 ## 8. Ayuda
 ```bash
 owrx-clone --help
-owrx-clone ayuda niveles | seguridad | dispositivos | migrar | problemas
+owrx-clone ayuda niveles | seguridad | dispositivos | migrar | docker | problemas
 man owrx-clone
 ```
 Las órdenes también existen en inglés (`export`, `show`, `import`, `undo`, `check`, `help`).
@@ -140,4 +162,4 @@ Las órdenes también existen en inglés (`export`, `show`, `import`, `undo`, `c
 | OpenWebRX+ no responde | `journalctl -u openwebrx -n 50` y `sudo owrx-clone comprobar` |
 | Un SDR no aparece | desenchufa y enchufa (o reinicia): reglas udev y lista negra de `dvb_usb_rtl28xxu` |
 
-Decisión de diseño: ADR-42 en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_owrx_clone.py` (exporta e importa estaciones simuladas, incluidos perfiles manipulados y maliciosos) y `tests/test_instalador_perfil.py`.
+Decisión de diseño: ADR-42 y ADR-45 (Docker) en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_owrx_clone.py` (exporta e importa estaciones simuladas, incluidos perfiles manipulados y maliciosos), `tests/test_owrx_clone_docker.py` y `tests/test_instalador_perfil.py`.

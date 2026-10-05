@@ -69,7 +69,8 @@ IMPORTAR=""; EXPORTAR=""; EXPORTAR_A=""      # v4.2 · perfiles de OpenWebRX+ (o
 PERFIL_IMPORTADO=/etc/bricohams/perfil-importado
 ESTADO_KIT=/var/lib/bricohams/kit-estado      # huella de cada paso aplicado (v4.1)
 KIT_ANTES="${BRICOHAMS_KIT_ANTES:-}"; KIT_DESPUES=""; PLAN=()
-LOCATOR_CATALOG_PATH=""
+LOCATOR_CATALOG_PATH=""; STATION_QTH_LOCATOR=""; LOCATOR_DERIVADAS=()
+LOCATOR_CACHE=/var/lib/bricohams/locator    # v4.3 · AEMET y FM de la zona bajados en la Pi
 
 c_ok=$'\e[32m'; c_ko=$'\e[31m'; c_av=$'\e[33m'; c_b=$'\e[1m'; c_0=$'\e[0m'
 info()  { printf '%s==>%s %s\n' "$c_b" "$c_0" "$*"; }
@@ -116,9 +117,70 @@ arreglar_kit() {
 arreglar_kit
 # v4.2 · exportar no necesita bricohams.env: vale en cualquier OpenWebRX+ (owrx-clone)
 if [ -n "$EXPORTAR" ]; then
-    exec python3 "$KIT/owrx-clone/owrx-clone" exportar ${EXPORTAR_A:+-o "$EXPORTAR_A"}
+    # v4.3 · si bricohams.env dice OWRX_BACKEND="docker", se exporta el contenedor
+    EXP_DOCKER=""
+    if [ -r "$KIT/bricohams.env" ]; then
+        eval "$(python3 "$FILES/bin/bricohams-env.py" --shell "$KIT/bricohams.env" 2>/dev/null | grep -E '^export (OWRX_BACKEND|OWRX_DOCKER_CONTAINER)=' || true)"
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then EXP_DOCKER=${OWRX_DOCKER_CONTAINER:-owrx-mbe}; fi
+    fi
+    exec python3 "$KIT/owrx-clone/owrx-clone" ${EXP_DOCKER:+--docker "$EXP_DOCKER"} exportar ${EXPORTAR_A:+-o "$EXPORTAR_A"}
 fi
 [ -r "$KIT/bricohams.env" ] || fallo "Falta $KIT/bricohams.env: cp bricohams.env.example bricohams.env y rellena las claves (docs/manuales/02_INSTALACION.md)"
+# v4.3 · Zona de la estación según el locator (manual 32, ADR-43). STATION_LOCATOR da las
+# coordenadas si STATION_LAT/LON están vacías o a 0 (si las pones, mandan: son más precisas).
+# Con LOCATOR_CATALOG (por defecto el catálogo de España del kit) se eligen los aeropuertos,
+# estaciones AEMET, puertos, NAVTEX y emisoras de FM más cercanos.
+coords_ok() { awk -v a="${STATION_LAT:-0}" -v b="${STATION_LON:-0}" 'BEGIN { exit !((a + 0) != 0 || (b + 0) != 0) }'; }
+zona_locator() {
+    local c
+    # si una pasada anterior sacó las coordenadas del locator, siguen siendo «del locator»
+    # (paso_meteo lo vuelve a llamar sin releer bricohams.env)
+    if [ "${COORDS_DEL_LOCATOR:-0}" = 1 ]; then STATION_LAT=0; STATION_LON=0; fi
+    COORDS_DEL_LOCATOR=0
+    STATION_QTH_LOCATOR=""; LOCATOR_CATALOG_PATH=""; LOCATOR_DERIVADAS=()
+    if [ -n "${STATION_LOCATOR:-}" ]; then
+        c=$(python3 "$FILES/bin/bricohams_locator.py" "$STATION_LOCATOR") || fallo "STATION_LOCATOR=$STATION_LOCATOR no es un locator Maidenhead válido (4, 6, 8 o 10 caracteres, p. ej. IM97kx)"
+        if ! coords_ok; then
+            read -r STATION_LAT STATION_LON <<<"$c"; export STATION_LAT STATION_LON
+            LOCATOR_DERIVADAS+=(STATION_LAT STATION_LON); COORDS_DEL_LOCATOR=1
+        elif [ -z "${_ZONA_AVISADA:-}" ] && ! python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); from bricohams_locator import dentro_de_celda as d; sys.exit(0 if d(sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), 5) else 1)' \
+                "$FILES/bin" "$STATION_LOCATOR" "$STATION_LAT" "$STATION_LON"; then
+            aviso "STATION_LAT/LON ($STATION_LAT, $STATION_LON) no caen en STATION_LOCATOR=$STATION_LOCATOR: uso las coordenadas (revisa cuál está mal)"
+        fi
+        STATION_QTH_LOCATOR=${STATION_LOCATOR^^}
+    elif coords_ok; then
+        STATION_QTH_LOCATOR=$(python3 "$FILES/bin/bricohams_locator.py" --a-locator "$STATION_LAT" "$STATION_LON") || STATION_QTH_LOCATOR=""
+    fi
+    if [ -n "$STATION_QTH_LOCATOR" ] && [ -z "${_ZONA_AVISADA:-}" ]; then
+        python3 "$FILES/bin/bricohams_locator.py" --espana "$STATION_QTH_LOCATOR" >/dev/null \
+            || aviso "El locator $STATION_QTH_LOCATOR cae fuera de España: el catálogo de zona del kit es de España (manual 32)"
+    fi
+    if [ -n "${LOCATOR_CATALOG:-}" ]; then
+        if [ -z "$STATION_QTH_LOCATOR" ]; then
+            [ -n "${_ZONA_AVISADA:-}" ] || aviso "LOCATOR_CATALOG necesita STATION_LOCATOR (o STATION_LAT/LON): sin marcadores de zona"
+        else
+            if [[ "$LOCATOR_CATALOG" = /* ]]; then LOCATOR_CATALOG_PATH=$LOCATOR_CATALOG
+            else LOCATOR_CATALOG_PATH=$KIT/$LOCATOR_CATALOG; fi
+            [ -r "$LOCATOR_CATALOG_PATH" ] || fallo "No puedo leer LOCATOR_CATALOG=$LOCATOR_CATALOG_PATH"
+            if [[ ! "${LOCATOR_METEO:-yes}" =~ ^([Nn][Oo]?|0|false)$ ]]; then    # (si() aún no existe aquí)
+                local estaciones
+                estaciones=$(zona_selector --meteo-stations) || fallo "No pude seleccionar servicios cercanos desde LOCATOR_CATALOG"
+                if [ -n "$estaciones" ]; then METEO_STATIONS=$estaciones; export METEO_STATIONS; LOCATOR_DERIVADAS+=(METEO_STATIONS); fi
+            fi
+        fi
+    fi
+    export STATION_QTH_LOCATOR
+    _ZONA_AVISADA=1
+}
+# zona_selector ARGS… : el selector de bricohams_locator_bookmarks.py con los ajustes de bricohams.env
+zona_selector() {
+    local a=(--locator "$STATION_QTH_LOCATOR" --catalog "$LOCATOR_CATALOG_PATH"
+             --radius-km "${LOCATOR_RADIUS_KM:-100}" --max-sites "${LOCATOR_MAX_SITES:-3}"
+             --radios-max "${LOCATOR_RADIOS_MAX:-30}" --radios "${LOCATOR_RADIOS:-regional,local}")
+    if coords_ok; then a+=(--lat "$STATION_LAT" --lon "$STATION_LON"); fi
+    if [ -d "$LOCATOR_CACHE" ]; then a+=(--online-cache "$LOCATOR_CACHE"); fi
+    python3 "$FILES/bin/bricohams_locator_bookmarks.py" "${a[@]}" "$@"
+}
 # v4.2 · bricohams.env se LEE, no se ejecuta: un «$» dentro de una clave
 # (QRZ_PASS="abc$Clave2026") paraba el instalador con «unbound variable».
 # bricohams-env.py entiende comillas dobles, simples y comentarios, y toma el «$» literal.
@@ -127,25 +189,8 @@ cargar_env() {
     command -v python3 >/dev/null || fallo "Falta python3 (viene con Raspberry Pi OS): sudo apt install python3"
     salida=$(python3 "$FILES/bin/bricohams-env.py" --shell "$1") || fallo "$1 tiene un error de sintaxis (arriba). Revisa las comillas de esa línea."
     eval "$salida"
-    if [ -n "${STATION_LOCATOR:-}" ]; then
-        local coordenadas
-        coordenadas=$(python3 "$FILES/bin/bricohams_locator.py" "$STATION_LOCATOR") || fallo "STATION_LOCATOR no es un locator Maidenhead válido"
-        read -r STATION_LAT STATION_LON <<<"$coordenadas"
-        export STATION_LAT STATION_LON
-    fi
-    LOCATOR_CATALOG_PATH=""
-    if [ -n "${LOCATOR_CATALOG:-}" ]; then
-        [ -n "${STATION_LOCATOR:-}" ] || fallo "LOCATOR_CATALOG requiere STATION_LOCATOR"
-        if [[ "$LOCATOR_CATALOG" = /* ]]; then LOCATOR_CATALOG_PATH=$LOCATOR_CATALOG
-        else LOCATOR_CATALOG_PATH=$KIT/$LOCATOR_CATALOG; fi
-        [ -r "$LOCATOR_CATALOG_PATH" ] || fallo "No puedo leer LOCATOR_CATALOG=$LOCATOR_CATALOG_PATH"
-        local estaciones
-        estaciones=$(python3 "$FILES/bin/bricohams_locator_bookmarks.py" --locator "$STATION_LOCATOR" \
-            --catalog "$LOCATOR_CATALOG_PATH" --radius-km "${LOCATOR_RADIUS_KM:-100}" \
-            --max-sites "${LOCATOR_MAX_SITES:-3}" --meteo-stations) \
-            || fallo "No pude seleccionar servicios cercanos desde LOCATOR_CATALOG"
-        if [ -n "$estaciones" ]; then METEO_STATIONS=$estaciones; export METEO_STATIONS; fi
-    fi
+    COORDS_DEL_LOCATOR=0                     # recién leído: las coordenadas son las del fichero
+    zona_locator
     case "${OWRX_BACKEND:-native}" in
         native) HTDOCS=/usr/lib/python3/dist-packages/htdocs; OWRX_DATA=/var/lib/openwebrx; OWRX_ETC=/etc/openwebrx ;;
         docker)
@@ -165,13 +210,69 @@ owrx_control() {
         systemctl "$action" openwebrx
     fi
 }
+# v4.3 · en Docker el paquete no crea el usuario «openwebrx» en la Pi: lo necesitan los servicios del host
+usuario_openwebrx() {
+    getent passwd openwebrx >/dev/null || useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin openwebrx
+}
 owrx_owner() {
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
-        docker exec "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" chown -R openwebrx:openwebrx \
-            /var/lib/openwebrx /etc/openwebrx /usr/lib/python3/dist-packages/htdocs/plugins
+        usuario_openwebrx
+        # v4.3 · OpenWebRX+ corre como root DENTRO del contenedor (lee todo); en la Pi las carpetas son
+        # del usuario «openwebrx» del sistema para que los servicios del host (meteo, cámara, visitas…)
+        # escriban en plugins/ igual que en la instalación nativa.
+        chown -R openwebrx:openwebrx "$OWRX_DATA" "$HTDOCS/plugins"
     else
         chown -R openwebrx:openwebrx "$OWRX_DATA"
     fi
+}
+# v4.3 · Docker: «docker compose» (plugin) o «docker-compose» (Bookworm)
+docker_compose() {
+    if docker compose version >/dev/null 2>&1; then docker compose "$@"
+    elif command -v docker-compose >/dev/null; then docker-compose "$@"
+    else fallo "Falta docker compose (sudo apt install docker-compose)"; fi
+}
+esperar_owrx() {   # esperar_owrx SEGUNDOS: hasta que /status.json responda en el 8073 (o el puerto publicado)
+    local fin=$((SECONDS + ${1:-60})) p=8073
+    [ "${OWRX_DOCKER_RED:-host}" = bridge ] && p=${OWRX_DOCKER_PORT:-8073}
+    while [ "$SECONDS" -lt "$fin" ]; do
+        curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:$p/status.json" && return 0
+        sleep 3
+    done
+    return 1
+}
+# v4.3 · despliega (o actualiza) el contenedor de OpenWebRX+ con el docker-compose.yaml del kit
+docker_preparar() {
+    local dir=$OWRX_DOCKER_DIR c=${OWRX_DOCKER_CONTAINER:-owrx-mbe} yml
+    if ! command -v docker >/dev/null; then
+        info "Instalo Docker (paquete docker.io de Debian)"
+        apt_update
+        apt_i docker.io || fallo "No pude instalar docker.io"
+    fi
+    if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null; then
+        apt_i docker-compose || fallo "No pude instalar docker-compose"
+    fi
+    systemctl enable --now docker >/dev/null 2>&1 || true
+    # el paquete nativo y el contenedor no pueden convivir: los dos quieren el puerto 8073 y los SDR
+    if systemctl is-enabled --quiet openwebrx 2>/dev/null || systemctl is-active --quiet openwebrx 2>/dev/null; then
+        aviso "Paro y desactivo el OpenWebRX+ nativo: el de Docker usa el 8073 y los SDR. Sus datos siguen en /var/lib/openwebrx (pásalos con owrx-clone, manual 33)"
+        systemctl disable --now openwebrx || true
+    fi
+    usuario_openwebrx
+    install -d -m 755 "$dir" "$dir/etc" "$dir/var" "$dir/plugins" "$dir/plugins/receiver" "$dir/plugins/map"
+    if docker inspect "$c" >/dev/null 2>&1 && [ ! -f "$dir/docker-compose.yaml" ]; then
+        aviso "El contenedor '$c' ya existía (no lo creó BricoHams): lo uso tal cual, sin docker-compose.yaml del kit"
+        [ "$(docker inspect --format '{{.State.Running}}' "$c")" = true ] || docker start "$c" >/dev/null
+        return 0
+    fi
+    yml=$(mktemp)
+    OWRX_DOCKER_DIR=$dir python3 "$FILES/bin/bricohams-docker-compose.py" >"$yml" || { rm -f "$yml"; fallo "Revisa OWRX_DOCKER_* en bricohams.env (arriba)"; }
+    install -m 644 "$yml" "$dir/docker-compose.yaml"; rm -f "$yml"
+    if si "${OWRX_DOCKER_ACTUALIZAR:-yes}"; then
+        (cd "$dir" && docker_compose pull) || aviso "No pude bajar la imagen ${OWRX_DOCKER_IMAGE:-slechev/openwebrxplus-softmbe:latest}: uso la que haya"
+    fi
+    (cd "$dir" && docker_compose up -d --remove-orphans) || fallo "docker compose up ha fallado en $dir (docker logs $c)"
+    if esperar_owrx 180; then bien "contenedor $c en marcha ($(docker inspect --format '{{.Config.Image}}' "$c"))"
+    else aviso "OpenWebRX+ (Docker) aún no responde: docker logs $c"; fi
 }
 owrx_admin_adduser() {
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
@@ -188,7 +289,19 @@ owrx_docker_mount() {
 instalar_env() {   # el temporal también es 600: lleva todas las claves
     local tmp; tmp=$(umask 077; mktemp "$1.XXXXXX")
     python3 "$FILES/bin/bricohams-env.py" --normalizar "$KIT/bricohams.env" >"$tmp" || { rm -f "$tmp"; fallo "bricohams.env tiene un error (arriba)"; }
+    {   # v4.3 · lo que calcula el instalador (vale lo último: bash, systemd y bricohams-env.py)
+        local v
+        echo "# --- calculadas por install.sh (locator y backend de OpenWebRX+): no las edites aquí"
+        for v in "${LOCATOR_DERIVADAS[@]}"; do envl "$v" "${!v}"; done
+        if [ -n "${STATION_QTH_LOCATOR:-}" ]; then envl STATION_QTH_LOCATOR "$STATION_QTH_LOCATOR"; fi
+        envl OWRX_DATA "$OWRX_DATA"; envl OWRX_ETC "$OWRX_ETC"; envl OWRX_HTDOCS "$HTDOCS"
+        if [ "${OWRX_BACKEND:-native}" = docker ]; then envl OWRX_CLONE_DOCKER "${OWRX_DOCKER_CONTAINER:-owrx-mbe}"; fi
+    } >>"$tmp"
     chmod 600 "$tmp"; mv -f "$tmp" "$1"
+    # v4.3 · lo que no es secreto, legible sin sudo (bricohams-locator): zona y backend
+    grep -E '^(STATION_[A-Z_]*|LOCATOR_[A-Z_]*|METEO_STATIONS|OWRX_BACKEND|OWRX_DOCKER_[A-Z_]*|OWRX_DATA|OWRX_ETC|OWRX_HTDOCS|OWRX_CLONE_DOCKER)=' "$1" \
+        >"$(dirname "$1")/zona.env" || true
+    chmod 644 "$(dirname "$1")/zona.env"
 }
 # NOMBRE='valor' para los .env derivados (systemd EnvironmentFile y bash los leen igual)
 sq() { local s=${1//\'/\'\\\'\'}; printf "'%s'" "$s"; }
@@ -336,7 +449,10 @@ vars_paso() {
     todas=$(grep -oE '^[[:space:]]*(export[[:space:]]+)?[A-Z][A-Z0-9_]*=' "$KIT/bricohams.env" | grep -oE '[A-Z][A-Z0-9_]*' | sort -u || true)
     [ -n "$todas" ] || return 0
     if [ "$1" = configuracion ]; then echo "$todas"; return 0; fi
-    { declare -f "paso_$1" | grep -oE '\$\{?[A-Z][A-Z0-9_]*' | tr -d '${' | sort -u | grep -Fx -f <(echo "$todas") || true; }
+    # v4.3 · los pasos que escriben en las carpetas de OpenWebRX+ dependen también del backend (nativo/Docker)
+    { { declare -f "paso_$1" | grep -oE '\$\{?[A-Z][A-Z0-9_]*' | tr -d '${'
+        if declare -f "paso_$1" | grep -qE 'HTDOCS|OWRX_DATA|OWRX_ETC|owrx_'; then printf '%s\n' OWRX_BACKEND OWRX_DOCKER_DIR; fi
+      } | sort -u | grep -Fx -f <(echo "$todas") || true; }
 }
 
 # Huella de un paso: «código ficheros variables» (16 hex cada una).
@@ -505,9 +621,13 @@ paso_comprobar() {
         *) fallo "Este sistema es '$PRETTY_NAME'. El kit funciona en Raspberry Pi OS Lite 64-bit Trixie (Debian 13) o Bookworm (Debian 12)." ;;
     esac
     grep -q 'Raspberry Pi 5' /proc/device-tree/model 2>/dev/null && bien "Raspberry Pi 5" || aviso "No parece una Raspberry Pi 5: los ajustes de arranque son para la Pi 5"
-    curl -fsS --max-time 15 -o /dev/null "https://luarvique.github.io/ppa/$DEB/Release" \
-        || fallo "Sin Internet o sin repositorio de OpenWebRX+ para $DEB (https://luarvique.github.io/ppa/$DEB/)"
-    bien "$PRETTY_NAME arm64 con Internet y repositorio de OpenWebRX+ para $DEB"
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then      # v4.3 · OpenWebRX+ viene en la imagen: no hace falta su repositorio
+        bien "$PRETTY_NAME arm64 · OpenWebRX+ en Docker (${OWRX_DOCKER_IMAGE:-slechev/openwebrxplus-softmbe:latest})"
+    else
+        curl -fsS --max-time 15 -o /dev/null "https://luarvique.github.io/ppa/$DEB/Release" \
+            || fallo "Sin Internet o sin repositorio de OpenWebRX+ para $DEB (https://luarvique.github.io/ppa/$DEB/)"
+        bien "$PRETTY_NAME arm64 con Internet y repositorio de OpenWebRX+ para $DEB"
+    fi
     for f in "$FILES/openwebrx/settings.json.tmpl" "$FILES/htdocs/plugins/receiver/init.js" "$FILES/branding/receiver_top_photo.png"; do
         [ -e "$f" ] || fallo "Kit incompleto: falta $f"
     done
@@ -673,8 +793,12 @@ paso_rtlsdr() {
 }
 
 paso_openwebrx() {
+    # huella de --actualizar: lo que usa docker_preparar (ficheros y variables)
+    : "$FILES/bin/bricohams-docker-compose.py" "${OWRX_DOCKER_IMAGE:-}${OWRX_DOCKER_RED:-}${OWRX_DOCKER_PORT:-}${OWRX_DOCKER_PRIVILEGED:-}${OWRX_DOCKER_DIR:-}${OWRX_DOCKER_CONTAINER:-}"
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
         local container=${OWRX_DOCKER_CONTAINER:-owrx-mbe} mounts target source expected
+        usuario_openwebrx
+        if si "${OWRX_DOCKER_DESPLEGAR:-yes}"; then docker_preparar; fi
         command -v docker >/dev/null || fallo "OWRX_BACKEND=docker requiere Docker CLI"
         docker inspect "$container" >/dev/null 2>&1 || fallo "No existe el contenedor '$container'; ajusta OWRX_DOCKER_CONTAINER"
         [ "$(docker inspect --format '{{.State.Running}}' "$container")" = true ] || fallo "El contenedor '$container' debe estar en ejecución"
@@ -695,6 +819,12 @@ paso_openwebrx() {
         bien "OpenWebRX+ Docker '$container' activo y con volúmenes persistentes"
         return 0
     fi
+    # v4.3 · vuelta a nativo: el contenedor (red host, restart unless-stopped) ocuparía el 8073 y los SDR
+    if command -v docker >/dev/null && docker inspect "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" >/dev/null 2>&1; then
+        aviso "OWRX_BACKEND=native: paro el contenedor ${OWRX_DOCKER_CONTAINER:-owrx-mbe} y le quito el arranque automático (sus datos siguen en ${OWRX_DOCKER_DIR:-/opt/owrx-docker})"
+        docker update --restart=no "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" >/dev/null 2>&1 || true
+        docker stop "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" >/dev/null 2>&1 || true
+    fi
     clave_apt https://luarvique.github.io/ppa/openwebrx-plus.gpg /etc/apt/trusted.gpg.d/openwebrx-plus.gpg
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/openwebrx-plus.gpg] https://luarvique.github.io/ppa/$DEB ./" >/etc/apt/sources.list.d/openwebrx-plus.list
     apt_update
@@ -706,6 +836,10 @@ paso_openwebrx() {
 
 paso_sdrplay() {
     if ! si "$INSTALL_SDRPLAY_API"; then aviso "API de SDRplay omitida (INSTALL_SDRPLAY_API)"; return; fi
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+        aviso "OpenWebRX+ en Docker: la API de SDRplay va dentro de la imagen. Si el RSP no aparece: OWRX_DOCKER_PRIVILEGED=\"yes\" y sudo bash install.sh --solo openwebrx"
+        return 0
+    fi
     if [ -e /usr/local/lib/libsdrplay_api.so ] || ls /usr/local/lib/libsdrplay_api.so.* >/dev/null 2>&1; then
         bien "API de SDRplay ya instalada"
     else
@@ -727,6 +861,7 @@ paso_sdrplay() {
 paso_configuracion() {
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
         :   # el contenedor sigue activo mientras se actualizan sus volúmenes bind
+        usuario_openwebrx
         mkdir -p "$OWRX_DATA" "$OWRX_ETC" "$HTDOCS/plugins"
     else
         systemctl stop openwebrx 2>/dev/null || true
@@ -762,16 +897,24 @@ paso_configuracion() {
     else
         install -m 644 "$FILES/openwebrx/bookmarks.json" "$OWRX_DATA/bookmarks.json"
     fi
+    : "$KIT/data/locator/catalogo_es.json" "$FILES/bin/bricohams_locator_bookmarks.py" "$FILES/bin/bricohams_locator.py"   # huella de --actualizar
     if [ -n "$LOCATOR_CATALOG_PATH" ]; then
+        # v4.3 · marcadores de la zona del locator (aeropuertos, puertos, NAVTEX, FM regionales y locales)
         local bm_locator
+        install -d -m 755 "$LOCATOR_CACHE"
+        if [[ ! "${LOCATOR_ONLINE-aemet,fmdx}" =~ ^([Nn][Oo]?|0|[Ff]alse)?$ ]]; then
+            AEMET_API_KEY="${AEMET_API_KEY:-}" timeout 150 python3 "$FILES/bin/bricohams_locator_online.py" refrescar \
+                --cache "$LOCATOR_CACHE" --lat "$STATION_LAT" --lon "$STATION_LON" --fuentes "${LOCATOR_ONLINE-aemet,fmdx}" \
+                || aviso "Sin datos de zona en línea (AEMET/FM): sigo con el catálogo del kit"
+        fi
         bm_locator=$(mktemp --suffix=.json)
-        python3 "$FILES/bin/bricohams_locator_bookmarks.py" --locator "$STATION_LOCATOR" \
-            --catalog "$LOCATOR_CATALOG_PATH" --radius-km "${LOCATOR_RADIUS_KM:-100}" \
-            --max-sites "${LOCATOR_MAX_SITES:-3}" --merge-existing "$OWRX_DATA/bookmarks.json" \
-            --output "$bm_locator" || { rm -f "$bm_locator"; fallo "No pude generar bookmarks cercanos al locator"; }
+        zona_selector --merge-existing "$OWRX_DATA/bookmarks.json" --kit "$FILES/openwebrx/bookmarks.json" \
+            --kit-zona-km "${LOCATOR_KIT_ZONA_KM:-150}" --output "$bm_locator" \
+            || { rm -f "$bm_locator"; fallo "No pude generar bookmarks cercanos al locator"; }
         install -m 664 "$bm_locator" "$OWRX_DATA/bookmarks.json"
         rm -f "$bm_locator"
-        bien "bookmarks locales actualizados para $STATION_LOCATOR"
+        zona_selector --informe | sed 's/^/    /' || true
+        bien "marcadores de la zona $STATION_QTH_LOCATOR (aeropuertos, puertos, NAVTEX y FM)"
     fi
     install -D -m 644 "$FILES/openwebrx/bookmarks.json" "$bm_kit"
     install -m 664 "$FILES/branding/receiver_avatar.png" "$OWRX_DATA/receiver_avatar.png"
@@ -783,6 +926,10 @@ paso_configuracion() {
         [ -r "$BACKUP" ] || fallo "No puedo leer la copia $BACKUP"
         local tmp; tmp=$(mktemp -d)
         tar -xzf "$BACKUP" -C "$tmp" var/lib/openwebrx/users.json var/lib/openwebrx/bookmarks.json 2>/dev/null || true
+        # v4.3 · copia de una estación en Docker: los datos van en OWRX_DOCKER_DIR/var
+        local dvar=${OWRX_DOCKER_DIR:-/opt/owrx-docker}; dvar=${dvar#/}/var
+        if [ ! -s "$tmp/var/lib/openwebrx/users.json" ] && tar -xzf "$BACKUP" -C "$tmp" "$dvar/users.json" "$dvar/bookmarks.json" 2>/dev/null; then :; fi
+        if [ -s "$tmp/$dvar/users.json" ]; then install -d "$tmp/var/lib/openwebrx"; mv -f "$tmp/$dvar"/*.json "$tmp/var/lib/openwebrx/"; fi
         [ -s "$tmp/var/lib/openwebrx/users.json" ] && install -m 600 "$tmp/var/lib/openwebrx/users.json" "$OWRX_DATA/users.json" && bien "usuarios restaurados de la copia"
         if [ -s "$tmp/var/lib/openwebrx/bookmarks.json" ]; then
             python3 "$FILES/bin/bricohams-merge-bookmarks.py" "$tmp/var/lib/openwebrx/bookmarks.json" \
@@ -847,9 +994,12 @@ paso_plugins() {
 
 paso_meteo() {
     install -m 755 "$FILES/bin/bricohams-meteo.py" /usr/local/bin/bricohams-meteo
+    if [ -n "$LOCATOR_CATALOG_PATH" ]; then        # v4.3 · con la lista de AEMET recién bajada (paso configuracion)
+        zona_locator; instalar_env "$ETC_BH/bricohams.env"
+    fi
     cat >"$ETC_BH/meteo.env" <<EOF
 AEMET_API_KEY=$(sq "${AEMET_API_KEY:-}")
-METEO_STATIONS=${METEO_STATIONS}
+METEO_STATIONS=$(sq "${METEO_STATIONS:-}")
 STATION_LAT=${STATION_LAT}
 STATION_LON=${STATION_LON}
 METEO_OUT=${HTDOCS}/plugins/receiver/meteo/meteo.json
@@ -1238,6 +1388,11 @@ paso_herramientas() {
     # v4.2 · owrx-clone: exportar/importar perfiles de OpenWebRX+ (también lo usa la copia diaria)
     install -m 755 "$KIT/owrx-clone/owrx-clone" /usr/local/bin/owrx-clone
     install -D -m 644 "$KIT/owrx-clone/owrx-clone.1" /usr/local/share/man/man1/owrx-clone.1
+    # v4.3 · bricohams-locator: zona de la estación (info, refrescar, marcadores --aplicar)
+    install -d /usr/local/lib/bricohams
+    install -m 644 "$FILES"/bin/bricohams_locator.py "$FILES"/bin/bricohams_locator_bookmarks.py \
+        "$FILES"/bin/bricohams_locator_online.py /usr/local/lib/bricohams/
+    install -m 755 "$FILES/bin/bricohams-locator" /usr/local/bin/bricohams-locator
     # copia del kit en la Raspberry para restaurar sin la tarjeta original
     install -d /opt/bricohams
     rsync -a --delete --exclude 'bricohams.env' "$KIT/" /opt/bricohams/kit/
@@ -1248,10 +1403,13 @@ paso_herramientas() {
 set -e
 d=/var/backups/bricohams; mkdir -p "$d"
 f="$d/backup-openwebrx-$(date +%F).tar.gz"
+# v4.3 · con OpenWebRX+ en Docker, sus tres carpetas y el docker-compose.yaml
+OD=$( . /etc/bricohams/bricohams.env 2>/dev/null; echo "${OWRX_DOCKER_DIR:-/opt/owrx-docker}" ); OD=${OD#/}
 tar -czf "$f" --ignore-failed-read -C / \
   var/lib/openwebrx/settings.json var/lib/openwebrx/users.json var/lib/openwebrx/bookmarks.json \
   var/lib/openwebrx/receiver_avatar.png var/lib/openwebrx/receiver_top_photo.png \
   etc/openwebrx usr/lib/python3/dist-packages/htdocs/plugins \
+  "$OD/docker-compose.yaml" "$OD/etc" "$OD/var" "$OD/plugins" \
   etc/bricohams etc/meshtasticd etc/mediamtx etc/default/gpsd etc/chrony/conf.d boot/firmware/config.txt \
   etc/default/readsb etc/rbfeeder.ini etc/udev/rules.d/99-bricohams-lilygo.rules etc/udev/rules.d/99-bricohams-rs485.rules \
   etc/udev/rules.d/99-bricohams-io.rules etc/nginx/sites-available/bricohams-sdr etc/letsencrypt etc/mosquitto/conf.d \
@@ -1399,6 +1557,10 @@ EOF
 # =====================================================================
 paso_ft2() {
     if ! si "${FT2_ENABLE:-yes}"; then aviso "FT2 omitido (FT2_ENABLE)"; return; fi
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then     # el parche toca el código de OpenWebRX+, que va dentro de la imagen
+        aviso "FT2 no está disponible con OpenWebRX+ en Docker (el parche cambia el código del paquete): usa OWRX_BACKEND=\"native\" si lo necesitas"
+        return 0
+    fi
     install -m 755 "$FILES/bin/bricohams-ft2" /usr/local/bin/bricohams-ft2
     install -m 755 "$FILES/bin/bricohams-ft2-decode" /usr/local/bin/bricohams-ft2-decode
     install -m 755 "$FILES/bin/bricohams-ft2-patch.py" /usr/local/sbin/bricohams-ft2-patch
@@ -1467,7 +1629,7 @@ paso_web() {
     install -d /etc/letsencrypt/renewal-hooks/deploy
     printf '#!/bin/sh\nsystemctl reload nginx\n' >/etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
     chmod 755 /etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
-    { envl SSL_DOMAIN "$dom"; envl SSL_MODO "${SSL_MODO:-admin}"; } >/etc/bricohams/web.env
+    { envl SSL_DOMAIN "$dom"; envl SSL_MODO "${SSL_MODO:-admin}"; envl OWRX_BACKEND "${OWRX_BACKEND:-native}"; } >/etc/bricohams/web.env
     # API de los plugins (ficha de indicativos); HamQTH principal y QRZ opcional
     {
         envl HAMQTH_USER "${HAMQTH_USER:-}"
@@ -1575,7 +1737,9 @@ paso_importar() {
     fi
     local oc=${OWRX_CLONE_BIN:-/usr/local/bin/owrx-clone} niveles=${IMPORTAR_NIVELES:-config,etc,web,paquetes}
     [ -n "${OWRX_CLONE_BIN:-}" ] || install -m 755 "$KIT/owrx-clone/owrx-clone" "$oc"
-    "$oc" importar "$IMPORTAR" --si --niveles "$niveles" \
+    local dk=()                     # v4.3 · en Docker, owrx-clone escribe en los volúmenes del contenedor
+    if [ "${OWRX_BACKEND:-native}" = docker ]; then dk=(--docker "${OWRX_DOCKER_CONTAINER:-owrx-mbe}"); fi
+    "$oc" "${dk[@]}" importar "$IMPORTAR" --si --niveles "$niveles" \
         || fallo "owrx-clone no ha podido importar $IMPORTAR (mensaje de arriba). Para volver atrás: sudo owrx-clone deshacer"
     # lo que BricoHams necesita de settings.json: el informe MQTT de las visitas
     if si "${VISITAS_ENABLE:-yes}" && [ -s "$OWRX_DATA/settings.json" ]; then

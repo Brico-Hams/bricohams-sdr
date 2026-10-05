@@ -1,6 +1,6 @@
 # BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
 
-Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.2):
+Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.3):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT.
@@ -31,6 +31,10 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **ficha DMR/YSF con HamQTH** primero (aportación de EA5KAO);
   - **arreglos de la instalación real:** claves con `$` en `bricohams.env`, cortes de red tras el paso `red`, descargas sin reintento;
   - [ayuda rápida](docs/AYUDA_RAPIDA.md) con todas las órdenes.
+- **v4.3:**
+  - **OpenWebRX+ en Docker** desde `bricohams.env` (`OWRX_BACKEND="docker"`): el instalador crea el `docker-compose.yaml` y el contenedor; owrx-clone 1.1 pasa una estación de nativo a Docker y al revés ([manual 33](docs/manuales/33_OPENWEBRX_DOCKER.md));
+  - **zona por locator:** con `STATION_LOCATOR` (cualquier locator de España) salen los aeropuertos, estaciones AEMET, puertos, NAVTEX y emisoras de FM regionales y locales más cercanos, como marcadores y `METEO_STATIONS`. Lejos de Mi QTH se quitan los de Murcia ([manual 32](docs/manuales/32_ZONA_LOCATOR.md), `bricohams-locator`);
+  - plantilla genérica (`N0CALL`), indicativo y QTH en `settings.json` y oyentes con bandera y enlace al perfil (aportaciones de EA5KAO).
 - **v4.1:** `sudo bash install.sh --actualizar` pone al día kit (git), `bricohams.env` (variables nuevas), sistema (apt) y solo los pasos que han cambiado, conservando tus marcadores ([manual 29](docs/manuales/29_ACTUALIZAR.md)).
 
 ![Arquitectura](docs/esquemas/01_arquitectura.png)
@@ -88,6 +92,15 @@ sudo owrx-clone exportar --cifrar                         # en el viejo
 sudo owrx-clone importar perfil.owrx.tar.gz.enc --todo    # en el nuevo (o: sudo bash install.sh --importar …)
 ```
 
+**Zona por locator y OpenWebRX+ en Docker** (v4.3, manuales [32](docs/manuales/32_ZONA_LOCATOR.md) y [33](docs/manuales/33_OPENWEBRX_DOCKER.md)):
+
+```bash
+# bricohams.env: STATION_LOCATOR="IN52pf"  ·  OWRX_BACKEND="docker" (opcional)
+bricohams-locator info                          # aeropuertos, AEMET, puertos, FM y NAVTEX cercanos
+sudo bricohams-locator marcadores --aplicar     # marcadores de la zona en OpenWebRX+
+sudo owrx-clone --docker owrx-mbe importar perfil.owrx.tar.gz   # tu estación nativa, dentro del contenedor
+```
+
 **Actualizar una estación ya instalada** (v4.1):
 
 ```bash
@@ -116,6 +129,7 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - [23 Web, SSL y servicios](docs/manuales/23_WEB_SSL_SERVICIOS.md) · [24 Visitas y Telegram](docs/manuales/24_VISITAS_TELEGRAM.md) · [25 Tareas automáticas](docs/manuales/25_TAREAS_AUTOMATICAS.md)
 - [26 Satélites](docs/manuales/26_SATELITES.md) · [27 Plugins web](docs/manuales/27_PLUGINS_WEB_V4.md) · [28 FT2](docs/manuales/28_FT2.md) · [29 Actualizar](docs/manuales/29_ACTUALIZAR.md)
 - v4.2: [30 Audio FILTRO y DSP](docs/manuales/30_AUDIO_DSP.md) · [31 Clonar OpenWebRX+](docs/manuales/31_CLONAR_OPENWEBRX.md) · [Ayuda rápida](docs/AYUDA_RAPIDA.md)
+- v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).

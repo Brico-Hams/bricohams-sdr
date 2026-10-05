@@ -12,7 +12,13 @@ MODO=${SSL_MODO:-admin}
 PUB=http; [ "$MODO" = todo ] && PUB=https          # receptor público
 ADM=https; [ "$MODO" = no ] && ADM=http            # administración (/login, /settings)
 v='\e[32m'; r='\e[31m'; g='\e[90m'; n='\e[0m'
-est() { systemctl is-active --quiet "$1" 2>/dev/null && printf "${v}● activo${n}" || printf "${r}○ parado${n}"; }
+est() {
+    if [ "$1" = openwebrx ] && [ "${OWRX_BACKEND:-native}" = docker ]; then    # v4.3 · contenedor: se mira la web
+        curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8073/status.json && printf "${v}● Docker${n}" || printf "${r}○ Docker${n}"
+        return
+    fi
+    systemctl is-active --quiet "$1" 2>/dev/null && printf "${v}● activo${n}" || printf "${r}○ parado${n}"
+}
 fila() { printf '%-22s %-24b %-38s %s\n' "$1" "$(est "$2")" "$3" "$4"; }
 echo "BricoHams SDR · servicios · $(hostname) · LAN ${IP:-?} · dominio ${DOM:-(ninguno)} · SSL_MODO=$MODO"
 printf '%-22s %-15s %-38s %s\n' "Servicio" "Estado" "Red local" "Internet"

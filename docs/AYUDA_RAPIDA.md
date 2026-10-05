@@ -47,6 +47,26 @@ Todas las órdenes del kit en una página. El detalle de cada una está en su ma
 - **Comprobar el fichero:** `python3 files/bin/bricohams-env.py --comprobar bricohams.env`
 - **Nunca se sube al git:** está en `.gitignore`.
 
+## v4.3 · Zona por locator (manual 32)
+```bash
+bricohams-locator info [LOCATOR]          # aeropuertos, AEMET, puertos, FM y NAVTEX cercanos, con distancia
+sudo bricohams-locator refrescar          # baja AEMET (AEMET_API_KEY) y las FM de la zona
+sudo bricohams-locator marcadores --aplicar   # pone los [AUTO-LOCATOR] en OpenWebRX+ y lo reinicia
+bricohams-locator meteo                   # METEO_STATIONS de la zona
+bricohams-locator locator 0.0 0.0 # IM97kx · bricohams-locator coordenadas IM97kx
+sudo bash install.sh --solo configuracion,meteo   # tras cambiar STATION_LOCATOR o LOCATOR_*
+```
+
+## v4.3 · OpenWebRX+ en Docker (manual 33)
+```bash
+# bricohams.env: OWRX_BACKEND="docker" (OWRX_DOCKER_IMAGE, _RED, _PRIVILEGED…)
+sudo bash install.sh --actualizar                             # tras cambiar OWRX_BACKEND: contenedor y pasos que escriben en él
+sudo docker logs -f owrx-mbe                                  # registro
+sudo docker exec -it owrx-mbe openwebrx admin adduser admin   # administrador
+cd /opt/owrx-docker && sudo docker compose pull && sudo docker compose up -d   # imagen nueva
+sudo owrx-clone --docker owrx-mbe exportar | importar | comprobar
+```
+
 ## Errores conocidos y arreglo
 | Mensaje | Arreglo |
 |---|---|
@@ -57,11 +77,15 @@ Todas las órdenes del kit en una página. El detalle de cada una está en su ma
 | `rtl-sdr : Depends: librtlsdr0 (= 0.7.0~rtlsdrblog1)` | resuelto en v3.3 |
 | `nginx no acepta la configuración` | mira el mensaje de `nginx -t` encima; `sudo nginx -t` |
 | `git pull no puede avanzar el kit` | `git stash`, actualiza y `git stash pop` (manual 29) |
+| `STATION_LOCATOR=… no es un locator Maidenhead válido` | 4, 6, 8 o 10 caracteres: `IM97kx` (manual 32) |
+| `Sin datos de zona en línea (AEMET/FM)` | sin red o sin `AEMET_API_KEY`: sigue con el catálogo del kit; luego `sudo bricohams-locator refrescar` |
+| `Falta el volumen Docker persistente …` | el contenedor no monta etc/var/plugins: deja que lo cree el kit (`OWRX_DOCKER_DESPLEGAR="yes"`, manual 33) |
 
 ## Ayuda integrada
 ```bash
 sudo bash install.sh --help
-owrx-clone --help ; owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,problemas} ; man owrx-clone
+owrx-clone --help ; owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,docker,problemas} ; man owrx-clone
+bricohams-locator --help ; python3 files/bin/bricohams-docker-compose.py --help
 bricohams-io --help ; bricohams-fan --help ; bricohams-ft2 ; sudo bricohams-tarea
 python3 files/bin/bricohams-env.py
 ```
