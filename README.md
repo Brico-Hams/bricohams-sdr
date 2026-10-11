@@ -1,6 +1,6 @@
 # BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
 
-Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.3):
+Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.4):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT.
@@ -31,6 +31,7 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **ficha DMR/YSF con HamQTH** primero (aportación de EA5KAO);
   - **arreglos de la instalación real:** claves con `$` en `bricohams.env`, cortes de red tras el paso `red`, descargas sin reintento;
   - [ayuda rápida](docs/AYUDA_RAPIDA.md) con todas las órdenes.
+- **v4.4:** **blindaje de seguridad** (`sudo bricohams-blindaje auditar | aplicar`): cortafuegos del host con vuelta atrás, SSH, fail2ban, permisos de las claves, búsqueda de fugas, límite de intentos en `/login`, y la **posición pública redondeada** a ~1 km ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
 - **v4.3:**
   - **OpenWebRX+ en Docker** desde `bricohams.env` (`OWRX_BACKEND="docker"`): el instalador crea el `docker-compose.yaml` y el contenedor; owrx-clone 1.1 pasa una estación de nativo a Docker y al revés ([manual 33](docs/manuales/33_OPENWEBRX_DOCKER.md));
   - **zona por locator:** con `STATION_LOCATOR` (cualquier locator de España) salen los aeropuertos, estaciones AEMET, puertos, NAVTEX y emisoras de FM regionales y locales más cercanos, como marcadores y `METEO_STATIONS`. Lejos de Mi QTH se quitan los de Murcia ([manual 32](docs/manuales/32_ZONA_LOCATOR.md), `bricohams-locator`);
@@ -129,6 +130,7 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - [23 Web, SSL y servicios](docs/manuales/23_WEB_SSL_SERVICIOS.md) · [24 Visitas y Telegram](docs/manuales/24_VISITAS_TELEGRAM.md) · [25 Tareas automáticas](docs/manuales/25_TAREAS_AUTOMATICAS.md)
 - [26 Satélites](docs/manuales/26_SATELITES.md) · [27 Plugins web](docs/manuales/27_PLUGINS_WEB_V4.md) · [28 FT2](docs/manuales/28_FT2.md) · [29 Actualizar](docs/manuales/29_ACTUALIZAR.md)
 - v4.2: [30 Audio FILTRO y DSP](docs/manuales/30_AUDIO_DSP.md) · [31 Clonar OpenWebRX+](docs/manuales/31_CLONAR_OPENWEBRX.md) · [Ayuda rápida](docs/AYUDA_RAPIDA.md)
+- v4.4: [34 Blindaje de seguridad](docs/manuales/34_BLINDAJE_SEGURIDAD.md)
 - v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 

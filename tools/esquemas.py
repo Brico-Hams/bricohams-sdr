@@ -910,6 +910,39 @@ def openwebrx_docker():
     return svg(W, H, b, 'OpenWebRX+ en Docker desde bricohams.env (v4.3)')
 
 
+def blindaje():
+    """Esquema 24: capas de seguridad de la estación (v4.4)."""
+    W, H = 1500, 900
+    b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net']])
+    b += caja_s(30, 90, 250, 300, 'Internet', 'sdr.ea5kao.ampr.org', C['cr'], '#fdecee', arriba=True)
+    for k, t in enumerate(['oyentes', 'robots que prueban', 'contraseñas', 'directorios de', 'receptores']):
+        b += txt(50, 160 + k * 26, t, 11)
+    b += caja_s(330, 90, 230, 300, 'Cortafuegos externo', '(router)', C['or'], '#fff3e0', arriba=True)
+    for k, t in enumerate(['80  → Pi', '443 → Pi', '8073 → Pi  (!)', 'nada más']):
+        b += txt(350, 165 + k * 32, t, 12, C['ink'], k < 3)
+    b += txt(350, 320, '(!) /login por 8073 va', 10.5, C['cr']) + txt(350, 338, 'sin cifrar: ciérralo', 10.5, C['cr'])
+    b += arrow(280, 240, 330, 240, C['cr'])
+    b += arrow(560, 240, 610, 240, C['ink'])
+    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · 192.168.1.105', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
+    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 9443, 8554 · resto: descartado y registrado', C['or']),
+             ('nginx', '/settings → HTTPS · /login 12/min (429) · sin versión · X-Frame · ocultos 404', C['net']),
+             ('SSH', 'solo LAN · sin root · 3 intentos · solo clave si la hay · fail2ban', C['pi']),
+             ('Claves', 'bricohams.env 600 · .env 640 · copias 700 · users.json 600 · fugas: buscadas', C['cr']),
+             ('Privacidad', 'posición pública a 2 decimales (~1 km): mapa, status.json, init.js, meteo, pases', C['sdr']),
+             ('Sistema', 'unattended-upgrades · sysctl · UMask 0027 · Bluetooth fuera', C['ink'])]
+    for k, (t, d, c) in enumerate(capas):
+        y = 150 + k * 84
+        b += caja_s(630, y, 820, 70, t, d, c, '#ffffff')
+    b += caja_s(30, 430, 530, 260, 'Procedimiento (manual 34)', '', C['ink'], '#fafafa', arriba=True)
+    for k, t in enumerate(['1  sudo bash install.sh --actualizar', '2  sudo bricohams-blindaje auditar   (no cambia nada)',
+                           '3  ssh-copy-id pi@192.168.1.105', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
+                           '6  sudo bricohams-blindaje confirmar  (si no, 3 min y se quita)', '7  sudo bricohams-blindaje auditar']):
+        b += txt(50, 485 + k * 28, t, 11)
+    b += txt(30, 760, 'La auditoría nunca enseña una clave: solo la variable y el fichero donde aparece. bricohams-check muestra el resumen cada 30 min.', 11)
+    b += txt(30, 860, 'HAT, Mini RTL-SDR y SDRplay pendientes: sus errores no son de seguridad. Manual 34 · ADR-47 y ADR-48.', 11, C['mute'])
+    return svg(W, H, b, 'Blindaje de seguridad de la estación (v4.4)')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -923,7 +956,8 @@ def main():
                      ('15_alimentacion_v3', alimentacion_v3), ('16_pico_io', pico_io), ('17_filtros_lna', filtros_lna),
                      ('18_red_servicios', red_servicios), ('19_actualizar', actualizar),
                      ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx),
-                     ('22_zona_locator', zona_locator), ('23_openwebrx_docker', openwebrx_docker)]:
+                     ('22_zona_locator', zona_locator), ('23_openwebrx_docker', openwebrx_docker),
+                     ('24_blindaje', blindaje)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

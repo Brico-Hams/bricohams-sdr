@@ -99,6 +99,15 @@
 - **openssl enc (AES-256-CBC + PBKDF2):** https://docs.openssl.org/master/man1/openssl-enc/
 - **Playwright (pruebas en Chromium real):** https://playwright.dev/python/
 
+## v4.4
+- **nftables** (familia inet, hook input, sets con intervalos): https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes
+- **OpenSSH sshd_config** (`PermitRootLogin`, `PasswordAuthentication`, `MaxAuthTries`, `sshd -T`): https://man.openbsd.org/sshd_config
+- **fail2ban** (jails `sshd`, `recidive`, backend systemd): https://github.com/fail2ban/fail2ban
+- **nginx limit_req / server_tokens:** https://nginx.org/en/docs/http/ngx_http_limit_req_module.html · https://nginx.org/en/docs/http/ngx_http_core_module.html#server_tokens
+- **unattended-upgrades en Debian:** https://wiki.debian.org/UnattendedUpgrades
+- **Endurecimiento del núcleo (sysctl):** https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt
+- **OpenWebRX+ `/status.json`** (lo que publica el receptor: nombre, admin, GPS, perfiles): https://github.com/luarvique/openwebrx (owrx/controllers/status.py)
+
 ## v4.3
 - **Imagen Docker de OpenWebRX+** (volúmenes `/etc/openwebrx`, `/var/lib/openwebrx`, `htdocs/plugins`; `--device /dev/bus/usb`, `--tmpfs /tmp`, variables `OPENWEBRX_ADMIN_*`): https://hub.docker.com/r/slechev/openwebrxplus · softmbe https://hub.docker.com/r/slechev/openwebrxplus-softmbe · constructor y `run.sh` (siembra de `/etc` y `/var`, admin, `FORWARD_LOCALPORT_*`): https://github.com/0xAF/openwebrxplus-docker-builder
 - **Docker Compose** (formato 2.4, `device_cgroup_rules`, `network_mode`): https://docs.docker.com/reference/compose-file/ · grupo de dispositivos USB 189: https://www.kernel.org/doc/Documentation/admin-guide/devices.txt

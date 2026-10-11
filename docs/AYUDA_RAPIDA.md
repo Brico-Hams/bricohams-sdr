@@ -67,6 +67,16 @@ cd /opt/owrx-docker && sudo docker compose pull && sudo docker compose up -d   #
 sudo owrx-clone --docker owrx-mbe exportar | importar | comprobar
 ```
 
+## v4.4 · Seguridad (manual 34)
+```bash
+sudo bricohams-blindaje auditar           # informe (no cambia nada, no enseña claves)
+ssh-copy-id pi@192.168.1.105          # desde tu PC: entrar con clave
+sudo bricohams-blindaje aplicar           # cortafuegos, SSH, fail2ban, permisos… (con copia)
+sudo bricohams-blindaje confirmar         # en 3 min; si no, el cortafuegos se quita solo
+sudo bricohams-blindaje deshacer          # volver a como estaba
+sudo fail2ban-client status sshd          # IPs bloqueadas
+```
+
 ## Errores conocidos y arreglo
 | Mensaje | Arreglo |
 |---|---|
@@ -77,6 +87,7 @@ sudo owrx-clone --docker owrx-mbe exportar | importar | comprobar
 | `rtl-sdr : Depends: librtlsdr0 (= 0.7.0~rtlsdrblog1)` | resuelto en v3.3 |
 | `nginx no acepta la configuración` | mira el mensaje de `nginx -t` encima; `sudo nginx -t` |
 | `git pull no puede avanzar el kit` | `git stash`, actualiza y `git stash pop` (manual 29) |
+| No entro por SSH tras `bricohams-blindaje aplicar` | espera 3 min (vuelta atrás) o en la Pi: `sudo bricohams-blindaje deshacer` |
 | `STATION_LOCATOR=… no es un locator Maidenhead válido` | 4, 6, 8 o 10 caracteres: `IM97kx` (manual 32) |
 | `Sin datos de zona en línea (AEMET/FM)` | sin red o sin `AEMET_API_KEY`: sigue con el catálogo del kit; luego `sudo bricohams-locator refrescar` |
 | `Falta el volumen Docker persistente …` | el contenedor no monta etc/var/plugins: deja que lo cree el kit (`OWRX_DOCKER_DESPLEGAR="yes"`, manual 33) |

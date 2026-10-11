@@ -10,11 +10,14 @@
 #  Las líneas «#@X@» las activa o borra install.sh; no las edites aquí.
 # =====================================================================
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
+# v4.4 · como mucho 12 intentos de /login por minuto y IP (fuerza bruta de la contraseña de admin)
+limit_req_zone $binary_remote_addr zone=bh_login:10m rate=12r/m;
 
 server {
     listen 80;
     listen [::]:80;
     server_name __DOMINIO__ _;
+    server_tokens off;
     location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
 #@ADMIN@    # páginas de administración (rutas de OpenWebRX+ con AuthorizationMixin): siempre HTTPS
 #@ADMIN@    location ~ ^/(login|logout|pwchange|settings|imageupload|clients|services|ban|unban|broadcast|files/delete)(/|$) {
@@ -29,6 +32,7 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     server_name __DOMINIO__ _;
+    server_tokens off;
     ssl_certificate     __CERT__;
     ssl_certificate_key __KEY__;
     ssl_protocols TLSv1.2 TLSv1.3;
