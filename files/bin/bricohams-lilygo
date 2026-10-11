@@ -7,9 +7,13 @@
 #   identificar   Crea /dev/lilygo-mesh y /dev/lilygo-igate (regla udev)
 #                 pidiéndote conectarlos de uno en uno.
 #   meshtastic    Configura el nodo Meshtastic EU_433 (el firmware se
-#                 graba antes con https://flasher.meshtastic.org).
-#   igate         Compila y graba el iGate LoRa APRS de CA2RXU
-#                 (richonguzman/LoRa_APRS_iGate) con su configuración.
+#                 graba antes con https://flasher.meshtastic.org). v4.5: con
+#                 MESH433_CHANNEL_URL aplica la URL de la red 433 tal cual.
+#   igate         ALTERNATIVA: compila y graba el iGate WiFi de CA2RXU en un
+#                 LilyGO. Desde la v4.5 el iGate es el RAK4631 (bricohams-rak-aprs).
+#   firmware      v4.5: actualiza el Meshtastic del LilyGO al último estable
+#                 oficial (esptool, conserva la configuración) y lo vuelve a
+#                 configurar. Para un borrado total: flasher.meshtastic.org.
 #   wxstation [puerto]  ALTERNATIVA (v3): graba un TERCER LilyGO con la estación
 #                 meteo LoRa de CA2RXU (richonguzman/LoRa_APRS_Wx_Station),
 #                 con su BME280, viento RS485 y pluviómetro propios. Emite
@@ -84,24 +88,45 @@ meshtastic_cli() {
     timeout 90 meshtastic --port /dev/lilygo-mesh "$@"
 }
 
+# v4.5 · el puerto serie es de uno solo: el servicio del mapa de OpenWebRX+ lo suelta mientras tanto
+soltar_puerto() {
+    if systemctl is-active --quiet bricohams-mesh-owrx 2>/dev/null; then
+        systemctl stop bricohams-mesh-owrx
+        trap 'systemctl start bricohams-mesh-owrx 2>/dev/null || true' EXIT
+        sleep 2
+    fi
+}
+
 conf_meshtastic() {
-    [ -e /dev/lilygo-mesh ] || { echo "✘ No existe /dev/lilygo-mesh: sudo $0 identificar"; exit 1; }
+    [ -e /dev/lilygo-mesh ] || { echo "✘ No existe /dev/lilygo-mesh: sudo bricohams-dispositivos identificar"; exit 1; }
+    soltar_puerto
     echo "Configurando el nodo Meshtastic 433 en /dev/lilygo-mesh…"
     meshtastic_cli --info >/dev/null || { echo "✘ No responde. ¿Tiene grabado el firmware Meshtastic (flasher.meshtastic.org, placa 'LILYGO T3 V1.6.1')?"; exit 1; }
-    if [ "${MESH433_CHANNELS:-yes}" = yes ] && [ -n "${MESH_CHANNEL_URL:-}" ]; then
-        # mismos canales (SFNarrow, Murcia, Cartagena, Test, Alicante) que el nodo 868…
+    if [ -n "${MESH433_CHANNEL_URL:-}" ]; then
+        # v4.5 · URL propia de la red 433 (canales y radio EU_433 LONG_FAST, 10 dBm): se aplica tal cual
+        local region
+        region=$(bricohams-mesh-url json "$MESH433_CHANNEL_URL" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["radio"].get("region",""))' 2>/dev/null || true)
+        case "$region" in
+            EU_433|"") ;;
+            *) echo "✘ MESH433_CHANNEL_URL es de $region, no de EU_433: el LilyGO es de 433 MHz"; exit 1 ;;
+        esac
+        bricohams-mesh-url ver "$MESH433_CHANNEL_URL" 2>/dev/null || true
+        meshtastic_cli --seturl "$MESH433_CHANNEL_URL"; sleep 20
+    elif [ "${MESH433_CHANNELS:-yes}" = yes ] && [ -n "${MESH_CHANNEL_URL:-}" ]; then
+        # mismos canales que el nodo 868…
         meshtastic_cli --seturl "$MESH_CHANNEL_URL"; sleep 20
         # …pero la radio en 433: el QR trae EU_868 a 869,618 MHz, que aquí no vale
         meshtastic_cli --set lora.region EU_433 --set lora.use_preset true --set lora.override_frequency 0 \
             --set lora.tx_power 0; sleep 15
+        meshtastic_cli --set lora.modem_preset LONG_FAST; sleep 10
     else
         meshtastic_cli --set lora.region EU_433; sleep 15
     fi
-    meshtastic_cli --set-owner "${MESH433_LONG_NAME:-EA5KAO BricoHams 433}" --set-owner-short "${MESH433_SHORT_NAME:-BH43}"; sleep 10
-    meshtastic_cli --set device.role "${MESH433_ROLE:-CLIENT}" --set lora.modem_preset LONG_FAST; sleep 10
+    meshtastic_cli --set-owner "${MESH433_LONG_NAME:-SDR BricoHams 433}" --set-owner-short "${MESH433_SHORT_NAME:-SB43}"; sleep 10
+    meshtastic_cli --set device.role "${MESH433_ROLE:-CLIENT}"; sleep 10
     meshtastic_cli --setlat "${STATION_LAT}" --setlon "${STATION_LON}" --setalt "${STATION_ASL}"; sleep 5
     meshtastic_cli --set position.gps_mode NOT_PRESENT || true
-    echo "✔ Meshtastic EU_433: ${MESH433_LONG_NAME:-} (${MESH433_SHORT_NAME:-}), posición fija"
+    echo "✔ Meshtastic EU_433: ${MESH433_LONG_NAME:-SDR BricoHams 433} (${MESH433_SHORT_NAME:-SB43}), posición fija"
 }
 
 conf_igate_json() {  # base.json salida.json
@@ -186,6 +211,38 @@ wxstation() {
     echo "✔ Estación WX LoRa ${WXLORA_CALLSIGN:-EA5KAO-14} grabada. Cambia antes la dirección de la veleta a 0x02 (manual 19)."
 }
 
+firmware_meshtastic() {
+    [ -e /dev/lilygo-mesh ] || { echo "✘ No existe /dev/lilygo-mesh: sudo bricohams-dispositivos identificar"; exit 1; }
+    local esptool tmp zip bin
+    esptool=$(command -v esptool || command -v esptool.py || true)
+    [ -n "$esptool" ] || { pipx install esptool >/dev/null && esptool=$(command -v esptool || command -v esptool.py); }
+    soltar_puerto
+    tmp=$(mktemp -d)
+    echo "Buscando el último Meshtastic estable para LilyGO T3 V1.6.1 (tlora-v2-1-1_6)…"
+    zip=$(curl -fsSL https://api.github.com/repos/meshtastic/firmware/releases/latest | python3 -c '
+import json, sys
+r = json.load(sys.stdin)
+print(next(a["browser_download_url"] for a in r["assets"] if a["name"].startswith("firmware-esp32-") and a["name"].endswith(".zip")))')
+    [ -n "$zip" ] || { echo "✘ No encuentro el firmware (sin Internet o cambió la publicación): usa flasher.meshtastic.org"; exit 1; }
+    echo "  -> $zip"
+    curl -fsSL -o "$tmp/fw.zip" "$zip"
+    python3 - "$tmp/fw.zip" "$tmp" <<'PY'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+n = [x for x in z.namelist() if 'tlora-v2-1-1_6' in x and x.endswith('.bin') and 'factory' not in x and 'ota' not in x]
+if not n:
+    sys.exit('✘ el paquete no trae tlora-v2-1-1_6')
+z.extract(n[0], sys.argv[2])
+open(sys.argv[2] + '/nombre', 'w').write(n[0])
+PY
+    bin="$tmp/$(cat "$tmp/nombre")"
+    echo "Grabando $(basename "$bin") (actualización: conserva canales y nombre)…"
+    "$esptool" --chip esp32 --port /dev/lilygo-mesh --baud 921600 write_flash 0x10000 "$bin"
+    rm -rf "$tmp"
+    sleep 8
+    conf_meshtastic
+}
+
 estado() {
     echo "Puertos serie:"; puertos | sed 's/^/   /'
     ls -l /dev/lilygo-* 2>/dev/null | sed 's/^/   /' || echo "   (sin nombres fijos: sudo $0 identificar)"
@@ -194,8 +251,9 @@ estado() {
 case "${1:-}" in
     identificar) identificar ;;
     meshtastic)  conf_meshtastic ;;
+    firmware)    firmware_meshtastic ;;
     igate)       igate ;;
     wxstation)   wxstation "${2:-}" ;;
     estado)      estado ;;
-    *) sed -n '2,22p' "$0"; exit 1 ;;
+    *) sed -n '2,26p' "$0"; exit 1 ;;
 esac

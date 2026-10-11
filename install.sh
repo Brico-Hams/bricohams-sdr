@@ -30,6 +30,10 @@
 #   - v4.1: «--actualizar»: kit (git) + bricohams.env + apt + solo los pasos cambiados.
 #   - v4.2: bricohams.env leído sin ejecutarse, espera de red, SSL solo en la administración
 #     (SSL_MODO), plugins de audio FILTRO y DSP, perfiles de OpenWebRX+ con owrx-clone.
+#   - v4.5: iGate LoRa APRS en un RAK4631 por USB (firmware propio, bricohams-rak-aprs),
+#     Meshtastic 433/868 con las URL de la red, inventario de dispositivos y banner SSH.
+#   - v4.6: TAK local aparte (tools/instalar_tak.sh), chat APRS en el CHAT común y mapa en
+#     vivo con aviones readsb y trazas APRS (tools/activar_mapa_local.sh); RadarBox/MLAT intactos.
 #   - Herramientas: bricohams-check, bricohams-sdr-serials, bricohams-lilygo,
 #     bricohams-servicios, bricohams-io, bricohams-ft2, owrx-clone.
 #
@@ -59,7 +63,7 @@ OWRX_ETC=/etc/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo satelites ft2 web visitas herramientas importar tareas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo rak satelites ft2 web visitas herramientas banner importar tareas)
 BACKUP=""
 SOLO=""
 REINICIAR=0
@@ -315,6 +319,8 @@ nginx_sitio() {
         no)    e=(-e 's/^#@HTTP@//' -e '/^#@ADMIN@/d' -e '/^#@TODO@/d' -e '/^#@SSL>/,/^#@SSL</d') ;;
         *) return 1 ;;
     esac
+    # v4.5 · cliente web de Meshtastic en :8443 (solo admin) si MESH_WEB=yes
+    if [ "${MESH_WEB:-yes}" = yes ]; then e+=(-e 's/^#@MW@//'); else e+=(-e '/^#@MW@/d'); fi
     sed "${e[@]}" -e "s#__DOMINIO__#${dom}#g" -e "s#__CERT__#${cert}#" -e "s#__KEY__#${key}#"
 }
 cargar_env "$KIT/bricohams.env"
@@ -830,6 +836,9 @@ paso_openwebrx() {
     apt_update
     apt_i openwebrx
     apt_i soapysdr-module-sdrplay3 || aviso "No pude instalar soapysdr-module-sdrplay3"
+    # v4.5 · modos «LoRa APRS» y «Meshtastic» del propio OpenWebRX+ (lorarx de dxlAPRS + librería meshtastic)
+    apt_i dxlaprs-lora python3-meshtastic python3-pycryptodome \
+        || aviso "No pude instalar dxlaprs-lora/python3-meshtastic: OpenWebRX+ no decodificará LoRa por SDR (el RAK y el LilyGO sí)"
     systemctl enable openwebrx
     bien "OpenWebRX+ $(dpkg-query -W -f='${Version}' openwebrx 2>/dev/null)"
 }
@@ -1307,16 +1316,122 @@ paso_adsb() {
     aviso "Asocia la estación a tu cuenta: sudo rbfeeder --showkey y https://www.airnavradar.com/raspberry-pi/claim"
 }
 
+# v4.5 · broker MQTT solo para la Pi: visitas y mapa LoRa/Meshtastic de OpenWebRX+ (ADR-50)
+mqtt_local() {
+    dpkg -s mosquitto >/dev/null 2>&1 || apt_i mosquitto
+    install -d /etc/mosquitto/conf.d
+    if [ ! -s /etc/mosquitto/conf.d/bricohams.conf ]; then
+        printf '# BricoHams: MQTT solo para la propia Pi (OpenWebRX+, visitas, mapa LoRa)\nlistener 1883 127.0.0.1\nallow_anonymous true\n' \
+            >/etc/mosquitto/conf.d/bricohams.conf
+        systemctl enable mosquitto >/dev/null 2>&1 || true
+        systemctl restart mosquitto || true
+    fi
+    install -d /usr/local/lib/bricohams
+    install -m 644 "$FILES/bin/bricohams_mqtt.py" /usr/local/lib/bricohams/bricohams_mqtt.py
+}
+
 paso_lilygo() {
     install -m 755 "$FILES/bin/bricohams-lilygo" /usr/local/bin/bricohams-lilygo
     usermod -aG dialout openwebrx 2>/dev/null || true
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install meshtastic >/dev/null 2>&1 || true
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install esptool >/dev/null 2>&1 || true
+    # v4.5 · nodos Meshtastic (LilyGO 433 y HAT 868) en el MAPA de OpenWebRX+ por su MQTT
+    install -m 755 "$FILES/bin/bricohams-mesh-owrx" /usr/local/bin/bricohams-mesh-owrx
+    if si "${OWRX_MAPA_LORA:-yes}" && [ -x /opt/pipx/venvs/meshtastic/bin/python ]; then
+        mqtt_local
+        cat >/etc/systemd/system/bricohams-mesh-owrx.service <<'UNIDAD'
+[Unit]
+Description=BricoHams · nodos Meshtastic en el mapa de OpenWebRX+ (MQTT local)
+After=network-online.target mosquitto.service meshtasticd.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/pipx/venvs/meshtastic/bin/python /usr/local/bin/bricohams-mesh-owrx servicio
+DynamicUser=yes
+SupplementaryGroups=dialout
+LoadCredential=env:/etc/bricohams/bricohams.env
+RuntimeDirectory=bricohams-mesh
+RuntimeDirectoryMode=0755
+DevicePolicy=closed
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+UNIDAD
+        systemctl daemon-reload
+        systemctl enable bricohams-mesh-owrx >/dev/null 2>&1 || true
+        systemctl restart bricohams-mesh-owrx || true
+        bien "Meshtastic -> mapa de OpenWebRX+ (bricohams-mesh-owrx: LilyGO 433 y, cuando llegue, HAT 868)"
+    else
+        systemctl disable --now bricohams-mesh-owrx >/dev/null 2>&1 || true
+    fi
     if [ -f /etc/udev/rules.d/99-bricohams-lilygo.rules ]; then
         bien "LilyGO ya identificados: $(ls /dev/lilygo-* 2>/dev/null | tr '\n' ' ')"
     else
         aviso "Falta identificar los LilyGO (una vez): sudo bricohams-lilygo identificar"
     fi
     aviso "Después: sudo bricohams-lilygo meshtastic  ·  sudo bricohams-lilygo igate  (docs/MANUAL_LILYGO.md)"
+}
+
+paso_rak() {
+    # v4.5 · RAK4631 WisBlock con el firmware «BricoHams RAK APRS» (port de LoRa_APRS_iGate):
+    # escucha LoRa APRS en 433,775 MHz y la Pi sube a APRS-IS lo que oye (manual 35)
+    apt_i python3-serial >/dev/null 2>&1 || aviso "No pude instalar python3-serial"
+    install -m 755 "$FILES/bin/bricohams-rak-aprs" /usr/local/bin/bricohams-rak-aprs
+    si "${OWRX_MAPA_LORA:-yes}" && mqtt_local
+    install -m 755 "$FILES/bin/bricohams-dispositivos" /usr/local/bin/bricohams-dispositivos
+    install -m 755 "$FILES/bin/bricohams-mesh-url" /usr/local/bin/bricohams-mesh-url
+    install -d /opt/bricohams/firmware/rak4631-lora-aprs/bin
+    install -m 644 "$KIT"/firmware/rak4631-lora-aprs/bin/* /opt/bricohams/firmware/rak4631-lora-aprs/bin/
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install adafruit-nrfutil >/dev/null 2>&1 \
+        || command -v adafruit-nrfutil >/dev/null || aviso "No pude instalar adafruit-nrfutil (solo hace falta para grabar el RAK)"
+    cat >/etc/systemd/system/bricohams-rak-aprs.service <<'UNIDAD'
+[Unit]
+Description=BricoHams · iGate LoRa APRS con el RAK4631 (KISS por USB -> APRS-IS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/bricohams-rak-aprs servicio
+# sin root: usuario temporal en dialout; bricohams.env llega como credencial (solo lo lee este servicio)
+DynamicUser=yes
+SupplementaryGroups=dialout
+LoadCredential=env:/etc/bricohams/bricohams.env
+RuntimeDirectory=bricohams-rak
+RuntimeDirectoryMode=0755
+DevicePolicy=closed
+DeviceAllow=char-ttyACM rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNIDAD
+    systemctl daemon-reload
+    bricohams-dispositivos identificar || true
+    if si "${RAK_ENABLE:-yes}"; then
+        systemctl enable bricohams-rak-aprs >/dev/null 2>&1 || true
+        systemctl restart bricohams-rak-aprs || true
+        [ -n "${APRS_PASSCODE:-}" ] || aviso "Sin APRS_PASSCODE: el RAK escucha, pero no se sube nada a APRS-IS"
+        if [ -e /dev/rak-aprs ]; then bien "RAK4631 en /dev/rak-aprs · iGate ${RAK_CALLSIGN:-${IGATE_CALLSIGN:-}} (sudo bricohams-rak-aprs prueba)"
+        else aviso "No veo el RAK4631: enchúfalo, grábalo (sudo bricohams-rak-aprs grabar) y: sudo bricohams-dispositivos identificar"; fi
+    else
+        systemctl disable --now bricohams-rak-aprs >/dev/null 2>&1 || true
+        bien "RAK_ENABLE=no: iGate RAK4631 desactivado"
+    fi
 }
 
 paso_meshtastic() {
@@ -1340,37 +1455,87 @@ paso_meshtastic() {
         [ -n "$HAT_LORA_RXEN" ] && echo "  RXen: ${HAT_LORA_RXEN}"
         echo "  spidev: ${HAT_LORA_SPIDEV}"
         echo "# El GPS lo usa gpsd (hora + OpenWebRX); el nodo usa posición fija"
-        echo "Webserver:"
-        echo "  Port: 9443"
-        echo "  RootPath: /usr/share/meshtasticd/web"
+        # v4.5 · el Webserver de meshtasticd no tiene contraseña: con MESH_WEB=yes escucha en 9443
+        # pero el cortafuegos bricohams-meshweb-fw solo deja entrar desde la propia Pi; fuera se
+        # llega por nginx :8443 con la sesión de /settings. Con MESH_WEB=no no hay Webserver.
+        if [ "${MESH_WEB:-yes}" = yes ]; then
+            echo "Webserver:"
+            echo "  Port: 9443"
+            echo "  RootPath: /usr/share/meshtasticd/web"
+        fi
         echo "General:"
         echo "  MaxNodes: 200"
         echo "  MACAddressSource: eth0"
     } >/etc/meshtasticd/config.d/hackergadgets-hat.yaml
+    if [ "${MESH_WEB:-yes}" = yes ]; then
+        command -v nft >/dev/null || apt_i nftables
+        install -d /etc/bricohams
+        cat >/etc/bricohams/meshweb-fw.nft <<'EOF'
+# BricoHams v4.5 · el Webserver de meshtasticd (9443, sin contraseña) solo para la propia Pi
+table inet bricohams_meshweb
+delete table inet bricohams_meshweb
+table inet bricohams_meshweb {
+    chain entrada {
+        type filter hook input priority -10; policy accept;
+        iifname != "lo" tcp dport 9443 drop
+    }
+}
+EOF
+        cat >/etc/systemd/system/bricohams-meshweb-fw.service <<EOF
+[Unit]
+Description=BricoHams - 9443 de meshtasticd solo desde la propia Pi
+Before=meshtasticd.service network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=$(command -v nft) -f /etc/bricohams/meshweb-fw.nft
+ExecStop=$(command -v nft) delete table inet bricohams_meshweb
+
+[Install]
+WantedBy=multi-user.target meshtasticd.service
+EOF
+        systemctl daemon-reload
+        systemctl enable bricohams-meshweb-fw >/dev/null 2>&1
+        systemctl restart bricohams-meshweb-fw || aviso "No pude cerrar el 9443 de meshtasticd (nft): revisa bricohams-meshweb-fw"
+    else
+        systemctl disable --now bricohams-meshweb-fw >/dev/null 2>&1 || true
+    fi
     systemctl enable meshtasticd
     systemctl restart meshtasticd || true
     # CLI de Meshtastic para dejar el nodo configurado
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install --force meshtastic >/dev/null 2>&1 || aviso "No pude instalar la CLI de meshtastic"
     if [ -e /dev/"$HAT_LORA_SPIDEV" ] && command -v meshtastic >/dev/null; then
+        systemctl stop bricohams-mesh-owrx 2>/dev/null || true      # v4.5: la API, libre mientras se configura
         for _ in $(seq 1 20); do ss -ltn | grep -q ':4403 ' && break; sleep 3; done
         if ss -ltn | grep -q ':4403 '; then
             local M=(timeout 60 meshtastic --host 127.0.0.1)
             if [ -n "${MESH_CHANNEL_URL:-}" ]; then
-                # canales SFNarrow, Murcia, Cartagena, Test y Alicante + radio EU_868 869,618 MHz BW 62,5 kHz SF7
+                # canales de la red (SFNarrow, Murcia, Cartagena, Iberia, Alicante, Almeria, SOS…) + radio EU_868
+                # 869,618 MHz BW 62,5 kHz SF7, 27 dBm (la URL manda: bricohams-mesh-url ver "$MESH_CHANNEL_URL")
                 "${M[@]}" --seturl "$MESH_CHANNEL_URL" && sleep 20
             else
                 "${M[@]}" --set lora.region "$MESH_REGION" && sleep 15
             fi
-            # canal privado solo en el nodo 868 (índice 5, detrás de los 5 canales de la red)
+            # canal privado solo en el nodo 868, detrás de los de la red (v4.5: solo si queda hueco, máx. 8)
             if [ -n "${MESH868_PRIVATE_PSK:-}" ]; then
-                "${M[@]}" --ch-add "${MESH868_PRIVATE_NAME:-BricoHams}" && sleep 10
-                "${M[@]}" --ch-index 5 --ch-set psk "base64:${MESH868_PRIVATE_PSK}" && sleep 10
-                bien "canal privado ${MESH868_PRIVATE_NAME:-BricoHams} (índice 5, AES-256) en el nodo 868"
+                local nc
+                nc=$(python3 "$FILES/bin/bricohams-mesh-url" contar "${MESH_CHANNEL_URL:-}" 2>/dev/null || echo 1)
+                case "$nc" in ''|*[!0-9]*) nc=1 ;; esac
+                if [ "$nc" -lt 8 ]; then
+                    "${M[@]}" --ch-add "${MESH868_PRIVATE_NAME:-BricoHams}" && sleep 10
+                    "${M[@]}" --ch-index "$nc" --ch-set psk "base64:${MESH868_PRIVATE_PSK}" && sleep 10
+                    bien "canal privado ${MESH868_PRIVATE_NAME:-BricoHams} (índice $nc, AES-256) en el nodo 868"
+                else
+                    aviso "MESH_CHANNEL_URL ya trae 8 canales: no cabe el privado ${MESH868_PRIVATE_NAME:-BricoHams}"
+                fi
             fi
             "${M[@]}" --set-owner "$MESH_LONG_NAME" --set-owner-short "$MESH_SHORT_NAME" && sleep 10
             "${M[@]}" --setlat "$STATION_LAT" --setlon "$STATION_LON" --setalt "$STATION_ASL" && sleep 5
             "${M[@]}" --set position.gps_mode NOT_PRESENT || true
             bien "nodo Meshtastic 868: $MESH_LONG_NAME ($MESH_SHORT_NAME), canales de MESH_CHANNEL_URL, posición fija"
+            systemctl start bricohams-mesh-owrx 2>/dev/null || true
         else
             aviso "meshtasticd no abre el puerto 4403 (¿pines LoRa? journalctl -u meshtasticd). Configura luego con: sudo bash install.sh --solo meshtastic"
         fi
@@ -1397,6 +1562,10 @@ paso_herramientas() {
     install -m 755 "$FILES/bin/bricohams-locator" /usr/local/bin/bricohams-locator
     # v4.4 · auditoría y blindaje de seguridad (manual 34): no cambia nada hasta «aplicar»
     install -m 755 "$FILES/bin/bricohams-blindaje" /usr/local/sbin/bricohams-blindaje
+    # v4.5 · inventario de dispositivos, URLs de Meshtastic sin enseñar claves y banner SSH
+    install -m 755 "$FILES/bin/bricohams-dispositivos" /usr/local/bin/bricohams-dispositivos
+    install -m 755 "$FILES/bin/bricohams-mesh-url" /usr/local/bin/bricohams-mesh-url
+    install -m 755 "$FILES/bin/bricohams-banner" /usr/local/bin/bricohams-banner
     # copia del kit en la Raspberry para restaurar sin la tarjeta original
     install -d /opt/bricohams
     rsync -a --delete --exclude 'bricohams.env' "$KIT/" /opt/bricohams/kit/
@@ -1455,6 +1624,18 @@ EOF
 #  v4 · Puente USB «bricohams-io» (Raspberry Pi Pico): con el HAT puesto no
 #  quedan pines libres; BME280, DS18B20, pluviómetro y ventiladores van a la Pico.
 # =====================================================================
+paso_banner() {
+    # v4.5 · banner SSH: aviso legal antes de entrar y estado de la estación al entrar
+    install -m 755 "$FILES/bin/bricohams-banner" /usr/local/bin/bricohams-banner
+    install -D -m 755 "$FILES/motd/20-bricohams" /usr/local/share/bricohams/20-bricohams
+    if si "${BANNER_SSH:-yes}"; then
+        BH_MOTD_SRC="$FILES/motd/20-bricohams" bricohams-banner instalar || aviso "No pude poner el banner SSH (mira sudo sshd -t)"
+    else
+        bricohams-banner quitar >/dev/null 2>&1 || true
+        bien "BANNER_SSH=no: sin banner propio"
+    fi
+}
+
 paso_io() {
     if [ "${IO_MODE:-pico}" != pico ]; then aviso "IO_MODE=${IO_MODE}: sensores y ventiladores en los GPIO de la Pi (sin HAT)"; return; fi
     apt_i python3-serial pipx
@@ -1616,6 +1797,19 @@ paso_web() {
         nginx_sitio "$modo" "${dom:-$(hostname)}" "$1" "$2" <"$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
         ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr
         rm -f /etc/nginx/sites-enabled/default
+        # v4.5 · otro sitio con default_server (p. ej. el «openwebrx» de una instalación manual con varnish)
+        # se queda las peticiones por IP y sirve /settings por HTTP sin pasar por el kit: se desactiva
+        local s
+        for s in /etc/nginx/sites-enabled/*; do
+            [ -e "$s" ] || continue
+            [ "$(basename "$s")" = bricohams-sdr ] && continue
+            if grep -qE '^[^#]*listen[^;]*default_server' "$s"; then
+                install -d -m 700 /etc/bricohams/nginx-desactivados
+                cp -aL "$s" "/etc/bricohams/nginx-desactivados/$(basename "$s").$(date +%Y%m%d-%H%M%S)"
+                rm -f "$s"
+                aviso "nginx: desactivado el sitio $(basename "$s") (default_server se saltaba la protección de /settings); copia en /etc/bricohams/nginx-desactivados"
+            fi
+        done
         nginx -t || fallo "nginx no acepta la configuración (mensaje de arriba): /etc/nginx/sites-available/bricohams-sdr"
         systemctl reload-or-restart nginx
     }
@@ -1661,6 +1855,47 @@ EOF
     systemctl daemon-reload
     systemctl enable --now bricohams-api
     systemctl restart bricohams-api
+    # v4.5 · panel Meshtastic 433/868 SOLO en /settings (sesión de administrador de OpenWebRX+)
+    install -m 755 "$FILES/bin/bricohams-mesh-url" /usr/local/bin/bricohams-mesh-url
+    install -m 755 "$FILES/bin/bricohams-mesh-admin" /usr/local/bin/bricohams-mesh-admin
+    # botones Meshtastic y APRS en /settings de OpenWebRX+ (y de nuevo tras cada apt de openwebrx)
+    install -m 755 "$FILES/bin/bricohams-owrx-botones" /usr/local/bin/bricohams-owrx-botones
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-botones ]; then /usr/local/bin/bricohams-owrx-botones -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-botones
+    /usr/local/bin/bricohams-owrx-botones || aviso "No he podido poner los botones Meshtastic/APRS en /settings de OpenWebRX+"
+    if [ -x /opt/pipx/venvs/meshtastic/bin/python ]; then
+        cat >/etc/systemd/system/bricohams-mesh-admin.service <<EOF
+[Unit]
+Description=BricoHams: panel Meshtastic 433/868 (solo /settings, sesión admin de OpenWebRX+)
+After=network-online.target openwebrx.service
+
+[Service]
+User=root
+Environment=HOME=/run/bricohams-mesh-admin
+Environment=BRICOHAMS_KIT_ENV=$KIT/bricohams.env
+ExecStart=/opt/pipx/venvs/meshtastic/bin/python /usr/local/bin/bricohams-mesh-admin servicio
+RuntimeDirectory=bricohams-mesh-admin
+ProtectSystem=strict
+ReadWritePaths=/etc/bricohams $KIT/bricohams.env
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+DevicePolicy=closed
+DeviceAllow=char-ttyACM rw
+DeviceAllow=char-ttyUSB rw
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now bricohams-mesh-admin
+        systemctl restart bricohams-mesh-admin
+    else
+        aviso "Panel Meshtastic sin instalar: falta el entorno pipx de meshtastic (paso lilygo)"
+    fi
     case "$modo" in
         admin) bien "nginx: receptor http://${dom:-$ip}/ · administración https://${dom:-$ip}/settings (forzada) · portal /bricohams/" ;;
         todo)  bien "nginx: todo por https://${dom:-$ip}/ · portal /bricohams/" ;;
@@ -1746,8 +1981,11 @@ paso_importar() {
     "$oc" "${dk[@]}" importar "$IMPORTAR" --si --niveles "$niveles" \
         || fallo "owrx-clone no ha podido importar $IMPORTAR (mensaje de arriba). Para volver atrás: sudo owrx-clone deshacer"
     # lo que BricoHams necesita de settings.json: el informe MQTT de las visitas
-    if si "${VISITAS_ENABLE:-yes}" && [ -s "$OWRX_DATA/settings.json" ]; then
-        python3 "$FILES/bin/bricohams-mqtt-settings.py" "$OWRX_DATA/settings.json"
+    if { si "${VISITAS_ENABLE:-yes}" || si "${OWRX_MAPA_LORA:-yes}" || si "${RAK_OWRX_CHAT:-yes}"; } && [ -s "$OWRX_DATA/settings.json" ]; then
+        local lora="" chat=""
+        si "${OWRX_MAPA_LORA:-yes}" && lora=--lora
+        si "${RAK_OWRX_CHAT:-yes}" && chat=--chat
+        python3 "$FILES/bin/bricohams-mqtt-settings.py" "$OWRX_DATA/settings.json" ${lora:+"$lora"} ${chat:+"$chat"}
         if [ "${OWRX_BACKEND:-native}" = docker ]; then owrx_owner; else chown openwebrx:openwebrx "$OWRX_DATA/settings.json"; fi
         owrx_control restart
     fi
@@ -1838,14 +2076,15 @@ cat <<EOF
 
   Siguientes pasos:
    1. Graba las series de los 4 RTL-SDR (una vez):  sudo bricohams-sdr-serials --grabar
-   2. Identifica los LilyGO (una vez):              sudo bricohams-lilygo identificar
+   2. Nombres fijos del RAK y del LilyGO:           sudo bricohams-dispositivos identificar
    3. Reinicia:                                     sudo reboot
-   4. Configura los LilyGO:                         sudo bricohams-lilygo meshtastic && sudo bricohams-lilygo igate
-   5. Comprueba todo:                               sudo bricohams-check
+   4. Graba y prueba el RAK4631 (iGate LoRa APRS):  sudo bricohams-rak-aprs grabar && sudo bricohams-rak-aprs prueba
+   5. Configura el LilyGO (Meshtastic 433):         sudo bricohams-lilygo meshtastic
+   6. Comprueba todo:                               sudo bricohams-check · sudo bricohams-dispositivos
 
   Servicios:  bricohams-servicios        (lista con estado y direcciones)
   Web:        http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · admin https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings (SSL_MODO=${SSL_MODO:-admin})
-  Meshtastic: https://$(hostname -I 2>/dev/null | awk '{print $1}'):9443
+  Meshtastic: https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings/bricohams/meshtastic  (solo administrador)
   Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
   Aviones:    http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
   Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado

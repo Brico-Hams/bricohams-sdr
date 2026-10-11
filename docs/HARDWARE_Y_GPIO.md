@@ -213,3 +213,11 @@ Cableado del sensor: [esquema 03](esquemas/03_cableado_bme280.png) y [manual 06]
 
 ## 10. Filtros y preamplificadores (v4)
 ![Filtros](esquemas/17_filtros_lna.png)
+
+## v4.5 · RAK4631 WisBlock (iGate LoRa APRS) y LilyGO T3 (Meshtastic 433)
+Van por USB a la Pi y no usan GPIO de la Pi. Pines internos del RAK4631 (SX1262, GPS del slot A, I2C de los sensores, LED y batería) en el [manual 35](manuales/35_LORA_APRS_MESHTASTIC.md#pines-rak4631-sobre-rak19007).
+
+| Aparato | USB (VID:PID) | Nombre fijo | Antena |
+|---|---|---|---|
+| RAK4631 (firmware BricoHams) | 239a:8029 (en grabación: 239a:0029; de fábrica con RUI3: 1915:521f, convertir antes, manual 35) | `/dev/rak-aprs` | LoRa 433 por IPEX→SMA al pasamuros IG433; GPS por IPEX |
+| LilyGO T3 V1.6.1 433 | 1a86:55d4 (CH9102) | `/dev/lilygo-mesh` | SMA al pasamuros M433 |

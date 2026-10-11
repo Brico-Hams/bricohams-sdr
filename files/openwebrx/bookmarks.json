@@ -236,18 +236,32 @@
   "scannable": true
  },
  {
-  "name": "📡 LoRa APRS",
+  "name": "📡 LoRa APRS 433,775",
   "frequency": 433775000,
-  "modulation": "nfm",
+  "modulation": "lora-aprs",
   "scannable": true,
-  "description": "LoRa (solo visible en cascada)"
+  "description": "LoRa APRS (SF12, BW 125 kHz). OpenWebRX+ lo decodifica y lo pinta en el mapa; el iGate RAK4631 de la estación también lo oye y lo sube a APRS-IS"
+ },
+ {
+  "name": "📶 Meshtastic 433 LongFast",
+  "frequency": 433875000,
+  "modulation": "meshtastic",
+  "scannable": true,
+  "description": "Red Meshtastic EU_433 LongFast (BW 250 kHz): canales públicos Murcia, Cartagena, Iberia, Alicante, Almería y SOS. Para decodificarlo aquí: Ajustes → Decodificación → Meshtastic bandwidth = 250"
  },
  {
   "name": "📶 Meshtastic EU LongFast",
   "frequency": 869525000,
-  "modulation": "nfm",
+  "modulation": "meshtastic",
   "scannable": true,
-  "description": "LoRa (solo visible en cascada)"
+  "description": "Meshtastic EU_868 LongFast por defecto (BW 250 kHz)"
+ },
+ {
+  "name": "📶 Meshtastic 868 SFNarrow (red de Murcia)",
+  "frequency": 869618000,
+  "modulation": "meshtastic",
+  "scannable": true,
+  "description": "Red Meshtastic de la zona: 869,618 MHz, BW 62,5 kHz, SF7 (Meshtastic bandwidth = 62.5 en Ajustes → Decodificación, el valor del kit). La oye también el nodo 868 del HAT"
  },
  {
   "name": "🎙️ PMR 1 · 446,00625",

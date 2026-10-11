@@ -32,6 +32,8 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **arreglos de la instalación real:** claves con `$` en `bricohams.env`, cortes de red tras el paso `red`, descargas sin reintento;
   - [ayuda rápida](docs/AYUDA_RAPIDA.md) con todas las órdenes.
 - **v4.4:** **blindaje de seguridad** (`sudo bricohams-blindaje auditar | aplicar`): cortafuegos del host con vuelta atrás, SSH, fail2ban, permisos de las claves, búsqueda de fugas, límite de intentos en `/login`, y la **posición pública redondeada** a ~1 km ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
+- **v4.5:** **iGate LoRa APRS en un RAK4631** con firmware propio (port de CA2RXU, GPS y temperatura de la caja), **Meshtastic 433/868** con las URL de la red, y todo **en el mapa de OpenWebRX+**; banner SSH e inventario de dispositivos ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md)).
+- **v4.6:** **servidor TAK local** (OpenTAKServer aislado), aviones de readsb en el mapa sin interrumpir RadarBox/MLAT, trayectorias APRS, mensajes APRS en el CHAT común y capa TAK privada para administradores ([manual 36](docs/manuales/36_TAK_MAPA_LOCAL.md), justificación en el [manual 37](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)).
 - **v4.3:**
   - **OpenWebRX+ en Docker** desde `bricohams.env` (`OWRX_BACKEND="docker"`): el instalador crea el `docker-compose.yaml` y el contenedor; owrx-clone 1.1 pasa una estación de nativo a Docker y al revés ([manual 33](docs/manuales/33_OPENWEBRX_DOCKER.md));
   - **zona por locator:** con `STATION_LOCATOR` (cualquier locator de España) salen los aeropuertos, estaciones AEMET, puertos, NAVTEX y emisoras de FM regionales y locales más cercanos, como marcadores y `METEO_STATIONS`. Lejos de Mi QTH se quitan los de Murcia ([manual 32](docs/manuales/32_ZONA_LOCATOR.md), `bricohams-locator`);
@@ -131,6 +133,8 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - [26 Satélites](docs/manuales/26_SATELITES.md) · [27 Plugins web](docs/manuales/27_PLUGINS_WEB_V4.md) · [28 FT2](docs/manuales/28_FT2.md) · [29 Actualizar](docs/manuales/29_ACTUALIZAR.md)
 - v4.2: [30 Audio FILTRO y DSP](docs/manuales/30_AUDIO_DSP.md) · [31 Clonar OpenWebRX+](docs/manuales/31_CLONAR_OPENWEBRX.md) · [Ayuda rápida](docs/AYUDA_RAPIDA.md)
 - v4.4: [34 Blindaje de seguridad](docs/manuales/34_BLINDAJE_SEGURIDAD.md)
+- v4.5: [35 LoRa APRS (RAK4631) y Meshtastic en OpenWebRX+](docs/manuales/35_LORA_APRS_MESHTASTIC.md)
+- v4.6: [36 TAK y mapa local](docs/manuales/36_TAK_MAPA_LOCAL.md) · [37 Justificación de los cambios v4.6](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)
 - v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 

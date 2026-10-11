@@ -1,5 +1,97 @@
 # Historial
 
+## v4.6 · 11/10/2026
+**Servidor TAK local, chat APRS en el CHAT común y mapa en vivo con aviones ADS-B y trazas APRS.** Todo lo de la v4.5 se mantiene. RadarBox y MLAT no se tocan. Justificación completa en el manual 37; manejo en el manual 36.
+
+**TAK local** (manual 36, ADR-54)
+- `tools/instalar_tak.sh`: OpenTAKServer 1.7.13 con la UI 1.7.5 (sha256 comprobado).
+  - Python 3.12.15 aislado con uv en `/opt/bricohams-tak`. El Python 3.13 del sistema no se toca: el gevent de OTS falla al hacer fork con 3.13.
+  - Puertos solo LAN: 8445 (UI), 8089 (CoT mTLS), 8446 (enrollment) y 8447 (Marti mTLS). 8443 sigue siendo de Meshtastic.
+  - `bricohams-tak-fw` cierra 4369, 5672, 15672, 25672, 5432 y 8081 desde fuera.
+  - Credenciales en `/etc/bricohams/tak-access.txt` (600).
+- Capa TAK en el mapa, **solo para el admin y por HTTPS**: `/settings/bricohams/tak/posiciones` (ADR-56).
+
+**Chat APRS** (ADR-57)
+- `bricohams-rak-aprs` publica en el CHAT común de OpenWebRX+ (MQTT `aprs/CLIENT`) los mensajes APRS-IS dirigidos a la estación:
+  - sin ack, rej ni telemetría;
+  - sin duplicados en 5 min;
+  - con un máximo de 200 caracteres.
+- Solo recibe: no transmite por RF ni manda ACK automáticos.
+- `RAK_OWRX_CHAT=yes` y `bricohams-mqtt-settings.py --chat`.
+
+**Mapa en vivo** (ADR-55)
+- `/bricohams/api/aviones`: aviones de readsb saneados.
+  - Responde 503 si los datos tienen más de 15 s.
+  - No publica la posición del receptor.
+- Plugin `bricohams_live`:
+  - aviones cada 2 s;
+  - trazas de las estaciones APRS en movimiento (2 h, 512 estaciones, 1000 puntos);
+  - etiquetas con `textContent`.
+- `tools/activar_mapa_local.sh`: despliegue con copia de seguridad. Comprueba que `rbfeeder.ini` no cambia y que MLAT sigue en marcha.
+- readsb pasa a `--device 00000401`: el `00001090` no existía. Cambio autorizado.
+
+**Pruebas y documentación**
+- `tests/test_live_map.py` es nuevo. Las pruebas TAK están en `tests/test_mesh_admin.py`.
+- Manuales 36 y 37, ADR-54 a ADR-57 y los puertos TAK en `DATOS.md`.
+
+## v4.5 · 11/10/2026
+**LoRa APRS en un RAK4631 con firmware propio, Meshtastic 433/868 con las URL de la red, todo dentro del mapa de OpenWebRX+, banner SSH e inventario de dispositivos.** Se mantiene todo lo anterior (la v4.4 que subió EA5KAO como «corregido»).
+
+**RAK4631 · iGate LoRa APRS** (manual 35, esquema 25, ADR-49)
+- Firmware `firmware/rak4631-lora-aprs`: **port de LoRa_APRS_iGate (CA2RXU)** al nRF52840/SX1262. Compilado y con sus binarios `.zip`, `.uf2` y `.hex`:
+  - igual que el original: radio LoRa APRS 433,775, CAD, digipeater y KISS;
+  - nuevo: baliza con estado y ambigüedad, telemetría con la **temperatura y humedad de la caja** (RAK1901/RAK1906/BME280), GPS del slot A y batería;
+  - configuración por USB (KISS 0x06 «BH:») guardada en la flash.
+- `bricohams-rak-aprs` en la Pi:
+  - sube a APRS-IS con las reglas de iGate (qAR, sin TCPIP/NOGATE/RFONLY, sin consultas ni terceros);
+  - baja a RF los mensajes de APRS-IS para estaciones oídas (messagesToRF);
+  - le manda al RAK su configuración desde `bricohams.env`;
+  - `grabar` (DFU), `prueba`, `estado`, `baliza`;
+  - servicio sin root (DynamicUser, credencial).
+- Configuración **clonada del iGate actual** (192.168.1.142) con el indicativo **EA5KAO-15**.
+- El control de ventiladores usa la temperatura del RAK si no hay DS18B20 (`FAN_CAJA_RAK`).
+
+**Meshtastic** (manual 35, ADR-51)
+- `MESH433_CHANNEL_URL`: la URL de la red 433 se aplica tal cual, con radio EU_433 LONG_FAST a 10 dBm. `MESH_CHANNEL_URL`: la nueva URL 868 (SFNarrow, 869,618 MHz, BW 62,5, SF7, 27 dBm).
+- Las URL completas, con los canales privados, solo van en tu `bricohams.env`. El `.env.example` lleva la versión pública (`bricohams-mesh-url publica`).
+- `bricohams-mesh-url`: lee una URL sin enseñar claves.
+- El canal privado `MESH868_PRIVATE_*` solo se añade si queda hueco (máx. 8).
+- Nombres: *SDR BricoHams 433* (SB43) y *SDR BricoHams 868* (SB86).
+- `bricohams-lilygo firmware`: actualiza el Meshtastic oficial del LilyGO con esptool, conservando la configuración.
+
+**Integración directa con OpenWebRX+** (ADR-50)
+- `bricohams-mesh-owrx` y `bricohams-rak-aprs` publican en el MQTT local (`lora433/APRS`, `mesh433/Meshtastic`, `mesh868/Meshtastic`). OpenWebRX+ 1.2.126 lo pinta en su **mapa** con su propio código.
+- La posición propia va redondeada. Chat de canales públicos opcional (`MESH_OWRX_CHAT`).
+- Se instalan `dxlaprs-lora`, `python3-meshtastic` y `python3-pycryptodome` (modos *LoRa APRS* y *Meshtastic* de OpenWebRX+).
+- Marcadores LoRa APRS 433,775, Meshtastic 433 LongFast y 868 SFNarrow.
+
+**Banner SSH** (`bricohams-banner`, ADR-52)
+- Antes de entrar: logo y aviso legal, sin sistema, versiones ni IP.
+- Al entrar: estado de la estación (sistema, caja, servicios, equipos, LoRa APRS, seguridad, ayuda).
+- La auditoría del blindaje lo comprueba.
+
+**Dispositivos:** `bricohams-dispositivos` (inventario por VID:PID y serie; `/dev/rak-aprs` y `/dev/lilygo-mesh` sin enchufar de uno en uno; `HARDWARE_PENDIENTE` = «en camino»).
+
+**Pruebas nuevas:** `test_rak_aprs`, `test_mesh_owrx`, `test_v45_dispositivos`.
+
+**Despliegue en la estación de EA5KAO (11/10/2026)** (informe: `docs/DESPLIEGUE_EA5KAO_2026-10-11.md`, ADR-53)
+- **Meshtastic solo para el admin:**
+  - nuevo `bricohams-mesh-admin` en `/settings/bricohams/meshtastic` (HTTPS, sesión de OpenWebRX+, CSRF, sin PSK). Botón «Meshtastic 433 / 868» en Ajustes;
+  - página `/settings/bricohams/aprs` («APRS (RAK)»): estado del RAK, registro de paquetes oídos y reinicio de la pasarela, sin enseñar el passcode;
+  - los botones los pone `bricohams-owrx-botones` en la plantilla `settings.html` de OpenWebRX+ (antes era un `sub_filter` de nginx que no salía entrando por `:8073`). Un gancho de apt los vuelve a poner tras actualizar openwebrx;
+  - se quita la web 9443 de meshtasticd;
+  - la web pública solo enseña los nodos en el mapa.
+- **nginx:** `install.sh` desactiva otros sites `default_server`. Un site antiguo `openwebrx` se saltaba el HTTPS y la protección de `/settings`.
+- **RAK4631 con RUI3:**
+  - `bricohams-dispositivos` lo reconoce (`1915:521f`, rol `rak-rui3`);
+  - `grabar` se para y explica la conversión a WisBlock (manual 35).
+- **`grabar`:** ya no da por bueno el DFU solo porque `adafruit-nrfutil` devuelva 0; exige «Device programmed».
+- **Firmware:**
+  - sin batería, el RAK mandaba `"vbat": nan` (JSON inválido). `prueba` se caía y el servicio tiraba todos los STATUS (sin `rak-aprs.json` ni temperatura de la caja);
+  - la Pi lo tolera (`json_rak`, nan/inf → null);
+  - el código usa `medidaValida()` por rangos en lugar de `isnan()`. **Hay que recompilar los binarios** (`tools/compilar_rak.sh`); los de `bin/` siguen siendo 1.0.0.
+- **Pruebas:** `test_mesh_admin` (nuevo). `test_rak_aprs` amplía con nan, `json_rak`, `grabar` y RUI3.
+
 ## v4.4 · 11/10/2026
 **Blindaje de seguridad de la estación y posición pública redondeada.** Se mantiene todo lo anterior, más el cambio de EA5KAO en v4.4.1 (`MESH_CHANNEL_URL` con los canales SFNarrow, Iberia, Test, Bots y Murcia).
 

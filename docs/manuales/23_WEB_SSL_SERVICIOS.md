@@ -27,7 +27,7 @@
      1. Entra en https://www.duckdns.org con tu cuenta y crea por ejemplo `bricohams-sdr`.
      2. Copia el *token*.
      3. En `bricohams.env`, pon `DUCKDNS_DOMAIN="bricohams-sdr"` y `DUCKDNS_TOKEN="…"`. La Pi actualiza la IP cada 5 min.
-2. **En el router:** reenvía los puertos **80 y 443 TCP** a la IP de la Pi (con `SSL_MODO="no"`, solo el 80). **No abras el 8073 ni el 9443.** Lo ideal es darle a la Pi una IP fija en el DHCP del router.
+2. **En el router:** reenvía los puertos **80 y 443 TCP** a la IP de la Pi (con `SSL_MODO="no"`, solo el 80). **No abras el 8073, el 4403 ni el 9443.** Lo ideal es darle a la Pi una IP fija en el DHCP del router.
 3. **En `bricohams.env`:**
    ```
    SSL_DOMAIN="bricohams-sdr.duckdns.org"    # o tu dominio
@@ -55,7 +55,8 @@
 | Cámara del mástil (HLS) | `http://DOMINIO/camara/mastil/` | `http://IP:8888/mastil/` |
 | Aviso de privacidad | `http://DOMINIO/bricohams/privacidad.html` | — |
 | API de los plugins | `http://DOMINIO/bricohams/api/salud` | — |
-| Meshtastic (web del nodo 868) | **no expuesto** | `https://IP:9443/` |
+| Meshtastic 433 / 868 (configuración) | **solo con sesión de admin:** `https://DOMINIO/settings/bricohams/meshtastic` (botón «Meshtastic 433 / 868» en Ajustes) | igual |
+| Meshtastic API del nodo 868 | no expuesto | `IP:4403` (TCP, sin clave: solo LAN) |
 | RTSP de la cámara | no expuesto | `rtsp://IP:8554/mastil` |
 | Admin de OpenWebRX+ | **`https://DOMINIO/settings`** (si entras por http, te lleva a https) | igual |
 

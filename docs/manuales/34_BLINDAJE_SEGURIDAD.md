@@ -80,6 +80,22 @@ Lo comprobado desde fuera el 11/10/2026: `https://sdr.ea5kao.ampr.org/status.jso
 - **sudo sin contraseña:** `--sudo-con-clave`. Antes, asegúrate de saber tu contraseña.
 - **Usuario `pi`:** si existe y no lo usas, `sudo deluser --remove-home pi`.
 
+## 4 bis. Banner SSH (v4.5)
+`sudo bricohams-banner instalar` (lo hace `install.sh`, paso `banner`; `BANNER_SSH="no"` lo quita):
+- **Antes de entrar** (`/etc/issue.net`, `Banner` de sshd):
+  - logo y aviso legal: sistema privado, conexiones registradas, art. 197 bis del Código Penal, nota RGPD;
+  - **sin** sistema, versiones, IP ni dominio: no ayuda a quien prueba contraseñas;
+  - la auditoría avisa si `issue.net` da pistas.
+- **Al entrar** (`/etc/update-motd.d/20-bricohams`, sin red ni apt):
+  - sistema (activo, carga, CPU, RAM, disco, IP de la LAN);
+  - caja (temperatura y humedad, ventiladores);
+  - servicios;
+  - equipos (receptores por su serie, RAK, LilyGO, lo que falta o está en camino);
+  - LoRa APRS (paquetes, último oído, APRS-IS);
+  - seguridad (blindaje sin confirmar, reinicio pendiente, IP bloqueadas, nota de la auditoría);
+  - órdenes de ayuda.
+- Se ve con `bricohams-banner ver`. El texto de Debian se guarda en `/etc/motd.bricohams-orig` y `quitar` lo devuelve.
+
 ## 5. Contraseñas
 - Usa claves largas y distintas para la Pi, el admin de OpenWebRX+, la WiFi y las API.
 - **Si una contraseña ha salido de la Pi** (pegada en un chat, en un correo, en una captura): cámbiala.

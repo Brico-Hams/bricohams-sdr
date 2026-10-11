@@ -213,6 +213,20 @@ def io_lectura(path):
         return None
 
 
+def temp_caja_rak(path=None):
+    """v4.5 · temperatura de la caja medida por el RAK4631 (bricohams-rak-aprs), si es reciente (< 5 min)."""
+    if not as_bool(env('FAN_CAJA_RAK', 'yes')):
+        return None
+    path = path or env('RAK_ESTADO', '/run/bricohams-rak/rak-aprs.json')
+    try:
+        if time.time() - os.path.getmtime(path) > 300:
+            return None
+        t = json.load(open(path)).get('t_caja')
+        return float(t) if t is not None else None
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
 def io_temp_caja(d, ident=''):
     lst = (d or {}).get('ds') or []
     if ident:
@@ -230,6 +244,8 @@ def main_pico(cfg, forzado, salida_web):
     while True:
         d = io_lectura(io_json)
         tc, tb = temp_cpu(), io_temp_caja(d, env('FAN_DS18B20_ID'))
+        if tb is None:
+            tb = temp_caja_rak()                          # v4.5: sin DS18B20, la del RAK4631
         nuevo = forzado if forzado is not None else curva(tc, tb, cfg, ciclo)
         if ciclo == 0 and 0 < nuevo < 60 and forzado is None:
             nuevo_envio = 100                                 # arranque desde parado: golpe al 100 %
@@ -317,6 +333,8 @@ def main():
     ciclo = 0
     while True:
         tc, tb = temp_cpu(), temp_ds18b20(env('FAN_DS18B20_ID'))
+        if tb is None:
+            tb = temp_caja_rak()                          # v4.5: sin DS18B20, la del RAK4631
         nuevo = forzado if forzado is not None else curva(tc, tb, cfg, ciclo)
         if ciclo == 0 and 0 < nuevo < 60:                # arranque desde parado: golpe al 100 % 1,5 s
             for i in range(len(pwm_gpios)):

@@ -88,7 +88,7 @@ def bloques():
     b += box(700, 80, 360, 846, 'Raspberry Pi 5 · Bookworm 64 bits', [], C['pi'], '#f3faf3')
     svcs = [('OpenWebRX+ :8073', 'rx SAT · HAM · MULTI (+HF) · SDRplay*'), ('Plugins web', 'DX · SOL · METEO · CAM · BricoHams'),
             ('readsb', 'Beast :30005 · tar1090 en :80'), ('rbfeeder + MLAT', 'AirNav RadarBox'),
-            ('meshtasticd', 'nodo 868 · web :9443 · API :4403'), ('gpsd + chrony', 'hora GPS + PPS · :2947'),
+            ('meshtasticd', 'nodo 868 · web :8443 (admin) · API :4403'), ('gpsd + chrony', 'hora GPS + PPS · :2947'),
             ('bricohams-wx', 'sensor → sensor.json · WX APRS'), ('bricohams-meteo', 'AEMET + Open-Meteo (10 min)'),
             ('MediaMTX', 'RTSP :8554 · WebRTC :8889 · HLS :8888'), ('bricohams-camsnap', 'foto cada 60 s → web :8073'),
             ('bricohams-lilygo', 'config. Meshtastic 433 e iGate'), ('bricohams-backup', 'copia diaria 04:30')]
@@ -246,7 +246,7 @@ def red():
             ('8889/tcp + 8189/udp', 'MediaMTX WebRTC (vídeo en directo)', 'opcional', C['cam']),
             ('8888/tcp', 'MediaMTX HLS', 'solo LAN', C['cam']),
             ('8554/tcp', 'MediaMTX RTSP (rtsp://<pi>:8554/mastil)', 'solo LAN', C['cam']),
-            ('9443/tcp', 'meshtasticd: web (https)', 'solo LAN', C['lora']),
+            ('8443/tcp', 'Meshtastic Web (sesión admin)', 'solo LAN', C['lora']),
             ('4403/tcp', 'meshtasticd: API (CLI, apps)', 'solo LAN', C['lora']),
             ('30005/tcp', 'readsb: salida Beast (rbfeeder)', 'local', C['sdr']),
             ('2947/tcp', 'gpsd', 'local', C['gps']),
@@ -686,7 +686,7 @@ def red_servicios():
     b += arrow(600, 675, 760, 675, C['pi'])
     b += txt(40, 780, '• Desde casa sigue funcionando http://IP:8073 sin nginx (la ficha DMR/YSF y el portal necesitan nginx).', 11.2)
     b += txt(40, 828, '• v4.2: el certificado protege la administración; SSL_MODO=todo pone todo en HTTPS y SSL_MODO=no lo quita (solo LAN).', 11.2)
-    b += txt(40, 804, '• Solo LAN: Meshtastic https://IP:9443, API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
+    b += txt(40, 804, '• Solo LAN: Meshtastic Web https://IP:8443 (admin), API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
     return svg(W, H, b, 'Servicios web, SSL (solo administración), visitas y tareas automáticas')
 
 
@@ -924,7 +924,7 @@ def blindaje():
     b += arrow(280, 240, 330, 240, C['cr'])
     b += arrow(560, 240, 610, 240, C['ink'])
     b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · 192.168.1.105', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
-    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 9443, 8554 · resto: descartado y registrado', C['or']),
+    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8554 · resto: descartado y registrado', C['or']),
              ('nginx', '/settings → HTTPS · /login 12/min (429) · sin versión · X-Frame · ocultos 404', C['net']),
              ('SSH', 'solo LAN · sin root · 3 intentos · solo clave si la hay · fail2ban', C['pi']),
              ('Claves', 'bricohams.env 600 · .env 640 · copias 700 · users.json 600 · fugas: buscadas', C['cr']),
@@ -943,6 +943,46 @@ def blindaje():
     return svg(W, H, b, 'Blindaje de seguridad de la estación (v4.4)')
 
 
+def lora_owrx():
+    """Esquema 25: RAK4631 LoRa APRS, nodos Meshtastic y su integración en OpenWebRX+ (v4.5)."""
+    W, H = 1500, 930
+    b = markers([C['ink'], C['lora'], C['sdr'], C['or'], C['net'], C['pi']])
+    b += caja_s(30, 80, 360, 250, 'RAK4631 WisBlock · 433,775 MHz', 'firmware BricoHams RAK APRS (port CA2RXU)', C['lora'], '#e0f7fa', arriba=True)
+    for k, t in enumerate(['SX1262 · SF12 · BW 125 · CR 4/5 · 20 dBm', 'digipeater WIDE1-1 · baliza · estado', 'GPS slot A · sensor de la caja (SHTC3/BME)',
+                           'KISS por USB + orden 0x06 «BH:…»', 'EA5KAO-15 · /dev/rak-aprs']):
+        b += txt(50, 150 + k * 30, t, 11)
+    b += caja_s(30, 370, 360, 190, 'LilyGO T3 V1.6.1 · 433', 'Meshtastic EU_433 LongFast · 10 dBm', C['or'], '#fff3e0', arriba=True)
+    for k, t in enumerate(['URL de la red 433 (MESH433_CHANNEL_URL)', 'SDR BricoHams 433 · SB43', '/dev/lilygo-mesh']):
+        b += txt(50, 440 + k * 30, t, 11)
+    b += caja_s(30, 600, 360, 170, 'HAT · SX1262 868 (en camino)', 'meshtasticd · 127.0.0.1:4403', C['pi'], '#e8f5e9', arriba=True)
+    for k, t in enumerate(['869,618 MHz · BW 62,5 · SF7 · 27 dBm', 'SDR BricoHams 868 · SB86']):
+        b += txt(50, 670 + k * 30, t, 11)
+    b += caja_s(480, 80, 430, 690, 'Raspberry Pi 5', 'servicios sin root (DynamicUser)', C['sdr'], '#eef4fb', arriba=True)
+    b += caja_s(500, 140, 390, 170, 'bricohams-rak-aprs', 'RF → APRS-IS (qAR) · baliza/telemetría · APRS-IS → RF (mensajes)', C['lora'], '#ffffff')
+    b += caja_s(500, 340, 390, 150, 'bricohams-mesh-owrx', 'API Meshtastic (serie y TCP) → posiciones, nombres, telemetría', C['or'], '#ffffff')
+    b += caja_s(500, 520, 390, 110, 'mosquitto 127.0.0.1:1883', 'lora433/APRS · mesh433/Meshtastic · mesh868/Meshtastic', C['net'], '#ffffff')
+    b += caja_s(500, 650, 390, 100, 'OpenWebRX+ 1.2.126', 'mqtt_aprs · mqtt_meshtastic → MAPA · LoRa APRS y Meshtastic por SDR (lorarx)', C['sdr'], '#ffffff')
+    b += arrow(390, 200, 500, 220, C['lora'], 'USB KISS')
+    b += arrow(390, 460, 500, 400, C['or'], 'USB serie')
+    b += arrow(390, 680, 500, 440, C['pi'], 'TCP 4403')
+    b += arrow(700, 310, 700, 520, C['lora'])
+    b += arrow(760, 490, 760, 520, C['or'])
+    b += arrow(700, 630, 700, 650, C['net'])
+    b += caja_s(1000, 80, 470, 200, 'APRS-IS', 'rotate.aprs2.net:14580 · filtro m/10', C['ink'], '#fafafa', arriba=True)
+    b += txt(1020, 160, 'sube lo oído por RF (sin TCPIP/NOGATE/RFONLY)', 11) + txt(1020, 188, 'baja mensajes para estaciones oídas (30 min)', 11)
+    b += txt(1020, 216, 'aprs.fi · EA5KAO-15', 11, C['lora'], True)
+    b += arrow(890, 220, 1000, 180, C['ink'], 'passcode')
+    b += caja_s(1000, 320, 470, 450, 'Mapa público de OpenWebRX+', 'https://sdr.ea5kao.ampr.org/map', C['sdr'], '#eef4fb', arriba=True)
+    for k, t in enumerate(['estaciones LoRa APRS oídas (icono APRS, RSSI/SNR)', 'nodos Meshtastic 433 y 868 (icono M)',
+                           'posición de NUESTROS nodos a 2 decimales (~1 km)', 'mensajes directos: nunca', 'chat de canales públicos: MESH_OWRX_CHAT=yes',
+                           'sin HAT: el 868 espera solo (no es un fallo)']):
+        b += txt(1020, 400 + k * 34, t, 11)
+    b += arrow(890, 700, 1000, 600, C['sdr'])
+    b += txt(30, 830, 'Grabar: sudo bricohams-rak-aprs grabar (DFU por USB) · sudo bricohams-lilygo firmware · Probar: sudo bricohams-rak-aprs prueba · sudo bricohams-check', 11)
+    b += txt(30, 880, 'Manual 35 · ADR-49 (RAK: radio en el RAK, Internet en la Pi) · ADR-50 (mapa por MQTT) · ADR-51 (URLs de Meshtastic)', 11, C['mute'])
+    return svg(W, H, b, 'LoRa APRS y Meshtastic en OpenWebRX+ (v4.5)')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -957,7 +997,7 @@ def main():
                      ('18_red_servicios', red_servicios), ('19_actualizar', actualizar),
                      ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx),
                      ('22_zona_locator', zona_locator), ('23_openwebrx_docker', openwebrx_docker),
-                     ('24_blindaje', blindaje)]:
+                     ('24_blindaje', blindaje), ('25_lora_owrx', lora_owrx)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

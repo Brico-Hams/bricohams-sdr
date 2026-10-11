@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-dispositivos · EA5KAO · BricoHams (v4.5)
+#  Inventario de todo lo que cuelga de la Raspberry y nombres fijos.
+#    inventario   qué hay conectado y para qué es (SDR por su serie, RAK, LilyGO,
+#                 Pico, RS485, HAT por SPI/serie) y qué falta todavía
+#    identificar  crea /dev/rak-aprs y /dev/lilygo-mesh por su VID:PID y serie
+#                 (regla udev). Si hay dos iguales, usa: sudo bricohams-lilygo identificar
+#    json         lo mismo en JSON (bricohams-check, banner SSH, /run/bricohams)
+#  Lee /sys (no necesita lsusb). Pendientes de llegar: HARDWARE_PENDIENTE en bricohams.env.
+# =====================================================================
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+
+SYS = os.environ.get('BH_SYS', '/sys')
+DEV = os.environ.get('BH_DEV', '/dev')
+ENV_FILE = os.environ.get('BRICOHAMS_ENV', '/etc/bricohams/bricohams.env')
+REGLAS = os.environ.get('BH_REGLAS', '/etc/udev/rules.d/99-bricohams-dispositivos.rules')
+REGLAS_LILYGO = '/etc/udev/rules.d/99-bricohams-lilygo.rules'
+
+# VID:PID -> (tipo, descripción)
+CONOCIDOS = {
+    '0bda:2838': ('rtlsdr', 'RTL-SDR (RTL2832U)'),
+    '0bda:2832': ('rtlsdr', 'RTL-SDR (RTL2832U)'),
+    '239a:8029': ('rak', 'RAK4631 WisBlock (firmware)'),
+    '239a:0029': ('rak-dfu', 'RAK4631 en modo grabación (bootloader)'),
+    '1915:521f': ('rak-rui3', 'RAK4631 con firmware RUI3 de fábrica (hay que convertirlo: manual 35)'),
+    '1a86:55d4': ('lilygo', 'LilyGO T3 V1.6.1 (CH9102)'),
+    '10c4:ea60': ('lilygo', 'LilyGO / ESP32 (CP210x)'),
+    '303a:1001': ('esp32s3', 'ESP32-S3 USB (LilyGO T3S3)'),
+    '2e8a:0005': ('pico', 'Raspberry Pi Pico (bricohams-io)'),
+    '1a86:7523': ('rs485', 'Adaptador RS485 (CH340)'),
+}
+
+
+def leer(p, d=''):
+    try:
+        return open(p, encoding='utf-8', errors='replace').read().strip()
+    except OSError:
+        return d
+
+
+def cargar_env():
+    v = {}
+    try:
+        for l in open(ENV_FILE, encoding='utf-8'):
+            m = re.match(r'^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$', l)
+            if m:
+                x = m.group(2).strip()
+                fin = x.find(x[0], 1) if x[:1] in ('"', "'") else -1
+                x = x[1:fin] if fin > 0 else re.sub(r'\s+#.*$', '', x)
+                v[m.group(1)] = x
+    except OSError:
+        pass
+    return v
+
+
+def ttys(d):
+    out = []
+    for t in glob.glob(os.path.join(d, '*:*', 'tty*')) + glob.glob(os.path.join(d, '*:*', 'tty', 'tty*')):
+        n = os.path.basename(t)
+        if n.startswith('tty') and n != 'tty':
+            out.append('/dev/' + n)
+    return sorted(set(out))
+
+
+def usb():
+    lista = []
+    for d in sorted(glob.glob(os.path.join(SYS, 'bus', 'usb', 'devices', '*'))):
+        if ':' in os.path.basename(d):
+            continue
+        vid, pid = leer(os.path.join(d, 'idVendor')), leer(os.path.join(d, 'idProduct'))
+        if not vid or vid == '1d6b':                   # concentradores raíz
+            continue
+        clase = leer(os.path.join(d, 'bDeviceClass'))
+        tipo, desc = CONOCIDOS.get('%s:%s' % (vid, pid), (None, None))
+        if vid == '1df7':
+            tipo, desc = 'sdrplay', 'SDRplay RSP (%s)' % (leer(os.path.join(d, 'product')) or pid)
+        if tipo is None:
+            if clase == '09':
+                tipo, desc = 'hub', 'Concentrador USB'
+            elif any(leer(os.path.join(i, 'bInterfaceClass')) == '0e' for i in glob.glob(os.path.join(d, '*:*'))):
+                tipo, desc = 'camara', 'Cámara USB (UVC)'
+            else:
+                tipo, desc = 'otro', leer(os.path.join(d, 'product')) or 'desconocido'
+        lista.append({'bus': os.path.basename(d), 'vidpid': '%s:%s' % (vid, pid), 'tipo': tipo, 'descripcion': desc,
+                      'producto': leer(os.path.join(d, 'product')), 'serie': leer(os.path.join(d, 'serial')),
+                      'velocidad': leer(os.path.join(d, 'speed')), 'tty': ttys(d)})
+    return lista
+
+
+def inventario():
+    e = cargar_env()
+    series = {e.get('SERIAL_HAT', '00000101'): ('HAT HackerGadgets', 'SATÉLITES'),
+              e.get('SERIAL_MINI', '00000102'): ('Mini RTL-SDR', 'RADIOAFICIONADOS'),
+              e.get('SERIAL_V3', '00000103'): ('RTL-SDR Blog V3', 'MULTIPERFIL + HF'),
+              e.get('SERIAL_ADSB', '00001090'): ('FlightStick RadarBox', 'ADS-B (readsb)')}
+    disp = usb()
+    for x in disp:
+        if x['tipo'] == 'rtlsdr':
+            nom, uso = series.get(x['serie'], (None, None))
+            x['rol'] = uso or 'SIN ROL (serie %s: sudo bricohams-sdr-serials --grabar)' % (x['serie'] or '?')
+            if nom:
+                x['descripcion'] = '%s · %s' % (x['descripcion'], nom)
+        elif x['tipo'] == 'sdrplay':
+            x['rol'] = 'HF (SDRplay)' if e.get('HF_SDRPLAY', 'no').lower() in ('yes', 'si', 'sí') else 'SDRplay (sin usar: HF_SDRPLAY=no)'
+        elif x['tipo'] == 'rak':
+            x['rol'] = 'iGate LoRa APRS 433,775 MHz (bricohams-rak-aprs)'
+        elif x['tipo'] == 'rak-rui3':
+            x['rol'] = 'SIN USAR: lleva RUI3; convertir a bootloader WisBlock (manual 35) y grabar'
+        elif x['tipo'] == 'lilygo':
+            x['rol'] = 'Meshtastic 433 (/dev/lilygo-mesh)'
+        elif x['tipo'] == 'pico':
+            x['rol'] = 'E/S de la caja (ventiladores, DS18B20)'
+        elif x['tipo'] == 'rs485':
+            x['rol'] = 'viento RS485'
+    roles = {x['serie'] for x in disp if x['tipo'] == 'rtlsdr'}
+    # el HAT no es USB para el LoRa (SPI) ni para el GPS (UART)
+    hat = {'spi': os.path.exists(os.path.join(DEV, e.get('HAT_LORA_SPIDEV', 'spidev0.0'))),
+           'gps': any(os.path.exists(os.path.join(DEV, n)) for n in ('ttyAMA0', 'serial0')),
+           'rtlsdr': e.get('SERIAL_HAT', '00000101') in roles}
+    pendiente = [p.strip() for p in e.get('HARDWARE_PENDIENTE', '').split(',') if p.strip()]
+    faltan = []
+    esperados = [('rtlsdr', e.get('SERIAL_V3', '00000103'), 'RTL-SDR Blog V3 (MULTIPERFIL)'),
+                 ('rtlsdr', e.get('SERIAL_ADSB', '00001090'), 'FlightStick (ADS-B)'),
+                 ('rtlsdr', e.get('SERIAL_HAT', '00000101'), 'HAT HackerGadgets (SATÉLITES)'),
+                 ('rtlsdr', e.get('SERIAL_MINI', '00000102'), 'Mini RTL-SDR (RADIOAFICIONADOS)')]
+    for tipo, serie, nombre in esperados:
+        if serie not in roles:
+            faltan.append(nombre)
+    if e.get('RAK_ENABLE', 'yes').lower() in ('yes', 'si', 'sí') and not any(x['tipo'] in ('rak', 'rak-dfu') for x in disp):
+        faltan.append('RAK4631 (iGate LoRa APRS)')
+    if not any(x['tipo'] == 'lilygo' for x in disp):
+        faltan.append('LilyGO T3 (Meshtastic 433)')
+    if e.get('HF_SDRPLAY', 'no').lower() in ('yes', 'si', 'sí') and not any(x['tipo'] == 'sdrplay' for x in disp):
+        faltan.append('SDRplay')
+    estado_faltan = []
+    for f in faltan:
+        en_camino = any(p.lower() in f.lower() for p in pendiente)
+        estado_faltan.append({'que': f, 'pendiente': en_camino})
+    return {'usb': disp, 'hat': hat, 'faltan': estado_faltan, 'pendiente_declarado': pendiente,
+            'nombres': {n: os.path.realpath(os.path.join(DEV, n)) for n in ('rak-aprs', 'lilygo-mesh', 'lilygo-igate',
+                                                                           'bricohams-io', 'rs485')
+                        if os.path.exists(os.path.join(DEV, n))}}
+
+
+def regla(x, nombre):
+    vid, pid = x['vidpid'].split(':')
+    s = 'SUBSYSTEM=="tty", ATTRS{idVendor}=="%s", ATTRS{idProduct}=="%s"' % (vid, pid)
+    if x['serie']:
+        s += ', ATTRS{serial}=="%s"' % x['serie']
+    return s + ', SYMLINK+="%s", GROUP="dialout", MODE="0660"' % nombre
+
+
+def identificar():
+    inv = inventario()
+    lineas, avisos = ['# BricoHams v4.5: nombres fijos por VID:PID y serie (bricohams-dispositivos identificar)'], []
+    raks = [x for x in inv['usb'] if x['tipo'] == 'rak']
+    if len(raks) == 1:
+        lineas.append(regla(raks[0], 'rak-aprs'))
+    elif raks:
+        avisos.append('hay %d RAK4631: deja solo el del iGate' % len(raks))
+    else:
+        avisos.append('no veo el RAK4631 (¿enchufado? ¿con el firmware BricoHams? sudo bricohams-rak-aprs grabar)')
+    lilys = [x for x in inv['usb'] if x['tipo'] == 'lilygo']
+    if os.path.exists(REGLAS_LILYGO) and '--forzar' not in sys.argv:
+        avisos.append('los LilyGO ya tienen nombre en %s (se respeta; --forzar para rehacerlo)' % REGLAS_LILYGO)
+    elif len(lilys) == 1:
+        lineas.append(regla(lilys[0], 'lilygo-mesh'))
+    elif lilys:
+        avisos.append('hay %d LilyGO iguales: usa sudo bricohams-lilygo identificar' % len(lilys))
+    if len(lineas) > 1:
+        os.makedirs(os.path.dirname(REGLAS), exist_ok=True)
+        with open(REGLAS, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lineas) + '\n')
+        if not os.environ.get('BH_SYS'):
+            subprocess.call(['udevadm', 'control', '--reload-rules'])
+            subprocess.call(['udevadm', 'trigger', '--subsystem-match=tty'])
+        print('✔ Reglas en %s:' % REGLAS)
+        for l in lineas[1:]:
+            print('   /dev/%s  <- %s' % (re.search(r'SYMLINK\+="([^"]+)"', l).group(1), l.split(', SYMLINK')[0]))
+    for a in avisos:
+        print('! ' + a)
+    return 0
+
+
+def mostrar(inv):
+    print('USB:')
+    for x in inv['usb']:
+        if x['tipo'] == 'hub':
+            continue
+        print('  %-9s %-44s %s%s' % (x['vidpid'], x['descripcion'][:44], x.get('rol', ''),
+                                     ('  [' + ' '.join(x['tty']) + ']') if x['tty'] else ''))
+    h = inv['hat']
+    print('HAT (SPI/UART): LoRa SPI %s · GPS UART %s · su RTL-SDR %s' % tuple(
+        'sí' if v else 'no' for v in (h['spi'], h['gps'], h['rtlsdr'])))
+    if inv['nombres']:
+        print('Nombres fijos: ' + ', '.join('/dev/%s -> %s' % kv for kv in inv['nombres'].items()))
+    if inv['faltan']:
+        print('Faltan:')
+        for f in inv['faltan']:
+            print('  - %s%s' % (f['que'], ' (en camino: no es un fallo)' if f['pendiente'] else ''))
+    else:
+        print('No falta nada.')
+
+
+def main(a):
+    o = a[1] if len(a) > 1 else 'inventario'
+    if o == 'inventario':
+        mostrar(inventario())
+        return 0
+    if o == 'json':
+        print(json.dumps(inventario(), ensure_ascii=False))
+        return 0
+    if o == 'identificar':
+        if os.geteuid() != 0 and not os.environ.get('BH_SYS'):
+            print('Ejecútalo con sudo.')
+            return 1
+        return identificar()
+    for l in open(__file__, encoding='utf-8').read().splitlines()[2:12]:
+        print(l.lstrip('# '))
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
