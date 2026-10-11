@@ -158,7 +158,9 @@ if journalctl -u meshtasticd -b --no-pager 2>/dev/null | grep -qiE 'SX126x init 
 elif journalctl -u meshtasticd -b --no-pager 2>/dev/null | grep -qiE 'radio init failed|No.*radio|SX126x.*fail'; then mal "la radio LoRa no arranca: revisa los pines en /etc/meshtasticd/config.d/hackergadgets-hat.yaml"
 else aviso "no encuentro en el registro si la radio arrancó (journalctl -u meshtasticd -b)"; fi
 ss -ltn 2>/dev/null | grep -q ':4403 ' && bien "API Meshtastic en el puerto 4403" || aviso "API Meshtastic (4403) no escucha"
-ss -ltn 2>/dev/null | grep -q ':9443 ' && bien "web de Meshtastic en https://$(hostname -I | awk '{print $1}'):9443" || aviso "web de Meshtastic (9443) no escucha"
+ss -ltn 2>/dev/null | grep -q ':9443 ' && aviso "meshtasticd sirve su web sin contraseña en 9443: quita «Webserver:» de /etc/meshtasticd/config.d/ (v4.5: sudo bash install.sh --solo meshtastic)" || bien "sin web de meshtasticd sin contraseña (9443 cerrado)"
+if systemctl is-active --quiet bricohams-mesh-admin 2>/dev/null; then bien "panel Meshtastic 433/868 solo en /settings/bricohams/meshtastic (sesión de administrador)"
+else aviso "panel Meshtastic parado: systemctl status bricohams-mesh-admin"; fi
 
 titulo "Cámara del mástil"
 if command -v rpicam-hello >/dev/null && rpicam-hello --list-cameras 2>&1 | grep -q '^[0-9] :'; then bien "cámara CSI detectada"; else aviso "no veo la cámara CSI (rpicam-hello --list-cameras); si MediaMTX la está usando es normal"; fi
@@ -168,10 +170,59 @@ servicio bricohams-camsnap
 e=$(edad "$HTDOCS/plugins/receiver/camara/snap/mastil.jpg")
 [ "$e" -lt $(( ${CAM_SNAPSHOT_SECONDS:-60} * 3 )) ] && bien "foto de la cámara al día (hace ${e}s)" || mal "foto de la cámara vieja o ausente"
 
-titulo "LilyGO 433 (USB)"
-for d in lilygo-mesh lilygo-igate; do
-    [ -e /dev/$d ] && bien "/dev/$d conectado" || aviso "/dev/$d no aparece (sudo bricohams-lilygo identificar)"
+titulo "LilyGO 433 (USB) · Meshtastic"
+[ -e /dev/lilygo-mesh ] && bien "/dev/lilygo-mesh conectado (Meshtastic 433)" || aviso "/dev/lilygo-mesh no aparece (sudo bricohams-dispositivos identificar)"
+[ -e /dev/lilygo-igate ] && bien "/dev/lilygo-igate conectado (iGate WiFi alternativo)"
+for u in MESH433_CHANNEL_URL MESH_CHANNEL_URL; do
+    [ -n "${!u:-}" ] || continue
+    if r=$(bricohams-mesh-url json "${!u}" 2>/dev/null) && [ -n "$r" ]; then
+        bien "$u: $(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("%d canales · %s" % (len(d["canales"]), d["radio"].get("region","?")))' "$r")"
+    else mal "$u no es una URL de Meshtastic válida"; fi
 done
+
+titulo "RAK4631 · iGate LoRa APRS 433,775 (v4.5)"
+if [ "${RAK_ENABLE:-yes}" = yes ]; then
+    servicio bricohams-rak-aprs
+    [ -e /dev/rak-aprs ] && bien "/dev/rak-aprs conectado" || aviso "/dev/rak-aprs no aparece (enchufa el RAK y: sudo bricohams-dispositivos identificar)"
+    rj=/run/bricohams-rak/rak-aprs.json
+    e=$(edad "$rj")
+    if [ "$e" -lt 300 ]; then
+        bien "$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("rak") or {}; g=r.get("gps") or {}
+print("firmware %s · radio %s · %s paquetes · caja %s °C (%s) · GPS %s · APRS-IS %s" % (r.get("fw","?"), r.get("radio","?"),
+      r.get("rx",0), r.get("t","?"), r.get("sensor","?"), ("fix %s sat" % g.get("sats")) if g.get("fix") else
+      ("sin fix" if g.get("present") else "no"), "conectado" if (d.get("aprsis") or {}).get("conectado") else "sin conexión"))' "$rj" 2>/dev/null)"
+    else aviso "el RAK no ha dado estado en 5 min (sudo bricohams-rak-aprs prueba)"; fi
+else aviso "RAK_ENABLE=no"; fi
+
+titulo "Mapa de OpenWebRX+: LoRa APRS y Meshtastic (v4.5)"
+if [ "${OWRX_MAPA_LORA:-yes}" = yes ]; then
+    systemctl is-active --quiet mosquitto && bien "MQTT local (mosquitto) activo" || mal "mosquitto parado: el mapa no recibe LoRa ni Meshtastic"
+    servicio bricohams-mesh-owrx
+    mj=/run/bricohams-mesh/mesh.json
+    if [ "$(edad "$mj")" -lt 120 ]; then
+        while IFS='|' read -r n c t; do
+            [ -n "$n" ] || continue
+            if [ "$c" = True ]; then bien "$n: $t"; else aviso "$n: $t"; fi
+        done < <(python3 -c 'import json,sys
+for n, f in json.load(open(sys.argv[1]))["fuentes"].items():
+    print("%s|%s|%s" % (n, f["conectado"], ("%d nodos · %d en el mapa · último %s" % (f["nodos"], f["en_mapa"], f["ultimo"] or "-")) if f["conectado"] else "sin conexión (%s)" % (f["error"] or "?")))' "$mj" 2>/dev/null)
+    else aviso "bricohams-mesh-owrx no ha dejado estado (journalctl -u bricohams-mesh-owrx)"; fi
+    s=$OWRX_DATA/settings.json
+    if [ -r "$s" ] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("mqtt_enabled") and d.get("mqtt_aprs") and d.get("mqtt_meshtastic") else 1)' "$s"; then
+        bien "OpenWebRX+ escucha APRS y Meshtastic por MQTT (mqtt_aprs, mqtt_meshtastic)"
+    else aviso "OpenWebRX+ no escucha el MQTT de APRS/Meshtastic: sudo bash install.sh --solo configuracion"; fi
+fi
+
+titulo "Dispositivos (v4.5)"
+if command -v bricohams-dispositivos >/dev/null; then
+    while IFS='|' read -r q p; do
+        [ -n "$q" ] || continue
+        if [ "$p" = True ]; then bien "$q: en camino (HARDWARE_PENDIENTE), no es un fallo"; else aviso "$q: no aparece"; fi
+    done < <(bricohams-dispositivos json 2>/dev/null | python3 -c 'import json,sys
+for f in json.load(sys.stdin)["faltan"]: print("%s|%s" % (f["que"], f["pendiente"]))' 2>/dev/null)
+    bien "inventario completo: sudo bricohams-dispositivos"
+fi
 
 titulo "Sensor BME280/BMP280, viento y lluvia"
 if [ "${WX_ENABLE:-yes}" = yes ]; then

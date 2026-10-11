@@ -436,7 +436,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - En el router solo se abren 80 y 443.
 - **Por qué:** lo pidió el usuario (servicio sin SSL). Además da una sola entrada, las IP reales para los baneos y las estadísticas, y nada más expuesto.
 - **Implica:**
-  - Meshtastic web (9443), RTSP y MQTT quedan solo en la LAN.
+  - RTSP y MQTT quedan solo en la LAN. La web de meshtasticd (9443) se quita en v4.5 (ADR-52).
   - `bricohams-check` vigila la caducidad del certificado.
   - **v4.2:** por decisión de EA5KAO, el HTTPS se usa solo para la administración (ADR-40).
 
@@ -724,3 +724,119 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
     - **Probar en la Pi** los plugins FILTRO y DSP con audio real (los navegadores móviles pueden limitar Web Audio).
     - **Primera migración real con owrx-clone** (Pi → Pi o Pi → PC) y revisar la lista de paquetes que propone.
     - **SSL_MODO=admin:** comprobar que el directorio de receptores (receiverbook) acepta la URL `http://`.
+
+
+## ADR-49 · iGate LoRa APRS en un RAK4631: radio en el RAK, Internet en la Pi (v4.5)
+**Contexto:** EA5KAO quiere el iGate en el RAK4631(L) que ya tiene (433 MHz, GPS y sensor de temperatura), partiendo de LoRa_APRS_iGate de CA2RXU. Ese firmware solo existe para ESP32 y depende de la WiFi: web de configuración, APRS-IS, OTA, NTP, MQTT y syslog. El nRF52840 no tiene WiFi.
+**Decisión:** port parcial al nRF52840:
+- **en el RAK**, lo que no depende de la red, reutilizando el código del original donde se puede:
+  - KISS sin cambios;
+  - radio y CAD adaptados;
+  - lógica del digipeater;
+- **en la Pi**, lo de Internet: `bricohams-rak-aprs` (APRS-IS con reglas de iGate, mensajes a RF y configuración);
+- **entre los dos**, KISS por USB, con la orden estándar 0x06 (SetHardware) para configuración y estado. Así cualquier cliente KISS sigue valiendo.
+
+Indicativo EA5KAO-15: «EA5KAO-SDR» no es válido en AX.25 ni en APRS-IS. Destino APZBH1 (experimental) hasta registrar uno.
+**Consecuencias:**
+- Sin la Pi el RAK sigue escuchando, digipeateando y balizando por RF, pero no sube a APRS-IS.
+- Configurar el RAK es editar `bricohams.env`: el servicio compara y reenvía.
+- Binarios en el repositorio, reproducibles con `tools/compilar_rak.sh`.
+
+## ADR-50 · Integración con OpenWebRX+ por su propio suscriptor MQTT (v4.5)
+**Contexto:** se pide ver el APRS y el Meshtastic «dentro» de OpenWebRX+. OpenWebRX+ no admite plugins de servidor, pero desde la 1.2.122 escucha `+/APRS`, `+/Meshtastic` y `+/CLIENT` en su broker (`mqtt_aprs`, `mqtt_meshtastic`, `mqtt_chat`) y los pasa por su código de mapa.
+**Decisión:**
+- Broker mosquitto **solo en 127.0.0.1**. Los dos servicios publican con el **mismo formato** que generan los decodificadores de OpenWebRX+, comprobado pasándolo por `AprsParser.updateMap` y `MeshtasticParser.updateMap` de la 1.2.126.
+- Publicador MQTT mínimo propio (`bricohams_mqtt.py`) para no depender de paho en el entorno de pipx.
+- Nuestra posición redondeada (ADR-48). Mensajes directos nunca; chat de canales públicos solo si se pide.
+
+**Consecuencias:** sin parches en OpenWebRX+ (vale nativo y Docker con red host). Si OpenWebRX+ cambia el formato, lo detecta la prueba de compatibilidad del manual 35.
+
+## ADR-51 · URLs de Meshtastic: completas solo en el env personal (v4.5)
+**Contexto:** las URL de la red 433 y 868 llevan canales con clave AES propia (EspeleoSOS, EA5RCZ).
+**Decisión:**
+- Las URL completas van **solo** en `bricohams.env`.
+- El `.env.example` (git) lleva la versión sin esos canales, generada con `bricohams-mesh-url publica`.
+- Nunca se enseña una clave: `bricohams-mesh-url ver` dice «PROPIA AES-256».
+- La URL 433 se aplica tal cual (trae EU_433 LONG_FAST y 10 dBm), sin forzar la radio.
+
+## ADR-52 · Banner SSH: aviso sin pistas antes, estado después (v4.5)
+**Decisión:**
+- **Antes de autenticarse:** solo logo y aviso legal. Cualquiera lo ve, así que no se dice sistema, versión, IP ni dominio.
+- **Después:** el estado útil, generado en cada entrada sin red (lee `/run` y `/proc`) para no retrasar el login.
+
+Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO CH9102 1a86:55d4). `HARDWARE_PENDIENTE` separa «no aparece» de «en camino».
+
+## ADR-53 · Configuración de Meshtastic solo dentro de /settings (v4.5, despliegue EA5KAO)
+**Contexto:** EA5KAO exige que la configuración de Meshtastic no sea accesible desde la web pública de OpenWebRX+. Solo se puede tocar en Ajustes, que pide contraseña.
+**Decisión:**
+- `bricohams-mesh-admin` (127.0.0.1:8076) se publica en `/settings/bricohams/meshtastic`:
+  - nginx lo fuerza a HTTPS (`SSL_MODO=admin`);
+  - cada petición valida la cookie de sesión de OpenWebRX+ contra `127.0.0.1:8073/settings` (sin sesión, redirige a `/login`);
+  - los POST llevan token CSRF;
+  - nunca enseña PSK.
+- Desde ahí se configuran el nodo 433 (LilyGO USB) y el 868 (HAT, API 4403), y qué sale en el mapa (`MESH433_OWRX`, `MESH868_OWRX`, `MESH_OWRX_CHAT`). Se guarda en los dos `bricohams.env`.
+- Se quita la web propia de meshtasticd (9443), que no tenía contraseña.
+- La web pública solo muestra los nodos en el mapa (ADR-50). El RAK solo envía información del nodo (baliza, estado, telemetría) y el log de estaciones oídas a APRS-IS/aprs.fi.
+- `escribir_nginx` desactiva cualquier otro site `default_server` (copia en `/etc/bricohams/nginx-desactivados/`). En la Pi de EA5KAO, un site antiguo `openwebrx` se saltaba HTTPS y las protecciones de /settings.
+
+## ADR-54 · TAK local aislado con Python 3.12 (v4.6)
+**Contexto:** EA5KAO quiere un servidor TAK local. El instalador oficial de OpenTAKServer borra los sites de nginx y ocupa 443/8443, donde ya están OpenWebRX+ HTTPS y Meshtastic. Además, el gevent que fija OTS 1.7.13 falla al hacer fork con el Python 3.13 del sistema.
+**Decisión:**
+- `tools/instalar_tak.sh` instala OTS 1.7.13 y la UI 1.7.5 (sha256 fijo) en `/opt/bricohams-tak`:
+  - Python 3.12.15 de uv, con dependencias fijadas;
+  - usuario de sistema propio, PostgreSQL `bricohams_tak` y RabbitMQ en loopback.
+- Puertos solo LAN (`BLINDAJE_PUERTOS_LAN`):
+  - 8445: UI;
+  - 8089: CoT mTLS;
+  - 8446: enrollment;
+  - 8447: Marti mTLS.
+- `bricohams-tak-fw` (tabla nft `bricohams_tak`) cierra desde fuera 4369, 5672, 15672, 25672, 5432 y 8081.
+- Las credenciales van solo en `/etc/bricohams/tak-access.txt` (root, 600).
+**Consecuencias:**
+- El resto del kit y el Python del sistema no cambian.
+- TAK se puede quitar desactivando sus cuatro servicios y su site.
+- Hay un segundo intérprete de Python que mantener.
+
+## ADR-55 · Aviones ADS-B públicos y saneados, sin tocar RadarBox/MLAT (v4.6)
+**Contexto:** el mapa debe mostrar los aviones en tiempo real. La Pi alimenta RadarBox con MLAT (readsb:30005 → rbfeeder → mlat-client → mlat1.rb24.com:40900). Exponer el JSON de readsb publicaría la posición del receptor y campos internos.
+**Decisión:**
+- `bricohams-api` sirve `/bricohams/api/aviones` a partir de `aircraft.json`:
+  - 503 si los datos tienen más de 15 s o vienen del futuro;
+  - descarta las posiciones con más de 60 s, las coordenadas inválidas y los hex mal formados;
+  - solo publica hex, vuelo, lat/lon, hora, altitud, velocidad y rumbo.
+- Los resultados MLAT (127.0.0.1:32004) no se reinyectan en readsb, para evitar bucles y no alterar el feed de RadarBox.
+- `activar_mapa_local.sh` comprueba el sha256 de `rbfeeder.ini` y que mlat-client sigue en marcha.
+- readsb pasa a `--device 00000401`, con autorización del usuario: `00001090` no existía.
+**Consecuencias:**
+- El mapa público enseña aviones, pero no dónde está la estación.
+- Los aviones que solo tienen MLAT no salen en el mapa.
+
+## ADR-56 · Capa TAK privada en el mapa (v4.6)
+**Contexto:** TAK debe verse en «Mapas». Sus posiciones son de personas y equipos y no pueden ser públicas (ADR-53).
+**Decisión:**
+- `bricohams-mesh-admin` sirve `/settings/bricohams/tak/posiciones`:
+  - valida la sesión de OpenWebRX+ en cada petición, sin caché;
+  - 401 sin sesión y 503 si TAK falla;
+  - `Cache-Control: no-store`.
+- Lee PostgreSQL en solo lectura: timeout de 3 s, 1000 filas como máximo y solo CoT no caducados.
+- El plugin solo la pide por HTTPS y la borra con 401, 403 o error.
+- Nunca va a MQTT.
+**Consecuencias:**
+- Solo el admin con sesión ve TAK.
+- El público sigue viendo el mapa sin TAK.
+- No hacen falta certificados de cliente en el navegador.
+
+## ADR-57 · Chat APRS en el CHAT común, solo recepción (v4.6)
+**Contexto:** los mensajes APRS deben verse en el CHAT común de OpenWebRX+. Transmitir o mandar ACK automáticos desde una web pública sería emitir sin control del operador.
+**Decisión:**
+- `bricohams-rak-aprs` publica en MQTT `aprs/CLIENT` los mensajes APRS-IS dirigidos a la estación:
+  - desempaqueta los de terceros;
+  - descarta ack, rej y telemetría;
+  - quita los caracteres de control y el `{msgid`, y corta a 200 caracteres;
+  - no repite el mismo mensaje en 5 min.
+- OpenWebRX+ los pinta con su chat MQTT (`bricohams-mqtt-settings.py --chat`), sin parchear su código.
+- Se controla con `RAK_OWRX_CHAT`.
+**Consecuencias:**
+- Los mensajes se ven en vivo.
+- No hay respuesta ni ACK: se contesta desde un cliente APRS.
+- Los mensajes no se guardan en el servidor.

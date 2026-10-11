@@ -11,6 +11,7 @@ const BRICOHAMS_TELEGRAM = 'https://t.me/bricohams';
 
 // Leyenda plegable (Mapa / Colores / Funciones): deja más sitio al mapa, sobre todo en el móvil
 Plugins.load(mp_url + '/reduce_map_legend_sections/reduce_map_legend_sections.js');
+Plugins.load('bricohams_live');
 
 // Botón BricoHams y "volver al receptor"
 (function () {

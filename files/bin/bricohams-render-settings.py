@@ -65,7 +65,7 @@ def main(src, dst):
         '__HF_SDRPLAY__': as_bool(env('HF_SDRPLAY', 'no')),
         '__SAT_BIAS_TEE__': as_bool(env('SAT_BIAS_TEE', 'no')),
         '__SDRPLAY_ANTENNA__': env('SDRPLAY_ANTENNA'),
-        '__MQTT_ENABLED__': as_bool(env('VISITAS_ENABLE', 'yes')),   # v4: avisos de conexión (bricohams-visitas)
+        '__MQTT_ENABLED__': as_bool(env('VISITAS_ENABLE', 'yes')) or as_bool(env('OWRX_MAPA_LORA', 'yes')),   # visitas (v4) y mapa LoRa/Meshtastic (v4.5)
     }
 
     def walk(o):

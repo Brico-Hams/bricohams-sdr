@@ -17,7 +17,7 @@
 #    BLINDAJE_8073="publico"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
 #    BLINDAJE_SSH="lan"          lan = SSH solo desde la red de casa · todos
 #    BLINDAJE_LAN=""             redes de casa (vacío = la de la interfaz, p. ej. 192.168.1.0/24)
-#    BLINDAJE_PUERTOS_LAN="4403 9443 8554"   otros puertos TCP solo para la LAN (Meshtastic, RTSP)
+#    BLINDAJE_PUERTOS_LAN="4403 8443 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin, RTSP)
 #  Lo que se abre a todo el mundo en el host: 80, 443 y (si «publico») 8073.
 # =====================================================================
 set -u
@@ -64,7 +64,7 @@ leer_env() {
     done <"$ENV"
 }
 env_de() { local n="E_$1"; printf '%s' "${!n:-${2:-}}"; }
-puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 9443 8554}"; }   # vacío = ninguno
+puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8554}"; }   # vacío = ninguno
 
 # --------------------------------------------------------------------- red de casa
 # redes IPv4 conectadas (las de las interfaces, sin docker ni lo), p. ej. 192.168.1.0/24
@@ -207,7 +207,13 @@ auditar() {
             [[ "$l" =~ maxauthtries\ ([0-9]+) ]] && [ "${BASH_REMATCH[1]}" -le 4 ] && bien "MaxAuthTries ${BASH_REMATCH[1]}" \
                 || hallazgo BAJO "SSH permite muchos intentos por conexión" "«aplicar» lo baja a 3"
             [[ "$l" =~ x11forwarding\ no ]] || hallazgo BAJO "SSH con X11Forwarding" "«aplicar» lo quita"
+            [[ "$l" =~ banner\ /etc/issue\.net ]] && bien "aviso legal antes de entrar por SSH (Banner)" \
+                || hallazgo BAJO "SSH sin aviso legal antes de entrar" "sudo bricohams-banner instalar (v4.5)"
         fi
+    fi
+    # v4.5 · el aviso previo al login no debe dar pistas (versiones, IP, sistema)
+    if { [ -n "$RAIZ" ] || [[ "${l:-}" =~ banner\ /etc/issue\.net ]]; } && [ -r "$RAIZ/etc/issue.net" ] && grep -qiE 'debian|raspbian|ubuntu|kernel|\\[rvsnm]|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$RAIZ/etc/issue.net"; then
+        hallazgo BAJO "/etc/issue.net enseña el sistema, la versión o una IP antes de entrar" "sudo bricohams-banner instalar"
     fi
 
     titulo "4. Puertos abiertos en la Pi"
@@ -364,6 +370,9 @@ lat=str(g.get("lat","")); print(max(len(lat.split(".")[1]) if "." in lat else 0,
     local nota_f=$(( 100 - ALTO * 15 - MEDIO * 5 - BAJO * 1 )); [ "$nota_f" -ge 0 ] || nota_f=0
     printf '\n%sResultado: %d alto · %d medio · %d bajo · %d bien · nota %d/100%s\n' "$c_b" "$ALTO" "$MEDIO" "$BAJO" "$OKS" "$nota_f" "$c_0"
     [ "$RESUMEN" = 1 ] || { [ "$ALTO$MEDIO" = 00 ] || echo "Para arreglar lo que se puede solo: sudo bricohams-blindaje aplicar   (manual 34)"; }
+    # v4.5 · resumen para el banner SSH (20-bricohams)
+    { install -d -m 755 "$RAIZ/var/lib/bricohams" && printf '%d alto · %d medio · nota %d/100 (%s)\n' "$ALTO" "$MEDIO" "$nota_f" \
+        "$(date +%d/%m)" >"$RAIZ/var/lib/bricohams/blindaje-nota"; } 2>/dev/null || true
     [ "$ALTO" -eq 0 ]
 }
 

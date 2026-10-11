@@ -119,3 +119,14 @@
 - **NAVTEX de España** (D/W A Coruña, G/T Tarifa, X/M Cabo de la Nao, I/A Las Palmas): https://en.wikipedia.org/wiki/List_of_Navtex_stations · Salvamento Marítimo https://www.salvamentomaritimo.es/mejora-tu-seguridad/control-y-servicios-en-la-mar/navtex-y-avisos-a-navegantes
 - **Canales VHF marinos** (ITU-R M.1084): https://www.itu.int/rec/R-REC-M.1084 · Puertos del Estado (puertos de interés general): https://www.puertos.es/
 
+
+## v4.5 · LoRa APRS, Meshtastic y OpenWebRX+
+- LoRa APRS iGate, CA2RXU (base del port al RAK4631, GPL-3.0), revisión 9314bf1 del 07/10/2026: https://github.com/richonguzman/LoRa_APRS_iGate
+- RAKwireless RAK4631 / RAK4630(L) 433 MHz y base RAK19007 (30 × 60 mm, IO2 = 3V3_S): https://docs.rakwireless.com/product-categories/wisblock/rak19007/datasheet/
+- BSP Arduino de RAKwireless para nRF52 (1.3.3): https://github.com/RAKWireless/RAK-nRF52-Arduino
+- RadioLib 7.6.0 (SX1262): https://github.com/jgromes/RadioLib
+- OpenWebRX+ 1.2.126: suscriptor MQTT (owrx/mqtt.py: «+/APRS», «+/Meshtastic», «+/CLIENT»), mapa de Meshtastic (owrx/meshtastic.py) y modos LoRa (csdr/chain/lora.py): https://github.com/luarvique/openwebrx
+- Formato de las URL de canales de Meshtastic (ChannelSet, apponly.proto): https://github.com/meshtastic/protobufs
+- Especificación APRS 1.01 (posiciones comprimidas, ambigüedad, objetos, mensajes y terceros): http://www.aprs.org/doc/APRS101.PDF
+- Reglas de iGate de APRS-IS (q-constructs, TCPIP/NOGATE/RFONLY): https://www.aprs-is.net/IGating.aspx
+- Código Penal español, art. 197 bis (acceso no autorizado a sistemas), citado en el aviso del banner SSH.

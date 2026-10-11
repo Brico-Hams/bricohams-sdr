@@ -10,6 +10,7 @@
 #    GET /bricohams/api/salud  -> {"ok": true}
 # =====================================================================
 import json
+import math
 import os
 import re
 import sqlite3
@@ -25,6 +26,37 @@ ESTADO = os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams')
 UA = {'User-Agent': 'BricoHams-SDR EA5KAO (+https://t.me/bricohams)'}
 CALL_RE = re.compile(r'^[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](/[A-Z0-9]{1,4})?$|^[A-Z0-9]{1,4}/[A-Z0-9]{3,7}$')
 CACHE_VERSION = 2
+ADSB_JSON = os.environ.get('ADSB_JSON', '/run/readsb/aircraft.json')
+
+
+def aviones(ruta=ADSB_JSON, ahora=None):
+    """Solo posiciones recientes de readsb; no publica la ubicacion del receptor."""
+    ahora = time.time() if ahora is None else ahora
+    with open(ruta, encoding='utf-8') as f:
+        datos = json.load(f)
+    generado = datos['now']
+    if not isinstance(generado, (float, int)) or not math.isfinite(generado) or not -5 <= ahora - generado <= 15:
+        raise ValueError('readsb no ha actualizado aircraft.json en los ultimos 15 segundos')
+    resultado = []
+    for a in datos['aircraft']:
+        lat, lon, edad = a.get('lat'), a.get('lon'), a.get('seen_pos')
+        if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lat, lon, edad)):
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180 and 0 <= edad <= 60):
+            continue
+        hexid = a.get('hex', '')
+        if not isinstance(hexid, str) or not re.fullmatch(r'~?[0-9a-fA-F]{6}', hexid):
+            continue
+        r = {'hex': hexid, 'lat': lat, 'lon': lon, 'timestamp': (generado - edad) * 1000,
+             'flight': str(a.get('flight') or hexid).strip()[:32]}
+        for k in ('alt_baro', 'gs', 'track'):
+            v = a.get(k)
+            if isinstance(v, (float, int)) and math.isfinite(v):
+                r[k] = v
+            elif k == 'alt_baro' and v == 'ground':
+                r[k] = v
+        resultado.append(r)
+    return {'now': generado, 'aircraft': resultado}
 
 
 def http_json(url, timeout=8):
@@ -199,17 +231,24 @@ def servidor(host='127.0.0.1', puerto=8075):
     qrz = Qrz(os.environ.get('QRZ_USER', ''), os.environ.get('QRZ_PASS', ''))
 
     class H(BaseHTTPRequestHandler):
-        def _json(self, code, obj):
+        def _json(self, code, obj, cache_control='public, max-age=3600'):
             b = json.dumps(obj, ensure_ascii=False).encode()
             self.send_response(code)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Cache-Control', cache_control)
             self.send_header('Content-Length', str(len(b)))
             self.end_headers()
             self.wfile.write(b)
 
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
+            if u.path == '/bricohams/api/aviones':
+                try:
+                    d = aviones()
+                except (OSError, ValueError, KeyError, TypeError) as e:
+                    print('api ADS-B: %s' % e, file=sys.stderr, flush=True)
+                    return self._json(503, {'error': 'ADS-B local no disponible o sin datos recientes'}, 'no-store')
+                return self._json(200, d, 'no-store')
             if u.path.endswith('/salud'):
                 return self._json(200, {'ok': True, 'hamqth': bool(hamqth.u), 'qrz': bool(qrz.u)})
             if u.path.endswith('/indicativo'):

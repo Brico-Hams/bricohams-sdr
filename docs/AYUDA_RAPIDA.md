@@ -69,6 +69,12 @@ sudo owrx-clone --docker owrx-mbe exportar | importar | comprobar
 
 ## v4.4 · Seguridad (manual 34)
 ```bash
+sudo bricohams-dispositivos              # v4.5 · qué hay enchufado, para qué es y qué falta («en camino»)
+sudo bricohams-rak-aprs prueba            # v4.5 · RAK4631: firmware, radio, temperatura de la caja, GPS
+sudo bricohams-rak-aprs grabar            # v4.5 · grabar el firmware del RAK por USB
+sudo bricohams-lilygo firmware            # v4.5 · actualizar el Meshtastic del LilyGO (conserva la configuración)
+bricohams-mesh-url ver "URL"              # v4.5 · canales y radio de una URL de Meshtastic (sin claves)
+bricohams-banner ver                      # v4.5 · cómo se ve el banner SSH
 sudo bricohams-blindaje auditar           # informe (no cambia nada, no enseña claves)
 ssh-copy-id pi@192.168.1.105          # desde tu PC: entrar con clave
 sudo bricohams-blindaje aplicar           # cortafuegos, SSH, fail2ban, permisos… (con copia)

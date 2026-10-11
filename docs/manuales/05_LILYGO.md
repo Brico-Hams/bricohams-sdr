@@ -1,5 +1,10 @@
 # 05 · LilyGO T3 V1.6.1 de 433 MHz: nodo Meshtastic e iGate LoRa APRS
 
+> **v4.5:**
+> - **El iGate pasa a un RAK4631** con firmware propio ([manual 35](35_LORA_APRS_MESHTASTIC.md)). El iGate WiFi de este manual queda como alternativa.
+> - El LilyGO es el **nodo Meshtastic 433** con la URL de la red (`MESH433_CHANNEL_URL`) y el nombre *SDR BricoHams 433* / SB43.
+> - Nombres fijos: `sudo bricohams-dispositivos identificar`. Actualizar su firmware: `sudo bricohams-lilygo firmware`.
+
 Los dos van por USB (hub alimentado) a la Pi. De ahí sacan la corriente y por ahí se configuran.
 
 ## 1. Grabar el firmware de Meshtastic (una vez, desde un PC con Chrome)

@@ -90,7 +90,7 @@
 
 ## 3. Marcadores
 
-Total en el kit: **374**. Hotspots de casa y repetidores digitales de Sierra Espuña:
+Total en el kit: **376**. Hotspots de casa y repetidores digitales de Sierra Espuña:
 
 | Frecuencia (MHz) | Modo | Nombre | Descripción | Perfil que la cubre |
 |---|---|---|---|---|
@@ -120,7 +120,15 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | 8888/tcp | MediaMTX HLS | LAN |
 | 8554/tcp | MediaMTX RTSP `rtsp://<pi>:8554/mastil` | LAN |
 | 9997/tcp | MediaMTX API | 127.0.0.1 |
-| 9443/tcp | meshtasticd web (https) | LAN |
+| 8076/tcp | v4.5 · bricohams-mesh-admin (panel Meshtastic, detrás de nginx en /settings/bricohams/meshtastic, exige sesión de admin de OpenWebRX+) | 127.0.0.1 |
+| 8443/tcp | v4.5 · nginx: cliente web oficial de Meshtastic (proxy a 9443 con autenticación de sesión de /settings) | LAN (admin only) |
+| 8445/tcp | v4.6 · nginx: interfaz web de OpenTAKServer (usuario TAK) | LAN |
+| 8089/tcp | v4.6 · OpenTAKServer CoT TLS con certificado de cliente | LAN |
+| 8446/tcp | v4.6 · nginx: alta de certificados TAK (enrollment) | LAN |
+| 8447/tcp | v4.6 · nginx: Marti API TAK con certificado de cliente | LAN |
+| 8081/tcp | v4.6 · OpenTAKServer interno | 127.0.0.1 |
+| 5432, 5672/tcp | v4.6 · PostgreSQL y RabbitMQ de TAK (cortafuegos `bricohams-tak-fw`) | 127.0.0.1 |
+| 9443/tcp | meshtasticd web: **bloqueada por firewall** `bricohams-meshweb-fw` (nftables) desde todas las IPs excepto localhost | 127.0.0.1 |
 | 4403/tcp | meshtasticd API | LAN |
 | 30005/tcp | readsb salida Beast | local |
 | 30003, 30002, 30104/tcp | readsb SBS / raw / entrada Beast | local |
@@ -170,8 +178,8 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | N0CALL-10 | iGate LoRa APRS 433,775 (LilyGO, solo RX) | `IGATE_CALLSIGN` |
 | N0CALL-13 | Estación meteorológica (BME280 + viento + lluvia) | `WX_APRS_CALLSIGN` |
 | N0CALL-14 | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |
-| N0CALL SDR / BH5K | Nodo Meshtastic 868 (HAT) | `MESH_LONG_NAME` |
-| N0CALL SDR 433 / BH43 | Nodo Meshtastic 433 (LilyGO) | `MESH433_LONG_NAME` |
+| SDR BricoHams 868 / SB86 | Nodo Meshtastic 868 (HAT) | `MESH_LONG_NAME` |
+| SDR BricoHams 433 / SB43 | Nodo Meshtastic 433 (LilyGO) | `MESH433_LONG_NAME` |
 
 ## 8. Canales Meshtastic (QR de la red)
 
@@ -228,6 +236,11 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/usr/local/sbin/bricohams-blindaje, /etc/bricohams/cortafuegos.nft` | v4.4 · blindaje y cortafuegos del host (manual 34) |
 | `/etc/ssh/sshd_config.d/90-bricohams.conf, /etc/fail2ban/jail.d/bricohams.conf, /etc/sysctl.d/90-bricohams.conf` | v4.4 · SSH, fail2ban y núcleo endurecidos |
 | `/var/backups/bricohams-blindaje/` | v4.4 · copias de «aplicar» para «deshacer» (700) |
+| `/run/bricohams-rak/rak-aprs.json` | v4.5 · estado del RAK4631: firmware, caja, GPS redondeado, oídos (manual 35) |
+| `/run/bricohams-mesh/mesh.json` | v4.5 · nodos Meshtastic 433/868 y lo publicado en el mapa de OpenWebRX+ |
+| `/opt/bricohams/firmware/rak4631-lora-aprs/bin/` | v4.5 · firmware del RAK4631 (.zip DFU, .uf2, .hex) |
+| `/etc/udev/rules.d/99-bricohams-dispositivos.rules` | v4.5 · /dev/rak-aprs y /dev/lilygo-mesh por VID:PID y serie |
+| `/etc/issue.net, /etc/update-motd.d/20-bricohams` | v4.5 · banner SSH: aviso legal y estado al entrar |
 | `/etc/nginx/snippets/bricohams-sdr-rutas.conf` | v4.2 · rutas comunes HTTP/HTTPS de nginx |
 | `/usr/local/bin/owrx-clone, /var/backups/owrx-clone/` | v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación |
 | `/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz` | v4.2 · perfil diario de OpenWebRX+ (7 últimos) |

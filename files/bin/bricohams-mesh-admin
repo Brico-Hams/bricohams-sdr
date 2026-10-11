@@ -1,0 +1,811 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-mesh-admin · panel de Meshtastic SOLO para el administrador (v4.5)
+#
+#  Vive en https://<estación>/settings/bricohams/meshtastic, dentro de la zona
+#  de administración de OpenWebRX+: nginx lo fuerza a HTTPS (SSL_MODO=admin) y
+#  cada petición se valida con la sesión de OpenWebRX+ (la misma contraseña de
+#  /settings). La web pública NO enseña ni cambia nada de Meshtastic.
+#
+#  Desde aquí se corrige o configura:
+#    - Nodo 433 (LilyGO por USB, /dev/lilygo-mesh): nombre, rol, URL de canales.
+#    - Nodo 868 (HAT, meshtasticd 127.0.0.1:4403): nombre, URL de canales y el
+#      canal privado de bricohams.env.
+#    - Qué sale en el mapa de OpenWebRX+ (MESH433_OWRX, MESH868_OWRX, MESH_OWRX_CHAT).
+#    - Lectura del estado real de los nodos y reinicio de los servicios.
+#    - /settings/bricohams/aprs: estado del RAK4631 LoRa APRS, registro de los
+#      paquetes oídos y reinicio de bricohams-rak-aprs (sin enseñar el passcode).
+#    - /settings/bricohams/auth: 204/401 para el auth_request de nginx que
+#      protege el cliente web de Meshtastic en :8443 (MESH_WEB=yes).
+#  Los cambios se guardan en bricohams.env (el del kit y la copia de /etc), así
+#  que un «install.sh --actualizar» no los deshace. Nunca enseña claves (PSK).
+#
+#  Uso: bricohams-mesh-admin servicio        (lo lanza systemd, 127.0.0.1:8076)
+#       bricohams-mesh-admin leer serie|tcp DESTINO   (JSON del nodo, sin claves)
+# =====================================================================
+import hashlib
+import hmac
+import html
+import http.client
+import http.cookies
+import http.server
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import secrets
+import socketserver
+import subprocess
+import sys
+import threading
+import time
+from urllib.parse import parse_qs, urlsplit
+
+PUERTO = int(os.environ.get('MESH_ADMIN_PORT', '8076'))
+OWRX = os.environ.get('MESH_ADMIN_OWRX', '127.0.0.1:8073')
+ENV_ETC = os.environ.get('BRICOHAMS_ENV', '/etc/bricohams/bricohams.env')
+ENV_KIT = os.environ.get('BRICOHAMS_KIT_ENV', '')
+BASE = '/settings/bricohams/meshtastic'
+APRS = '/settings/bricohams/aprs'
+AUTH = '/settings/bricohams/auth'
+TAK_POSICIONES = '/settings/bricohams/tak/posiciones'
+RAK_JSON = os.path.join(os.environ.get('RAK_RUN_DIR', '/run/bricohams-rak'), 'rak-aprs.json')
+SERVICIO_MAPA = 'bricohams-mesh-owrx'
+SERVICIO_RAK = 'bricohams-rak-aprs'
+SECRETO = secrets.token_bytes(32)
+ROLES = ('CLIENT', 'CLIENT_MUTE', 'CLIENT_HIDDEN', 'CLIENT_BASE', 'ROUTER', 'ROUTER_LATE',
+         'TRACKER', 'SENSOR', 'TAK', 'TAK_TRACKER', 'LOST_AND_FOUND')
+URL_RE = re.compile(r'^https://meshtastic\.org/e/#[A-Za-z0-9_-]{4,2000}$')
+PROHIBIDOS = re.compile(r'[\'"\\$`\r\n\x00-\x1f]')
+
+NODOS = {
+    '433': {'titulo': 'Nodo 433 · LilyGO T3 (USB)', 'region': 'EU_433', 'url': 'MESH433_CHANNEL_URL',
+            'largo': 'MESH433_LONG_NAME', 'corto': 'MESH433_SHORT_NAME', 'rol': 'MESH433_ROLE',
+            'def_largo': 'SDR BricoHams 433', 'def_corto': 'SB43', 'mapa': 'MESH433_OWRX'},
+    '868': {'titulo': 'Nodo 868 · HAT (meshtasticd)', 'region': 'EU_868', 'url': 'MESH_CHANNEL_URL',
+            'largo': 'MESH_LONG_NAME', 'corto': 'MESH_SHORT_NAME', 'rol': None,
+            'def_largo': 'SDR BricoHams 868', 'def_corto': 'SB86', 'mapa': 'MESH868_OWRX'},
+}
+
+
+# ---------------------------------------------------------------- bricohams.env
+def leer_env(ruta=None):
+    """{CLAVE: valor} con las mismas reglas que bricohams-mesh-owrx (sin ejecutar nada)."""
+    d = {}
+    try:
+        for l in open(ruta or ENV_ETC, encoding='utf-8'):
+            m = re.match(r'^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$', l)
+            if not m:
+                continue
+            v = m.group(2).strip()
+            fin = v.find(v[0], 1) if v[:1] in ('"', "'") else -1
+            v = v[1:fin] if fin > 0 else re.sub(r'\s+#.*$', '', v)
+            d[m.group(1)] = v
+    except OSError:
+        pass
+    return d
+
+
+def valor_seguro(v):
+    if PROHIBIDOS.search(v):
+        raise ValueError('el valor lleva comillas, «$», «\\» o saltos de línea')
+    return v
+
+
+def escribir_env(ruta, cambios, comilla='"'):
+    """Cambia o añade CLAVE=valor conservando el resto (y los comentarios de la línea).
+    Se escribe en el sitio: mismo dueño y permisos (bricohams.env es 600: lleva claves)."""
+    for v in cambios.values():
+        valor_seguro(v)
+    with open(ruta, 'r+', encoding='utf-8') as f:
+        lineas = f.read().splitlines(True)
+        hechos = set()
+        for i, l in enumerate(lineas):
+            m = re.match(r'^(\s*(?:export\s+)?)([A-Z][A-Z0-9_]*)=(.*?)(\r?\n)?$', l)
+            if not m or m.group(2) not in cambios:
+                continue
+            v, q, resto = m.group(3), comilla, ''
+            if v[:1] in ('"', "'"):
+                q = v[0]
+                fin = v.find(q, 1)
+                resto = v[fin + 1:] if fin > 0 else ''
+            else:
+                c = re.search(r'\s+#.*$', v)
+                resto = c.group(0) if c else ''
+            lineas[i] = '%s%s=%s%s%s%s%s' % (m.group(1), m.group(2), q, cambios[m.group(2)], q, resto, m.group(4) or '\n')
+            hechos.add(m.group(2))
+        if lineas and not lineas[-1].endswith('\n'):
+            lineas[-1] += '\n'
+        for k, v in cambios.items():
+            if k not in hechos:
+                lineas.append('%s=%s%s%s\n' % (k, comilla, v, comilla))
+        f.seek(0)
+        f.write(''.join(lineas))
+        f.truncate()
+
+
+def guardar(cambios):
+    """bricohams.env del kit (manda en la próxima instalación) y la copia de /etc (la leen los servicios)."""
+    if ENV_KIT and os.path.isfile(ENV_KIT):
+        escribir_env(ENV_KIT, cambios, '"')
+    escribir_env(ENV_ETC, cambios, "'")
+
+
+def si(v, d='no'):
+    return (v or d).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
+
+
+# ---------------------------------------------------------------- URL de canales (sin claves)
+def _mesh_url():
+    for ruta in (os.environ.get('MESH_URL_CLI', '/usr/local/bin/bricohams-mesh-url'),
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bricohams-mesh-url')):
+        if os.path.isfile(ruta):
+            cargador = importlib.machinery.SourceFileLoader('bricohams_mesh_url', ruta)
+            spec = importlib.util.spec_from_loader('bricohams_mesh_url', cargador)
+            mod = importlib.util.module_from_spec(spec)
+            cargador.exec_module(mod)
+            return mod
+    return None
+
+
+def resumen_url(url):
+    """(canales, radio) de una URL de Meshtastic: nombres y TIPO de clave, nunca la clave."""
+    mod = _mesh_url()
+    if not url or mod is None:
+        return [], {}
+    return mod.leer(url)
+
+
+def validar_url(url, region):
+    if not URL_RE.match(url):
+        raise ValueError('la URL debe ser https://meshtastic.org/e/#…')
+    try:
+        canales, radio = resumen_url(url)
+    except Exception:
+        raise ValueError('la URL de Meshtastic no se puede leer (¿mal copiada?)')
+    if not canales:
+        raise ValueError('la URL no trae canales')
+    if radio.get('region') not in (None, '', region):
+        raise ValueError('la URL es de %s y este nodo es %s' % (radio.get('region'), region))
+    return url
+
+
+def validar_nombres(largo, corto):
+    largo, corto = largo.strip(), corto.strip()
+    if not largo or len(largo.encode('utf-8')) > 39:
+        raise ValueError('nombre largo: de 1 a 39 bytes')
+    if not corto or len(corto) > 4:
+        raise ValueError('nombre corto: de 1 a 4 caracteres')
+    return valor_seguro(largo), valor_seguro(corto)
+
+
+# ---------------------------------------------------------------- lectura del nodo (subproceso)
+def _enum(msg, campo):
+    try:
+        v = getattr(msg, campo)
+        return msg.DESCRIPTOR.fields_by_name[campo].enum_type.values_by_number[v].name
+    except Exception:
+        return None
+
+
+def leer_nodo(tipo, destino):
+    """Estado del nodo en un dict apto para la web: sin PSK ni URL."""
+    import meshtastic.serial_interface
+    import meshtastic.tcp_interface
+    if tipo == 'serie':
+        i = meshtastic.serial_interface.SerialInterface(devPath=destino)
+    else:
+        i = meshtastic.tcp_interface.TCPInterface(hostname=destino)
+    try:
+        num = i.myInfo.my_node_num if i.myInfo else None
+        yo = (i.nodesByNum or {}).get(num, {}) if num is not None else {}
+        u = yo.get('user', {})
+        ln = i.localNode
+        lc = ln.localConfig
+        canales = []
+        for c in (ln.channels or []):
+            rol = _enum(c, 'role')
+            if rol in (None, 'DISABLED'):
+                continue
+            psk = bytes(c.settings.psk or b'')
+            clave = 'sin cifrar' if not psk else ('pública (por defecto)' if len(psk) == 1 else 'propia AES-%d' % (len(psk) * 8))
+            canales.append({'indice': c.index, 'nombre': c.settings.name or '(principal)', 'rol': rol, 'clave': clave})
+        pos = yo.get('position', {})
+        meta = getattr(i, 'metadata', None)
+        return {
+            'ok': True, 'num': '!%08x' % num if num is not None else '',
+            'largo': u.get('longName', ''), 'corto': u.get('shortName', ''), 'hw': u.get('hwModel', ''),
+            'firmware': getattr(meta, 'firmware_version', '') if meta else '',
+            'rol': _enum(lc.device, 'role'), 'region': _enum(lc.lora, 'region'),
+            'preset': _enum(lc.lora, 'modem_preset'), 'potencia': lc.lora.tx_power, 'saltos': lc.lora.hop_limit,
+            'canales': canales, 'nodos_oidos': max(len(i.nodes or {}) - 1, 0),
+            'lat': round(pos['latitude'], 3) if 'latitude' in pos else None,
+            'lon': round(pos['longitude'], 3) if 'longitude' in pos else None,
+        }
+    finally:
+        i.close()
+
+
+# ---------------------------------------------------------------- trabajos (uno a la vez)
+class Trabajo:
+    def __init__(self):
+        self.cerrojo = threading.Lock()
+        self.activo = False
+        self.titulo = ''
+        self.log = []
+        self.fin = None
+        self.lecturas = {}
+
+    def apunta(self, texto):
+        for l in tapar(str(texto)).splitlines():
+            if l.strip():
+                self.log.append(time.strftime('%H:%M:%S ') + l.rstrip())
+        del self.log[:-200]
+
+    def lanzar(self, titulo, fn, soltar_mapa=True):
+        with self.cerrojo:
+            if self.activo:
+                return False
+            self.activo, self.titulo, self.log, self.fin = True, titulo, [], None
+        threading.Thread(target=self._correr, args=(fn, soltar_mapa), daemon=True).start()
+        return True
+
+    def _correr(self, fn, soltar_mapa):
+        mapa = soltar_mapa and systemctl('is-active', '--quiet', SERVICIO_MAPA) == 0
+        try:
+            if mapa:
+                self.apunta('Paro %s mientras tanto (el puerto es de uno solo)' % SERVICIO_MAPA)
+                systemctl('stop', SERVICIO_MAPA)
+                time.sleep(2)
+            fn(self)
+            self.apunta('✔ Terminado')
+        except Exception as e:
+            self.apunta('✘ %s' % e)
+        finally:
+            if mapa:
+                systemctl('start', SERVICIO_MAPA)
+                self.apunta('%s arrancado de nuevo' % SERVICIO_MAPA)
+            self.fin = time.time()
+            self.activo = False
+
+
+TRABAJO = Trabajo()
+
+
+def tapar(s):
+    """Nada de claves en el registro de la web."""
+    s = re.sub(r'(meshtastic\.org/e/#?)[A-Za-z0-9_-]+', r'\1…', s)
+    s = re.sub(r'(?i)(psk\S*\s*[:=]?\s*)(base64:)?[A-Za-z0-9+/=]{8,}', r'\1…', s)
+    return re.sub(r'base64:[A-Za-z0-9+/=]+', 'base64:…', s)
+
+
+def systemctl(*a):
+    try:
+        return subprocess.run(['systemctl'] + list(a), capture_output=True, timeout=60).returncode
+    except Exception:
+        return 1
+
+
+def destino(nodo, env):
+    if nodo == '433':
+        return 'serie', env.get('MESH433_PUERTO', '/dev/lilygo-mesh')
+    return 'tcp', env.get('MESH868_HOST', '127.0.0.1')
+
+
+def cli(t, nodo, env, args, espera=0):
+    tipo, dest = destino(nodo, env)
+    if tipo == 'serie' and not os.path.exists(dest):
+        raise RuntimeError('no existe %s: sudo bricohams-dispositivos identificar' % dest)
+    cmd = [sys.executable, '-m', 'meshtastic'] + (['--port', dest] if tipo == 'serie' else ['--host', dest]) + args
+    vista = [a if not a.startswith(('https://meshtastic.org', 'base64:')) else '…' for a in args]
+    t.apunta('meshtastic %s' % ' '.join(vista))
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
+    t.apunta('\n'.join((r.stdout + r.stderr).splitlines()[-6:]))
+    if r.returncode != 0:
+        raise RuntimeError('meshtastic terminó con error %d' % r.returncode)
+    if espera:
+        time.sleep(espera)
+
+
+def tarea_leer(nodos):
+    def fn(t):
+        env = leer_env()
+        for n in nodos:
+            tipo, dest = destino(n, env)
+            if tipo == 'serie' and not os.path.exists(dest):
+                TRABAJO.lecturas[n] = {'ok': False, 'error': 'no existe %s' % dest, 'hora': time.time()}
+                t.apunta('%s: no existe %s' % (n, dest))
+                continue
+            t.apunta('Leyendo el nodo %s (%s)…' % (n, dest))
+            try:
+                r = subprocess.run([sys.executable, os.path.abspath(__file__), 'leer', tipo, dest],
+                                   capture_output=True, text=True, timeout=120)
+                datos = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+                if not datos.get('ok'):
+                    datos = {'ok': False, 'error': datos.get('error') or tapar(r.stderr.strip()[-300:]) or 'sin respuesta'}
+            except subprocess.TimeoutExpired:
+                datos = {'ok': False, 'error': 'el nodo no responde (120 s)'}
+            except ValueError:
+                datos = {'ok': False, 'error': 'respuesta ilegible'}
+            datos['hora'] = time.time()
+            TRABAJO.lecturas[n] = datos
+            t.apunta('%s: %s' % (n, 'leído' if datos.get('ok') else datos.get('error')))
+    return fn
+
+
+def tarea_aplicar(nodo):
+    def fn(t):
+        env = leer_env()
+        cfg = NODOS[nodo]
+        url = env.get(cfg['url'], '')
+        if nodo == '433':
+            if url:
+                cli(t, nodo, env, ['--seturl', url], 20)
+            elif si(env.get('MESH433_CHANNELS'), 'yes') and env.get('MESH_CHANNEL_URL'):
+                cli(t, nodo, env, ['--seturl', env['MESH_CHANNEL_URL']], 20)
+                cli(t, nodo, env, ['--set', 'lora.region', 'EU_433', '--set', 'lora.use_preset', 'true',
+                                   '--set', 'lora.override_frequency', '0', '--set', 'lora.tx_power', '0'], 15)
+                cli(t, nodo, env, ['--set', 'lora.modem_preset', 'LONG_FAST'], 10)
+            else:
+                cli(t, nodo, env, ['--set', 'lora.region', 'EU_433'], 15)
+        else:
+            if url:
+                cli(t, nodo, env, ['--seturl', url], 20)
+            else:
+                cli(t, nodo, env, ['--set', 'lora.region', env.get('MESH_REGION', 'EU_868')], 15)
+            psk = env.get('MESH868_PRIVATE_PSK', '')
+            if psk:
+                try:
+                    n = len(resumen_url(url)[0]) if url else 1
+                except Exception:
+                    n = 1
+                if n < 8:
+                    cli(t, nodo, env, ['--ch-add', env.get('MESH868_PRIVATE_NAME', 'BricoHams')], 10)
+                    cli(t, nodo, env, ['--ch-index', str(n), '--ch-set', 'psk', 'base64:' + psk], 10)
+                else:
+                    t.apunta('La URL ya trae 8 canales: no cabe el canal privado')
+        cli(t, nodo, env, ['--set-owner', env.get(cfg['largo'], cfg['def_largo']),
+                           '--set-owner-short', env.get(cfg['corto'], cfg['def_corto'])], 10)
+        if cfg['rol']:
+            cli(t, nodo, env, ['--set', 'device.role', env.get(cfg['rol'], 'CLIENT')], 10)
+        if env.get('STATION_LAT') and env.get('STATION_LON'):
+            cli(t, nodo, env, ['--setlat', env['STATION_LAT'], '--setlon', env['STATION_LON'],
+                               '--setalt', env.get('STATION_ASL', '0')], 5)
+        try:
+            cli(t, nodo, env, ['--set', 'position.gps_mode', 'NOT_PRESENT'])
+        except RuntimeError:
+            pass
+        tarea_leer([nodo])(t)
+    return fn
+
+
+def tarea_reiniciar(servicio):
+    def fn(t):
+        t.apunta('systemctl restart %s' % servicio)
+        rc = systemctl('restart', servicio)
+        time.sleep(3)
+        estado = 'activo' if systemctl('is-active', '--quiet', servicio) == 0 else 'NO arranca (journalctl -u %s)' % servicio
+        t.apunta('%s: %s' % (servicio, estado))
+        if rc != 0:
+            raise RuntimeError('no se pudo reiniciar %s' % servicio)
+    return fn
+
+
+# ---------------------------------------------------------------- acciones del formulario
+def accion(campos):
+    """Devuelve el mensaje para la web; ValueError = dato no válido."""
+    a = campos.get('accion', '')
+    env = leer_env()
+    m = re.match(r'^(guardar|aplicar)(433|868)$', a)
+    if m:
+        nodo = m.group(2)
+        cfg = NODOS[nodo]
+        largo, corto = validar_nombres(campos.get('largo', ''), campos.get('corto', ''))
+        cambios = {cfg['largo']: largo, cfg['corto']: corto}
+        if cfg['rol']:
+            rol = campos.get('rol', 'CLIENT')
+            if rol not in ROLES:
+                raise ValueError('rol no válido')
+            cambios[cfg['rol']] = rol
+        url = campos.get('url', '').strip()
+        if url:
+            cambios[cfg['url']] = validar_url(url, cfg['region'])
+        guardar(cambios)
+        if m.group(1) == 'guardar':
+            return 'Guardado en bricohams.env (nodo %s). Aplícalo al nodo cuando quieras.' % nodo
+        if not TRABAJO.lanzar('Aplicar la configuración al nodo %s' % nodo, tarea_aplicar(nodo)):
+            return 'Guardado, pero hay otro trabajo en marcha: aplícalo cuando termine.'
+        return 'Guardado. Aplicando al nodo %s (tarda 1-2 minutos)…' % nodo
+    if a == 'mapa':
+        cambios = {k: ('yes' if campos.get(k) == 'yes' else 'no') for k in ('MESH433_OWRX', 'MESH868_OWRX', 'MESH_OWRX_CHAT')}
+        guardar(cambios)
+        if si(env.get('OWRX_MAPA_LORA'), 'yes'):
+            TRABAJO.lanzar('Reiniciar el mapa de OpenWebRX+', tarea_reiniciar(SERVICIO_MAPA), soltar_mapa=False)
+        return 'Mapa de OpenWebRX+ actualizado.'
+    if a == 'leer':
+        if not TRABAJO.lanzar('Leer los nodos', tarea_leer(['433', '868'])):
+            return 'Hay otro trabajo en marcha.'
+        return 'Leyendo los nodos…'
+    if a in ('reiniciar868', 'reiniciarmapa'):
+        s = 'meshtasticd' if a == 'reiniciar868' else SERVICIO_MAPA
+        if not TRABAJO.lanzar('Reiniciar %s' % s, tarea_reiniciar(s), soltar_mapa=(a == 'reiniciar868')):
+            return 'Hay otro trabajo en marcha.'
+        return 'Reiniciando %s…' % s
+    if a == 'reiniciarrak':
+        if not TRABAJO.lanzar('Reiniciar %s' % SERVICIO_RAK, tarea_reiniciar(SERVICIO_RAK), soltar_mapa=False):
+            return 'Hay otro trabajo en marcha.'
+        return 'Reiniciando la pasarela APRS del RAK…'
+    raise ValueError('acción desconocida')
+
+
+# ---------------------------------------------------------------- web
+def e(s):
+    return html.escape('' if s is None else str(s), quote=True)
+
+
+def token(sesion):
+    return hmac.new(SECRETO, sesion.encode('utf-8'), hashlib.sha256).hexdigest()[:40]
+
+
+def sesion_owrx(cabecera_cookie):
+    try:
+        c = http.cookies.SimpleCookie()
+        c.load(cabecera_cookie or '')
+        return c['owrx-session'].value if 'owrx-session' in c else ''
+    except http.cookies.CookieError:
+        return ''
+
+
+_VALIDAS = {}
+_VALIDAS_LOCK = threading.Lock()
+VALIDA_SEG = 30
+
+
+def autorizado_cache(sesion):
+    """Como autorizado(), recordando 30 s las sesiones buenas (el cliente web de :8443 sondea mucho)."""
+    ahora = time.monotonic()
+    with _VALIDAS_LOCK:
+        if _VALIDAS.get(sesion, 0) > ahora:
+            return True
+    if not autorizado(sesion):
+        return False
+    with _VALIDAS_LOCK:
+        if len(_VALIDAS) > 200:
+            for k in [k for k, v in _VALIDAS.items() if v <= ahora]:
+                del _VALIDAS[k]
+        _VALIDAS[sesion] = ahora + VALIDA_SEG
+    return True
+
+
+def autorizado(sesion):
+    """La sesión vale si OpenWebRX+ deja ver /settings con ella (AuthorizationMixin: 200 o 403)."""
+    if not sesion or not re.match(r'^[A-Za-z0-9_-]{8,128}$', sesion):
+        return False
+    host, _, puerto = OWRX.partition(':')
+    try:
+        c = http.client.HTTPConnection(host, int(puerto or 80), timeout=5)
+        c.request('GET', '/settings', headers={'Cookie': 'owrx-session=' + sesion, 'X-Requested-With': 'XMLHttpRequest'})
+        r = c.getresponse()
+        r.read()
+        c.close()
+        return r.status == 200
+    except (OSError, ValueError, http.client.HTTPException):
+        return False
+
+
+def hora(t):
+    return time.strftime('%d/%m %H:%M:%S', time.localtime(t)) if t else ''
+
+
+def html_lectura(n):
+    d = TRABAJO.lecturas.get(n)
+    if not d:
+        return '<p class="text-muted">Sin leer todavía (botón «Leer los nodos»).</p>'
+    if not d.get('ok'):
+        return '<p class="text-danger">Última lectura %s: %s</p>' % (e(hora(d.get('hora'))), e(d.get('error')))
+    filas = [('Nodo', '%s · %s (%s)' % (d.get('num'), d.get('largo'), d.get('corto'))), ('Hardware', d.get('hw')),
+             ('Firmware', d.get('firmware')), ('Rol', d.get('rol')),
+             ('Radio', '%s · %s · %s dBm · %s saltos' % (d.get('region'), d.get('preset'), d.get('potencia'), d.get('saltos'))),
+             ('Posición', '%s, %s' % (d.get('lat'), d.get('lon')) if d.get('lat') is not None else 'sin posición'),
+             ('Nodos oídos', d.get('nodos_oidos')),
+             ('Canales', ' · '.join('%s %s (%s)' % (c['indice'], c['nombre'], c['clave']) for c in d.get('canales', [])))]
+    return ('<p class="text-muted">Leído %s</p><table class="table table-sm">' % e(hora(d.get('hora')))
+            + ''.join('<tr><th>%s</th><td>%s</td></tr>' % (e(k), e(v)) for k, v in filas) + '</table>')
+
+
+def html_url(url, region):
+    if not url:
+        return 'sin URL propia'
+    try:
+        canales, radio = resumen_url(url)
+    except Exception:
+        return '<span class="text-danger">URL ilegible</span>'
+    nombres = ', '.join('%s (%s)' % (c['nombre'] or 'principal', c['clave']) for c in canales)
+    return e('%d canales: %s · radio %s %s' % (len(canales), nombres, radio.get('region', region), radio.get('modem', '')))
+
+
+def pagina(sesion, aviso='', error=''):
+    env = leer_env()
+    tk = token(sesion)
+    oculto = '<input type="hidden" name="csrf" value="%s">' % tk
+    partes = []
+    for n, cfg in NODOS.items():
+        sel = ''
+        if cfg['rol']:
+            actual = env.get(cfg['rol'], 'CLIENT')
+            sel = ('<div class="form-group"><label>Rol</label><select class="form-control" name="rol">'
+                   + ''.join('<option%s>%s</option>' % (' selected' if r == actual else '', r) for r in ROLES)
+                   + '</select></div>')
+        priv = ''
+        if n == '868':
+            priv = '<p class="small">Canal privado: %s</p>' % (
+                e(env.get('MESH868_PRIVATE_NAME', 'BricoHams')) + ' configurado (clave en bricohams.env)'
+                if env.get('MESH868_PRIVATE_PSK') else 'no')
+        partes.append('''
+<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>%(titulo)s</b></div><div class="card-body">
+%(lectura)s
+<form method="post" action="%(base)s" autocomplete="off">%(oculto)s
+<div class="form-group"><label>Nombre largo</label><input class="form-control" name="largo" maxlength="39" value="%(largo)s"></div>
+<div class="form-group"><label>Nombre corto</label><input class="form-control" name="corto" maxlength="4" value="%(corto)s"></div>
+%(sel)s
+<div class="form-group"><label>URL de canales (%(region)s)</label>
+<input class="form-control" name="url" type="password" placeholder="vacío = no cambiar" spellcheck="false">
+<small class="form-text text-muted">Actual: %(url)s</small></div>
+%(priv)s
+<button class="btn btn-secondary" name="accion" value="guardar%(n)s">Guardar</button>
+<button class="btn btn-primary" name="accion" value="aplicar%(n)s">Guardar y aplicar al nodo</button>
+</form></div></div></div>''' % {
+            'titulo': e(cfg['titulo']), 'lectura': html_lectura(n), 'base': BASE, 'oculto': oculto, 'n': n,
+            'largo': e(env.get(cfg['largo'], cfg['def_largo'])), 'corto': e(env.get(cfg['corto'], cfg['def_corto'])),
+            'sel': sel, 'region': cfg['region'], 'url': html_url(env.get(cfg['url'], ''), cfg['region']), 'priv': priv})
+
+    def caja(k, texto, d):
+        return ('<div class="form-check"><input class="form-check-input" type="checkbox" id="%s" name="%s" value="yes"%s>'
+                '<label class="form-check-label" for="%s">%s</label></div>' % (k, k, ' checked' if si(env.get(k), d) else '', k, e(texto)))
+    trabajo = ''
+    if TRABAJO.titulo:
+        trabajo = '<div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><pre class="card-body mb-0" style="max-height:20em;overflow:auto">%s</pre></div>' % (
+            e(TRABAJO.titulo), 'en marcha…' if TRABAJO.activo else 'terminado ' + e(hora(TRABAJO.fin)), e('\n'.join(TRABAJO.log)))
+    refresco = '<meta http-equiv="refresh" content="5;url=%s">' % BASE if TRABAJO.activo else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Meshtastic · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item active">Meshtastic 433 / 868</li><li class="breadcrumb-item"><a href="%(aprs)s">APRS (RAK)</a></li></ol></nav>
+<h1>Meshtastic · administración</h1>
+<p class="text-muted">Solo para el administrador (sesión de OpenWebRX+). Los cambios se guardan en bricohams.env; las claves nunca se muestran.</p>
+%(aviso)s%(error)s%(trabajo)s</div></div>
+<div class="row">%(nodos)s</div>
+<div class="row"><div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Mapa de OpenWebRX+</b></div><div class="card-body">
+<form method="post" action="%(base)s">%(oculto)s
+%(c433)s%(c868)s%(chat)s
+<button class="btn btn-primary mt-2" name="accion" value="mapa">Guardar</button></form></div></div></div>
+<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Mantenimiento</b></div><div class="card-body">
+<form method="post" action="%(base)s">%(oculto)s
+<button class="btn btn-secondary mb-2" name="accion" value="leer">Leer los nodos</button>
+<button class="btn btn-secondary mb-2" name="accion" value="reiniciar868">Reiniciar meshtasticd (868)</button>
+<button class="btn btn-secondary mb-2" name="accion" value="reiniciarmapa">Reiniciar el servicio del mapa</button>
+</form></div></div></div></div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'oculto': oculto, 'nodos': ''.join(partes), 'trabajo': trabajo,
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else '',
+        'c433': caja('MESH433_OWRX', 'Nodo 433 en el mapa', 'yes'), 'c868': caja('MESH868_OWRX', 'Nodo 868 en el mapa', 'yes'),
+        'chat': caja('MESH_OWRX_CHAT', 'Mensajes de canales públicos en el chat de la web (nunca los directos)', 'no')}
+
+
+def leer_rak():
+    try:
+        with open(RAK_JSON, encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def pagina_aprs(sesion, aviso='', error=''):
+    """Estado del RAK4631 LoRa APRS (433.775) y su registro de paquetes, solo lectura + reinicio."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    d = leer_rak()
+    activo = systemctl('is-active', '--quiet', SERVICIO_RAK) == 0
+    if not d:
+        estado = '<p class="text-danger">Sin datos de %s (%s).</p>' % (e(RAK_JSON), 'servicio activo' if activo else 'servicio parado')
+        oidos = ''
+    else:
+        r = d.get('rak') or {}
+        gps = r.get('gps') or {}
+        ais = d.get('aprsis') or {}
+        mapa = d.get('mapa_owrx') or {}
+        filas = [
+            ('Servicio', '%s · actualizado %s' % ('activo' if activo else 'PARADO', d.get('actualizado', '?'))),
+            ('Puerto', d.get('puerto', '?')),
+            ('Firmware / indicativo', '%s · %s' % (r.get('fw', '?'), r.get('call', '?'))),
+            ('Radio', '%s · %.3f MHz · TX %s' % (r.get('radio', '?'), (r.get('freq') or 0) / 1e6, 'sí' if r.get('tx') else 'no')),
+            ('Contadores', 'RX %s · TX %s · digi %s · CRC err %s' % (r.get('rx', 0), r.get('txn', 0), r.get('digin', 0), r.get('crcerr', 0))),
+            ('Último RSSI / SNR', '%s dBm · %s dB' % (r.get('rssi', '?'), r.get('snr', '?'))),
+            ('Sensor', '%s · %s °C · %s %% · %s hPa' % (r.get('sensor', '-'), r.get('t', '-'), r.get('h', '-'), r.get('p', '-'))),
+            ('Batería', '%s V' % r['vbat'] if r.get('vbat') is not None else 'sin batería (alimentado por USB)'),
+            ('GPS', 'fix, %s satélites' % gps.get('sats', 0) if gps.get('fix') else ('sin fix' if gps.get('present') else 'no hay')),
+            ('APRS-IS', '%s · %s enviados' % ('conectado' if ais.get('conectado') else ('desconectado' if ais.get('activo') else 'desactivado'), ais.get('enviados', 0))),
+            ('Mapa OpenWebRX+', '%s · %s publicados' % ('sí' if mapa.get('activo') else 'no', mapa.get('publicados', 0))),
+            ('Uptime del RAK', '%s s' % r.get('up', '?')),
+        ]
+        estado = ('<table class="table table-sm mb-0">'
+                  + ''.join('<tr><th>%s</th><td>%s</td></tr>' % (e(k), e(v)) for k, v in filas) + '</table>')
+        oidos = ''.join('<tr><td>%s</td><td>%s</td><td>%s / %s</td><td>%s</td><td>%s</td><td class="small" style="word-break:break-all">%s</td></tr>' % (
+            e(o.get('hora')), e(o.get('de')), e(o.get('rssi')), e(o.get('snr')),
+            'sí' if o.get('aprsis') else '-', 'sí' if o.get('mapa') else '-', e(o.get('paquete')))
+            for o in (d.get('oidos') or []))
+    refresco = '<meta http-equiv="refresh" content="5;url=%s">' % APRS if TRABAJO.activo else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>APRS (RAK) · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item"><a href="%(base)s">Meshtastic 433 / 868</a></li>
+<li class="breadcrumb-item active">APRS (RAK)</li></ol></nav>
+<h1>LoRa APRS · RAK4631</h1>
+<p class="text-muted">Solo para el administrador (sesión de OpenWebRX+). La configuración (indicativo, passcode, baliza) está en bricohams.env y no se muestra aquí.</p>
+%(aviso)s%(error)s%(trabajo)s</div></div>
+<div class="row"><div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Estado</b></div><div class="card-body">%(estado)s
+<form method="post" action="%(aprs)s" class="mt-3">%(oculto)s
+<button class="btn btn-secondary" name="accion" value="reiniciarrak">Reiniciar la pasarela APRS</button></form>
+</div></div></div></div>
+<div class="row"><div class="col-12"><div class="card mb-4"><div class="card-header"><b>Registro · últimos paquetes oídos</b></div><div class="card-body">
+<table class="table table-sm"><tr><th>Hora</th><th>De</th><th>RSSI / SNR</th><th>APRS-IS</th><th>Mapa</th><th>Paquete</th></tr>%(oidos)s</table>
+</div></div></div></div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'oculto': oculto, 'estado': estado,
+        'oidos': oidos or '<tr><td colspan="6" class="text-muted">Nada todavía.</td></tr>',
+        'trabajo': html_trabajo(),
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else ''}
+
+
+def html_trabajo():
+    if not TRABAJO.titulo:
+        return ''
+    return '<div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><pre class="card-body mb-0" style="max-height:20em;overflow:auto">%s</pre></div>' % (
+        e(TRABAJO.titulo), 'en marcha…' if TRABAJO.activo else 'terminado ' + e(hora(TRABAJO.fin)), e('\n'.join(TRABAJO.log)))
+
+
+PAGINAS = {BASE: pagina, APRS: pagina_aprs}
+
+
+def posiciones_tak():
+    """Consulta local de solo lectura bajo la identidad PostgreSQL del servicio TAK."""
+    sql = """
+        SELECT COALESCE(json_agg(n), '[]'::json) FROM (
+            SELECT DISTINCT ON (p.device_uid)
+                p.device_uid AS uid, COALESCE(e.callsign, p.device_uid) AS callsign,
+                p.latitude AS lat, p.longitude AS lon,
+                EXTRACT(EPOCH FROM p.timestamp AT TIME ZONE 'UTC') * 1000 AS timestamp
+            FROM points p JOIN euds e ON e.uid = p.device_uid
+            JOIN cot c ON c.id = p.cot_id
+            WHERE p.latitude BETWEEN -90 AND 90 AND p.longitude BETWEEN -180 AND 180
+                AND c.stale > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+            ORDER BY p.device_uid, p.timestamp DESC, p.id DESC LIMIT 1000
+        ) n
+    """
+    r = subprocess.run(['runuser', '-u', 'opentakserver', '--', 'psql', '-X', '-q', '-A', '-t',
+                        '--set=ON_ERROR_STOP=1', '--host=/var/run/postgresql',
+                        '--dbname=bricohams_tak', '--command', sql],
+                       capture_output=True, text=True, timeout=5,
+                       env={**os.environ, 'PGOPTIONS': '-c statement_timeout=3000 -c default_transaction_read_only=on'})
+    if r.returncode:
+        raise RuntimeError('PostgreSQL TAK no disponible')
+    datos = json.loads(r.stdout)
+    if not isinstance(datos, list):
+        raise ValueError('respuesta TAK no valida')
+    return {'nodes': datos}
+
+
+class Manejador(http.server.BaseHTTPRequestHandler):
+    server_version = 'bricohams-mesh-admin'
+    sys_version = ''
+
+    def log_message(self, fmt, *a):
+        pass
+
+    def _enviar(self, codigo, cuerpo=b'', tipo='text/html; charset=utf-8', cabeceras=()):
+        self.send_response(codigo)
+        self.send_header('Content-Type', tipo)
+        self.send_header('Content-Length', str(len(cuerpo)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Robots-Tag', 'noindex')
+        self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'; frame-ancestors 'self'")
+        for k, v in cabeceras:
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(cuerpo)
+
+    def _sesion(self):
+        s = sesion_owrx(self.headers.get('Cookie'))
+        return s if autorizado(s) else None
+
+    def _ruta(self):
+        return urlsplit(self.path).path.rstrip('/')
+
+    def do_GET(self):
+        ruta = self._ruta()
+        if ruta == AUTH:
+            # auth_request de nginx para el cliente web de Meshtastic (:8443): 204 admin, 401 el resto
+            ok = autorizado_cache(sesion_owrx(self.headers.get('Cookie')))
+            return self._enviar(204 if ok else 401, tipo='text/plain; charset=utf-8')
+        if ruta == TAK_POSICIONES:
+            if not self._sesion():
+                return self._enviar(401, b'{"error":"sesion de administrador necesaria"}', 'application/json')
+            try:
+                datos = posiciones_tak()
+            except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as e:
+                print('mapa TAK: %s' % e, file=sys.stderr, flush=True)
+                return self._enviar(503, b'{"error":"TAK no disponible"}', 'application/json')
+            return self._enviar(200, json.dumps(datos).encode(), 'application/json')
+        if ruta not in (BASE, APRS, '/settings/bricohams'):
+            return self._enviar(404, b'no encontrado', 'text/plain; charset=utf-8')
+        s = self._sesion()
+        if not s:
+            destino = APRS if ruta == APRS else BASE
+            return self._enviar(302, cabeceras=[('Location', '/login?ref=' + destino.lstrip('/'))])
+        if ruta not in PAGINAS:
+            return self._enviar(302, cabeceras=[('Location', BASE)])
+        return self._enviar(200, PAGINAS[ruta](s).encode('utf-8'))
+
+    do_HEAD = do_GET
+
+    def _mismo_origen(self):
+        host = (self.headers.get('Host') or '').split(':')[0].lower()
+        for cab in ('Origin', 'Referer'):
+            v = self.headers.get(cab)
+            if v:
+                return (urlsplit(v).hostname or '').lower() == host and bool(host)
+        return False
+
+    def do_POST(self):
+        ruta = self._ruta()
+        if ruta not in PAGINAS:
+            return self._enviar(404, b'no encontrado', 'text/plain; charset=utf-8')
+        s = self._sesion()
+        if not s:
+            return self._enviar(403, b'sesion de administrador necesaria', 'text/plain; charset=utf-8')
+        try:
+            largo = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            largo = 0
+        if largo <= 0 or largo > 16384:
+            return self._enviar(400, b'peticion no valida', 'text/plain; charset=utf-8')
+        campos = {k: v[0] for k, v in parse_qs(self.rfile.read(largo).decode('utf-8', 'replace')).items()}
+        if not (self._mismo_origen() and hmac.compare_digest(campos.get('csrf', ''), token(s))):
+            return self._enviar(403, b'origen no valido', 'text/plain; charset=utf-8')
+        aviso = error = ''
+        try:
+            if ruta == APRS and campos.get('accion') != 'reiniciarrak':
+                raise ValueError('acción desconocida')
+            aviso = accion(campos)
+        except (ValueError, OSError) as x:
+            error = str(x)
+        return self._enviar(200, PAGINAS[ruta](s, aviso, error).encode('utf-8'))
+
+
+class Servidor(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+
+
+def main(a):
+    if len(a) >= 4 and a[1] == 'leer':
+        try:
+            print(json.dumps(leer_nodo(a[2], a[3]), ensure_ascii=False))
+        except Exception as x:
+            print(json.dumps({'ok': False, 'error': tapar(str(x))[:300]}, ensure_ascii=False))
+        return 0
+    if len(a) >= 2 and a[1] == 'servicio':
+        Servidor(('127.0.0.1', PUERTO), Manejador).serve_forever()
+        return 0
+    print(open(__file__, encoding='utf-8').read().split('# =====')[1].replace('\n#  ', '\n').strip('#=\n '))
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

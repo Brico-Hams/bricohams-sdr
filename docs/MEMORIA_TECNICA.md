@@ -153,6 +153,9 @@ La estación tiene cinco zonas:
 | W10 | plugins `filtro_audio` + `dsp_audio` | filtro y DSP de audio en el navegador de cada oyente | 30 |
 | W11 | `bricohams-locator` + `data/locator/catalogo_es.json` (v4.3) | marcadores y METEO_STATIONS de la zona según el locator: aeropuertos, AEMET, puertos, NAVTEX y FM | 32 |
 | W12 | OpenWebRX+ en Docker (`OWRX_BACKEND="docker"`, v4.3) | contenedor `slechev/openwebrxplus(-softmbe)` con volúmenes en `/opt/owrx-docker`; owrx-clone 1.1 `--docker` | 33 |
+| W14 | RAK4631 «BricoHams RAK APRS» + `bricohams-rak-aprs` (v4.5) | iGate LoRa APRS 433,775: radio y digipeater en el RAK, APRS-IS y mensajes en la Pi; GPS y temperatura de la caja | 35 |
+| W15 | `bricohams-mesh-owrx` + MQTT local (v4.5) | LoRa APRS y nodos Meshtastic 433/868 en el mapa de OpenWebRX+ | 35 |
+| W16 | `bricohams-banner` y `bricohams-dispositivos` (v4.5) | aviso legal SSH sin pistas y estado al entrar; inventario por VID:PID y serie | 34, 35 |
 | W13 | `bricohams-blindaje` (v4.4) | auditoría y blindaje de seguridad: cortafuegos del host con vuelta atrás, SSH, fail2ban, permisos, fugas de claves, posición pública redondeada | 34 |
 
 ## 6. Verificaciones pendientes

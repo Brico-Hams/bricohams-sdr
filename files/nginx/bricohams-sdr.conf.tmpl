@@ -42,4 +42,44 @@ server {
     proxy_cookie_flags owrx-session secure httponly samesite=lax;
     include /etc/nginx/snippets/bricohams-sdr-rutas.conf;
 }
+#@MW@
+#@MW@# v4.5 · cliente web oficial de Meshtastic (nodo 868) SOLO para el admin: https://<estación>:8443/
+#@MW@# Va en su propio puerto porque la app usa rutas absolutas (/index-*.js, /api/v1/...). Cada
+#@MW@# petición pasa por auth_request → bricohams-mesh-admin, que valida la sesión de /settings de
+#@MW@# OpenWebRX+ (la cookie owrx-session es del host, no del puerto). meshtasticd sirve en 9443
+#@MW@# solo hacia la propia Pi (cortafuegos bricohams-meshweb-fw). NO abras el 8443 en el router.
+#@MW@server {
+#@MW@    listen 8443 ssl http2;
+#@MW@    listen [::]:8443 ssl http2;
+#@MW@    server_name __DOMINIO__ _;
+#@MW@    server_tokens off;
+#@MW@    ssl_certificate     __CERT__;
+#@MW@    ssl_certificate_key __KEY__;
+#@MW@    ssl_protocols TLSv1.2 TLSv1.3;
+#@MW@    add_header X-Content-Type-Options nosniff always;
+#@MW@    add_header X-Frame-Options SAMEORIGIN always;
+#@MW@    add_header X-Robots-Tag noindex always;
+#@MW@    error_page 401 = @bh_login;
+#@MW@    location = /_bh_auth {
+#@MW@        internal;
+#@MW@        proxy_pass http://127.0.0.1:8076/settings/bricohams/auth;
+#@MW@        proxy_pass_request_body off;
+#@MW@        proxy_set_header Content-Length "";
+#@MW@        proxy_set_header Host $host;
+#@MW@    }
+#@MW@    location @bh_login { return 302 https://$host/login?ref=settings; }
+#@MW@    location /api/ {
+#@MW@        auth_request /_bh_auth;
+#@MW@        proxy_pass https://127.0.0.1:9443;
+#@MW@        proxy_ssl_verify off;
+#@MW@        proxy_buffering off;
+#@MW@        proxy_read_timeout 60s;
+#@MW@        add_header Cache-Control no-store always;
+#@MW@    }
+#@MW@    location / {
+#@MW@        auth_request /_bh_auth;
+#@MW@        root /usr/share/meshtasticd/web;
+#@MW@        try_files $uri $uri/ /index.html;
+#@MW@    }
+#@MW@}
 #@SSL<
