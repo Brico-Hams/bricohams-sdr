@@ -1,5 +1,48 @@
 # Historial
 
+## v4.4 · 11/10/2026
+**Blindaje de seguridad de la estación y posición pública redondeada.** Se mantiene todo lo anterior, más el cambio de EA5KAO en v4.4.1 (`MESH_CHANNEL_URL` con los canales SFNarrow, Iberia, Test, Bots y Murcia).
+
+**`bricohams-blindaje`** (manual 34, esquema 24, ADR-47)
+- **`auditar`** (no cambia nada; nota de 0 a 100; nunca enseña una clave) revisa:
+  - actualizaciones;
+  - cuentas sin contraseña, usuario `pi` y sudo sin contraseña;
+  - SSH;
+  - puertos a la vista y cortafuegos;
+  - 8073 abierto a Internet (`/login` sin cifrar);
+  - permisos de `settings.json`, `users.json`, `bricohams.env`, los `.env`, las copias, `mediamtx.yml` y `rbfeeder.ini`;
+  - `bricohams.env` dentro del git;
+  - **valores de las claves en ficheros públicos**;
+  - posición exacta publicada;
+  - nginx (versión, límite de `/login`, redirección a HTTPS, certificado);
+  - servicios que sobran, fail2ban y sysctl.
+
+  Además recuerda que el HAT, el Mini RTL-SDR y el SDRplay están pendientes.
+- **`aplicar`** (con copia; `deshacer` vuelve atrás):
+  - cortafuegos nftables del host: público 80/443/8073; solo LAN SSH, 4403, 9443 y 8554. Se carga con **vuelta atrás automática en 3 minutos** si no se hace `confirmar`;
+  - SSH sin root y con 3 intentos, solo con clave si ya hay claves;
+  - fail2ban (SSH y reincidentes);
+  - unattended-upgrades;
+  - permisos;
+  - `UMask=0027` en OpenWebRX+;
+  - sysctl;
+  - Bluetooth fuera;
+  - `--sudo-con-clave` opcional.
+- **Variables:** `BLINDAJE_8073`, `BLINDAJE_SSH`, `BLINDAJE_LAN`, `BLINDAJE_PUERTOS_LAN`.
+- **Instalación:** la pone el paso `herramientas`; `bricohams-check` enseña su resumen.
+
+**nginx:** `server_tokens off`, 12 intentos por minuto en `/login` y `/pwchange` (429), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos (`.git`, `.env`…) 404.
+
+**Posición pública redondeada** (ADR-48): `/status.json` de `sdr.ea5kao.ampr.org` publicaba la casa con 6 decimales. Ahora:
+- `OWRX_GPS_DECIMALES="2"` (~1 km) en `settings.json`;
+- `meteo.json`, `pases.json` e `init.js`, siempre a 2 decimales;
+- los cálculos siguen con la posición exacta.
+
+**Pruebas:**
+- `test_blindaje` (sistema de mentira, `nft -c`);
+- `test_ssl_admin` con nginx real: 429, cabeceras y ocultos;
+- `test_render_settings` y `test_locator_es` con la posición redondeada.
+
 ## v4.3 · 05/10/2026
 **OpenWebRX+ en Docker desde `bricohams.env` y zona de la estación por locator para cualquier sitio de España.** Se mantiene todo lo anterior. Parte de la V4.3 que empezó EA5KAO (revisada y adoptada): `OWRX_BACKEND`, `owrx_control`, comprobación de volúmenes, selector por locator, plantilla genérica `N0CALL`, indicativo/QTH/país en `settings.json`, `APRS_IGATE_ENABLE`, `LISTENERS_COUNTRY` y enlace a perfiles remotos en el plugin de oyentes.
 

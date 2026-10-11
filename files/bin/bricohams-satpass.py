@@ -195,7 +195,8 @@ def main():
                 x['duracion_s'] // 60, x['az_aos'], x['az_los'], x['hz'] / 1e6, x['modo']))
         return 0
     write_atomic(SALIDA, {'actualizado': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-                          'qth': {'lat': lat, 'lon': lon, 'asl': alt}, 'pases': p[:40]})
+                          'qth': {'lat': round(lat, 2), 'lon': round(lon, 2), 'asl': alt},   # v4.4: público, ~1 km
+                          'pases': p[:40]})
     print('satpass: %d pases en las próximas 24 h' % len(p))
     return 0
 

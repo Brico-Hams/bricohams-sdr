@@ -167,7 +167,8 @@ def main():
     key = env('AEMET_API_KEY')
     stations = parse_stations(env('METEO_STATIONS', '7158X:Archena,7237E:Molina de Segura,7228:Alcantarilla Base Aérea,7178I:Murcia'))
     res = {'updated': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-           'qth': {'lat': lat, 'lon': lon}, 'stations': [], 'model': None, 'errors': []}
+           'qth': {'lat': round(lat, 2), 'lon': round(lon, 2)},   # v4.4: es público (~1 km), no la casa exacta
+           'stations': [], 'model': None, 'errors': []}
 
     for sid, name in stations:
         if not key:

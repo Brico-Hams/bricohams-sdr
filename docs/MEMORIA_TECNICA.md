@@ -153,6 +153,7 @@ La estación tiene cinco zonas:
 | W10 | plugins `filtro_audio` + `dsp_audio` | filtro y DSP de audio en el navegador de cada oyente | 30 |
 | W11 | `bricohams-locator` + `data/locator/catalogo_es.json` (v4.3) | marcadores y METEO_STATIONS de la zona según el locator: aeropuertos, AEMET, puertos, NAVTEX y FM | 32 |
 | W12 | OpenWebRX+ en Docker (`OWRX_BACKEND="docker"`, v4.3) | contenedor `slechev/openwebrxplus(-softmbe)` con volúmenes en `/opt/owrx-docker`; owrx-clone 1.1 `--docker` | 33 |
+| W13 | `bricohams-blindaje` (v4.4) | auditoría y blindaje de seguridad: cortafuegos del host con vuelta atrás, SSH, fail2ban, permisos, fugas de claves, posición pública redondeada | 34 |
 
 ## 6. Verificaciones pendientes
 

@@ -979,7 +979,9 @@ paso_plugins() {
     fi
     rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
-    sed -i -e "s/__LAT__/${STATION_LAT}/" -e "s/__LON__/${STATION_LON}/" \
+    # v4.4 · init.js lo descarga cualquiera: la posición va redondeada (~1 km), no la de la casa
+    local plat plon; plat=$(LC_ALL=C printf '%.2f' "${STATION_LAT:-0}"); plon=$(LC_ALL=C printf '%.2f' "${STATION_LON:-0}")
+    sed -i -e "s/__LAT__/${plat}/" -e "s/__LON__/${plon}/" \
         -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" \
         -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" \
         -e "s#__LISTENERS_COUNTRY__#${listeners_country}#" "$R/init.js"
@@ -1393,6 +1395,8 @@ paso_herramientas() {
     install -m 644 "$FILES"/bin/bricohams_locator.py "$FILES"/bin/bricohams_locator_bookmarks.py \
         "$FILES"/bin/bricohams_locator_online.py /usr/local/lib/bricohams/
     install -m 755 "$FILES/bin/bricohams-locator" /usr/local/bin/bricohams-locator
+    # v4.4 · auditoría y blindaje de seguridad (manual 34): no cambia nada hasta «aplicar»
+    install -m 755 "$FILES/bin/bricohams-blindaje" /usr/local/sbin/bricohams-blindaje
     # copia del kit en la Raspberry para restaurar sin la tarjeta original
     install -d /opt/bricohams
     rsync -a --delete --exclude 'bricohams.env' "$KIT/" /opt/bricohams/kit/

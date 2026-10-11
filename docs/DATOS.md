@@ -225,6 +225,9 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/var/lib/bricohams/locator/{aemet,fmdx}.json` | v4.3 · datos de zona bajados en la Pi (caché 30 días) |
 | `/usr/local/lib/bricohams/, /usr/local/bin/bricohams-locator` | v4.3 · zona por locator (manual 32) |
 | `/opt/owrx-docker/{docker-compose.yaml,etc,var,plugins}` | v4.3 · OpenWebRX+ en Docker (OWRX_BACKEND=docker, manual 33) |
+| `/usr/local/sbin/bricohams-blindaje, /etc/bricohams/cortafuegos.nft` | v4.4 · blindaje y cortafuegos del host (manual 34) |
+| `/etc/ssh/sshd_config.d/90-bricohams.conf, /etc/fail2ban/jail.d/bricohams.conf, /etc/sysctl.d/90-bricohams.conf` | v4.4 · SSH, fail2ban y núcleo endurecidos |
+| `/var/backups/bricohams-blindaje/` | v4.4 · copias de «aplicar» para «deshacer» (700) |
 | `/etc/nginx/snippets/bricohams-sdr-rutas.conf` | v4.2 · rutas comunes HTTP/HTTPS de nginx |
 | `/usr/local/bin/owrx-clone, /var/backups/owrx-clone/` | v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación |
 | `/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz` | v4.2 · perfil diario de OpenWebRX+ (7 últimos) |

@@ -25,6 +25,11 @@ def main(src, dst):
     station_lon = float(env('STATION_LON', '0.0'))
     if env('STATION_LOCATOR') and not (station_lat or station_lon):    # v4.3 · las coordenadas, si están, mandan
         station_lat, station_lon = locator_to_latlon(env('STATION_LOCATOR'))
+    # v4.4 · la posición del receptor es PÚBLICA (mapa, /status.json, directorios de receptores):
+    # se redondea (2 decimales ≈ 1 km) para no publicar la casa. Vacío o «exacta» = sin redondear.
+    decimales = env('OWRX_GPS_DECIMALES', '2')
+    if decimales.isdigit():
+        station_lat, station_lon = round(station_lat, int(decimales)), round(station_lon, int(decimales))
     station_country = env('STATION_COUNTRY', 'ES').upper()
     if len(station_country) != 2 or not station_country.isascii() or not station_country.isalpha():
         sys.exit('STATION_COUNTRY debe ser un código ISO de dos letras')

@@ -3,7 +3,7 @@
 set -e
 export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/.."
-echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo files/bin/bricohams-ft2 files/bin/bricohams-servicios files/bin/bricohams-tarea files/bin/bricohams-telegram owrx-clone/instalar.sh tools/*.sh tests/run_tests.sh
+echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo files/bin/bricohams-ft2 files/bin/bricohams-servicios files/bin/bricohams-tarea files/bin/bricohams-telegram files/bin/bricohams-blindaje owrx-clone/instalar.sh tools/*.sh tests/run_tests.sh
 echo "== bash -n";     bash -n install.sh
 echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
 echo "== javascript"
@@ -31,6 +31,7 @@ python3 tests/test_anclajes.py
 python3 tests/test_actualizar.py
 python3 tests/test_env_red.py
 python3 tests/test_ssl_admin.py
+python3 tests/test_blindaje.py
 python3 tests/test_audio_plugins.py
 python3 tests/test_audio_navegador.py
 python3 tests/test_owrx_clone.py

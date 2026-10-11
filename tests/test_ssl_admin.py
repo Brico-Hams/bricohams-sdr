@@ -112,10 +112,19 @@ if nginx and os.geteuid() == 0:
         r = get('/login', https=True)
         ck = (r.getheader('Set-Cookie') or '').lower()
         assert r.status == 200 and 'secure' in ck and 'httponly' in ck and r.getheader('X-Proto') == 'https', ck
+        # v4.4 · blindaje: límite de intentos de /login, sin versión de nginx, cabeceras y ficheros ocultos
+        estados = [get('/login', https=True).status for _ in range(12)]
+        assert 429 in estados and estados[0] == 200, estados
+        assert get('/', https=True).status == 200, 'el límite es solo para /login'
+        r = get('/')
+        assert r.getheader('Server') == 'nginx' and r.getheader('X-Frame-Options') == 'SAMEORIGIN', (r.getheader('Server'), r.getheader('X-Frame-Options'))
+        assert 'geolocation=()' in (r.getheader('Permissions-Policy') or '')
+        for oculto in ('/.git/config', '/bricohams/.env', '/.htpasswd'):
+            assert get(oculto).status == 404, oculto
         real = True
     finally:
         proc.terminate(); proc.wait(5); srv.shutdown()
         shutil.rmtree(d, ignore_errors=True)
 
-print('OK test_ssl_admin: modos admin/todo/no%s; /login y /settings forzados a HTTPS, receptor por HTTP, cookie Secure' %
+print('OK test_ssl_admin: modos admin/todo/no%s; /login y /settings forzados a HTTPS, receptor por HTTP, cookie Secure; v4.4: /login limitado (429), sin versión, X-Frame-Options y ocultos 404' %
       (' probados con nginx real' if real else ' (sin nginx: solo la plantilla)'))

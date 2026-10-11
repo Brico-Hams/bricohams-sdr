@@ -285,5 +285,15 @@ for p in solar meteo camara bricohams banderas dvficha satelites visitas; do
 done
 grep -q "Plugins.load(name)" "$HTDOCS/plugins/receiver/init.js" 2>/dev/null && bien "init.js de BricoHams" || mal "init.js no es el de BricoHams"
 
+titulo "Seguridad (v4.4)"
+if [ -x /usr/local/sbin/bricohams-blindaje ]; then
+    r=$(/usr/local/sbin/bricohams-blindaje auditar --resumen 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -o '[0-9]* alto · [0-9]* medio.*')
+    case "$r" in
+        "0 alto · 0 medio"*) bien "blindaje: $r" ;;
+        "") aviso "no pude ejecutar bricohams-blindaje auditar" ;;
+        *) aviso "blindaje: $r · detalle: sudo bricohams-blindaje auditar" ;;
+    esac
+else aviso "sin bricohams-blindaje (v4.4): sudo bash install.sh --solo herramientas"; fi
+
 printf '\n\e[1mResumen:\e[0m %d bien · %d avisos · %d fallos\n' "$OK" "$AV" "$KO"
 [ "$KO" -eq 0 ]

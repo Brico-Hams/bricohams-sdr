@@ -260,7 +260,7 @@ auto = [b for b in final if '[AUTO-LOCATOR]' in b.get('description', '')]
 assert any('LEVX' in b['name'] for b in auto) and any('Vigo' in b['name'] for b in auto), [b['name'] for b in auto]
 assert 'Mi repetidor ED1ZZZ' in [b['name'] for b in final], 'lo tuyo se queda'
 assert not any('Cartagena' in b['name'] or b['modulation'] == 'wfm' for b in final if b not in auto), 'kit de Murcia adaptado'
-assert json.load(open(dd + '/var/settings.json'))['receiver_gps']['lat'] == 42.229167
+assert json.load(open(dd + '/var/settings.json'))['receiver_gps']['lat'] == 42.23     # v4.4: posición pública redondeada
 etc = open(T + '/etc/bricohams.env', encoding='utf-8').read()
 assert "STATION_QTH_LOCATOR='IN52PF'" in etc and "OWRX_HTDOCS='%s'" % dd in etc and "METEO_STATIONS='1496X:Vigo-O Castro" in etc, etc[-600:]
 assert 'CONTROL restart' in r.stdout and 'Aeropuertos' in r.stdout and 'marcadores de la zona IN52PF' in r.stdout

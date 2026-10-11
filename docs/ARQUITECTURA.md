@@ -664,6 +664,40 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **Verificación:** con la Pi real (aquí no hay salida a esos servicios).
   - **`LOCATOR_ONLINE="no"`:** desactiva las dos fuentes.
 
+## ADR-47 · Blindaje: auditar sin tocar, aplicar con copia y cortafuegos con vuelta atrás (v4.4)
+- **Decisión:** `bricohams-blindaje` (bash, `/usr/local/sbin`).
+  - **`auditar`:** solo lee, da una nota y **no enseña nunca un valor de clave**.
+  - **`aplicar`:**
+    - cortafuegos nftables propio (`table inet bricohams`, solo la cadena `input`): público 80/443/8073, SSH y servicios auxiliares solo para la LAN;
+    - SSH sin root y con 3 intentos; **solo con clave únicamente si ya hay claves**;
+    - fail2ban, unattended-upgrades, sysctl, permisos de todo lo que lleva claves, `UMask=0027` para OpenWebRX+ y Bluetooth apagado.
+  - **Copia y vuelta atrás:** cada cambio guarda copia en `/var/backups/bricohams-blindaje/FECHA` y `deshacer` la restaura.
+  - **El cortafuegos** se carga con un temporizador de vuelta atrás de 3 minutos (`systemd-run`) y solo se hace permanente con `confirmar`.
+  - **nginx (kit):** `server_tokens off`, `limit_req` de 12/min en `/login` y `/pwchange` (regex, para que en `SSL_MODO=admin` gane la redirección a HTTPS), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos 404.
+- **Por qué:**
+  - **Sin acceso remoto a la Pi:** EA5KAO pidió revisar y blindar el servidor (192.168.1.105, `sdr.ea5kao.ampr.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
+  - **Herramienta para la Pi:** él la ejecuta en la Pi, se puede repetir y queda en el kit para cualquier estación.
+  - **Lo visto desde fuera** (`/status.json`) confirmó una fuga real: la posición exacta de la casa (ADR-48).
+  - **Contraseña solo con claves:** quitar la contraseña de SSH sin una clave instalada deja a la gente fuera.
+  - **Cortafuegos con vuelta atrás:** uno mal calculado (otra subred, VPN) también. Por eso la red de casa se detecta de la interfaz (`BLINDAJE_LAN` la cambia) y hay vuelta atrás automática.
+  - **Tabla propia en `input`:** no choca con las cadenas de Docker (`forward`, `nat`) ni con un ufw que ya hubiera; borrarla deja la Pi como estaba.
+  - **El 8073 queda abierto, con aviso ALTO:** el usuario lo abre en el router. Por ahí la administración no pasa por nginx (sin HTTPS ni límite de intentos), así que se recomienda cerrarlo (`BLINDAJE_8073="lan"`), pero sin imponerlo.
+  - **Búsqueda de fugas:** recorre los valores de las variables secretas de `bricohams.env` en la web, el kit y `/etc`, y solo cuenta los ficheros legibles por todos o servidos. La clave «anon» de Supabase es pública por diseño.
+- **Implica:**
+  - `bricohams-check` muestra el resumen (aviso, no fallo: no satura Telegram).
+  - Los paquetes que instala `aplicar` (nftables, fail2ban, unattended-upgrades) no se desinstalan al deshacer, y los permisos endurecidos se quedan.
+  - Pruebas sin tocar la máquina (`BH_RAIZ`), `nft -c` del cortafuegos generado y nginx real para el 429.
+
+## ADR-48 · La posición pública va redondeada; la exacta se queda en la Pi (v4.4)
+- **Decisión:**
+  - `OWRX_GPS_DECIMALES="2"` (por defecto) redondea `receiver_gps` en `settings.json` (mapa, `/status.json`, directorios de receptores).
+  - `meteo.json`, `pases.json` e `init.js` (todos públicos) llevan siempre 2 decimales.
+  - `STATION_LAT/LON` siguen exactas para los cálculos (distancias AEMET, pases, Open-Meteo) y el APRS.
+- **Por qué:** `https://sdr.ea5kao.ampr.org/status.json` publicaba 0.0, 0.0, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
+- **Implica:**
+  - **El APRS WX sigue publicando su posición:** el protocolo lo exige; queda a elección del operador.
+  - **Volver a publicar la posición exacta:** `"exacta"`.
+
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
 2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
@@ -679,13 +713,14 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
 13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
 14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.
-12. **v4:**
+15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real** (192.168.1.105): comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña de `pi` (salió en un chat).
+16. **v4:**
     - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
     - **Token y chat de Telegram.**
     - **Medir** el Ø del tubo de la antena de fibra (`FIBRA_D`) y la brida de los sensores de viento.
     - **Cable de cámara de Pi 5:** comprar el Standard–Mini (15 → 22 pines).
     - **Primera compilación de FT2 en la Pi**, todavía sin probar en arm64.
-13. **v4.2:**
+17. **v4.2:**
     - **Probar en la Pi** los plugins FILTRO y DSP con audio real (los navegadores móviles pueden limitar Web Audio).
     - **Primera migración real con owrx-clone** (Pi → Pi o Pi → PC) y revisar la lista de paquetes que propone.
     - **SSL_MODO=admin:** comprobar que el directorio de receptores (receiverbook) acepta la URL `http://`.
