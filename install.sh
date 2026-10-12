@@ -63,7 +63,7 @@ OWRX_ETC=/etc/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo rak satelites ft2 web visitas herramientas banner importar tareas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
 BACKUP=""
 SOLO=""
 REINICIAR=0
@@ -1761,6 +1761,191 @@ paso_ft2() {
 #  v4 · Web: nginx con SSL (Let's Encrypt o autofirmado), portal de servicios,
 #  aviso de privacidad y API de los plugins (bricohams-api).
 # =====================================================================
+paso_tak() {
+    # v5.0 · servidor TAK local (OpenTAKServer) opcional; se gestiona desde /settings → «Servidor TAK»
+    if ! si "${TAK:-no}"; then aviso "Servidor TAK omitido (TAK=no)"; return 0; fi
+    if [ "$(uname -m)" != aarch64 ]; then aviso "El servidor TAK necesita una Pi de 64 bits (aarch64): omitido"; return 0; fi
+    BRICOHAMS_ENV="$ETC_BH/bricohams.env" bash "$KIT/tools/instalar_tak.sh" \
+        || aviso "La instalación del servidor TAK ha fallado: mira $LOG y repite con --solo tak"
+    bien "servidor TAK (credenciales en $ETC_BH/tak-access.txt; gestión en /settings → Servidor TAK)"
+}
+
+paso_monitorizacion() {
+    # v5.0 · Prometheus + node-exporter + Grafana, solo en 127.0.0.1. Grafana se ve únicamente a través
+    # de nginx en /settings/bricohams/grafana/ tras el login de administrador de OpenWebRX+.
+    # Idempotente y «adoptivo»: si Prometheus/node_exporter se instalaron a mano (binarios oficiales en
+    # /usr/local/bin con unidades propias) se respetan y solo se les fuerza 127.0.0.1 con drop-ins; las
+    # configuraciones previas ajenas al kit se guardan una vez como *.bak-manual y los trabajos de
+    # Prometheus que añadiera el usuario (exporters propios) se conservan en el prometheus.yml generado.
+    if ! si "${MONITORIZACION:-no}"; then aviso "Monitorización omitida (MONITORIZACION=no)"; return 0; fi
+    local manual=no prom_unit=prometheus node_unit=prometheus-node-exporter d
+    if [ -x /usr/local/bin/prometheus ] && [ -f /etc/systemd/system/prometheus.service ]; then manual=yes; fi
+    if [ "$manual" = yes ]; then
+        aviso "Prometheus instalado a mano en /usr/local/bin: se adopta (no se instala el paquete de Debian)"
+        apt_i apt-transport-https gnupg python3-yaml
+        local tsdb
+        tsdb=$(systemctl cat prometheus 2>/dev/null | grep -o -- '--storage.tsdb.path=[^ \\]*' | tail -n1 || true)
+        d=/etc/systemd/system/prometheus.service.d; install -d -m 755 "$d"
+        cat >"$d/bricohams.conf" <<UNIT
+# BricoHams SDR · generado por install.sh (paso monitorizacion): Prometheus manual solo en 127.0.0.1
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/prometheus --config.file=/etc/prometheus/prometheus.yml ${tsdb:---storage.tsdb.path=/var/lib/prometheus/} --storage.tsdb.retention.time=30d --web.listen-address=127.0.0.1:9090
+UNIT
+        if [ -x /usr/local/bin/node_exporter ] && [ -f /etc/systemd/system/node_exporter.service ]; then
+            node_unit=node_exporter
+            d=/etc/systemd/system/node_exporter.service.d; install -d -m 755 "$d"
+            cat >"$d/bricohams.conf" <<'UNIT'
+# BricoHams SDR · generado por install.sh (paso monitorizacion): node_exporter manual solo en 127.0.0.1
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100
+UNIT
+        else
+            apt_i prometheus-node-exporter
+            echo 'ARGS="--web.listen-address=127.0.0.1:9100"' >/etc/default/prometheus-node-exporter
+        fi
+    else
+        apt_i prometheus prometheus-node-exporter apt-transport-https gnupg python3-yaml
+        echo 'ARGS="--web.listen-address=127.0.0.1:9090 --storage.tsdb.retention.time=30d"' >/etc/default/prometheus
+        echo 'ARGS="--web.listen-address=127.0.0.1:9100"' >/etc/default/prometheus-node-exporter
+    fi
+    # Exporter ajeno (p. ej. openwebrx_exporter en 0.0.0.0:8000): solo se le deja hablar con localhost.
+    if [ -f /etc/systemd/system/openwebrx_exporter.service ]; then
+        d=/etc/systemd/system/openwebrx_exporter.service.d; install -d -m 755 "$d"
+        printf '%s\n' "# BricoHams SDR · el exporter escucha en 0.0.0.0:8000 (código ajeno al kit): solo se deja hablar con localhost" \
+            '[Service]' 'IPAddressDeny=any' 'IPAddressAllow=localhost' >"$d/bricohams.conf"
+    fi
+    if ! dpkg -s grafana >/dev/null 2>&1; then
+        install -d -m 755 /etc/apt/keyrings
+        clave_apt https://apt.grafana.com/gpg.key /etc/apt/keyrings/grafana.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" >/etc/apt/sources.list.d/grafana.list
+        apt_update; apt_i grafana
+    fi
+
+    local py=/etc/prometheus/prometheus.yml
+    install -d -m 755 /etc/prometheus
+    if [ -s "$py" ] && ! grep -q 'BricoHams SDR' "$py" && [ ! -e "$py.bak-manual" ]; then cp -a "$py" "$py.bak-manual"; fi
+    python3 - "$py" <<'PY' || aviso "No se pudo fusionar prometheus.yml (python3-yaml); revisa $py"
+import sys
+try:
+    import yaml
+except ImportError:
+    yaml = None
+ruta = sys.argv[1]
+base = [{'job_name': 'prometheus', 'static_configs': [{'targets': ['127.0.0.1:9090']}]},
+        {'job_name': 'node', 'static_configs': [{'targets': ['127.0.0.1:9100']}]}]
+extra = []
+if yaml:
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            viejo = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        viejo = {}
+    for job in viejo.get('scrape_configs') or []:
+        if not isinstance(job, dict):
+            continue
+        dest = [t for sc in job.get('static_configs') or [] for t in sc.get('targets') or []]
+        if job.get('job_name') in ('prometheus', 'node', 'node_exporter') or any(
+                str(t).endswith((':9090', ':9100')) for t in dest):
+            continue
+        extra.append(job)
+cab = '# BricoHams SDR · generado por install.sh (paso monitorizacion). Los trabajos extra se conservan.\n'
+cfg = {'global': {'scrape_interval': '30s', 'evaluation_interval': '30s'}, 'scrape_configs': base + extra}
+if yaml:
+    cuerpo = yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True)
+else:
+    cuerpo = ('global:\n  scrape_interval: 30s\n  evaluation_interval: 30s\nscrape_configs:\n'
+              "  - job_name: prometheus\n    static_configs:\n      - targets: ['127.0.0.1:9090']\n"
+              "  - job_name: node\n    static_configs:\n      - targets: ['127.0.0.1:9100']\n")
+with open(ruta, 'w', encoding='utf-8') as f:
+    f.write(cab + cuerpo)
+print('prometheus.yml: %d trabajo(s) extra conservado(s)' % len(extra))
+PY
+    chmod 644 "$py"
+
+    # Clave de admin estable: GRAFANA_ADMIN_PASS > la ya guardada en grafana-access.txt > aleatoria.
+    local gi=/etc/grafana/grafana.ini pass="${GRAFANA_ADMIN_PASS:-}"
+    [ -n "$pass" ] || [ ! -r "$ETC_BH/grafana-access.txt" ] || pass=$( . "$ETC_BH/grafana-access.txt"; printf '%s' "${GRAFANA_PASS:-}")
+    [ -n "$pass" ] || pass=$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)
+    if [ -s "$gi" ] && ! grep -q 'BricoHams SDR' "$gi" && [ ! -e "$gi.bak-manual" ]; then cp -a "$gi" "$gi.bak-manual"; fi
+    cat >"$gi" <<GRAF
+; BricoHams SDR · generado por install.sh (paso monitorizacion). Grafana solo escucha en local;
+; se publica por nginx en /settings/bricohams/grafana/ detrás del login de administrador.
+; [paths] repite las rutas que la unidad de Debian pasa por argumento para que «grafana cli» use la misma base de datos.
+[paths]
+data = /var/lib/grafana
+logs = /var/log/grafana
+plugins = /var/lib/grafana/plugins
+provisioning = /etc/grafana/provisioning
+[server]
+http_addr = 127.0.0.1
+http_port = 3000
+root_url = %(protocol)s://%(domain)s/settings/bricohams/grafana/
+serve_from_sub_path = true
+[security]
+admin_user = admin
+admin_password = $pass
+allow_embedding = true
+cookie_samesite = lax
+[auth.anonymous]
+enabled = true
+org_role = Viewer
+[users]
+allow_sign_up = false
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+[dashboards]
+default_home_dashboard_path = /var/lib/grafana/dashboards/bricohams.json
+GRAF
+    chown root:grafana "$gi"; chmod 640 "$gi"
+    install -d -m 755 /etc/grafana/provisioning/datasources /etc/grafana/provisioning/dashboards /var/lib/grafana/dashboards
+    cat >/etc/grafana/provisioning/datasources/bricohams.yaml <<'DS'
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090
+    isDefault: true
+DS
+    cat >/etc/grafana/provisioning/dashboards/bricohams.yaml <<'DP'
+apiVersion: 1
+providers:
+  - name: BricoHams
+    folder: BricoHams
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+DP
+    install -m 644 "$FILES/grafana/bricohams.json" /var/lib/grafana/dashboards/bricohams.json
+    chown -R grafana:grafana /var/lib/grafana/dashboards 2>/dev/null || true
+    { envl GRAFANA_USUARIO admin; envl GRAFANA_PASS "$pass"; } >"$ETC_BH/grafana-access.txt"; chmod 600 "$ETC_BH/grafana-access.txt"
+    systemctl daemon-reload
+    systemctl enable "$node_unit" "$prom_unit" grafana-server >/dev/null 2>&1 || true
+    [ ! -f /etc/systemd/system/openwebrx_exporter.service ] || systemctl restart openwebrx_exporter >/dev/null 2>&1 || true
+    systemctl restart "$node_unit" "$prom_unit" grafana-server || aviso "Algún servicio de monitorización no ha arrancado (systemctl status grafana-server)"
+
+    # admin_password de grafana.ini solo se aplica al crear la base de datos: en reinstalaciones o
+    # instalaciones manuales previas se fija explícitamente con «grafana cli admin reset-admin-password».
+    local n=0 gcli=(grafana-cli)
+    [ -x /usr/share/grafana/bin/grafana ] && gcli=(/usr/share/grafana/bin/grafana cli)
+    until curl -fsS -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null || [ $n -ge 30 ]; do sleep 2; n=$((n+1)); done
+    printf '%s' "$pass" | runuser -u grafana -- "${gcli[@]}" --homepath /usr/share/grafana --config "$gi" \
+            admin reset-admin-password --password-from-stdin >>"$LOG" 2>&1 \
+        || runuser -u grafana -- "${gcli[@]}" --homepath /usr/share/grafana --config "$gi" \
+            admin reset-admin-password "$pass" >>"$LOG" 2>&1 \
+        || aviso "No se pudo fijar la clave de admin de Grafana (mira $LOG)"
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' -u "admin:$pass" http://127.0.0.1:3000/api/user 2>/dev/null)" = 200 ]; then
+        bien "Prometheus + Grafana en local (credenciales en $ETC_BH/grafana-access.txt; panel en /settings → Monitorización)"
+    else
+        aviso "Grafana no acepta aún la clave guardada en $ETC_BH/grafana-access.txt (systemctl status grafana-server)"
+    fi
+}
+
 paso_web() {
     apt_i nginx certbot openssl
     install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
@@ -1793,7 +1978,13 @@ paso_web() {
     # v4.2 · SSL_MODO: admin = receptor por HTTP y administración por HTTPS (decisión de EA5KAO)
     escribir_nginx() {
         install -d /etc/nginx/snippets
-        install -m 644 "$FILES/nginx/bricohams-sdr-rutas.conf" /etc/nginx/snippets/bricohams-sdr-rutas.conf
+        # v5.0 · proxy de Grafana (botón «Monitorización») solo si MONITORIZACION=yes
+        if [ "${MONITORIZACION:-no}" = yes ]; then
+            sed -e 's/^#@GF@//' "$FILES/nginx/bricohams-sdr-rutas.conf" >/etc/nginx/snippets/bricohams-sdr-rutas.conf
+        else
+            sed -e '/^#@GF@/d' "$FILES/nginx/bricohams-sdr-rutas.conf" >/etc/nginx/snippets/bricohams-sdr-rutas.conf
+        fi
+        chmod 644 /etc/nginx/snippets/bricohams-sdr-rutas.conf
         nginx_sitio "$modo" "${dom:-$(hostname)}" "$1" "$2" <"$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
         ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr
         rm -f /etc/nginx/sites-enabled/default
@@ -1862,8 +2053,37 @@ EOF
     install -m 755 "$FILES/bin/bricohams-owrx-botones" /usr/local/bin/bricohams-owrx-botones
     echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-botones ]; then /usr/local/bin/bricohams-owrx-botones -q; fi"; };' \
         >/etc/apt/apt.conf.d/99bricohams-owrx-botones
-    /usr/local/bin/bricohams-owrx-botones || aviso "No he podido poner los botones Meshtastic/APRS en /settings de OpenWebRX+"
-    if [ -x /opt/pipx/venvs/meshtastic/bin/python ]; then
+    /usr/local/bin/bricohams-owrx-botones || aviso "No he podido poner los botones Meshtastic/APRS/TAK/Monitorización en /settings de OpenWebRX+"
+    # v5.0 · importar/exportar bookmarks (JSON) en /settings/bookmarks, solo administrador
+    install -m 755 "$FILES/bin/bricohams-owrx-bookmarks-io" /usr/local/bin/bricohams-owrx-bookmarks-io
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-bookmarks-io ]; then /usr/local/bin/bricohams-owrx-bookmarks-io -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-bookmarks-io
+    /usr/local/bin/bricohams-owrx-bookmarks-io || aviso "No he podido poner los botones Importar/Exportar en /settings/bookmarks de OpenWebRX+"
+    # v5.0 · campo «RepeaterBook API key» en Ajustes generales (/settings/general, solo administrador)
+    install -m 755 "$FILES/bin/bricohams-owrx-repeaterbook" /usr/local/bin/bricohams-owrx-repeaterbook
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-repeaterbook ]; then /usr/local/bin/bricohams-owrx-repeaterbook -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-repeaterbook
+    /usr/local/bin/bricohams-owrx-repeaterbook || aviso "No he podido poner el campo RepeaterBook API key en /settings/general de OpenWebRX+"
+    # v5.0 · subtono CTCSS por bookmark («Subtono FM») con silenciador en el demodulador FM
+    # el detector usa numpy/scipy; sin ellos OpenWebRX+ sigue funcionando, pero el silenciador no actúa
+    apt_i python3-numpy python3-scipy || aviso "No he podido instalar python3-numpy/python3-scipy: el silenciador CTCSS no actuará"
+    install -d -m 755 /usr/local/share/bricohams-ctcss
+    install -m 644 "$FILES/share/bricohams-ctcss/bricohams_ctcss.py" "$FILES/share/bricohams-ctcss/bricohams-ctcss.js" /usr/local/share/bricohams-ctcss/
+    install -m 755 "$FILES/bin/bricohams-owrx-ctcss" /usr/local/bin/bricohams-owrx-ctcss
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-ctcss ]; then /usr/local/bin/bricohams-owrx-ctcss -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-ctcss
+    /usr/local/bin/bricohams-owrx-ctcss || aviso "No he podido añadir el subtono CTCSS a los bookmarks de OpenWebRX+"
+    # v5.0 · importador de repetidores de RepeaterBook (solo frecuencia de salida) en /settings/bookmarks
+    install -d -m 755 /usr/local/share/bricohams-rbimport
+    install -m 644 "$FILES/share/bricohams-rbimport/bricohams_rbimport.py" /usr/local/share/bricohams-rbimport/
+    install -m 755 "$FILES/bin/bricohams-owrx-rbimport" /usr/local/bin/bricohams-owrx-rbimport
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-rbimport ]; then /usr/local/bin/bricohams-owrx-rbimport -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-rbimport
+    /usr/local/bin/bricohams-owrx-rbimport || aviso "No he podido poner el importador RepeaterBook en /settings/bookmarks de OpenWebRX+"
+    local py=/opt/pipx/venvs/meshtastic/bin/python
+    # v5.0 · sin el entorno de meshtastic el panel sigue sirviendo TAK y Monitorización con el python del sistema
+    [ -x "$py" ] || { py=/usr/bin/python3; aviso "Sin entorno pipx de meshtastic (paso lilygo): el panel funcionará sin las páginas Meshtastic"; }
+    if [ -x "$py" ]; then
         cat >/etc/systemd/system/bricohams-mesh-admin.service <<EOF
 [Unit]
 Description=BricoHams: panel Meshtastic 433/868 (solo /settings, sesión admin de OpenWebRX+)
@@ -1873,10 +2093,12 @@ After=network-online.target openwebrx.service
 User=root
 Environment=HOME=/run/bricohams-mesh-admin
 Environment=BRICOHAMS_KIT_ENV=$KIT/bricohams.env
-ExecStart=/opt/pipx/venvs/meshtastic/bin/python /usr/local/bin/bricohams-mesh-admin servicio
+ExecStart=$py /usr/local/bin/bricohams-mesh-admin servicio
 RuntimeDirectory=bricohams-mesh-admin
 ProtectSystem=strict
 ReadWritePaths=/etc/bricohams $KIT/bricohams.env
+# v5.0: el cambio de clave TAK arranca OpenTAKServer, que escribe su log aquí ("-": opcional si no hay TAK)
+ReadWritePaths=-/var/lib/bricohams-tak
 ProtectHome=read-only
 PrivateTmp=yes
 NoNewPrivileges=yes
@@ -1894,7 +2116,7 @@ EOF
         systemctl enable --now bricohams-mesh-admin
         systemctl restart bricohams-mesh-admin
     else
-        aviso "Panel Meshtastic sin instalar: falta el entorno pipx de meshtastic (paso lilygo)"
+        aviso "Panel de /settings sin instalar: no encuentro python3"
     fi
     case "$modo" in
         admin) bien "nginx: receptor http://${dom:-$ip}/ · administración https://${dom:-$ip}/settings (forzada) · portal /bricohams/" ;;
@@ -2088,6 +2310,7 @@ cat <<EOF
   Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
   Aviones:    http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
   Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado
+  TAK:        /settings → «Servidor TAK» (TAK=${TAK:-no})   Grafana: /settings → «Monitorización» (MONITORIZACION=${MONITORIZACION:-no})
 EOF
 [ "$REINICIAR" -eq 1 ] && aviso "Hay cambios de arranque (config.txt): hace falta reiniciar."
 exit 0

@@ -5,11 +5,12 @@ export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/.."
 echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo files/bin/bricohams-ft2 files/bin/bricohams-servicios files/bin/bricohams-tarea files/bin/bricohams-telegram files/bin/bricohams-blindaje files/bin/bricohams-banner files/motd/20-bricohams owrx-clone/instalar.sh tools/*.sh tests/run_tests.sh
 echo "== bash -n";     bash -n install.sh
-echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator files/bin/bricohams-rak-aprs files/bin/bricohams-dispositivos files/bin/bricohams-mesh-url files/bin/bricohams-mesh-owrx files/bin/bricohams-mesh-admin owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
+echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator files/bin/bricohams-rak-aprs files/bin/bricohams-dispositivos files/bin/bricohams-mesh-url files/bin/bricohams-mesh-owrx files/bin/bricohams-mesh-admin files/bin/bricohams-owrx-bookmarks-io files/bin/bricohams-owrx-repeaterbook files/bin/bricohams-owrx-ctcss files/bin/bricohams-owrx-rbimport files/share/bricohams-ctcss/*.py files/share/bricohams-rbimport/*.py owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
 echo "== javascript"
 for f in files/htdocs/plugins/receiver/{solar,meteo,camara,bricohams,banderas,dvficha,satelites,visitas,audio_cadena,filtro_audio,dsp_audio}/*.js files/htdocs/plugins/receiver/init.js files/htdocs/plugins/map/init.js files/htdocs/plugins/map/bricohams_live/*.js; do
     sed -e 's/__LAT__/38.08/;s/__LON__/-1.25/;s/__CAM_SNAPSHOT_SECONDS__/60/' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
 done
+node --check files/share/bricohams-ctcss/bricohams-ctcss.js
 echo "== pruebas"
 python3 tests/test_wx_bme280.py
 python3 tests/test_render_settings.py
@@ -42,6 +43,11 @@ python3 tests/test_rak_aprs.py
 python3 tests/test_v45_dispositivos.py
 python3 tests/test_mesh_owrx.py
 python3 tests/test_mesh_admin.py
+python3 tests/test_bookmarks_io.py
+python3 tests/test_repeaterbook.py
+python3 tests/test_ctcss_patch.py
+python3 tests/test_rbimport.py
+python3 tests/test_monitorizacion.py
 python3 tools/marcadores.py --comprobar
 python3 tools/locator_catalogo.py --comprobar
 echo "TODO OK"

@@ -52,13 +52,13 @@ with tempfile.TemporaryDirectory() as t:
         s = json.load(f)
     assert s['receiver_name'] == 'keep' and s['mqtt_chat'] and s['mqtt_aprs']
 
-packet = 'EA1AAA>APRS,TCPIP*::EA5KAO   :hola{123'
+packet = 'EA1AAA>APRS,TCPIP*::N0CALL   :hola{123'
 m = rak.mensaje_chat(packet)
-assert m == {'state': 'ChatMessage', 'name': 'EA1AAA -> EA5KAO', 'message': 'hola'}, m
+assert m == {'state': 'ChatMessage', 'name': 'EA1AAA -> N0CALL', 'message': 'hola'}, m
 assert rak.mensaje_chat('EA2BBB>APRS:}' + packet) == m
 for body in ('ack123', 'rej12', 'PARM.x', 'UNIT.x', 'EQNS.x', 'BITS.x', ''):
-    assert rak.mensaje_chat('EA1AAA>APRS::EA5KAO   :' + body) is None
-assert rak.mensaje_chat('EA1AAA>APRS::EA5KAO   :<img onerror=x>')['message'] == '<img onerror=x>'
+    assert rak.mensaje_chat('EA1AAA>APRS::N0CALL   :' + body) is None
+assert rak.mensaje_chat('EA1AAA>APRS::N0CALL   :<img onerror=x>')['message'] == '<img onerror=x>'
 assert rak.mensaje_chat('broken') is None
 
 

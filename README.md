@@ -144,6 +144,8 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 
 ## Estructura
 
+Resumen. El detalle está en [docs/COMPONENTES.md](docs/COMPONENTES.md) (qué hace cada componente) y [docs/ESTRUCTURA_FICHEROS.md](docs/ESTRUCTURA_FICHEROS.md) (qué hace cada fichero).
+
 ```
 install.sh                 instalador por pasos e idempotente (--lista, --solo, --backup, --actualizar, --exportar, --importar)
 owrx-clone/                v4.2: herramienta genérica para clonar OpenWebRX+ (README es/en, man, instalar.sh, MIT)
@@ -156,9 +158,13 @@ files/
                            visitas, api, ft2, servicios, tarea, telegram…)
   nginx/                   v4: plantilla del sitio y rutas comunes (v4.2: SSL_MODO)
   web/                     v4: portal /bricohams/ y página de privacidad
+  share/                   v5.0: subtonos CTCSS (bricohams-ctcss) e importador RepeaterBook (bricohams-rbimport)
+  grafana/                 v5.0: panel Grafana de la estación (paso monitorizacion)
 firmware/pico-io/          v4: firmware MicroPython de la Pico (sensores y ventiladores)
 docs/
   ARQUITECTURA.md          decisiones de arquitectura (ADR)
+  COMPONENTES.md           ficha de cada componente: paso, ficheros, servicios, puertos, panel, prueba y manual
+  ESTRUCTURA_FICHEROS.md   árbol completo del repositorio y función de cada fichero (generado)
   DATOS.md                 conjuntos de datos: SDR, perfiles, marcadores, puertos, servicios, I2C (generado)
   HARDWARE_Y_GPIO.md       pines GPIO, buses, USB, alimentación, antenas
   EVALUACION_MODULOS.md    evaluación de cada módulo (BME280, LX-LBU2C, WPI408, FlightStick…)

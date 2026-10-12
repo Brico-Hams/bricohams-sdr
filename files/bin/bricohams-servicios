@@ -31,6 +31,13 @@ fila "AirNav rbfeeder" rbfeeder "sudo rbfeeder --showkey" "airnavradar.com"
 fila "Cámara MediaMTX" mediamtx "rtsp://$IP:8554/mastil · http://$IP:8888/mastil/" "${DOM:+$PUB://$DOM/camara/mastil/}"
 fila "Meshtastic 868" meshtasticd "API $IP:4403" "solo LAN"
 fila "Panel Meshtastic" bricohams-mesh-admin "$ADM://$IP/settings/bricohams/meshtastic" "${DOM:+$ADM://$DOM/settings/bricohams/meshtastic} (admin)"
+if [ -e /etc/systemd/system/bricohams-tak.service ]; then    # v5.0
+    fila "Servidor TAK" bricohams-tak "https://$IP:8445 · CoT TLS 8089" "solo LAN · gestión /settings/bricohams/tak"
+fi
+if [ -d /usr/share/grafana ]; then
+    fila "Prometheus" prometheus "127.0.0.1:9090" "-"
+    fila "Grafana" grafana-server "$ADM://$IP/settings/bricohams/monitorizacion" "${DOM:+$ADM://$DOM/settings/bricohams/monitorizacion} (admin)"
+fi
 fila "iGate LoRa APRS" bricohams-rak-aprs "RAK4631 USB · 433,775 MHz" "APRS-IS (aprs.fi)"
 fila "Mesh -> mapa OWRX+" bricohams-mesh-owrx "LilyGO 433 · HAT 868 -> MQTT" "mapa de OpenWebRX+"
 fila "API plugins" bricohams-api "127.0.0.1:8075" "${DOM:+$PUB://$DOM/bricohams/api/salud}"

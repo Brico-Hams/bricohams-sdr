@@ -129,3 +129,138 @@ bricohams-locator locator 0.0 0.0   # IM97kx
 - **Comunicaciones privadas:** no se añaden. El catálogo es de servicios de radiodifusión, aeronáuticos y marítimos que se pueden escuchar; escuchar no es divulgar (Ley 11/2022).
 
 Decisiones: ADR-43 (zona por locator) y ADR-46 (datos en línea en la Pi) en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_locator_es.py` (895 puntos de toda España) y `tests/test_locator_bookmarks.py`.
+
+## 8. Importar y exportar bookmarks (v5.0)
+Está en **Ajustes → Bookmarks** (`/settings/bookmarks`). Hace falta sesión de administrador, y la página principal pública no cambia.
+
+| Botón | Qué hace |
+|---|---|
+| **Importar desde fichero…** | Eliges un `.json` de tu ordenador (5 MB como máximo). Se comprueba en el navegador y te pide confirmación. Después da de alta los bookmarks uno a uno con el mismo formulario de OpenWebRX+ y recarga la página con el resultado. |
+| **Exportar todos** | Baja `bookmarks-todos-AAAAMMDD-HHMM.json`. Incluye los del sistema y los de la zona por locator. |
+| **Exportar editables** | Baja `bookmarks-editables-AAAAMMDD-HHMM.json`, solo con los tuyos (`/var/lib/openwebrx/bookmarks.json`). Es lo que conviene guardar como copia o llevar a otra estación. |
+
+**Formato del fichero:** vale una lista JSON o un objeto `{"bookmarks": [...]}`. Cada bookmark lleva:
+- `name` y `frequency` (en Hz), obligatorios;
+- `modulation`, que tiene que ser un modo que exista en tu OpenWebRX+;
+- opcionales: `underlying`, `description` y `scannable`.
+
+Otros campos se ignoran.
+
+```json
+[{"name": "Repetidor R7", "frequency": 145775000, "modulation": "nfm", "description": "Ejemplo", "scannable": true}]
+```
+
+**Qué no se importa** (lo verás en el resumen):
+- un bookmark idéntico a uno que ya existe;
+- uno en una frecuencia que ya está ocupada. OpenWebRX+ guarda los bookmarks por frecuencia, así que no se pisa ninguno;
+- uno con datos inválidos o un modo desconocido.
+
+**Mantenimiento:**
+- Lo pone `bricohams-owrx-bookmarks-io` y se repite solo tras cada `apt` (`/etc/apt/apt.conf.d/99bricohams-owrx-bookmarks-io`).
+- Para quitarlo: `sudo bricohams-owrx-bookmarks-io --quitar && sudo systemctl restart openwebrx`.
+- Prueba: `tests/test_bookmarks_io.py`.
+
+## 9. Clave de la API de RepeaterBook (v5.0)
+
+OpenWebRX+ puede pedir a RepeaterBook.com los repetidores cercanos para crear bookmarks automáticos. Desde marzo de 2026, RepeaterBook solo atiende clientes aprobados con token. El instalador deja el campo para introducir ese token en **Ajustes → General → RepeaterBook**. Esa página solo se abre con la contraseña de administrador; la página principal no cambia.
+
+**Pasos**
+1. Pide el token en <https://www.repeaterbook.com/api/token_request.php>, o créalo en tu cuenta → *API apps*. Cópialo nada más crearlo, porque RepeaterBook no vuelve a enseñarlo.
+2. En `/settings/general` rellena **Receiver admin** con tu e-mail. RepeaterBook exige un e-mail de contacto dentro del User-Agent.
+3. Pega el token en **RepeaterBook API key** y pulsa *Apply and save*.
+
+**Comprobación**
+Desde la Pi, cambiando `TOKEN`, `EMAIL` y `UA` por los tuyos:
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H "X-RB-App-Token: TOKEN" \
+  -A "UA" "https://www.repeaterbook.com/api/exportROW.php?country=Spain&frequency=145.6"
+```
+`200` significa que funciona.
+
+**Respuestas habituales**
+
+| Código | Significado | Qué hacer |
+|---|---|---|
+| `401 auth_missing` | No ha llegado ningún token. | Revisa que esté guardado en Ajustes. |
+| `403 ua_mismatch` | El token es válido, pero el User-Agent no coincide con el aprobado para la aplicación del token. | Consulta en RepeaterBook (*API apps*) el patrón aprobado. No reintentes sin corregirlo: RepeaterBook puede bloquear el token. |
+| `429` | Límite de peticiones. | Espera. OpenWebRX+ guarda la lista en `/var/lib/openwebrx/repeaters.json` y solo la renueva semanalmente o al cambiar de ubicación. |
+
+OpenWebRX+ 1.2.x envía la cabecera `Authorization: Bearer <token>` y el User-Agent `OpenWebRX/<versión> (https://fms.komkon.org/OWRX/; <Receiver admin>)`. Si tu aplicación aprobada usa otro User-Agent, la petición fallará con `ua_mismatch` hasta que RepeaterBook apruebe ese patrón.
+
+**Quitar el campo:** `sudo bricohams-owrx-repeaterbook --quitar`. La clave guardada en `settings.json` no se borra.
+
+## 10. Subtono CTCSS en los bookmarks (v5.0)
+
+Muchos repetidores FM analógicos solo abren con su subtono CTCSS. Si el receptor no lo filtra, en la misma frecuencia se oye ruido, portadoras o el repetidor vecino. El parche `bricohams-owrx-ctcss` añade el subtono al bookmark y un silenciador por subtono en el demodulador FM de OpenWebRX+.
+
+**Dónde se configura.** Solo en **Ajustes → Bookmarks** (`/settings/bookmarks`), con sesión de administrador.
+- Aparece la columna **«Subtono FM»**, con un desplegable de los 50 tonos EIA (67,0 – 254,1 Hz) y la opción «sin subtono».
+- El valor se valida en el servidor: solo se aceptan tonos entre 60 y 260 Hz.
+- Si la modulación no es FM, el tono se anula.
+- El tono se guarda como campo `ctcss` (en Hz) en `/var/lib/openwebrx/bookmarks.json`.
+
+**Qué ve el oyente.** La página principal no gana ningún ajuste nuevo.
+- Al sintonizar un bookmark con subtono, el silenciador se activa solo.
+- El panel muestra un selector **«Subtono FM»** para escuchar con otro tono. Ese cambio afecta solo a la sesión de ese navegador y no se guarda.
+- En toda la interfaz el modo se llama **FM**; internamente OpenWebRX+ lo llama `nfm`.
+
+**Solo frecuencia de salida.** El SDR solo recibe. Por eso el bookmark lleva la frecuencia de **salida** del repetidor (la que tú escuchas) y su subtono. El desplazamiento y la frecuencia de entrada no se guardan en el bookmark; si acaso, se anotan en la descripción.
+
+**Cómo funciona el silenciador** (`owrx/bricohams_ctcss.py`, numpy + scipy). Se inserta en la cadena FM entre la de-énfasis y el AGC, y solo cuando hay tono.
+1. Filtra la señal con un paso-banda de 55–280 Hz y la diezma a unos 1200 Hz.
+2. Cada 0,1 s analiza una ventana Hann de 1 s y mide la energía en los 50 tonos EIA.
+3. Abre si el tono pedido supera el umbral **y** es claramente el más fuerte (×2 sobre cualquier otro tono estándar). Así no abre con un repetidor vecino que usa otro tono.
+4. Cierra si la energía cae por debajo del umbral de cierre durante 0,4 s.
+5. Con el silenciador abierto aplica un paso-alto de 300 Hz, de modo que el subtono no se oye. Cerrado, emite silencio. La ganancia sube y baja en rampa para evitar chasquidos.
+
+Con tono 0, el módulo se retira de la cadena y OpenWebRX+ queda exactamente como el original.
+
+**Mantenimiento.**
+- Modifica cinco ficheros de OpenWebRX+: `bookmarks.py`, el controlador de bookmarks, `BookmarkTable.js`, `index.html` y `dsp.py`.
+- Las líneas añadidas llevan la marca `#@BH-CTCSS@` (o `<!--#@BH-CTCSS@-->` en el HTML).
+- Se reaplica tras cada `apt` (`/etc/apt/apt.conf.d/99bricohams-owrx-ctcss`).
+- Para quitarlo: `sudo bricohams-owrx-ctcss --quitar && sudo systemctl restart openwebrx`. El campo `ctcss` que ya está en `bookmarks.json` no estorba a OpenWebRX+ original.
+- Dependencias: `python3-numpy` y `python3-scipy`, que instala `install.sh`. Si faltan, OpenWebRX+ sigue funcionando pero el silenciador no actúa; lo verás en el registro como `bricohams ctcss: no se pudo aplicar el subtono`.
+- Prueba: `tests/test_ctcss_patch.py`. Comprueba el parche sobre copias de los ficheros y el detector con tonos sintéticos: abre con el tono correcto, no abre con un tono vecino ni con ruido.
+
+## 11. Importar repetidores de RepeaterBook (v5.0)
+
+En **Ajustes → Bookmarks** aparece el botón **«Importar repetidores (RepeaterBook)…»**. Necesitas la clave de la §9 y sesión de administrador.
+
+**Búsqueda**
+
+| Campo | Significado |
+|---|---|
+| País | Nombre en inglés tal como lo usa RepeaterBook (`Spain`, `Portugal`, `United States`…). |
+| Distrito | En España, el número de distrito del indicativo, EA1 a EA9. Por ejemplo, **5** = Comunidad Valenciana y Murcia. Se traduce a las comunidades autónomas que RepeaterBook escribe en «Region». |
+| Bandas | 10 m, 6 m, 4 m, 2 m, 70 cm, 23 cm (por defecto 2 m y 70 cm). |
+| Texto | Filtra por indicativo, población o notas. |
+| Solo activos | Descarta los marcados como fuera de servicio. |
+
+**Vista previa.** Antes de crear nada aparece una tabla para elegir qué repetidores importar. Cada fila lleva:
+- la frecuencia de **salida**, que es lo que se guarda;
+- el subtono, tomado de TSQ o, si no hay, de PL;
+- una descripción con indicativo, población, entrada y desplazamiento;
+- la marca **«ya existe»** si esa frecuencia ya tiene bookmark. OpenWebRX+ guarda un bookmark por frecuencia, así que no se pisa ninguno.
+
+Solo se proponen repetidores FM analógicos. Los DMR, D-STAR, C4FM o NXDN se descartan: OpenWebRX+ los demodula aparte y no usan CTCSS.
+
+**Importar.** Los repetidores marcados se crean uno a uno con la API del propio editor (`POST /settings/bookmarks`), en modo FM y con su subtono.
+
+**Asignar subtonos a bookmarks existentes.** El botón **«Asignar subtonos»** (`POST /settings/bookmarks/repeaterbook/tonos`) recorre tus bookmarks FM y busca en RepeaterBook los repetidores con esa misma frecuencia de salida en el distrito elegido.
+- Si todos coinciden en un único tono, lo asigna.
+- Si hay varios tonos posibles, usa el indicativo que aparezca en el nombre del bookmark para decidir.
+- Si no puede decidir, no toca el bookmark.
+- Por defecto no sobrescribe un tono ya puesto.
+
+**Caché y límites.**
+- La descarga de cada país se guarda en memoria durante 6 h.
+- La casilla «refrescar» fuerza una descarga nueva; úsala poco, porque RepeaterBook limita las peticiones (`429`).
+- Los errores `401`, `403 ua_mismatch` y `429` se muestran tal cual; su significado está en la §9.
+
+**Mantenimiento.**
+- Es el módulo `owrx/controllers/settings/bricohams_rbimport.py`, copiado desde `/usr/local/share/bricohams-rbimport/`.
+- Añade dos rutas a `owrx/http.py`, marcadas con `#@BH-RBI@`.
+- Añade un bloque en `htdocs/settings/bookmarks.html`, entre `<!-- bricohams-rbi -->` y `<!-- /bricohams-rbi -->`. Si una versión futura de la plantilla no tiene el punto de anclaje esperado, el bloque se inserta antes de `</body>`.
+- Se reaplica tras cada `apt` (`99bricohams-owrx-rbimport`). Para quitarlo: `sudo bricohams-owrx-rbimport --quitar`.
+- Prueba: `tests/test_rbimport.py`.

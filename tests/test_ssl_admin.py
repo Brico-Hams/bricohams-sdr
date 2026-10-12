@@ -84,6 +84,8 @@ if nginx and os.geteuid() == 0:
     c = sitio('admin', d + '/c.pem', d + '/k.pem').replace('/etc/nginx/snippets/bricohams-sdr-rutas.conf', d + '/rutas.conf')
     c = '\n'.join(l for l in c.splitlines() if '[::]' not in l)
     c = c.replace('listen 80;', 'listen 127.0.0.1:%d;' % p_http).replace('listen 443 ssl http2;', 'listen 127.0.0.1:%d ssl http2;' % p_https)
+    # el resto de bloques (p. ej. cliente web de Meshtastic en :8443) a puertos libres: en un servidor real ya están ocupados
+    c = re.sub(r'listen (\d+)(?=[ ;])', lambda mm: 'listen 127.0.0.1:%d' % libre(), c)
     open(d + '/site.conf', 'w').write(c)
     open(d + '/nginx.conf', 'w').write('daemon off; pid %s/n.pid; error_log %s/e.log;\nevents{}\nhttp{ access_log off; include %s/site.conf; }\n' % (d, d, d))
     t = subprocess.run([nginx, '-t', '-c', d + '/nginx.conf', '-p', d], capture_output=True, text=True)
