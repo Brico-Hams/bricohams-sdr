@@ -40,6 +40,9 @@ UF2=$(find "${ARDUINO_DATA:-$HOME/.arduino15}" -path '*rakwireless*' -name uf2co
 if [ -n "$UF2" ]; then
     python3 "$UF2" -f 0xADA52840 -c -o "$OUT/bricohams-rak4631-lora-aprs.uf2" "$OUT/bricohams-rak4631-lora-aprs.hex"
 fi
+# v5.1 · versión para «bricohams-rak-aprs puesta-en-marcha» (graba solo si el RAK lleva otra)
+VER=$(sed -n 's/^#define FW_VERSION *"\([^"]*\)".*/\1/p' "$FW/configuration.h")
+printf '{"version": "%s", "firmware": "BricoHams-RAK-APRS"}\n' "$VER" >"$OUT/VERSION.json"
 (cd "$OUT" && sha256sum bricohams-rak4631-lora-aprs.* >SHA256SUMS)
 echo "✔ Firmware en $OUT"
 cat "$OUT/SHA256SUMS"

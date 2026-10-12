@@ -40,6 +40,7 @@ if [ -d /usr/share/grafana ]; then
 fi
 fila "iGate LoRa APRS" bricohams-rak-aprs "RAK4631 USB · 433,775 MHz" "APRS-IS (aprs.fi)"
 fila "Mesh -> mapa OWRX+" bricohams-mesh-owrx "LilyGO 433 · HAT 868 -> MQTT" "mapa de OpenWebRX+"
+fila "Meshtastic web 433" bricohams-mesh-puente "USB -> 127.0.0.1:4404/4480" "https://$IP:8444/ (admin, solo LAN)"
 fila "API plugins" bricohams-api "127.0.0.1:8075" "${DOM:+$PUB://$DOM/bricohams/api/salud}"
 fila "Visitas + Telegram" bricohams-visitas "MQTT 127.0.0.1:1883 (openwebrx/#)" "-"
 fila "MQTT mosquitto" mosquitto "127.0.0.1:1883" "-"

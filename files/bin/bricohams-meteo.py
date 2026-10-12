@@ -161,8 +161,8 @@ def write_atomic(path, obj):
 
 
 def main():
-    lat = float(env('STATION_LAT', '0.0'))
-    lon = float(env('STATION_LON', '0.0'))
+    lat = float(env('STATION_LAT', '38.08'))
+    lon = float(env('STATION_LON', '-1.25'))
     out = env('METEO_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/meteo.json')
     key = env('AEMET_API_KEY')
     stations = parse_stations(env('METEO_STATIONS', '7158X:Archena,7237E:Molina de Segura,7228:Alcantarilla Base Aérea,7178I:Murcia'))

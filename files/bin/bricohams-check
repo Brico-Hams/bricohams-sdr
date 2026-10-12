@@ -227,6 +227,20 @@ for n, f in json.load(open(sys.argv[1]))["fuentes"].items():
         bien "OpenWebRX+ escucha APRS y Meshtastic por MQTT (mqtt_aprs, mqtt_meshtastic)"
     else aviso "OpenWebRX+ no escucha el MQTT de APRS/Meshtastic: sudo bash install.sh --solo configuracion"; fi
 fi
+# v5.1 · interfaz web de Meshtastic del LilyGO 433 (puente serie -> 127.0.0.1:4404/4480 -> nginx :8444)
+if [ "${MESH433_WEB:-no}" = yes ]; then
+    servicio bricohams-mesh-puente
+    pj=/run/bricohams-mesh-puente/puente.json
+    if [ "$(edad "$pj")" -lt 60 ]; then
+        python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); t=d["tramas"]
+print("%s|radio %s · %d clientes TCP · web %s · %d tramas de la radio, %d a la radio" % ("ok" if d["radio"] else "mal",
+      "abierta" if d["radio"] else "SIN ABRIR (" + (d["error"] or "?") + ")", d["clientes_tcp"],
+      "en uso" if d["web_activa"] else "sin uso", t["de_radio"], t["a_radio"]))' "$pj" 2>/dev/null | \
+        while IFS='|' read -r e t; do if [ "$e" = ok ]; then bien "Puente LilyGO: $t"; else aviso "Puente LilyGO: $t"; fi; done
+    else aviso "bricohams-mesh-puente no ha dejado estado (journalctl -u bricohams-mesh-puente)"; fi
+    [ -f /usr/share/bricohams-meshweb/index.html ] && bien "Cliente web de Meshtastic 433 instalado (https://<estación>:8444/, solo admin)" \
+        || aviso "Falta el cliente web de Meshtastic 433: sudo bash install.sh --solo lilygo,web"
+fi
 
 titulo "Dispositivos (v4.5)"
 if command -v bricohams-dispositivos >/dev/null; then

@@ -74,7 +74,7 @@ bricohams-locator marcadores             # enseña los que pondría
 sudo bricohams-locator marcadores --aplicar   # los pone en OpenWebRX+ y lo reinicia (nativo o Docker)
 bricohams-locator meteo                  # la METEO_STATIONS que saldría
 bricohams-locator coordenadas IM97kx     # 38.062500 -1.291667
-bricohams-locator locator 0.0 0.0   # IM97kx
+bricohams-locator locator 38.08 -1.26   # IM97kx
 ```
 
 ## 4. Qué pasa con los marcadores que ya tienes

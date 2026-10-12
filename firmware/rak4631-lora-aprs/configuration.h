@@ -12,7 +12,7 @@
 #include <Arduino.h>
 
 #define FW_NAME     "BricoHams-RAK-APRS"
-#define FW_VERSION  "1.0.0"
+#define FW_VERSION  "1.0.1"
 #define APRS_TOCALL "APZBH1"            // APZ = experimental (hasta registrar uno propio)
 
 class Configuration {

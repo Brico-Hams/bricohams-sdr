@@ -31,12 +31,20 @@ Todas las órdenes del kit en una página. El detalle de cada una está en su ma
 | Sensores y ventiladores (Pico) | `sudo bricohams-io estado` · `sudo bricohams-fan --estado` |
 | Pases de satélites | `cat /usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json` |
 | Visitas de hoy | `sudo -u openwebrx bricohams-visitas --resumen` |
+| v5.1 · RAK de una vez (grabar si hace falta, prueba, bootloader, GPS) | `sudo bricohams-rak-aprs puesta-en-marcha` |
+| v5.1 · Versión del bootloader del RAK | `sudo bricohams-rak-aprs bootloader` |
+| v5.1 · ¿Tiene fix el GPS en la caja? | `sudo bricohams-rak-aprs gps 15` |
+| v5.1 · Puente del LilyGO 433 (web Meshtastic) | `bricohams-mesh-puente estado` |
+| v5.1 · ¿Por qué no sincroniza con GitHub? (en el PC) | `bash tools/git_sanear.sh` · `--reparar` |
+| v5.1 · ¿Hay datos personales o claves en lo que subo? | `python3 tools/datos_personales.py` · `--historial` |
 
 ## Web
 | Qué | Dónde |
 |---|---|
 | Receptor público | `http://DOMINIO/` (o `http://IP:8073/` en casa) |
 | Administración (siempre HTTPS) | `https://DOMINIO/settings` |
+| v5.1 · Panel APRS: mensajes, baliza, digipeater (admin) | `https://DOMINIO/settings/bricohams/aprs` |
+| v5.1 · Cliente web de Meshtastic del LilyGO 433 (admin, solo LAN) | `https://IP:8444/` (botón «Meshtastic Web (433)» en Ajustes) |
 | Portal de servicios | `http://DOMINIO/bricohams/` |
 | Cambiar el modo SSL | `SSL_MODO` (admin, todo o no) en `bricohams.env` + `sudo bash install.sh --solo web` (manual 23) |
 | Filtro y DSP de audio | botones **FILTRO** y **DSP** de la barra superior (manual 30) |
@@ -53,7 +61,7 @@ bricohams-locator info [LOCATOR]          # aeropuertos, AEMET, puertos, FM y NA
 sudo bricohams-locator refrescar          # baja AEMET (AEMET_API_KEY) y las FM de la zona
 sudo bricohams-locator marcadores --aplicar   # pone los [AUTO-LOCATOR] en OpenWebRX+ y lo reinicia
 bricohams-locator meteo                   # METEO_STATIONS de la zona
-bricohams-locator locator 0.0 0.0 # IM97kx · bricohams-locator coordenadas IM97kx
+bricohams-locator locator 38.08 -1.26 # IM97kx · bricohams-locator coordenadas IM97kx
 sudo bash install.sh --solo configuracion,meteo   # tras cambiar STATION_LOCATOR o LOCATOR_*
 ```
 
@@ -76,7 +84,7 @@ sudo bricohams-lilygo firmware            # v4.5 · actualizar el Meshtastic del
 bricohams-mesh-url ver "URL"              # v4.5 · canales y radio de una URL de Meshtastic (sin claves)
 bricohams-banner ver                      # v4.5 · cómo se ve el banner SSH
 sudo bricohams-blindaje auditar           # informe (no cambia nada, no enseña claves)
-ssh-copy-id pi@192.168.1.105          # desde tu PC: entrar con clave
+ssh-copy-id <usuario>@192.168.1.50          # desde tu PC: entrar con clave
 sudo bricohams-blindaje aplicar           # cortafuegos, SSH, fail2ban, permisos… (con copia)
 sudo bricohams-blindaje confirmar         # en 3 min; si no, el cortafuegos se quita solo
 sudo bricohams-blindaje deshacer          # volver a como estaba

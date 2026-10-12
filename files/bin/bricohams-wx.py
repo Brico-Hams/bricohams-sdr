@@ -474,7 +474,7 @@ def main():
         return rs485_herramienta(sys.argv)
     out = env('WX_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/sensor.json')
     hist_file = os.path.join(env('STATE_DIRECTORY', '/var/lib/bricohams'), 'wx-history.json')
-    lat, lon = float(env('STATION_LAT', '0.0')), float(env('STATION_LON', '0.0'))
+    lat, lon = float(env('STATION_LAT', '38.08')), float(env('STATION_LON', '-1.25'))
     alt = float(env('STATION_ASL', '200')) + float(env('WX_SENSOR_HEIGHT', '2'))
     toff = float(env('WX_TEMP_OFFSET', '0') or 0)
     do_aprs = as_bool(env('WX_APRS', 'no'))

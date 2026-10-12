@@ -90,14 +90,14 @@ assert mq.simbolo(',', 'M') == {'symbol': ',', 'table': 'M', 'index': 11, 'table
 M = cargar('mesh', os.path.join(BIN, 'bricohams-mesh-owrx'))
 nodo = {'num': 0x1234abcd, 'user': {'longName': 'SDR BricoHams 433', 'shortName': 'SB43', 'hwModel': 'TLORA_V2_1_1P6',
                                     'role': 'CLIENT'},
-        'position': {'latitude': 0.0, 'longitude': 0.0, 'altitude': 230},
+        'position': {'latitude': 38.08, 'longitude': -1.25, 'altitude': 230},
         'deviceMetrics': {'voltage': 4.1, 'channelUtilization': 3.2, 'airUtilTx': 0.5, 'uptimeSeconds': 600}}
 d = M.nodo_a_owrx(nodo['num'], nodo, 'mesh433', 433875000, decimales=2)
 assert d['mode'] == 'Meshtastic' and d['src'] == 0x1234abcd and (d['lat'], d['lon']) == (38.08, -1.25), d
 assert d['nickName'] == 'SB43' and d['longName'] == 'SDR BricoHams 433' and d['device'] == 'TLORA_V2_1_1P6'
 assert d['battery'] == 4.1 and d['symbol']['table'] == 'M' and d['freq'] == 433875000 and d['timestamp'] > 1.7e12
 assert M.nodo_a_owrx(1, {'user': {}}, 'mesh433', 1) is None, 'sin posición no va al mapa'
-assert M.nodo_a_owrx(1, {'position': {'latitudeI': 380823010, 'longitudeI': -12534920}}, 'm', 1)['lat'] == 0.0
+assert M.nodo_a_owrx(1, {'position': {'latitudeI': 380800000, 'longitudeI': -12500000}}, 'm', 1)['lat'] == 38.08
 nodos = {}
 n, t, extra = M.paquete(nodos, {'from': 7, 'to': M.BROADCAST, 'rxSnr': 6.25, 'rxRssi': -95, 'hopStart': 3, 'hopLimit': 1,
                                 'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'hola Murcia'}}, 'mesh433')

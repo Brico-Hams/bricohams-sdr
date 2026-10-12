@@ -321,6 +321,8 @@ nginx_sitio() {
     esac
     # v4.5 · cliente web de Meshtastic en :8443 (solo admin) si MESH_WEB=yes
     if [ "${MESH_WEB:-yes}" = yes ]; then e+=(-e 's/^#@MW@//'); else e+=(-e '/^#@MW@/d'); fi
+    # v5.1 · cliente web de Meshtastic del LilyGO 433 en :8444 (solo admin) si MESH433_WEB=yes y está el cliente
+    if [ "${MESH433_WEB:-no}" = yes ] && [ -f /usr/share/bricohams-meshweb/index.html ]; then e+=(-e 's/^#@M4@//'); else e+=(-e '/^#@M4@/d'); fi
     sed "${e[@]}" -e "s#__DOMINIO__#${dom}#g" -e "s#__CERT__#${cert}#" -e "s#__KEY__#${key}#"
 }
 cargar_env "$KIT/bricohams.env"
@@ -1373,12 +1375,76 @@ UNIDAD
     else
         systemctl disable --now bricohams-mesh-owrx >/dev/null 2>&1 || true
     fi
+    meshweb_433
     if [ -f /etc/udev/rules.d/99-bricohams-lilygo.rules ]; then
         bien "LilyGO ya identificados: $(ls /dev/lilygo-* 2>/dev/null | tr '\n' ' ')"
     else
         aviso "Falta identificar los LilyGO (una vez): sudo bricohams-lilygo identificar"
     fi
     aviso "Después: sudo bricohams-lilygo meshtastic  ·  sudo bricohams-lilygo igate  (docs/MANUAL_LILYGO.md)"
+}
+
+# v5.1 · interfaz web de Meshtastic para el LilyGO 433 (manual 35 §9, ADR-66): bricohams-mesh-puente
+# es el único que abre /dev/lilygo-mesh y lo reparte (TCP 4404 para el mapa y el panel, HTTP 4480 para
+# el cliente web); nginx sirve el cliente oficial en https://<estación>:8444/ solo con sesión de admin.
+MESHWEB_VER="v2.7.2"
+MESHWEB_SHA256="62657b85b4c24af4d44da2932b64143abdbf6e65a79fcb51fd0801d9540616e2"
+meshweb_433() {
+    install -m 755 "$FILES/bin/bricohams-mesh-puente" /usr/local/bin/bricohams-mesh-puente
+    if ! si "${MESH433_WEB:-no}"; then
+        systemctl disable --now bricohams-mesh-puente >/dev/null 2>&1 || true
+        return 0
+    fi
+    apt_i python3-serial >/dev/null 2>&1 || aviso "No pude instalar python3-serial"
+    if [ ! -f /usr/share/bricohams-meshweb/.version ] || [ "$(cat /usr/share/bricohams-meshweb/.version)" != "$MESHWEB_VER" ]; then
+        local t; t=$(mktemp -d)
+        if curl -fsSL --retry 3 -o "$t/build.tar" "https://github.com/meshtastic/web/releases/download/$MESHWEB_VER/build.tar" \
+           && echo "$MESHWEB_SHA256  $t/build.tar" | sha256sum -c --quiet -; then
+            rm -rf /usr/share/bricohams-meshweb.nuevo && install -d /usr/share/bricohams-meshweb.nuevo
+            tar -xf "$t/build.tar" -C /usr/share/bricohams-meshweb.nuevo --no-same-owner
+            find /usr/share/bricohams-meshweb.nuevo -name '*.gz' -exec gunzip -f {} +
+            echo "$MESHWEB_VER" >/usr/share/bricohams-meshweb.nuevo/.version
+            rm -rf /usr/share/bricohams-meshweb && mv /usr/share/bricohams-meshweb.nuevo /usr/share/bricohams-meshweb
+            bien "Cliente web de Meshtastic $MESHWEB_VER en /usr/share/bricohams-meshweb"
+        else
+            aviso "No pude bajar (o no cuadra el SHA-256) el cliente web de Meshtastic $MESHWEB_VER: sin :8444"
+        fi
+        rm -rf "$t"
+    fi
+    cat >/etc/systemd/system/bricohams-mesh-puente.service <<'UNIDAD'
+[Unit]
+Description=BricoHams · puente del LilyGO 433 (Meshtastic USB -> TCP 4404 + web 4480, solo 127.0.0.1)
+After=dev-lilygo\x2dmesh.device
+Before=bricohams-mesh-owrx.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/bricohams-mesh-puente servicio
+DynamicUser=yes
+SupplementaryGroups=dialout
+LoadCredential=env:/etc/bricohams/bricohams.env
+RuntimeDirectory=bricohams-mesh-puente
+Environment=MESH_RUN_DIR=/run/bricohams-mesh-puente
+DevicePolicy=closed
+DeviceAllow=char-ttyUSB rw
+DeviceAllow=char-ttyACM rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIDAD
+    systemctl daemon-reload
+    systemctl enable bricohams-mesh-puente >/dev/null 2>&1 || true
+    systemctl restart bricohams-mesh-puente || true
+    systemctl try-restart bricohams-mesh-owrx 2>/dev/null || true     # pasa a entrar por 127.0.0.1:4404
+    bien "Meshtastic 433 por web: https://<estación>:8444/ (solo admin) · puente: bricohams-mesh-puente estado"
 }
 
 paso_rak() {

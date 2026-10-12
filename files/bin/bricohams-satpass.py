@@ -182,8 +182,8 @@ def main():
     if Satrec is None:
         print('satpass: falta python3-sgp4', file=sys.stderr)
         return 1
-    lat = float(os.environ.get('STATION_LAT', '0.0'))
-    lon = float(os.environ.get('STATION_LON', '0.0'))
+    lat = float(os.environ.get('STATION_LAT', '38.08'))
+    lon = float(os.environ.get('STATION_LON', '-1.25'))
     alt = float(os.environ.get('STATION_ASL', '200'))
     lista = json.load(open(LISTA, encoding='utf-8'))['satelites']
     omms = descargar_omm([s['norad'] for s in lista])

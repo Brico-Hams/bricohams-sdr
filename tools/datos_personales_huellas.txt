@@ -1,0 +1,8 @@
+# Huellas SHA-256 de datos personales que no deben ir al GitHub público (manual 38).
+# Formato: <sha256 del dato en minúsculas> <tipo>. Añadir: python3 tools/datos_personales.py --huella 'dato'
+d4039a02fe9123ed58c54209533b9081e24ca82773771293c3e6d1524c955198 red de casa (LAN)
+a8b635619b8e3c263405bde447f1ae91d39b77a317a39fc8a2aa25f24dbbdf85 usuario del sistema de la Pi
+733c165e637823c6885dfaa2adbf650ef100aa45dd280609d217c907e6ffb97f coordenada exacta (lat)
+6b0065ea88ca33003238faba5bc8686dad902e0622c2063daa9f82172591c48a coordenada exacta (lon)
+fe004f55a693eec1a885c3fd19a891d2de5eab738ef5a03d9968df3382902a01 coordenada exacta (lon)
+15e1235fd92ad99b16caa572abb5a65a7effafe7dbb965ecba0a5d7fe2155f64 IP de un tercero

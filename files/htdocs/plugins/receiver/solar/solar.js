@@ -23,8 +23,8 @@ Plugins.solar.no_css = true;
 
 Plugins.solar.init = function () {
     var cfg = window.solar_config || {};
-    var LAT = (typeof cfg.lat === 'number') ? cfg.lat : 0.0;
-    var LON = (typeof cfg.lon === 'number') ? cfg.lon : 0.0;
+    var LAT = (typeof cfg.lat === 'number') ? cfg.lat : 38.08;
+    var LON = (typeof cfg.lon === 'number') ? cfg.lon : -1.25;
     var AFTER = cfg.after || '#owrx-rig-dx-button';
 
     var SW = 'https://services.swpc.noaa.gov';
