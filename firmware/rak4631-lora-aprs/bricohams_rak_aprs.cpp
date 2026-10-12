@@ -61,6 +61,9 @@ static void hw(const String& text) { sendRaw(encapsulateKISS(text, CMD_HARDWARE)
 static void logHost(const String& text) { hw("BH:LOG " + text); }
 static void toHost(const String& tnc2) { sendRaw(encodeKISS(tnc2)); }
 
+// 1.0.1 · nunca «nan»/«inf» en el JSON (1.0.0 llegó a mandar "vbat": nan y la Pi no lo leía)
+static bool finito(float v) { return !isnan(v) && !isinf(v); }
+
 static String statusJson() {
     JsonDocument d;
     SensorData& s = Sensor_Utils::data();
@@ -71,16 +74,17 @@ static String statusJson() {
     d["rx"] = rxCount;               d["txn"] = txCount;            d["digin"] = digiCount;
     d["crcerr"] = LoRa_Utils::crcErrors;  d["kissin"] = kissIn;
     d["rssi"] = lastRssi;            d["snr"] = lastSnr;
-    if (s.tempOk) d["t"] = serialized(String(s.temp, 1));
+    if (s.tempOk && finito(s.temp)) d["t"] = serialized(String(s.temp, 1));
     if (medidaValida(s.hum, 0, 100)) d["h"] = serialized(String(s.hum, 0));
     if (medidaValida(s.pres, 300, 1200)) d["p"] = serialized(String(s.pres, 1));
     d["sensor"] = s.source;
-    if (medidaValida(s.vbat, 0.5f, 10)) d["vbat"] = serialized(String(s.vbat, 2));
+    if (finito(s.vbat) && medidaValida(s.vbat, 0.5f, 10)) d["vbat"] = serialized(String(s.vbat, 2));
     JsonObject jg = d["gps"].to<JsonObject>();
     jg["present"] = g.present;       jg["fix"] = g.fix;             jg["sats"] = g.sats;
-    if (g.fix) {
+    if (g.fix && finito(g.lat) && finito(g.lon)) {
         jg["lat"] = serialized(String(g.lat, 6)); jg["lon"] = serialized(String(g.lon, 6));
-        jg["alt"] = serialized(String(g.alt, 0)); jg["hdop"] = serialized(String(g.hdop, 1));
+        if (finito(g.alt))  jg["alt"] = serialized(String(g.alt, 0));
+        if (finito(g.hdop)) jg["hdop"] = serialized(String(g.hdop, 1));
     }
     if (g.utc.length()) jg["utc"] = g.utc;
     d["crc"] = Config.checksum();

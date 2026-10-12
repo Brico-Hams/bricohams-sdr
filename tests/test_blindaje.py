@@ -45,7 +45,7 @@ def nft(raiz, extra=''):
 T = tempfile.mkdtemp()
 r = nft(T)
 assert 'policy drop' in r and 'tcp dport { 80, 443, 8073 } ct state new accept' in r, r
-assert 'ip saddr @lan4 tcp dport { 22, 4403, 8443, 8554 }' in r and 'elements = { 192.168.1.0/24 }' in r
+assert 'ip saddr @lan4 tcp dport { 22, 4403, 8443, 8444, 8554 }' in r and 'elements = { 192.168.1.0/24 }' in r
 assert 'ct state established,related accept' in r and 'iif "lo" accept' in r and 'ipv6-icmp' in r
 r2 = nft(T, 'BLINDAJE_8073="lan"\nBLINDAJE_SSH="todos"\nBLINDAJE_PUERTOS_LAN=""\n')
 assert 'tcp dport { 80, 443, 22 } ct state new accept' in r2 and 'ip saddr @lan4 tcp dport { 8073 }' in r2, r2

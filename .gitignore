@@ -1,0 +1,27 @@
+# Claves de la estación: nunca al git
+bricohams.env
+*.env.local
+# Generados
+__pycache__/
+*.pyc
+tests/salida/
+# v5.1 · nunca al GitHub público (manual 38)
+*.env
+!bricohams.env.example
+.env*
+*.key
+*.pem
+*.p12
+id_ed25519*
+id_rsa*
+# copias de conflicto de los clientes de sincronización en la nube
+*Name clash*
+*Edit conflict*
+*conflicted copy*
+*sync-conflict*
+desktop.ini
+.DS_Store
+Thumbs.db
+# binarios compilados en lote (322 MB): se publican como Release, no en el git
+firmware-compilado/*
+!firmware-compilado/build_all.py

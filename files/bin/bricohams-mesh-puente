@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-mesh-puente · BricoHams SDR (v5.1, manual 35 §9, ADR-66)
+#
+#  Interfaz web de Meshtastic para el nodo 433 (LilyGO T3 por USB).
+#  El LilyGO no tiene WiFi en esta estación: solo habla por el puerto serie,
+#  y ese puerto solo lo puede abrir UN programa. Este puente es el único que
+#  lo abre y lo reparte:
+#    - 127.0.0.1:4404  API «stream» de Meshtastic (la misma que meshtasticd en 4403):
+#                      la usan bricohams-mesh-owrx (mapa), bricohams-mesh-admin y
+#                      «meshtastic --host 127.0.0.1:4404».
+#    - 127.0.0.1:4480  API HTTP de Meshtastic (PUT /api/v1/toradio, GET /api/v1/fromradio):
+#                      la usa el cliente web oficial, que nginx sirve en https://<estación>:8444/
+#                      SOLO con la sesión de administrador de /settings (como el 868 en :8443).
+#  Todo escucha en 127.0.0.1: nada de esto se ve fuera de la Pi sin pasar por nginx.
+#
+#  Tramas serie de Meshtastic: 0x94 0xC3 <longitud 16 bits> <protobuf ≤ 512 B>.
+#  Lo que llega de la radio (FromRadio) se copia a todos los clientes; lo que manda
+#  cualquier cliente (ToRadio) va a la radio. Cada cliente pide su configuración con
+#  su propio want_config_id y descarta la de los demás (lo hace la librería oficial).
+#
+#  Uso:  bricohams-mesh-puente servicio      (systemd: bricohams-mesh-puente.service)
+#        bricohams-mesh-puente estado        (clientes y tramas, de /run/bricohams-mesh/puente.json)
+# =====================================================================
+import json
+import os
+import re
+import socket
+import sys
+import threading
+import time
+from collections import deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+START1, START2, MAXIMO = 0x94, 0xC3, 512
+RUN = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh')
+
+
+def env(k, d=''):
+    v = os.environ.get(k, '')
+    return v if v != '' else d
+
+
+def cargar_env():
+    """Solo MESH433_* de bricohams.env (credencial de systemd): el puente no necesita ninguna clave."""
+    cred = os.path.join(os.environ.get('CREDENTIALS_DIRECTORY', '/nonexistent'), 'env')
+    ruta = os.environ.get('BRICOHAMS_ENV', cred if os.path.exists(cred) else '/etc/bricohams/bricohams.env')
+    try:
+        for l in open(ruta, encoding='utf-8'):
+            m = re.match(r'^\s*(MESH433_[A-Z_]+)=\s*(["\']?)([^"\'#]*?)\2\s*(#.*)?$', l)
+            if m and m.group(1) not in ('MESH433_CHANNEL_URL',):
+                os.environ.setdefault(m.group(1), m.group(3).strip())
+    except OSError:
+        pass
+
+
+def trama(datos):
+    """Protobuf -> trama del puerto serie de Meshtastic."""
+    if len(datos) > MAXIMO:
+        raise ValueError('trama de %d bytes (máximo %d)' % (len(datos), MAXIMO))
+    return bytes([START1, START2, len(datos) >> 8, len(datos) & 0xFF]) + datos
+
+
+class Lector:
+    """Saca protobufs de un flujo de bytes; lo que no es trama (registro de depuración
+    de la radio, bytes de despertar 0xC3…) se descarta o se guarda como texto."""
+
+    def __init__(self):
+        self.buf = bytearray()
+        self.texto = bytearray()
+
+    def alimentar(self, datos):
+        self.buf += datos
+        out = []
+        while True:
+            i = self.buf.find(bytes([START1, START2]))
+            if i < 0:
+                guarda = 1 if self.buf[-1:] == bytes([START1]) else 0
+                self.texto += self.buf[:len(self.buf) - guarda]
+                del self.buf[:len(self.buf) - guarda]
+                break
+            self.texto += self.buf[:i]
+            del self.buf[:i]
+            if len(self.buf) < 4:
+                break
+            n = (self.buf[2] << 8) | self.buf[3]
+            if n > MAXIMO:                      # cabecera falsa: saltamos el 0x94 y seguimos buscando
+                del self.buf[:1]
+                continue
+            if len(self.buf) < 4 + n:
+                break
+            out.append(bytes(self.buf[4:4 + n]))
+            del self.buf[:4 + n]
+        if len(self.texto) > 4096:
+            del self.texto[:-4096]
+        return out
+
+
+class Puente:
+    def __init__(self, abrir_radio):
+        self.abrir_radio = abrir_radio          # función -> objeto con read(n)/write(b)/close()
+        self.radio = None
+        self.lock = threading.Lock()
+        self.clientes = set()                   # sockets TCP
+        self.http = deque(maxlen=int(env('MESH_PUENTE_COLA', '3000')))
+        self.http_visto = 0.0
+        self.cuenta = {'de_radio': 0, 'a_radio': 0, 'reaperturas': 0, 'descartadas': 0}
+        self.ultimo_error = ''
+
+    # --- radio
+    def a_radio(self, datos):
+        with self.lock:
+            r = self.radio
+        if r is None:
+            self.cuenta['descartadas'] += 1
+            return False
+        try:
+            r.write(trama(datos))
+            self.cuenta['a_radio'] += 1
+            return True
+        except (OSError, ValueError) as e:
+            self.ultimo_error = str(e)
+            return False
+
+    def repartir(self, datos):
+        self.cuenta['de_radio'] += 1
+        t = trama(datos)
+        for c in list(self.clientes):
+            try:
+                c.sendall(t)
+            except OSError:
+                self.quitar(c)
+        if time.time() - self.http_visto < 120:   # el cliente web solo recibe si está mirando
+            self.http.append(datos)
+
+    def bucle_radio(self, parar=None):
+        while not (parar and parar.is_set()):
+            try:
+                r = self.abrir_radio()
+                r.write(bytes([START2] * 32))     # despierta la API serie del nodo
+                with self.lock:
+                    self.radio = r
+                print('puente: radio abierta', flush=True)
+                lector = Lector()
+                while not (parar and parar.is_set()):
+                    d = r.read(256)
+                    for p in lector.alimentar(d or b''):
+                        self.repartir(p)
+            except (OSError, ValueError) as e:
+                self.ultimo_error = str(e)
+                print('puente: radio: %s; reintento en 5 s' % e, flush=True)
+            with self.lock:
+                if self.radio:
+                    try:
+                        self.radio.close()
+                    except OSError:
+                        pass
+                self.radio = None
+            self.cuenta['reaperturas'] += 1
+            for _ in range(50):
+                if parar and parar.is_set():
+                    return
+                time.sleep(0.1)
+
+    # --- clientes TCP (API stream)
+    def quitar(self, c):
+        self.clientes.discard(c)
+        try:
+            c.close()
+        except OSError:
+            pass
+
+    def atender_tcp(self, c):
+        self.clientes.add(c)
+        lector = Lector()
+        try:
+            while True:
+                d = c.recv(1024)
+                if not d:
+                    break
+                for p in lector.alimentar(d):
+                    self.a_radio(p)
+        except OSError:
+            pass
+        self.quitar(c)
+
+    def servidor_tcp(self, puerto, listo=None):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(('127.0.0.1', puerto))
+        s.listen(8)
+        if listo is not None:
+            listo.append(s.getsockname()[1])
+        while True:
+            c, _ = s.accept()
+            if len(self.clientes) >= 8:
+                c.close()
+                continue
+            c.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            threading.Thread(target=self.atender_tcp, args=(c,), daemon=True).start()
+
+    # --- cliente web (API HTTP)
+    def servidor_http(self, puerto):
+        puente = self
+
+        class H(BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
+
+            def log_message(self, *a):
+                pass
+
+            def _resp(self, codigo, cuerpo=b'', tipo='application/x-protobuf'):
+                self.send_response(codigo)
+                self.send_header('Content-Type', tipo)
+                self.send_header('Content-Length', str(len(cuerpo)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(cuerpo)
+
+            def do_OPTIONS(self):
+                self._resp(204)
+
+            def do_GET(self):
+                ruta = self.path.split('?')[0]
+                if ruta == '/api/v1/fromradio':
+                    puente.http_visto = time.time()
+                    try:
+                        d = puente.http.popleft()
+                    except IndexError:
+                        d = b''
+                    return self._resp(200, d)
+                if ruta in ('/json/report', '/api/v1/estado'):
+                    return self._resp(200, json.dumps(puente.estado()).encode(), 'application/json')
+                self._resp(404, b'no existe', 'text/plain')
+
+            def do_PUT(self):
+                try:
+                    n = int(self.headers.get('Content-Length') or 0)
+                except ValueError:
+                    n = -1
+                if n < 0 or n > 4096:
+                    self.close_connection = True          # no leemos cuerpos enormes: se corta la conexión
+                    return self._resp(400, b'longitud', 'text/plain')
+                d = self.rfile.read(n)
+                if self.path.split('?')[0] != '/api/v1/toradio':
+                    return self._resp(404, b'no existe', 'text/plain')
+                if not 0 < n <= MAXIMO:
+                    return self._resp(400, b'longitud', 'text/plain')
+                if d[:1] == b'\x18':          # ToRadio.want_config_id (campo 3, varint): config nueva
+                    puente.http.clear()
+                puente.http_visto = time.time()
+                self._resp(200 if puente.a_radio(d) else 503)
+            do_POST = do_PUT
+
+        srv = ThreadingHTTPServer(('127.0.0.1', puerto), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        return srv
+
+    def estado(self):
+        return {'radio': self.radio is not None, 'clientes_tcp': len(self.clientes),
+                'web_activa': time.time() - self.http_visto < 120, 'cola_web': len(self.http),
+                'tramas': dict(self.cuenta), 'error': self.ultimo_error[:200],
+                'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S')}
+
+
+def abrir_serie():
+    import serial
+    puerto = env('MESH433_PUERTO', '/dev/lilygo-mesh')
+    s = serial.Serial(puerto, 115200, timeout=0.2, write_timeout=2, exclusive=True)
+    return s
+
+
+def servicio():
+    cargar_env()
+    p = Puente(abrir_serie)
+    threading.Thread(target=p.servidor_tcp, args=(int(env('MESH433_PUENTE_TCP', '4404')),), daemon=True).start()
+    p.servidor_http(int(env('MESH433_PUENTE_HTTP', '4480')))
+    threading.Thread(target=p.bucle_radio, daemon=True).start()
+    os.makedirs(RUN, exist_ok=True)
+    while True:
+        try:
+            tmp = os.path.join(RUN, 'puente.json.tmp')
+            with open(tmp, 'w') as f:
+                json.dump(p.estado(), f)
+            os.replace(tmp, os.path.join(RUN, 'puente.json'))
+        except OSError:
+            pass
+        time.sleep(10)
+
+
+def main(argv):
+    o = argv[1] if len(argv) > 1 else ''
+    if o == 'servicio':
+        return servicio()
+    if o == 'estado':
+        try:
+            print(open(os.path.join(RUN, 'puente.json')).read())
+            return 0
+        except OSError:
+            print('Sin estado (¿MESH433_WEB="no" o servicio parado? systemctl status bricohams-mesh-puente)')
+            return 1
+    for l in open(__file__, encoding='utf-8').read().splitlines()[2:24]:
+        print(l.lstrip('# '))
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

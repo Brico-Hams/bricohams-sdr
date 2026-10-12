@@ -1,5 +1,59 @@
 # Historial
 
+## v5.1 · 12/10/2026
+**Interfaz web del APRS y de Meshtastic 433, firmware RAK 1.0.1 y GitHub sin datos personales.** Se mantiene todo lo de v5.0.
+
+**GitHub: sincronización y privacidad** (manual 38, ADR-65)
+- Diagnóstico de por qué la carpeta del PC no se sincronizaba:
+  - copias «`(# Name clash … #)`» y «`(# Edit conflict … #)`» del cliente de la nube dentro de `.git` (Proton Drive);
+  - `origin/main` perdido (`[gone]`);
+  - un commit de la web que borraba `.gitignore`;
+  - 322 MB de binarios sin seguimiento en `firmware-compilado/`.
+- `tools/git_sanear.sh`: diagnóstico y `--reparar`. Aparta, no borra; nunca hace push.
+- `tools/datos_personales.py`:
+  - árbol, `--historial` (con los zip de dentro) y `--zip`;
+  - busca huellas SHA-256 de datos personales y las claves del `bricohams.env` personal;
+  - no imprime nunca un valor. Lo pasa `run_tests.sh`.
+- Árbol despersonalizado: red de casa, usuario del sistema, coordenadas exactas e IP de un visitante fuera. El indicativo, el dominio y el locator se quedan.
+- `.gitignore` restaurado y ampliado: `*.env` salvo el ejemplo, claves, copias de conflicto y `firmware-compilado/` salvo `build_all.py`.
+- Comprobado: el historial público **no** tiene contraseñas, passcodes, tokens ni PSK. Sí tiene SSID, red, usuario y posición en commits viejos (manual 38 §6).
+
+**Interfaz web del APRS** (manual 35, ADR-67/68)
+- `bricohams-rak-aprs` reorganizado en `Pasarela` con una API local `127.0.0.1:8077`:
+  - estado completo sin passcode;
+  - baliza a demanda;
+  - mensajes APRS con acuse automático de los recibidos y marca de `ack` en los enviados.
+  - Integrado con lo de v5.0: chat APRS, APRS-IS en el mapa, `json_rak` y RUI3.
+- `/settings/bricohams/aprs` (solo admin, CSRF):
+  - formulario de mensajes y botón «Enviar baliza ahora»;
+  - mensajes y estaciones oídas con posición;
+  - digipeater, bootloader y resultado de la puesta en marcha.
+- `RAK_DIGI="auto"`: repite solo cuando el LilyGO iGate lleva una hora sin oírse (`RAK_DIGI_OTRO`, `RAK_DIGI_AUTO_MIN`, `RAK_DIGI_AUTO_MODO`).
+- Nuevas órdenes:
+  - `bricohams-rak-aprs bootloader`: versión por UF2;
+  - `gps [min]`: fix dentro de la caja;
+  - `puesta-en-marcha`: todo de una vez, con resumen en `/var/lib/bricohams`.
+- Firmware **1.0.1**: nunca `nan`/`inf` en el JSON de estado. Lleva `bin/VERSION.json`, que también genera `tools/compilar_rak.sh`.
+
+**Interfaz web de Meshtastic para el LilyGO 433** (manual 35, ADR-66)
+- `bricohams-mesh-puente`: único dueño del USB.
+  - API stream en `127.0.0.1:4404`, para el mapa, el panel y la CLI.
+  - API HTTP en `127.0.0.1:4480`, para el cliente web.
+  - Sin root, solo localhost.
+- nginx `:8444` con el cliente oficial `meshtastic/web` v2.7.2 (SHA-256 comprobado) y la sesión de `/settings`.
+  - Botón «Meshtastic Web (433)» en Ajustes.
+  - `MESH433_WEB`, `MESH433_PUENTE_TCP`, `MESH433_PUENTE_HTTP`.
+- `bricohams-mesh-owrx` y `bricohams-mesh-admin` entran por el puente si está activo. `bricohams-lilygo` lo para mientras graba.
+- `bricohams-blindaje`: 8444 solo LAN. `bricohams-check` y `bricohams-servicios` lo vigilan.
+
+**Seguridad de la Pi** (manual 34 §4 ter)
+- Comprobación externa y desde la LAN. El dominio público publica la posición con 6 decimales, mientras la Pi da 2. El nombre público no sirve la configuración de esta Pi: revisar el reenvío del router y el DNS.
+- `:8073` responde directo por HTTP en la LAN: hay que cerrar su reenvío en el router y poner `BLINDAJE_8073="lan"`.
+- `.git` y `bricohams.env` no se sirven. Grafana y 9443 no se ven fuera de la Pi.
+
+**Pruebas nuevas:** `test_git_sanear`, `test_v51_aprs_web` y `test_v51_mesh_puente` (con la librería oficial de Meshtastic si está instalada).
+**Conocido:** `test_owrx_clone` falla de vez en cuando (≈1/256). Un descifrado con una contraseña equivocada puede pasar el relleno por casualidad. Viene de antes y no lo toca esta versión.
+
 ## v5.0 · en desarrollo
 **Repositorio genérico (sin datos personales), botones TAK/Monitorización y gestión de bookmarks desde /settings.**
 
@@ -143,7 +197,7 @@
   - le manda al RAK su configuración desde `bricohams.env`;
   - `grabar` (DFU), `prueba`, `estado`, `baliza`;
   - servicio sin root (DynamicUser, credencial).
-- Configuración **clonada del iGate actual** (192.168.1.142) con el indicativo **EA5KAO-15**.
+- Configuración **clonada del iGate actual** (el LilyGO de la LAN) con el indicativo **EA5KAO-15**.
 - El control de ventiladores usa la temperatura del RAK si no hay DS18B20 (`FAN_CAJA_RAK`).
 
 **Meshtastic** (manual 35, ADR-51)

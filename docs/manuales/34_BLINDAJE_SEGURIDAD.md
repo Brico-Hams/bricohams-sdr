@@ -21,7 +21,7 @@ La estación está en Internet: `sdr.ea5kao.ampr.org`, con **80, 443 y 8073** ab
 | Núcleo | redirecciones ICMP, rp_filter, syncookies, kptr/dmesg, enlaces protegidos |
 | Hardware | recuerda que, sin el HAT, el Mini y el SDRplay, los errores de meshtasticd, gpsd y de los receptores SATÉLITES y RADIOAFICIONADOS **no** son de seguridad |
 
-Lo comprobado desde fuera el 11/10/2026: `https://sdr.ea5kao.ampr.org/status.json` publicaba la posición **exacta** (0.0, 0.0, unos 10 cm) y el correo de contacto.
+Lo comprobado desde fuera el 11/10/2026: `https://sdr.ea5kao.ampr.org/status.json` publicaba la posición **exacta** (6 decimales, unos 10 cm) y el correo de contacto.
 
 ## 2. Procedimiento: revisar y blindar (paso a paso)
 **Antes:** entra a la Pi por SSH **desde casa** y deja otra ventana de SSH abierta (por si acaso).
@@ -39,8 +39,8 @@ Lo comprobado desde fuera el 11/10/2026: `https://sdr.ea5kao.ampr.org/status.jso
 3. **Clave SSH (recomendado):** así SSH ya no acepta contraseñas. En tu PC (PowerShell o terminal):
    ```bash
    ssh-keygen -t ed25519                         # si no tienes clave
-   ssh-copy-id pi@192.168.1.105              # en Windows: type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh pi@192.168.1.105 "mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
-   ssh pi@192.168.1.105                      # comprueba que entra SIN pedir contraseña
+   ssh-copy-id <usuario>@192.168.1.50              # en Windows: type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh <usuario>@192.168.1.50 "mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
+   ssh <usuario>@192.168.1.50                      # comprueba que entra SIN pedir contraseña
    ```
 4. **Aplica:**
    ```bash
@@ -95,6 +95,32 @@ Lo comprobado desde fuera el 11/10/2026: `https://sdr.ea5kao.ampr.org/status.jso
   - seguridad (blindaje sin confirmar, reinicio pendiente, IP bloqueadas, nota de la auditoría);
   - órdenes de ayuda.
 - Se ve con `bricohams-banner ver`. El texto de Debian se guarda en `/etc/motd.bricohams-orig` y `quitar` lo devuelve.
+
+## 4 ter. Comprobación del 12/10/2026 (v5.1)
+Hecha desde fuera (Internet) y desde la LAN con el navegador. Sin SSH: el asistente no inicia sesión con contraseñas. Lo que se vio:
+
+| Dónde | Resultado | Qué hacer |
+|---|---|---|
+| Internet · `https://<dominio>/status.json` | Publica la posición con **6 decimales** (unos 10 cm) y el correo de contacto. En la LAN, `http://<IP-de-la-Pi>:8073/status.json` da **2 decimales**. **El nombre público no está sirviendo la configuración de esta Pi** | Mira en el router a qué IP reenvía el 443/80 y en el DNS del dominio adónde apunta. Si va a otra máquina o a una instancia antigua de OpenWebRX+, apágala o pon `OWRX_GPS_DECIMALES="2"` también ahí |
+| Internet · `/.git/config`, `/bricohams.env` | No se sirven | ✔ |
+| Internet · `robots.txt` | Excluye `/login`, `/settings`, `/pwchange` | ✔ |
+| LAN · `:8073` | OpenWebRX+ contesta **directo por HTTP**, sin pasar por nginx. La contraseña de admin viaja sin cifrar dentro de casa. Si el router también reenvía el 8073, viaja sin cifrar por Internet: ya se vio un acceso externo el 11/10 | Cierra el reenvío del 8073 en el router. `BLINDAJE_8073="lan"` y `sudo bricohams-blindaje aplicar` → `confirmar`. Entra a `/settings` siempre por `https://` |
+| LAN · `:3000` (Grafana), `:9443` (meshtasticd) | No responden fuera de la Pi | ✔ (Grafana solo por `/settings/bricohams/grafana/`) |
+| Cuenta de la Pi | La contraseña del usuario salió en un chat | Cámbiala (`passwd`) y deja SSH solo con clave (apartado 2) |
+
+**Para la auditoría completa** (puertos, permisos de `bricohams.env`, sudo, SSH, fugas), en la Pi:
+
+```bash
+sudo bricohams-blindaje auditar
+```
+
+Después, si algo sale mal:
+
+```bash
+sudo bricohams-blindaje aplicar
+```
+
+Pásale el resultado al asistente para revisarlo: no lleva claves.
 
 ## 5. Contraseñas
 - Usa claves largas y distintas para la Pi, el admin de OpenWebRX+, la WiFi y las API.

@@ -29,7 +29,7 @@ from bricohams_locator import en_espana, latlon_to_locator, locator_to_latlon  #
 ETIQUETA = '[AUTO-LOCATOR]'
 CATEGORIAS = ('airport', 'weather', 'port', 'radio', 'other')
 MINIMO_UNO = ('airport', 'weather')        # si no hay ninguno en el radio, el más cercano (hasta 2,5 × radio)
-KIT_ORIGEN = (0.0, 0.0)             # Mi QTH (Región de Murcia): la zona de los marcadores del kit
+KIT_ORIGEN = (38.08, -1.25)             # Mi QTH (Región de Murcia): la zona de los marcadores del kit
 LOCAL_KIT = re.compile(r'\b(E[ACD]\d\w*|Sierra Espuña|Murcia|Cartagena|Mazarrón|Lorca|Alicante|Benidorm|Granada|'
                        r'Albacete|Águilas|Carrascoy|Peña Rubia|Valencia|Radio Club|Cabo de Gata|Cabo la Nao|LE[A-Z]{2})\b')
 

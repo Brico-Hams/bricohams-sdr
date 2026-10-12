@@ -17,7 +17,7 @@
 #    BLINDAJE_8073="publico"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
 #    BLINDAJE_SSH="lan"          lan = SSH solo desde la red de casa · todos
 #    BLINDAJE_LAN=""             redes de casa (vacío = la de la interfaz, p. ej. 192.168.1.0/24)
-#    BLINDAJE_PUERTOS_LAN="4403 8443 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin, RTSP)
+#    BLINDAJE_PUERTOS_LAN="4403 8443 8444 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin 868 y 433, RTSP)
 #  Lo que se abre a todo el mundo en el host: 80, 443 y (si «publico») 8073.
 # =====================================================================
 set -u
@@ -64,7 +64,7 @@ leer_env() {
     done <"$ENV"
 }
 env_de() { local n="E_$1"; printf '%s' "${!n:-${2:-}}"; }
-puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8554}"; }   # vacío = ninguno
+puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8444 8554}"; }   # vacío = ninguno
 
 # --------------------------------------------------------------------- red de casa
 # redes IPv4 conectadas (las de las interfaces, sin docker ni lo), p. ej. 192.168.1.0/24

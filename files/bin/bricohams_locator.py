@@ -2,7 +2,7 @@
 """Locator Maidenhead ⇄ coordenadas (v4.3).
 
   bricohams_locator.py IM98iu            → «38.854167 -1.291667» (centro de la cuadrícula)
-  bricohams_locator.py --a-locator 0.0 0.0   → «IM97kx»
+  bricohams_locator.py --a-locator 38.08 -1.26   → «IM97kx»
   bricohams_locator.py --espana IM98iu   → sale con 0 si cae en España (península, Baleares,
                                            Canarias, Ceuta o Melilla) y con 3 si no
 

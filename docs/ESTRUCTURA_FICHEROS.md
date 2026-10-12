@@ -3,21 +3,21 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **529 ficheros** en **103 carpetas**.
+El repositorio tiene **538 ficheros** en **104 carpetas**.
 
 ## Árbol de carpetas
 
 ```
-.                                     7  Raíz del repositorio
+.                                     6  Raíz del repositorio
   .vscode/                            1
   data/                               3  Datos de entrada: repetidores, marcadores, satélites y catálogo de localizadores
     locator/                          2  Catálogo de localidades → locator Maidenhead y repetidores por zona (bricohams-locator)
       fuentes/                        5
   docs/                              11  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
     esquemas/                        46  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
-    manuales/                        37  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
+    manuales/                        38  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
   files/                              0  Todo lo que install.sh copia al sistema
-    bin/                             40  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
+    bin/                             41  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
     branding/                         4  Imagen BricoHams (cabecera, avatar, favicon) que se aplica a OpenWebRX+
     grafana/                          1  Paneles de Grafana aprovisionados por install.sh
     htdocs/                           0  Recursos web servidos por OpenWebRX+ (plugins del cliente)
@@ -84,7 +84,7 @@ El repositorio tiene **529 ficheros** en **103 carpetas**.
   firmware/                           0  Firmware para los microcontroladores de la estación
     pico-io/                          1  MicroPython de la Raspberry Pi Pico (sensores y ventiladores)
     rak4631-lora-aprs/               18  Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO)
-      bin/                            4
+      bin/                            5
       test/                           1
         shim/                         1
   hardware/                           0  Diseño mecánico y de RF (OpenSCAD, STL, NEC2)
@@ -102,15 +102,16 @@ El repositorio tiene **529 ficheros** en **103 carpetas**.
     caja_v3/                          1  Caja v3 en dos módulos (electrónica + potencia)
       render/                         5
       stl/                           30
+    gcode/                            1
   owrx-clone/                         6  Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+
-  tests/                             38  Pruebas automáticas (bash tests/run_tests.sh)
+  tests/                             41  Pruebas automáticas (bash tests/run_tests.sh)
     datos/                            2  Datos de prueba (fixtures) usados por los tests
       owrx/                           0
         htdocs/                       0
           lib/                        2
         owrx/                         2
       owrx-1.2.126/                   5
-  tools/                             18  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
+  tools/                             21  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
 ```
 
 ## Qué hace cada fichero
@@ -123,7 +124,6 @@ Raíz del repositorio.
 |---|---|
 | `.gitattributes` | Fuerza finales de línea LF (los scripts se ejecutan en Linux) |
 | `.gitignore` | Excluye claves (bricohams.env), cachés y artefactos de compilación |
-| `bricohams.env` | bricohams.env · BricoHams SDR · plantilla pública sin credenciales |
 | `bricohams.env.example` | Plantilla pública de configuración de la estación, sin credenciales (copiar a bricohams.env) |
 | `CHANGELOG.md` | Historial de versiones y de cada cambio |
 | `install.sh` | Instalador por pasos, idempotente: dependencias, servicios, parches de OpenWebRX+, nginx, Meshtastic, APRS, TAK, Grafana/Prometheus y copias (--lista, --solo, --backup, --actualizar) |
@@ -278,6 +278,7 @@ Manuales paso a paso numerados (instalación, cada servicio y cada panel).
 | `35_LORA_APRS_MESHTASTIC.md` | 35 · iGate LoRa APRS en un RAK4631 y Meshtastic 433/868, dentro de OpenWebRX+ (v4.5) |
 | `36_TAK_MAPA_LOCAL.md` | TAK local, mapa ADS-B/APRS y CHAT |
 | `37_JUSTIFICACION_CAMBIOS_V4_6.md` | 37 · Justificación de los cambios de la v4.6 |
+| `38_GITHUB_SINCRONIZACION_PRIVACIDAD.md` | 38 · GitHub: sincronización y repositorio sin datos personales (v5.1) |
 
 ### `files/bin/`
 
@@ -303,6 +304,7 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 | `bricohams-merge-bookmarks.py` | Une marcadores de OpenWebRX (clave: frecuencia + modo). |
 | `bricohams-mesh-admin` | Panel de administración (solo /settings, con sesión): Meshtastic 433/868, iGate RAK, APRS, TAK (credenciales) y Monitorización |
 | `bricohams-mesh-owrx` | Integra Meshtastic en la web de OpenWebRX+ (solo información de nodos y registro APRS, sin configuración) |
+| `bricohams-mesh-puente` | bricohams-mesh-puente · BricoHams SDR (v5.1, manual 35 §9, ADR-66) |
 | `bricohams-mesh-url` | Genera/lee las URL de canales Meshtastic compartidas entre los nodos 433 y 868 |
 | `bricohams-meteo.py` | bricohams-meteo · EA5KAO · BricoHams |
 | `bricohams-mqtt-settings.py` | v4.2 · Tras importar un perfil (install.sh --importar), activa en settings.json el informe |
@@ -829,6 +831,7 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 | `bricohams-rak4631-lora-aprs.uf2` | Firmware iGate precompilado (UF2, arrastrar a la unidad del bootloader) |
 | `bricohams-rak4631-lora-aprs.zip` | Paquete DFU del firmware iGate (adafruit-nrfutil por USB serie, el que usa el instalador) |
 | `SHA256SUMS` | Sumas SHA-256 de los binarios del firmware iGate |
+| `VERSION.json` | Datos JSON: VERSION |
 
 ### `firmware/rak4631-lora-aprs/test/`
 
@@ -1049,6 +1052,12 @@ Caja v3 en dos módulos (electrónica + potencia).
 | `potencia_tapon_pg.stl` | Pieza 3D lista para imprimir: potencia tapon pg |
 | `potencia_tejadillo.stl` | Pieza 3D lista para imprimir: potencia tejadillo |
 
+### `hardware/gcode/`
+
+| Fichero | Qué hace |
+|---|---|
+| `1004-1742-electronica_tapa_plate(01)_PETG_0.16_8h42m34s.gcode` | HEADER_BLOCK_START |
+
 ### `owrx-clone/`
 
 Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+.
@@ -1082,6 +1091,7 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_env_red.py` | v4.2 · Los dos fallos de la instalación real en la Pi de EA5KAO |
 | `test_fan.py` | Curva de los ventiladores de la caja (bricohams-fan). |
 | `test_ft2.py` | v4 (experimental): FT2 en OpenWebRX+. |
+| `test_git_sanear.py` | v5.1 · tools/git_sanear.sh y tools/datos_personales.py (manual 38). |
 | `test_instalador_docker.py` | Verifica backend Docker de OpenWebRX+ sin requerir un daemon Docker. |
 | `test_instalador_os.py` | v3.1: el instalador vale para Trixie (Debian 13) y Bookworm (Debian 12). |
 | `test_instalador_perfil.py` | v4.2 · owrx-clone dentro del instalador BricoHams |
@@ -1103,6 +1113,8 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_ssl_admin.py` | v4.2 · SSL_MODO (decisión de EA5KAO: «el certificado SSL es solo para la página de settings»). |
 | `test_v3_hardware.py` | v3: comprueba las piezas de antenas y de la caja v3 (selector en el .scad, |
 | `test_v45_dispositivos.py` | v4.5 · inventario de dispositivos con un /sys de mentira (SDR por su serie, RAK4631, LilyGO, lo que falta |
+| `test_v51_aprs_web.py` | v5.1 · Interfaz web del APRS: la pasarela del RAK (bricohams-rak-aprs) con su API local |
+| `test_v51_mesh_puente.py` | v5.1 · bricohams-mesh-puente: interfaz web de Meshtastic para el LilyGO 433 por USB. |
 | `test_viento_lluvia.py` | Viento RS485 (Modbus RTU), pluviómetro y paquete APRS WX completo. |
 | `test_visitas.py` | v4: bricohams-visitas. IP parcial, GeoIP (simulada), avisos de Telegram con |
 | `test_wx_bme280.py` | Compensación BME280/BMP280 contra el ejemplo de la hoja de datos de Bosch |
@@ -1155,8 +1167,11 @@ Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilació
 | `canales.py` | v4: genera docs/CANALES_Y_FRECUENCIAS.md a partir de data/marcadores_v4.json y de |
 | `compilar_rak.sh` | Compila el firmware iGate para todas las placas (PlatformIO) y deja los binarios |
 | `datos.py` | Genera docs/DATOS.md a partir de los ficheros del repositorio |
+| `datos_personales.py` | tools/datos_personales.py · BricoHams SDR (v5.1, manual 38) |
+| `datos_personales_huellas.txt` | Huellas SHA-256 de datos personales que no deben ir al GitHub público (manual 38). |
 | `esquemas.py` | Genera los esquemas de docs/esquemas/ (SVG, y PNG si hay cairosvg). |
 | `estructura.py` | Genera docs/ESTRUCTURA_FICHEROS.md (este árbol con descripciones) |
+| `git_sanear.sh` | tools/git_sanear.sh · BricoHams SDR (v5.1, manual 38) |
 | `instalar_tak.sh` | Instala OpenTAKServer (venv, PostgreSQL, CA, usuarios con clave aleatoria en /etc/bricohams/tak-access.txt) |
 | `locator_catalogo.py` | v4.3 · Construye data/locator/catalogo_es.json, el catálogo nacional que usa el instalador |
 | `marcadores.py` | Genera y fusiona marcadores de OpenWebRX |

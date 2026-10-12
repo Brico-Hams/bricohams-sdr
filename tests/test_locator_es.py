@@ -70,8 +70,8 @@ for _ in range(500):
         assert loc.dentro_de_celda(l, lat, lon), (lat, lon, l)
         c = loc.locator_to_latlon(l)
         assert loc.latlon_to_locator(c[0], c[1], n) == l, (l, c)
-assert loc.latlon_to_locator(0.0, 0.0) == 'IM97kx' and loc.locator_to_latlon('IM98') == (38.5, -1.0)
-for nombre, (lat, lon), zona in (('Mi QTH', (0.0, 0.0), 'península'), ('Badajoz', (38.878, -6.970), 'península'),
+assert loc.latlon_to_locator(38.08, -1.26) == 'IM97kx' and loc.locator_to_latlon('IM98') == (38.5, -1.0)
+for nombre, (lat, lon), zona in (('Mi QTH', (38.08, -1.26), 'península'), ('Badajoz', (38.878, -6.970), 'península'),
                                  ('Palma', (39.57, 2.65), 'península'), ('Las Palmas', (28.12, -15.43), 'Canarias'),
                                  ('Ceuta', (35.889, -5.32), 'Ceuta'), ('Melilla', (35.292, -2.94), 'Melilla'),
                                  ('Lisboa', (38.72, -9.14), None), ('Porto', (41.15, -8.61), None), ('Andorra', (42.51, 1.52), None),
@@ -91,7 +91,7 @@ assert lc.canal_833('118.010')[0] == 118008333 and lc.canal_833('118.015')[0] ==
 assert subprocess.run([sys.executable, os.path.join(RAIZ, 'tools', 'locator_catalogo.py'), '--comprobar'], capture_output=True).returncode == 0
 
 # ------------------------------------------------------------------ 3. datos en línea (respuestas de prueba)
-QTH = (0.0, 0.0)
+QTH = (38.08, -1.26)
 FMDX = {'locations': {
     '101': {'lat': 38.0, 'lon': -1.2, 'name': 'Murcia/Carrascoy', 'itu': 'E', 'stations': [
         {'freq': 95.6, 'station': 'Onda Regional de Murcia', 'erp': 10, 'pi': 'E2A1'},
@@ -195,7 +195,7 @@ r = subprocess.run([sys.executable, cli, 'meteo'], capture_output=True, text=Tru
 assert r.stdout.startswith('0201D:'), r.stdout
 r = subprocess.run([sys.executable, cli, 'marcadores', 'IM75IV'], capture_output=True, text=True, env=e)
 assert 'GECE' in r.stdout and 'NAVTEX Tarifa' in r.stdout and '--aplicar' in r.stdout, r.stdout
-assert subprocess.run([sys.executable, cli, 'locator', '0.0', '0.0'], capture_output=True, text=True).stdout.strip() == 'IM97kx'
+assert subprocess.run([sys.executable, cli, 'locator', '38.08', '-1.26'], capture_output=True, text=True).stdout.strip() == 'IM97kx'
 assert subprocess.run([sys.executable, cli, 'coordenadas', 'IM98'], capture_output=True, text=True).stdout.strip() == '38.500000 -1.000000'
 shutil.rmtree(T)
 

@@ -120,15 +120,18 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | 8888/tcp | MediaMTX HLS | LAN |
 | 8554/tcp | MediaMTX RTSP `rtsp://<pi>:8554/mastil` | LAN |
 | 9997/tcp | MediaMTX API | 127.0.0.1 |
-| 8076/tcp | v4.5 · bricohams-mesh-admin (panel Meshtastic, detrás de nginx en /settings/bricohams/meshtastic, exige sesión de admin de OpenWebRX+) | 127.0.0.1 |
-| 8443/tcp | v4.5 · nginx: cliente web oficial de Meshtastic (proxy a 9443 con autenticación de sesión de /settings) | LAN (admin only) |
+| 9443/tcp | meshtasticd web (https) | 127.0.0.1 |
+| 8443/tcp | nginx: Meshtastic Web (solo admin) | LAN |
+| 8444/tcp | v5.1 · nginx: Meshtastic Web del LilyGO 433 (solo admin) | LAN |
+| 4404/tcp | v5.1 · bricohams-mesh-puente: API de Meshtastic del LilyGO 433 | 127.0.0.1 |
+| 4480/tcp | v5.1 · bricohams-mesh-puente: API HTTP del cliente web 433 | 127.0.0.1 |
+| 8077/tcp | v5.1 · bricohams-rak-aprs: API del panel APRS (mensajes, baliza) | 127.0.0.1 |
 | 8445/tcp | v4.6 · nginx: interfaz web de OpenTAKServer (usuario TAK) | LAN |
 | 8089/tcp | v4.6 · OpenTAKServer CoT TLS con certificado de cliente | LAN |
 | 8446/tcp | v4.6 · nginx: alta de certificados TAK (enrollment) | LAN |
 | 8447/tcp | v4.6 · nginx: Marti API TAK con certificado de cliente | LAN |
 | 8081/tcp | v4.6 · OpenTAKServer interno | 127.0.0.1 |
 | 5432, 5672/tcp | v4.6 · PostgreSQL y RabbitMQ de TAK (cortafuegos `bricohams-tak-fw`) | 127.0.0.1 |
-| 9443/tcp | meshtasticd web: **bloqueada por firewall** `bricohams-meshweb-fw` (nftables) desde todas las IPs excepto localhost | 127.0.0.1 |
 | 4403/tcp | meshtasticd API | LAN |
 | 30005/tcp | readsb salida Beast | local |
 | 30003, 30002, 30104/tcp | readsb SBS / raw / entrada Beast | local |

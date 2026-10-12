@@ -1,6 +1,6 @@
 # Despliegue en la estación de EA5KAO · 11/10/2026
 
-Informe de lo que se hizo en la Pi de OpenWebRX+ (`192.168.1.105`, usuario `pi`) para:
+Informe de lo que se hizo en la Pi de OpenWebRX+ (`192.168.1.50`, usuario `<usuario>`) para:
 - pasar el kit de v4.3 a v4.5;
 - grabar el RAK4631;
 - integrar Meshtastic y LoRa APRS con OpenWebRX+.
@@ -22,10 +22,10 @@ Todo se hizo por SSH. No se escribe ninguna clave en este documento.
 - Pruebas ejecutadas en la Pi: `tests/test_rak_aprs.py` (incluye la lógica del firmware compilada con g++) y `tests/test_mesh_admin.py`. **Pasan.**
 
 ## 2. Actualización del kit v4.3 → v4.5
-- Copia de seguridad del kit anterior: `/home/pi/bricohams-sdr.v43-backup-20261011-141629`.
-- Subido el kit v4.5 a `/home/pi/bricohams-sdr`, con los finales de línea CRLF quitados.
-- **Env:** se fusionó el `bricohams.env` de EA5KAO con el de la Pi. Se conservan las credenciales que ya había en el servidor (APRS-IS, Telegram, DuckDNS, contraseñas). Copias del env anterior en `/home/pi/bricohams-backups/`.
-- `sudo bash install.sh --actualizar`. El log está en `/home/pi/bricohams-backups/install-v45.log`.
+- Copia de seguridad del kit anterior: `/home/<usuario>/bricohams-sdr.v43-backup-20261011-141629`.
+- Subido el kit v4.5 a `/home/<usuario>/bricohams-sdr`, con los finales de línea CRLF quitados.
+- **Env:** se fusionó el `bricohams.env` de EA5KAO con el de la Pi. Se conservan las credenciales que ya había en el servidor (APRS-IS, Telegram, DuckDNS, contraseñas). Copias del env anterior en `/home/<usuario>/bricohams-backups/`.
+- `sudo bash install.sh --actualizar`. El log está en `/home/<usuario>/bricohams-backups/install-v45.log`.
 
 ## 3. Meshtastic solo en /settings (ADR-53)
 - Nuevo servicio **`bricohams-mesh-admin`** (127.0.0.1:8076). nginx lo publica en `/settings/bricohams/meshtastic`:
@@ -36,14 +36,14 @@ Todo se hizo por SSH. No se escribe ninguna clave en este documento.
 - Botones **«Meshtastic 433 / 868»** y **«APRS (RAK)»** en la página de Ajustes de OpenWebRX+.
 
 ### Corrección: el botón no salía en Ajustes
-- Al principio el botón se metía con un `sub_filter` de nginx. EA5KAO entra **directo a `http://192.168.1.105:8073`**, que no pasa por nginx, así que no lo veía. En los logs de nginx solo había mis peticiones.
+- Al principio el botón se metía con un `sub_filter` de nginx. EA5KAO entra **directo a `http://192.168.1.50:8073`**, que no pasa por nginx, así que no lo veía. En los logs de nginx solo había mis peticiones.
 - Ahora `bricohams-owrx-botones` lo pone en la propia plantilla `/usr/lib/python3/dist-packages/htdocs/settings.html`:
   - es idempotente, con marcas `<!-- bricohams-botones -->`;
   - OpenWebRX+ lee la plantilla en cada petición, así que no hace falta reiniciarlo;
   - entrando por :8073, los enlaces pasan a `https://IP/settings/bricohams/…`.
 - Gancho `/etc/apt/apt.conf.d/99bricohams-owrx-botones`: lo vuelve a aplicar después de cada apt. Se quita el `sub_filter` de nginx.
 - Nueva página **«APRS (RAK)»** (`/settings/bricohams/aprs`): estado del RAK, registro de paquetes oídos y reinicio de la pasarela. Sin sesión → `/login` (comprobado: 302).
-- **Seguridad:** había una IP externa (79.117.7.56) conectada directa a :8073. El router parece reenviar 8073 a internet, y ahí la contraseña de admin viaja **sin cifrar**. Recomendado: cerrar ese reenvío y publicar solo 80/443 (nginx, HTTPS).
+- **Seguridad:** había una IP externa conectada directa a :8073. El router parece reenviar 8073 a internet, y ahí la contraseña de admin viaja **sin cifrar**. Recomendado: cerrar ese reenvío y publicar solo 80/443 (nginx, HTTPS).
 
 ### LED rojo del RAK
 Es el LED de carga (CHG) de la base RAK19007, que va por hardware y está fijo con USB sin batería. El firmware solo maneja el verde (RX) y el azul (TX) (`board_pinout.h`). El RAK funciona: EA5KAO-15, radio ok en 433,775, paquetes oídos y subidos a APRS-IS.
@@ -63,7 +63,7 @@ Es el LED de carga (CHG) de la base RAK19007, que va por hardware y está fijo c
 | accesos indebidos | 403 |
 
 ## 4. RAK4631: de RUI3 a WisBlock y firmware BricoHams
-El RAK venía con **RUI3** de fábrica (USB `1915:521f`). Su bootloader no admite el `.zip` de Adafruit. Con autorización de EA5KAO se cambió el bootloader. Paquetes y logs en `/home/pi/bricohams-backups/rak-bootloader/`.
+El RAK venía con **RUI3** de fábrica (USB `1915:521f`). Su bootloader no admite el `.zip` de Adafruit. Con autorización de EA5KAO se cambió el bootloader. Paquetes y logs en `/home/<usuario>/bricohams-backups/rak-bootloader/`.
 
 1. Bajados de RAKwireless (`downloads.rakwireless.com/RUI/RUI3/Bootloader Upgrade/`): `rak4631_factory_bootloader.zip`, `rak4631_factory_softdevice.zip` y `rak4631_factory_application.zip`. Sus SHA256 están en `SHA256SUMS.rak`.
 2. Instalado **nrfutil 6.1.7** de Nordic en `/opt/bricohams/nrfutil-venv`:

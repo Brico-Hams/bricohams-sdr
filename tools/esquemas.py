@@ -247,6 +247,7 @@ def red():
             ('8888/tcp', 'MediaMTX HLS', 'solo LAN', C['cam']),
             ('8554/tcp', 'MediaMTX RTSP (rtsp://<pi>:8554/mastil)', 'solo LAN', C['cam']),
             ('8443/tcp', 'Meshtastic Web (sesión admin)', 'solo LAN', C['lora']),
+            ('8444/tcp', 'Meshtastic Web 433 · LilyGO (admin)', 'solo LAN', C['lora']),
             ('4403/tcp', 'meshtasticd: API (CLI, apps)', 'solo LAN', C['lora']),
             ('30005/tcp', 'readsb: salida Beast (rbfeeder)', 'local', C['sdr']),
             ('2947/tcp', 'gpsd', 'local', C['gps']),
@@ -686,7 +687,7 @@ def red_servicios():
     b += arrow(600, 675, 760, 675, C['pi'])
     b += txt(40, 780, '• Desde casa sigue funcionando http://IP:8073 sin nginx (la ficha DMR/YSF y el portal necesitan nginx).', 11.2)
     b += txt(40, 828, '• v4.2: el certificado protege la administración; SSL_MODO=todo pone todo en HTTPS y SSL_MODO=no lo quita (solo LAN).', 11.2)
-    b += txt(40, 804, '• Solo LAN: Meshtastic Web https://IP:8443 (admin), API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
+    b += txt(40, 804, '• Solo LAN: Meshtastic Web https://IP:8443 y :8444 (admin), API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
     return svg(W, H, b, 'Servicios web, SSL (solo administración), visitas y tareas automáticas')
 
 
@@ -923,8 +924,8 @@ def blindaje():
     b += txt(350, 320, '(!) /login por 8073 va', 10.5, C['cr']) + txt(350, 338, 'sin cifrar: ciérralo', 10.5, C['cr'])
     b += arrow(280, 240, 330, 240, C['cr'])
     b += arrow(560, 240, 610, 240, C['ink'])
-    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · 192.168.1.105', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
-    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8554 · resto: descartado y registrado', C['or']),
+    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · IP fija de la LAN', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
+    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8444, 8554 · resto: descartado y registrado', C['or']),
              ('nginx', '/settings → HTTPS · /login 12/min (429) · sin versión · X-Frame · ocultos 404', C['net']),
              ('SSH', 'solo LAN · sin root · 3 intentos · solo clave si la hay · fail2ban', C['pi']),
              ('Claves', 'bricohams.env 600 · .env 640 · copias 700 · users.json 600 · fugas: buscadas', C['cr']),
@@ -935,7 +936,7 @@ def blindaje():
         b += caja_s(630, y, 820, 70, t, d, c, '#ffffff')
     b += caja_s(30, 430, 530, 260, 'Procedimiento (manual 34)', '', C['ink'], '#fafafa', arriba=True)
     for k, t in enumerate(['1  sudo bash install.sh --actualizar', '2  sudo bricohams-blindaje auditar   (no cambia nada)',
-                           '3  ssh-copy-id pi@192.168.1.105', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
+                           '3  ssh-copy-id usuario@IP-de-la-Pi', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
                            '6  sudo bricohams-blindaje confirmar  (si no, 3 min y se quita)', '7  sudo bricohams-blindaje auditar']):
         b += txt(50, 485 + k * 28, t, 11)
     b += txt(30, 760, 'La auditoría nunca enseña una clave: solo la variable y el fichero donde aparece. bricohams-check muestra el resumen cada 30 min.', 11)

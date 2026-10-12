@@ -675,7 +675,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **El cortafuegos** se carga con un temporizador de vuelta atrás de 3 minutos (`systemd-run`) y solo se hace permanente con `confirmar`.
   - **nginx (kit):** `server_tokens off`, `limit_req` de 12/min en `/login` y `/pwchange` (regex, para que en `SSL_MODO=admin` gane la redirección a HTTPS), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos 404.
 - **Por qué:**
-  - **Sin acceso remoto a la Pi:** EA5KAO pidió revisar y blindar el servidor (192.168.1.105, `sdr.ea5kao.ampr.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
+  - **Sin acceso remoto a la Pi:** EA5KAO pidió revisar y blindar el servidor (`sdr.ea5kao.ampr.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
   - **Herramienta para la Pi:** él la ejecuta en la Pi, se puede repetir y queda en el kit para cualquier estación.
   - **Lo visto desde fuera** (`/status.json`) confirmó una fuga real: la posición exacta de la casa (ADR-48).
   - **Contraseña solo con claves:** quitar la contraseña de SSH sin una clave instalada deja a la gente fuera.
@@ -693,7 +693,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `OWRX_GPS_DECIMALES="2"` (por defecto) redondea `receiver_gps` en `settings.json` (mapa, `/status.json`, directorios de receptores).
   - `meteo.json`, `pases.json` e `init.js` (todos públicos) llevan siempre 2 decimales.
   - `STATION_LAT/LON` siguen exactas para los cálculos (distancias AEMET, pases, Open-Meteo) y el APRS.
-- **Por qué:** `https://sdr.ea5kao.ampr.org/status.json` publicaba 0.0, 0.0, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
+- **Por qué:** `https://sdr.ea5kao.ampr.org/status.json` publicaba la posición con 6 decimales, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
 - **Implica:**
   - **El APRS WX sigue publicando su posición:** el protocolo lo exige; queda a elección del operador.
   - **Volver a publicar la posición exacta:** `"exacta"`.
@@ -713,7 +713,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
 13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
 14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.
-15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real** (192.168.1.105): comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña de `pi` (salió en un chat).
+15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real**: comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña del usuario de la Pi (salió en un chat).
 16. **v4:**
     - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
     - **Token y chat de Telegram.**
@@ -914,3 +914,81 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - Reejecutar el paso es idempotente y no destruye nada del operador.
 - Los exportadores ajenos que escuchen en `0.0.0.0` se limitan a localhost con `IPAddressDeny`/`IPAddressAllow` en lugar de tocar su código.
 - Si el operador cambia la clave dentro de Grafana, la próxima ejecución la vuelve a fijar a la del `.env`/fichero: hay que rotarla por `GRAFANA_ADMIN_PASS`.
+
+## ADR-65 · Repositorio público sin datos personales, comprobado por huellas (v5.1)
+**Contexto:** el GitHub del kit es público. El diagnóstico del 12/10/2026 encontró en el historial, en el árbol y en los `.zip` de `Claude outputs/` estos datos:
+- la red de casa;
+- el usuario del sistema de la Pi;
+- la posición exacta;
+- los SSID de las WiFi;
+- la IP de un visitante.
+
+No había contraseñas, passcodes ni PSK. Además, la carpeta del PC estaba dentro de una carpeta sincronizada en la nube (formato de conflictos de Proton Drive), que rompía `.git`. Y en la web de GitHub se había borrado `.gitignore`.
+**Decisión:**
+- Árbol despersonalizado:
+  - ejemplos con `192.168.1.50` y `<usuario>`;
+  - coordenadas de ejemplo con 2 decimales;
+  - sin IP de terceros.
+- `tools/datos_personales.py` busca de dos formas y nunca imprime un valor:
+  - **huellas SHA-256** de los datos a esconder (`tools/datos_personales_huellas.txt`), para que la lista no publique lo que protege;
+  - si hay un `bricohams.env` personal, sus claves, PSK de Meshtastic, coordenadas y `DATOS_PERSONALES`.
+  - Se puede pasar al árbol, al historial y a un zip; `run_tests.sh` lo pasa siempre.
+- `tools/git_sanear.sh` diagnostica y, con `--reparar`, aparta (sin borrar) las copias de conflicto, las refs rotas y los `.lock` viejos, y hace `fetch --prune`.
+- `.gitignore` ampliado:
+  - `*.env` salvo el ejemplo;
+  - claves `*.key`/`*.pem`;
+  - copias de conflicto de la nube;
+  - `firmware-compilado/` (322 MB, va como Release).
+- Reescribir el historial queda como decisión del usuario (manual 38 §6): cambia todos los hashes.
+**Consecuencias:**
+- Un `push` con datos personales falla en las pruebas antes de llegar a GitHub.
+- El historial antiguo sigue público hasta que el usuario decida limpiarlo.
+- El indicativo, el dominio y el locator se consideran públicos y se quedan.
+
+## ADR-66 · Un único dueño del USB del LilyGO 433: puente serie con API TCP y HTTP (v5.1)
+**Contexto:** se pidió la interfaz web de Meshtastic también para el nodo 433.
+- El LilyGO T3 de la estación solo habla por USB, y un puerto serie lo abre un único programa. Hasta ahora era `bricohams-mesh-owrx` (mapa), y el panel lo paraba para configurar.
+- El cliente web oficial necesita la API HTTP del firmware (`/api/v1/toradio`, `/api/v1/fromradio`), que en un nodo sin WiFi no existe.
+**Decisión:**
+- `bricohams-mesh-puente` es el único que abre `/dev/lilygo-mesh`. Reparte las tramas serie de Meshtastic (`0x94 0xC3 len`):
+  - a la **API stream** en `127.0.0.1:4404`, el mismo protocolo que meshtasticd en 4403. La usan el mapa, el panel y la CLI con `--host 127.0.0.1:4404`, cada uno con su `want_config_id`;
+  - a la **API HTTP** en `127.0.0.1:4480`, con su propia cola que solo se llena mientras la web mira.
+- nginx sirve el cliente oficial `meshtastic/web` (v2.7.2, SHA-256 fijado) en `:8444` con `auth_request` a la sesión de `/settings`, igual que el 868 en `:8443`.
+- El servicio va sin root, con `DynamicUser`, `IPAddressAllow=localhost` y el env como credencial; solo lee `MESH433_*`.
+- `MESH433_WEB="no"` deja todo como en v4.5.
+**Consecuencias:**
+- Mapa, panel y web funcionan a la vez sin pararse unos a otros. `bricohams-lilygo` para el puente solo mientras graba.
+- Probado con la librería oficial: dos `TCPInterface` simultáneas sobre un nodo falso reciben su configuración completa.
+- Un fallo del puente deja sin 433 a los tres consumidores: lo vigilan systemd (`Restart=always`) y `bricohams-check`.
+
+## ADR-67 · Panel APRS con mensajes y baliza por una API local de la pasarela (v5.1)
+**Contexto:** se pidió una interfaz web del APRS.
+- v5.0 ya tenía `/settings/bricohams/aprs`, en solo lectura y leyendo `/run/bricohams-rak/rak-aprs.json`.
+- Mandar mensajes o balizas exige hablar con el proceso que tiene el puerto serie y la conexión APRS-IS.
+**Decisión:**
+- `bricohams-rak-aprs` se reorganiza en una clase `Pasarela`:
+  - el bucle principal es el único que toca el serie y APRS-IS;
+  - un hilo HTTP en `127.0.0.1:8077` (`RAK_API_PUERTO`) da `GET /estado` (completo, sin passcode) y `POST /baliza`;
+  - `POST /mensaje` valida el indicativo y 1-67 caracteres, y deja órdenes en una cola.
+- Los mensajes para el indicativo del RAK se registran y se contestan con `ack`. Los `ack` recibidos marcan los enviados.
+- La página de `bricohams-mesh-admin` usa esa API con la misma sesión y CSRF de los demás paneles. Si la API no contesta, vuelve al JSON de `/run`.
+- Se integró con lo que v5.0 añadió a la pasarela: chat APRS en OpenWebRX+, APRS-IS en el mapa, `json_rak` tolerante a `nan` y detección de RUI3.
+**Consecuencias:**
+- Nada nuevo escucha fuera de la Pi.
+- Enviar por RF sigue requiriendo `RAK_TX="yes"` (licencia).
+- La pasarela es algo más compleja, pero queda probada sin hardware (`tests/test_v51_aprs_web.py`).
+
+## ADR-68 · Digipeater automático y puesta en marcha guiada del RAK (v5.1)
+**Contexto:**
+- Pendientes de la estación: «`RAK_DIGI="1"` cuando se apague el LilyGO iGate», la versión del bootloader del RAK, el fix del GPS dentro de la caja y grabarlo y probarlo en real.
+- Además, el firmware 1.0.0 llegó a mandar `nan` en su JSON.
+**Decisión:**
+- `RAK_DIGI="auto"`: el RAK repite (modo `RAK_DIGI_AUTO_MODO`) solo si `RAK_DIGI_OTRO` lleva `RAK_DIGI_AUTO_MIN` minutos sin oírse por RF, ya sea un paquete suyo o uno repetido por él. Al arrancar espera ese tiempo antes de decidir.
+- Nuevas órdenes de `bricohams-rak-aprs`:
+  - `bootloader`: modo UF2, lee `INFO_UF2.TXT` y sale grabando el `.uf2`;
+  - `gps [min]`: espera al fix e informa de los satélites;
+  - `puesta-en-marcha`: graba solo si la versión difiere de `bin/VERSION.json`, nombres fijos, prueba, bootloader y GPS, con resumen en `/var/lib/bricohams` que enseña el panel.
+- Firmware 1.0.1: nunca `nan`/`inf` en el JSON de estado.
+**Consecuencias:**
+- Sin duplicados en aprs.fi cuando funcionan los dos iGates, y sin hueco cuando el LilyGO cae.
+- La primera `puesta-en-marcha` regraba los RAK que llevan 1.0.0.

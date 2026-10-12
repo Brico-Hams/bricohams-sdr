@@ -31,6 +31,9 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 | 8075 | `bricohams-api` (indicativos, aviones) | 127.0.0.1 |
 | 8076 | `bricohams-mesh-admin` (paneles `/settings/bricohams/` y `auth_request`) | 127.0.0.1 |
 | 8443 | nginx → cliente web de Meshtastic (solo admin) | LAN |
+| 8444 | v5.1 · nginx → cliente web de Meshtastic del LilyGO 433 (solo admin) | LAN |
+| 4404 / 4480 | v5.1 · `bricohams-mesh-puente`: API de Meshtastic y API HTTP del LilyGO 433 | 127.0.0.1 |
+| 8077 | v5.1 · `bricohams-rak-aprs`: API del panel APRS (mensajes, baliza, estado) | 127.0.0.1 |
 | 9443 | Webserver de `meshtasticd` (sin contraseña) | solo la Pi (`bricohams-meshweb-fw`) |
 | 4403 | API TCP de `meshtasticd` | LAN |
 | 1883 | Mosquitto (MQTT interno) | 127.0.0.1 |

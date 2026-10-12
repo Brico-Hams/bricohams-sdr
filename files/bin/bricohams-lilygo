@@ -90,9 +90,17 @@ meshtastic_cli() {
 
 # v4.5 · el puerto serie es de uno solo: el servicio del mapa de OpenWebRX+ lo suelta mientras tanto
 soltar_puerto() {
-    if systemctl is-active --quiet bricohams-mesh-owrx 2>/dev/null; then
-        systemctl stop bricohams-mesh-owrx
-        trap 'systemctl start bricohams-mesh-owrx 2>/dev/null || true' EXIT
+    # v5.1 · también el puente de la web de Meshtastic 433 (bricohams-mesh-puente), que tiene el puerto serie
+    local u parados=""
+    for u in bricohams-mesh-owrx bricohams-mesh-puente; do
+        if systemctl is-active --quiet "$u" 2>/dev/null; then
+            systemctl stop "$u"
+            parados="$parados $u"
+        fi
+    done
+    if [ -n "$parados" ]; then
+        # shellcheck disable=SC2064   # se expande ahora a propósito: la lista de lo parado
+        trap "systemctl start$parados 2>/dev/null || true" EXIT
         sleep 2
     fi
 }

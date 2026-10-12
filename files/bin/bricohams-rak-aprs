@@ -20,6 +20,10 @@
 #        bricohams-rak-aprs config            (lo que se le mandaría al RAK, sin claves)
 #        bricohams-rak-aprs baliza            (pide una baliza ya)
 #        bricohams-rak-aprs grabar [paquete.zip] (graba el firmware por DFU serie)
+#        bricohams-rak-aprs gps [minutos]     (espera al fix del GPS y dice cuántos satélites ve)
+#        bricohams-rak-aprs bootloader        (versión del bootloader por UF2; sale grabando el .uf2)
+#        bricohams-rak-aprs puesta-en-marcha  (todo: grabar si hace falta, nombres, prueba, bootloader, GPS)
+#  Panel web (v5.1): https://<estación>/settings/bricohams/aprs (solo admin; API local 127.0.0.1:8077).
 # =====================================================================
 import json
 import os
@@ -520,148 +524,414 @@ def sincronizar_config(ser, lector):
     return 'actualizada (%s): %s' % (', '.join(malas), r or 'sin respuesta')
 
 
+
+# ------------------------------------------------------------------ digipeater automático (v4.5.1)
+def digi_auto(ahora, inicio, ultimo_visto, minutos=60, modo=1):
+    """RAK_DIGI="auto": el RAK solo hace de digipeater si el otro iGate de la estación (RAK_DIGI_OTRO, el
+    LilyGO EA5KAO-10) lleva «minutos» sin oírse por RF. Al arrancar se espera ese tiempo antes de decidir."""
+    if ahora - inicio < minutos * 60:
+        return 0
+    return modo if ahora - ultimo_visto >= minutos * 60 else 0
+
+
+def visto_en(tnc2, call):
+    """El paquete es de «call» o lo ha repetido «call» (call* en la ruta)."""
+    if not call or '>' not in tnc2 or ':' not in tnc2:
+        return False
+    cab = tnc2.split(':', 1)[0]
+    src, resto = cab.split('>', 1)
+    return src == call or (call + '*') in resto.split(',')[1:]
+
+
+# ------------------------------------------------------------------ mensajes APRS (panel web)
+def mensaje_para(info, call):
+    """(texto, id) si el campo de información es un mensaje para «call»; si no, None."""
+    if len(info) < 11 or info[0] != ':' or info[10] != ':' or info[1:10].strip().upper() != call:
+        return None
+    texto = info[11:]
+    mid = None
+    if '{' in texto:
+        texto, mid = texto.rsplit('{', 1)
+        mid = mid.split('}')[0][:5] or None
+    return texto, mid
+
+
+def linea_mensaje(a, texto, mid=None):
+    texto = re.sub(r'[|~{]', '', texto)[:67]
+    return ':%-9s:%s%s' % (a.upper()[:9], texto, ('{%s' % mid) if mid else '')
+
+
+# ------------------------------------------------------------------ servicio
+class Pasarela:
+    """Todo el estado del servicio; el bucle principal es el único que toca el puerto serie y APRS-IS.
+    El panel web (hilo HTTP) solo lee el estado y deja órdenes en una cola."""
+
+    def __init__(self):
+        import queue
+        import threading
+        self.igate = indicativo()
+        self.decimales = int(num('OWRX_GPS_DECIMALES', 2, int)) if env('OWRX_GPS_DECIMALES', '2').isdigit() else 6
+        self.aprsis = APRSIS(env('RAK_APRSIS_SERVER', env('IGATE_APRSIS_SERVER', 'euro.aprs2.net')),
+                             int(num('RAK_APRSIS_PORT', 14580, int)), self.igate,
+                             env('APRS_PASSCODE') if si('RAK_APRSIS', 'yes') else '', env('RAK_APRSIS_FILTRO', 'm/10'))
+        self.tx = si('RAK_TX', 'no')
+        self.a_rf = self.tx and si('RAK_MENSAJES_RF', 'yes')
+        self.recordar = int(num('RAK_RECORDAR_MIN', 30, int)) * 60
+        self.ruta1 = env('RAK_PATH', 'WIDE1-1').split(',')[0]
+        self.mqtt = None
+        self.mapa_activo, self.chat_activo = si('OWRX_MAPA_LORA', 'yes'), si('RAK_OWRX_CHAT', 'yes')
+        if not Publicador and (self.mapa_activo or self.chat_activo):
+            print('rak: falta bricohams_mqtt; mapa y chat no disponibles', file=sys.stderr, flush=True)
+        if Publicador and (self.mapa_activo or self.chat_activo):
+            h, _, pt = env('BRICOHAMS_MQTT', '127.0.0.1:1883').partition(':')
+            self.mqtt = Publicador(h, int(pt or 1883), 'bricohams-rak-aprs')
+        self.chat = ChatAPRS(self.mqtt) if self.mqtt and self.chat_activo else None
+        self.cola = queue.Queue()
+        self.lock = threading.Lock()
+        self.oidas, self.enviados_rf, self.vistos = {}, {}, {}
+        self.oidos, self.posiciones, self.mensajes = [], {}, []
+        self.estado_rak, self.meta = {}, {}
+        self.inicio = time.time()
+        self.digi_modo = env('RAK_DIGI', '0').strip().lower()
+        self.digi_otro = env('RAK_DIGI_OTRO', env('IGATE_CALLSIGN', '')).upper()
+        self.digi_min = int(num('RAK_DIGI_AUTO_MIN', 60, int))
+        self.otro_visto = 0.0
+        self.digi_actual = None
+        self.n_msg = int(time.time()) % 1000
+        self.ser = None
+
+    # --- configuración (con el digipeater automático)
+    def digi_deseado(self):
+        if self.digi_modo == 'auto':
+            if not self.tx:
+                return 0
+            return digi_auto(time.time(), self.inicio, self.otro_visto, self.digi_min,
+                             int(num('RAK_DIGI_AUTO_MODO', 1, int)))
+        return int(num('RAK_DIGI', 0, int))
+
+    def config(self):
+        c = config_deseada()
+        c['digi'] = self.digi_deseado()
+        return c
+
+    def sincronizar(self, lector):
+        deseada = self.config()
+        orden(self.ser, 'BH:CONF?')
+        actual = esperar_hw(self.ser, lector, 'BH:CONF')
+        try:
+            actual = json_rak(actual) if actual else {}
+        except ValueError:
+            actual = {}
+        malas = difiere(actual, deseada)
+        self.digi_actual = deseada['digi']
+        if not malas:
+            return 'al día'
+        orden(self.ser, 'BH:CFG ' + json.dumps(deseada, separators=(',', ':')))
+        r = esperar_hw(self.ser, lector, 'BH:CFG', 8)
+        return 'actualizada (%s): %s' % (', '.join(malas), r or 'sin respuesta')
+
+    # --- salida
+    def transmitir(self, tnc2):
+        if self.tx and self.ser:
+            self.ser.write(kiss_frame(CMD_DATA, tnc2_a_ax25(tnc2)))
+            return True
+        return False
+
+    def enviar_mensaje(self, a, texto, mid=None, apunte=True):
+        if mid is None:
+            self.n_msg = self.n_msg % 999 + 1
+            mid = str(self.n_msg)
+        linea = linea_mensaje(a, texto, mid if mid != '-' else None)
+        via = []
+        if self.transmitir('%s>%s,%s:%s' % (self.igate, TOCALL, self.ruta1, linea)):
+            via.append('RF')
+        if self.aprsis.enviar('%s>%s,TCPIP*:%s' % (self.igate, TOCALL, linea)):
+            via.append('APRS-IS')
+        if apunte:
+            with self.lock:
+                self.mensajes.insert(0, {'hora': time.strftime('%H:%M:%S'), 'de': self.igate, 'a': a.upper(),
+                                         'texto': texto, 'id': mid, 'via': '+'.join(via) or 'sin salida',
+                                         'ack': False})
+                del self.mensajes[50:]
+        return via
+
+    def recibir_mensaje(self, src, info, via):
+        m = mensaje_para(info, self.igate)
+        if not m:
+            return
+        texto, mid = m
+        if texto.startswith('ack') or texto.startswith('rej'):
+            with self.lock:
+                for x in self.mensajes:
+                    if x['de'] == self.igate and x['a'] == src and x['id'] == texto[3:]:
+                        x['ack'] = texto.startswith('ack')
+            return
+        with self.lock:
+            self.mensajes.insert(0, {'hora': time.strftime('%H:%M:%S'), 'de': src, 'a': self.igate, 'texto': texto,
+                                     'id': mid, 'via': via})
+            del self.mensajes[50:]
+        if mid:
+            self.enviar_mensaje(src, 'ack' + mid, '-', apunte=False)
+
+    # --- entrada
+    def de_aprsis(self, ahora):
+        for l in self.aprsis.lineas():
+            if l.startswith('#') or ':' not in l or '>' not in l:
+                continue
+            src = l.split('>', 1)[0]
+            info = l.split(':', 1)[1]
+            if self.chat:
+                self.chat.recibir(l, ahora)
+            if self.mqtt and self.mapa_activo:
+                m = aprs_mapa(l, origen='APRS-IS')
+                if m and not self.mqtt.publicar('aprsis/APRS', m):
+                    print('aprs-is mapa: broker MQTT no disponible', flush=True)
+            self.recibir_mensaje(src, info, 'APRS-IS')
+            p = mensaje_a_rf(l, self.igate, self.oidas, ahora, self.recordar, self.ruta1) if self.a_rf else None
+            if p and ahora - self.enviados_rf.get(info, 0) > 300 and self.tx:
+                self.enviados_rf[info] = ahora
+                self.transmitir(p)
+                print('aprs-is -> rf: %s' % p, flush=True)
+        self.enviados_rf = {k: v for k, v in self.enviados_rf.items() if ahora - v < 600}
+
+    def de_rak(self, cmd, datos):
+        if cmd & 0x0F == CMD_HW:
+            t = datos.decode('utf-8', 'replace')
+            if t.startswith('BH:STATUS '):
+                try:
+                    self.estado_rak = json_rak(t[10:])
+                except ValueError:
+                    pass
+            elif t.startswith('BH:RX '):
+                try:
+                    self.meta = json_rak(t[6:])
+                except ValueError:
+                    self.meta = {}
+            elif t.startswith('BH:LOG '):
+                print('rak: ' + t[7:], flush=True)
+            return
+        if cmd & 0x0F != CMD_DATA:
+            return
+        try:
+            tnc2 = ax25_a_tnc2(datos)
+        except ValueError:
+            return
+        ahora = time.time()
+        src = tnc2.split('>', 1)[0]
+        propio = src == self.igate
+        if visto_en(tnc2, self.digi_otro):
+            self.otro_visto = ahora
+        linea = para_aprsis(tnc2, propio, self.igate)
+        clave = src + tnc2.split(':', 1)[1]
+        if self.chat:
+            self.chat.recibir(tnc2, ahora)
+        self.vistos = {k: v for k, v in self.vistos.items() if ahora - v < 30}
+        subido = False
+        if linea and clave not in self.vistos:
+            self.vistos[clave] = ahora
+            subido = self.aprsis.enviar(linea)
+        if not propio:
+            if ':}' not in tnc2:
+                self.oidas[src] = ahora
+            m = aprs_mapa(tnc2, self.meta)
+            en_mapa = bool(m) and bool(self.mqtt) and self.mapa_activo and self.mqtt.publicar('lora433/APRS', m)
+            with self.lock:
+                if m:
+                    self.posiciones[m.get('object') or src] = {
+                        'lat': m['lat'], 'lon': m['lon'], 'simbolo': (m.get('symbol') or {}).get('symbol', '/'),
+                        'tabla': (m.get('symbol') or {}).get('table', '/'), 'comentario': m.get('comment', '')[:120],
+                        'hora': time.strftime('%H:%M:%S'), 't': ahora}
+                    if len(self.posiciones) > 150:
+                        del self.posiciones[min(self.posiciones, key=lambda k: self.posiciones[k]['t'])]
+                self.oidos.insert(0, {'mapa': en_mapa, 'hora': time.strftime('%H:%M:%S'), 'de': src,
+                                      'rssi': self.meta.get('rssi'), 'snr': self.meta.get('snr'), 'aprsis': subido,
+                                      'paquete': tnc2[:160]})
+                del self.oidos[50:]
+            self.recibir_mensaje(src, tnc2.split(':', 1)[1], 'RF')
+            print('rf: %s%s' % (tnc2, '  -> APRS-IS' if subido else ''), flush=True)
+        self.meta = {}
+
+    def ordenes(self):
+        import queue
+        while True:
+            try:
+                o = self.cola.get_nowait()
+            except queue.Empty:
+                return
+            if o[0] == 'baliza' and self.ser:
+                orden(self.ser, 'BH:BEACON')
+            elif o[0] == 'mensaje':
+                self.enviar_mensaje(o[1], o[2])
+
+    # --- estado
+    def estado(self, publico=True):
+        with self.lock:
+            e = {'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S'), 'puerto': getattr(self.ser, 'port', None),
+                 'indicativo': self.igate,
+                 'rak': resumir_status(self.estado_rak, self.decimales), 't_caja': (self.estado_rak or {}).get('t'),
+                 'aprsis': {'conectado': self.aprsis.sock is not None, 'enviados': self.aprsis.enviados,
+                            'activo': self.aprsis.activo(), 'mensajes_a_rf': self.a_rf},
+                 'mapa_owrx': {'activo': self.mqtt is not None and self.mapa_activo, 'chat': self.chat is not None,
+                               'publicados': self.mqtt.enviados if self.mqtt else 0},
+                 'digi': {'modo': self.digi_modo, 'actual': self.digi_actual, 'otro': self.digi_otro,
+                          'otro_oido': time.strftime('%H:%M:%S', time.localtime(self.otro_visto)) if self.otro_visto else None},
+                 'tx': self.tx, 'oidos': list(self.oidos[:30])}
+            if not publico:
+                e.update({'posiciones': dict(self.posiciones), 'mensajes': list(self.mensajes),
+                          'oidos': list(self.oidos), 'config': self.config()})
+        return e
+
+
+class _Api:
+    """Panel web del iGate (manual 35): GET /estado · POST /baliza · POST /mensaje {"a", "texto"}.
+    Solo escucha en 127.0.0.1; la usa bricohams-mesh-admin en /settings/bricohams/aprs (sesión de admin)."""
+
+    @staticmethod
+    def arrancar(pasarela, puerto):
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        class H(BaseHTTPRequestHandler):
+            def _json(self, codigo, datos):
+                b = json.dumps(datos, ensure_ascii=False).encode()
+                self.send_response(codigo)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('Content-Length', str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+
+            def do_GET(self):
+                if self.path.split('?')[0].rstrip('/') in ('/estado', ''):
+                    return self._json(200, pasarela.estado(publico=False))
+                self._json(404, {'error': 'no existe'})
+
+            def do_POST(self):
+                ruta = self.path.split('?')[0].rstrip('/')
+                try:
+                    n = min(int(self.headers.get('Content-Length') or 0), 4096)
+                    d = json.loads(self.rfile.read(n) or b'{}')
+                except ValueError:
+                    return self._json(400, {'error': 'JSON no válido'})
+                if ruta == '/baliza':
+                    pasarela.cola.put(('baliza',))
+                    return self._json(200, {'ok': True})
+                if ruta == '/mensaje':
+                    a, texto = str(d.get('a', '')).strip().upper(), str(d.get('texto', '')).strip()
+                    if not re.match(r'^[A-Z0-9]{3,6}(-[0-9A-Z]{1,2})?$', a) or not texto:
+                        return self._json(400, {'error': 'indicativo o texto no válidos'})
+                    pasarela.cola.put(('mensaje', a, texto[:67]))
+                    return self._json(200, {'ok': True})
+                self._json(404, {'error': 'no existe'})
+
+            def log_message(self, *_):
+                pass
+
+        srv = ThreadingHTTPServer(('127.0.0.1', puerto), H)
+        threading.Thread(target=srv.serve_forever, daemon=True, name='api-aprs').start()
+        return srv
+
+
 def servicio():
     cargar_env()
     if not si('RAK_ENABLE', 'yes'):
         print('RAK_ENABLE=no: nada que hacer', flush=True)
         return 0
-    igate = indicativo()
-    decimales = int(num('OWRX_GPS_DECIMALES', 2, int)) if env('OWRX_GPS_DECIMALES', '2').isdigit() else 6
-    aprsis = APRSIS(env('RAK_APRSIS_SERVER', env('IGATE_APRSIS_SERVER', 'euro.aprs2.net')),
-                    int(num('RAK_APRSIS_PORT', 14580, int)), igate,
-                    env('APRS_PASSCODE') if si('RAK_APRSIS', 'yes') else '', env('RAK_APRSIS_FILTRO', 'm/10'))
-    a_rf = si('RAK_TX', 'no') and si('RAK_MENSAJES_RF', 'yes')
-    recordar = int(num('RAK_RECORDAR_MIN', 30, int)) * 60
-    mqtt = None
-    mapa_activo, chat_activo = si('OWRX_MAPA_LORA', 'yes'), si('RAK_OWRX_CHAT', 'yes')
-    if not Publicador and (mapa_activo or chat_activo):
-        print('rak: falta bricohams_mqtt; mapa y chat no disponibles', file=sys.stderr, flush=True)
-    if Publicador and (mapa_activo or chat_activo):
-        h, _, pt = env('BRICOHAMS_MQTT', '127.0.0.1:1883').partition(':')
-        mqtt = Publicador(h, int(pt or 1883), 'bricohams-rak-aprs')
-    chat = ChatAPRS(mqtt) if mqtt and chat_activo else None
-    oidas, enviados_rf, t_estado, t_latido = {}, {}, 0.0, time.time()
-    if not aprsis.activo():
+    p = Pasarela()
+    if not p.aprsis.activo():
         print('aviso: sin APRS_PASSCODE (o RAK_APRSIS=no): solo escucha, no sube nada a APRS-IS', flush=True)
-    vistos, oidos, estado_rak, meta = {}, [], {}, {}
+    try:
+        _Api.arrancar(p, int(num('RAK_API_PUERTO', 8077, int)))
+    except OSError as e:
+        print('aviso: sin panel web (%s)' % e, flush=True)
+    t_estado = t_latido = t_digi = 0.0
     while True:
         try:
-            ser = abrir(puerto())
+            p.ser = abrir(puerto())
         except (SystemExit, OSError) as e:
             print('rak: %s; reintento en 20 s' % e, flush=True)
-            time.sleep(20)
+            p.ser = None
+            for _ in range(20):
+                p.ordenes()
+                time.sleep(1)
             continue
         lector = LectorKISS()
-        print('rak: abierto %s · configuración %s' % (ser.port, sincronizar_config(ser, lector)), flush=True)
-        orden(ser, 'BH:GET')
+        print('rak: abierto %s · configuración %s' % (p.ser.port, p.sincronizar(lector)), flush=True)
+        orden(p.ser, 'BH:GET')
         ultimo_dato = time.time()
         try:
             while True:
                 ahora = time.time()
-                for l in aprsis.lineas():
-                    if chat:
-                        chat.recibir(l, ahora)
-                    if mqtt and mapa_activo:
-                        m = aprs_mapa(l, origen='APRS-IS')
-                        if m and not mqtt.publicar('aprsis/APRS', m):
-                            print('aprs-is mapa: broker MQTT no disponible', flush=True)
-                    p = mensaje_a_rf(l, igate, oidas, ahora, recordar, env('RAK_PATH', 'WIDE1-1').split(',')[0]) \
-                        if a_rf else None
-                    clave_m = l.split(':', 1)[-1]
-                    if p and ahora - enviados_rf.get(clave_m, 0) > 300:
-                        enviados_rf[clave_m] = ahora
-                        ser.write(kiss_frame(CMD_DATA, tnc2_a_ax25(p)))
-                        print('aprs-is -> rf: %s' % p, flush=True)
-                enviados_rf = {k: v for k, v in enviados_rf.items() if ahora - v < 600}
-                for cmd, datos in lector.alimentar(ser.read(512)):
+                p.de_aprsis(ahora)
+                p.ordenes()
+                for cmd, datos in lector.alimentar(p.ser.read(512)):
                     ultimo_dato = time.time()
-                    if cmd & 0x0F == CMD_HW:
-                        t = datos.decode('utf-8', 'replace')
-                        if t.startswith('BH:STATUS '):
-                            try:
-                                estado_rak = json_rak(t[10:])
-                            except ValueError:
-                                continue
-                        elif t.startswith('BH:RX '):
-                            try:
-                                meta = json_rak(t[6:])
-                            except ValueError:
-                                meta = {}
-                        elif t.startswith('BH:LOG '):
-                            print('rak: ' + t[7:], flush=True)
-                        continue
-                    if cmd & 0x0F != CMD_DATA:
-                        continue
-                    try:
-                        tnc2 = ax25_a_tnc2(datos)
-                    except ValueError:
-                        continue
-                    propio = tnc2.split('>', 1)[0] == igate
-                    linea = para_aprsis(tnc2, propio, igate)
-                    clave = tnc2.split('>', 1)[0] + tnc2.split(':', 1)[1]
-                    ahora = time.time()
-                    if chat:
-                        chat.recibir(tnc2, ahora)
-                    vistos = {k: v for k, v in vistos.items() if ahora - v < 30}
-                    subido = False
-                    if linea and clave not in vistos:
-                        vistos[clave] = ahora
-                        subido = aprsis.enviar(linea)
-                    if not propio:
-                        if ':}' not in tnc2:
-                            oidas[tnc2.split('>', 1)[0]] = ahora
-                        en_mapa = False
-                        if mqtt and mapa_activo:
-                            m = aprs_mapa(tnc2, meta)
-                            en_mapa = bool(m) and mqtt.publicar('lora433/APRS', m)
-                        oidos.insert(0, {'mapa': en_mapa, 'hora': time.strftime('%H:%M:%S'), 'de': tnc2.split('>', 1)[0],
-                                         'rssi': meta.get('rssi'), 'snr': meta.get('snr'), 'aprsis': subido,
-                                         'paquete': tnc2[:160]})
-                        del oidos[30:]
-                        print('rf: %s%s' % (tnc2, '  -> APRS-IS' if subido else ''), flush=True)
-                    meta = {}
-                if mqtt and time.time() - t_latido > 30:
-                    mqtt.latido()
-                    t_latido = time.time()
-                if (estado_rak or oidos) and time.time() - t_estado > 5:
-                    t_estado = time.time()
-                    guardar_estado({'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S'), 'puerto': ser.port,
-                                    'rak': resumir_status(estado_rak, decimales),
-                                    't_caja': (estado_rak or {}).get('t'),
-                                    'aprsis': {'conectado': aprsis.sock is not None, 'enviados': aprsis.enviados,
-                                               'activo': aprsis.activo(), 'mensajes_a_rf': a_rf},
-                                    'mapa_owrx': {'activo': mqtt is not None,
-                                                  'publicados': mqtt.enviados if mqtt else 0},
-                                    'oidos': oidos})
-                if time.time() - ultimo_dato > 180:
+                    p.de_rak(cmd, datos)
+                if p.mqtt and ahora - t_latido > 30:
+                    p.mqtt.latido()
+                    t_latido = ahora
+                if p.digi_modo == 'auto' and ahora - t_digi > 60:
+                    t_digi = ahora
+                    if p.digi_deseado() != p.digi_actual:
+                        print('digi: %s -> %s (%s %s)' % (p.digi_actual, p.digi_deseado(), p.digi_otro,
+                              'callado' if p.digi_deseado() else 'activo'), flush=True)
+                        p.sincronizar(lector)
+                if (p.estado_rak or p.oidos) and ahora - t_estado > 5:
+                    t_estado = ahora
+                    guardar_estado(p.estado())
+                if ahora - ultimo_dato > 180:
                     raise OSError('el RAK no habla desde hace 3 min')
         except OSError as e:
             print('rak: %s; reabro en 5 s' % e, flush=True)
             try:
-                ser.close()
+                p.ser.close()
             except OSError:
                 pass
+            p.ser = None
             time.sleep(5)
+
+
+# ------------------------------------------------------------------ órdenes de puesta en marcha
+class servicio_parado:
+    """Las pruebas abren el puerto serie: el servicio lo suelta mientras tanto y se vuelve a arrancar."""
+
+    def __enter__(self):
+        self.estaba = subprocess.call(['systemctl', 'is-active', '--quiet', 'bricohams-rak-aprs']) == 0
+        if self.estaba:
+            subprocess.call(['systemctl', 'stop', 'bricohams-rak-aprs'])
+            time.sleep(1)
+        return self
+
+    def __exit__(self, *a):
+        if self.estaba:
+            subprocess.call(['systemctl', 'start', 'bricohams-rak-aprs'])
+
+
+def _estado_rak(ser, lector):
+    orden(ser, 'BH:GET')
+    st = esperar_hw(ser, lector, 'BH:STATUS')
+    return json_rak(st) if st else {}
 
 
 def prueba():
     cargar_env()
-    ser = abrir(puerto())
-    lector = LectorKISS()
-    orden(ser, 'BH:PING')
-    pong = esperar_hw(ser, lector, 'BH:PONG')
-    if not pong:
-        print('✘ El RAK no contesta. ¿Tiene el firmware BricoHams? sudo bricohams-rak-aprs grabar')
-        return 1
-    print('✔ firmware: %s' % pong)
-    print('  configuración: %s' % sincronizar_config(ser, lector))
-    orden(ser, 'BH:GET')
-    st = esperar_hw(ser, lector, 'BH:STATUS')
-    try:
-        st = json_rak(st) if st else {}
-    except ValueError:
-        print('  ✘ estado ilegible: %s' % st[:200])
-        return 1
+    with servicio_parado():
+        ser = abrir(puerto())
+        lector = LectorKISS()
+        orden(ser, 'BH:PING')
+        pong = esperar_hw(ser, lector, 'BH:PONG')
+        if not pong:
+            print('✘ El RAK no contesta. ¿Tiene el firmware BricoHams? sudo bricohams-rak-aprs grabar')
+            return 1
+        print('✔ firmware: %s' % pong)
+        print('  configuración: %s' % sincronizar_config(ser, lector))
+        try:
+            st = _estado_rak(ser, lector)
+        except ValueError as e:
+            print('  ✘ estado ilegible: %s' % str(e)[:200])
+            return 1
+        finally:
+            ser.close()
     g = st.get('gps') or {}
     print('  radio: %s · %.3f MHz · TX %s · digi %s' % (st.get('radio'), st.get('freq', 0) / 1e6,
                                                        'sí' if st.get('tx') else 'no', st.get('digi')))
@@ -692,6 +962,144 @@ RUI3_AVISO = '''✘ El RAK lleva el firmware de fábrica RUI3 de RAKwireless (US
   UNA vez (manual 35, «RAK con RUI3»): AT+BOOT -> nrfutil 6.1.7 «dfu usb-serial» con
   rak4631_factory_bootloader.zip -> adafruit-nrfutil con rak4631_factory_softdevice.zip
   -> y después otra vez: sudo bricohams-rak-aprs grabar'''
+
+
+def gps(minutos=15):
+    """Espera al fix del GPS (dentro de la caja tarda más o no llega): satélites cada 15 s."""
+    cargar_env()
+    with servicio_parado():
+        ser = abrir(puerto())
+        lector = LectorKISS()
+        fin, t0 = time.time() + minutos * 60, time.time()
+        g = {}
+        while time.time() < fin:
+            g = _estado_rak(ser, lector).get('gps') or {}
+            print('  %3d s · %s · %s satélites%s' % (time.time() - t0, 'FIX' if g.get('fix') else 'sin fix',
+                  g.get('sats', 0), (' · hdop %s · %s' % (g.get('hdop'), g.get('utc', ''))) if g.get('fix') else ''),
+                  flush=True)
+            if g.get('fix') or not g.get('present', True):
+                break
+            time.sleep(15)
+        ser.close()
+    if not g.get('present'):
+        print('✘ No llegan frases NMEA: ¿hay un RAK1910/RAK12500 en el slot A? (RAK_GPS="no" si no lo usas)')
+        return 1
+    if g.get('fix'):
+        print('✔ GPS con fix en %d s (%s satélites, hdop %s)' % (time.time() - t0, g.get('sats'), g.get('hdop')))
+        return 0
+    print('✘ Sin fix en %d min dentro de la caja. Pon la antena GPS (IPEX) junto a la tapa o fuera, o deja '
+          'RAK_GPS_BALIZA="no": la baliza usa STATION_LAT/LON y el GPS solo da la hora.' % minutos)
+    return 1
+
+
+def info_uf2(texto):
+    """Datos de INFO_UF2.TXT del bootloader de Adafruit/RAK: versión, modelo y placa."""
+    d = {}
+    for l in texto.splitlines():
+        if l.startswith('UF2 Bootloader'):
+            d['bootloader'] = l.split()[2] if len(l.split()) > 2 else l
+        elif ':' in l:
+            k, v = l.split(':', 1)
+            d[k.strip().lower()] = v.strip()
+    return d
+
+
+def _unidad_uf2(segundos=20):
+    fin = time.time() + segundos
+    while time.time() < fin:
+        for d in ('/dev/disk/by-label',):
+            try:
+                for n in os.listdir(d):
+                    if n.upper().startswith(('RAK', 'NRF52', 'FTHR840')):
+                        return os.path.realpath(os.path.join(d, n))
+            except OSError:
+                pass
+        time.sleep(1)
+    return None
+
+
+def bootloader(grabar_uf2=True):
+    """Lleva el RAK al modo UF2 (unidad de disco), lee la versión del bootloader y sale grabando el .uf2."""
+    cargar_env()
+    uf2 = os.path.join(FW_DIR, 'bin', 'bricohams-rak4631-lora-aprs.uf2')
+    with servicio_parado():
+        ser = abrir(puerto())
+        orden(ser, 'BH:UF2')
+        ser.close()
+        print('RAK en modo UF2: esperando la unidad de disco…')
+        dev = _unidad_uf2()
+        if not dev:
+            print('✘ No aparece la unidad: el bootloader no tiene UF2 (es antiguo). La grabación por USB '
+                  '(DFU serie, «grabar») sigue valiendo; pulsa RESET para volver al firmware.')
+            return 1
+        mnt = '/run/bricohams-uf2'
+        os.makedirs(mnt, exist_ok=True)
+        if subprocess.call(['mount', dev, mnt]) != 0:
+            print('✘ No pude montar %s' % dev)
+            return 1
+        try:
+            info = info_uf2(open(os.path.join(mnt, 'INFO_UF2.TXT'), encoding='utf-8', errors='replace').read())
+            print('✔ bootloader %s · modelo %s · placa %s' % (info.get('bootloader', '?'), info.get('model', '?'),
+                                                            info.get('board-id', '?')))
+            os.makedirs('/var/lib/bricohams', exist_ok=True)
+            json.dump(info, open('/var/lib/bricohams/rak-bootloader.json', 'w'), ensure_ascii=False)
+            if grabar_uf2 and os.path.exists(uf2):
+                print('Grabando el firmware por UF2 para salir del modo disco…')
+                subprocess.call(['cp', uf2, mnt + '/'])
+                subprocess.call(['sync'])
+        finally:
+            subprocess.call(['umount', '-l', mnt], stderr=subprocess.DEVNULL)
+        time.sleep(8)
+    return 0
+
+
+def puesta_en_marcha(minutos_gps=10):
+    """Todo de una vez (manual 35, §3): grabar si hace falta, nombres, prueba, bootloader y GPS."""
+    cargar_env()
+    res = []
+
+    def paso(nombre, codigo):
+        res.append((nombre, codigo))
+        print('%s %s' % ('✔' if codigo == 0 else '✘', nombre), flush=True)
+
+    with servicio_parado():
+        actual = None
+        try:
+            ser = abrir(puerto())
+            orden(ser, 'BH:PING')
+            actual = esperar_hw(ser, LectorKISS(), 'BH:PONG', 4)
+            ser.close()
+        except (SystemExit, OSError):
+            pass
+    nuevo = None
+    try:
+        nuevo = re.search(r'"version"\s*:\s*"([^"]+)"', open(os.path.join(FW_DIR, 'bin', 'VERSION.json')).read()).group(1)
+    except (OSError, AttributeError):
+        pass
+    if not actual or (nuevo and nuevo not in actual):
+        print('== 1. grabar el firmware (%s)' % ('no contesta' if not actual else 'hay uno más nuevo'))
+        paso('firmware grabado', grabar())
+    else:
+        paso('firmware ya grabado (%s)' % actual, 0)
+    print('== 2. nombres fijos')
+    paso('/dev/rak-aprs y /dev/lilygo-mesh', subprocess.call(['bricohams-dispositivos', 'identificar']))
+    time.sleep(3)
+    print('== 3. prueba')
+    paso('radio, configuración y sensor', prueba())
+    print('== 4. bootloader')
+    paso('versión del bootloader (UF2)', bootloader())
+    print('== 5. GPS (hasta %d min)' % minutos_gps)
+    paso('fix del GPS dentro de la caja', gps(minutos_gps))
+    print('\nResumen:')
+    for n, c in res:
+        print('  %s %s' % ('✔' if c == 0 else '✘', n))
+    try:
+        os.makedirs('/var/lib/bricohams', exist_ok=True)
+        open('/var/lib/bricohams/rak-puesta.txt', 'w').write(
+            time.strftime('%F %T\n') + '\n'.join('%s %s' % ('OK' if c == 0 else 'FALLO', n) for n, c in res) + '\n')
+    except OSError:
+        pass
+    return 0 if all(c == 0 for n, c in res[:3]) else 1
 
 
 def grabar(zip_=None):
@@ -752,13 +1160,24 @@ def main(argv):
         return 0
     if o == 'baliza':
         cargar_env()
-        ser = abrir(puerto())
-        orden(ser, 'BH:BEACON')
+        try:                                             # con el servicio en marcha, por su API
+            import urllib.request
+            urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:%s/baliza' % env('RAK_API_PUERTO', '8077'),
+                                                          data=b'{}', method='POST'), timeout=3)
+        except OSError:
+            ser = abrir(puerto())
+            orden(ser, 'BH:BEACON')
         print('Baliza pedida (sale en unos segundos).')
         return 0
+    if o == 'gps':
+        return gps(int(argv[2]) if len(argv) > 2 and argv[2].isdigit() else 15)
+    if o == 'bootloader':
+        return bootloader()
+    if o == 'puesta-en-marcha':
+        return puesta_en_marcha(int(argv[2]) if len(argv) > 2 and argv[2].isdigit() else 10)
     if o == 'grabar':
         return grabar(argv[2] if len(argv) > 2 else None)
-    for linea in open(__file__, encoding='utf-8').read().splitlines()[2:21]:
+    for linea in open(__file__, encoding='utf-8').read().splitlines()[2:26]:
         print(linea.lstrip('# '))
     return 1
 
