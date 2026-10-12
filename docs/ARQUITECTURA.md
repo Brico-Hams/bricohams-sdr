@@ -840,3 +840,77 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - Los mensajes se ven en vivo.
 - No hay respuesta ni ACK: se contesta desde un cliente APRS.
 - Los mensajes no se guardan en el servidor.
+
+## ADR-58 · Importar/exportar bookmarks con el propio formulario de OpenWebRX+ (v5.0)
+**Contexto:** hay que poder volcar y cargar todos los bookmarks desde un fichero. Escribir directamente `bookmarks.json` saltaría la validación de OpenWebRX+ y se rompería al actualizar.
+**Decisión:**
+- `bricohams-owrx-bookmarks-io` parchea solo la página `/settings/bookmarks` (marcadores `<!-- bricohams-bmio -->` y `#@BH-BMIO@`).
+- Importar: el navegador lee el `.json` y da de alta cada bookmark con el formulario nativo, uno a uno.
+- Exportar: «todos» o «editables», a partir de la lista incrustada como JSON escapado.
+- Parche idempotente, atómico, compilado antes de escribir, reversible (`--quitar`) y con hook de `apt`.
+**Consecuencias:**
+- Sin sesión de administrador no existe nada nuevo; la web pública no cambia.
+- Si OpenWebRX+ cambia la página, el parche no se aplica y lo avisa, en vez de romperla.
+
+## ADR-59 · Clave de RepeaterBook en Ajustes generales (v5.0)
+**Contexto:** OpenWebRX+ ya sabe usar `repeaterbook_api_key`, pero el campo viene comentado. El operador quiere ponerla desde la web protegida.
+**Decisión:**
+- `bricohams-owrx-repeaterbook` activa la sección «RepeaterBook» en `/settings/general` con un campo de contraseña (marcador `#@BH-RB@`).
+- No la duplica si una versión futura trae el campo.
+**Consecuencias:**
+- La clave se guarda en la configuración de OpenWebRX+ y no se publica.
+- RepeaterBook exige el e-mail de «Receiver admin» en el User-Agent; un token `rbuapp_` con otro patrón devuelve `403 ua_mismatch`.
+
+## ADR-60 · Subtono CTCSS en el bookmark y silenciador por tono (v5.0)
+**Contexto:** muchos repetidores solo son útiles si se escucha su subtono; el bookmark de OpenWebRX+ no tiene campo para él. Al ser un SDR (solo recepción) el bookmark guarda únicamente la frecuencia de salida del repetidor.
+**Decisión:**
+- `bricohams-owrx-ctcss` añade el campo opcional `ctcss` (Hz), la columna «Subtono FM» en `/settings/bookmarks` (50 tonos EIA, 60–260 Hz) y el módulo `CtcssSquelch` entre la de-énfasis FM y el AGC (marcador `#@BH-CTCSS@`).
+- El silenciador abre solo si el tono pedido es el más fuerte de los 50 con margen claro; paso-alto de 300 Hz y rampas anti-chasquido.
+- Etiqueta siempre **FM**, nunca «NFM».
+- En la web pública solo se activa al sintonizar un bookmark con tono; el selector del panel afecta a la sesión del navegador, sin ajustes persistentes fuera de `/settings`.
+**Consecuencias:**
+- Requiere `python3-numpy` y `python3-scipy` (los instala `install.sh`).
+- Sin numpy/scipy el silenciador queda inactivo y el audio pasa sin filtrar.
+
+## ADR-61 · Importador de repetidores de RepeaterBook por zona (v5.0)
+**Contexto:** cargar a mano los repetidores de la zona es lento y propenso a errores de subtono.
+**Decisión:**
+- `bricohams-owrx-rbimport` añade `/settings/bookmarks/repeaterbook` (marcador `#@BH-RBI@`): consulta la API con la clave de ADR-59, filtra por región/provincia/banda, previsualiza y crea bookmarks con su frecuencia de salida y su subtono (ADR-60).
+- Modos analógicos a FM; los digitales se marcan y no se inventa subtono.
+- No duplica bookmarks ya existentes en la misma frecuencia.
+**Consecuencias:**
+- Prueba de concepto en la estación del autor con la región 5 (Valencia/Murcia).
+- Los datos de RepeaterBook pueden estar desactualizados: el operador revisa la previsualización.
+
+## ADR-62 · Paneles TAK y Monitorización con Grafana tras /settings (v5.0)
+**Contexto:** el operador necesita llegar a TAK y a la monitorización sin abrir puertos ni enlaces en la web pública.
+**Decisión:**
+- Accesos `/settings/bricohams/tak` y `/settings/bricohams/monitorizacion`, servidos por `bricohams-mesh-admin` con la sesión de OpenWebRX+.
+- Grafana escucha solo en loopback y se publica por nginx en `/settings/bricohams/grafana/`; contraseña inicial `GRAFANA_ADMIN_PASS`.
+**Consecuencias:**
+- Nada nuevo en la página principal.
+- La contraseña inicial de Grafana debe cambiarse en el primer acceso.
+
+## ADR-63 · Credenciales TAK aleatorias, visibles y cambiables solo desde /settings (v5.0)
+**Contexto:** las claves TAK se generan aleatorias al instalar y solo existían en `/etc/bricohams/tak-access.txt` (root, 600): no había forma documentada de verlas ni de cambiarlas sin terminal, y el manual citaba usuarios que no eran los reales.
+**Decisión:**
+- Sin claves por defecto: `instalar_tak.sh` las genera con `secrets.token_urlsafe(24)`. Los nombres salen de `TAK_ADMIN_USER` (rol administrator) y `TAK_USER` (rol user).
+- Tarjeta «Credenciales TAK» en `/settings/bricohams/tak`: claves enmascaradas por defecto; «Mostrar credenciales» por POST con CSRF y `no-store`.
+- Cambio de clave (manual o aleatoria) solo para usuarios del fichero; la clave va por stdin a OpenTAKServer bajo `runuser -u opentakserver`, nunca en argv ni en logs. El fichero se reescribe atómico (0600) solo si OpenTAKServer confirma; código 3 = usuario inexistente.
+- La unidad `bricohams-mesh-admin` añade `ReadWritePaths=-/var/lib/bricohams-tak` (opcional con `-`), porque `ProtectSystem=strict` impedía a OpenTAKServer escribir su log. `instalar_tak.sh` hace `try-restart` del panel.
+**Consecuencias:**
+- El administrador ve y rota las claves sin SSH.
+- El panel puede escribir en el directorio de TAK; se acepta porque ya es root y se limita a esa ruta.
+- OpenTAKServer solo admite usuarios con letras, números, `_` y `.` (`UsernameValidator`): un guion da HTTP 400 en `/api/login`. `instalar_tak.sh` valida `TAK_ADMIN_USER` y `TAK_USER` con `^[A-Za-z0-9_.]{1,64}$`. Los usuarios nuevos llevan `active=True` y `confirmed_at`. No se renombra un usuario existente porque la tabla `certificates` referencia el nombre: se crea uno nuevo y se desactiva el antiguo.
+
+## ADR-64 · Monitorización «adoptiva»: Prometheus/Grafana manuales se integran, no se reinstalan (v5.0)
+**Contexto:** hay estaciones donde el operador ya instaló a mano Prometheus y node_exporter (binarios oficiales en `/usr/local/bin`) y Grafana por apt, con trabajos de scraping propios y escuchando en `0.0.0.0`. Reinstalar desde Debian duplicaría unidades y perdería datos y configuración.
+**Decisión:**
+- `paso_monitorizacion` detecta la instalación manual y solo añade drop-ins `*.service.d/bricohams.conf` que reescriben `ExecStart=` para escuchar en loopback, conservando la ruta TSDB existente.
+- `prometheus.yml` se regenera con los trabajos `prometheus` y `node` y se conservan los demás; la primera vez se guarda `*.bak-manual`.
+- Clave de Grafana estable y rotable sin terminal web: `GRAFANA_ADMIN_PASS` > fichero guardado > aleatoria, aplicada con `grafana cli`.
+- Grafana solo es accesible por `/settings/bricohams/grafana/` tras `auth_request`.
+**Consecuencias:**
+- Reejecutar el paso es idempotente y no destruye nada del operador.
+- Los exportadores ajenos que escuchen en `0.0.0.0` se limitan a localhost con `IPAddressDeny`/`IPAddressAllow` en lugar de tocar su código.
+- Si el operador cambia la clave dentro de Grafana, la próxima ejecución la vuelve a fijar a la del `.env`/fichero: hay que rotarla por `GRAFANA_ADMIN_PASS`.

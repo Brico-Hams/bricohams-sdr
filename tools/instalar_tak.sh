@@ -5,8 +5,20 @@ umask 077
 trap 'printf "TAK: fallo en la linea %s\n" "$LINENO" >&2' ERR
 [[ $(id -u) = 0 ]] || { echo "Ejecuta con sudo bash tools/instalar_tak.sh" >&2; exit 1; }
 BASE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-IP=192.168.1.105
-LAN=192.168.1.0/24
+# IP/LAN/ciudad/usuarios: variables TAK_* o bricohams.env (si existe); si no, se detectan.
+ENVF=${BRICOHAMS_ENV:-/etc/bricohams/bricohams.env}
+# shellcheck source=/dev/null
+if [[ -r $ENVF ]]; then set -a; . "$ENVF"; set +a; fi
+IP=${TAK_IP:-$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="src"){print $(i+1); exit}}')}
+LAN=${TAK_LAN:-$(ip -4 -o addr show | awk -v ip="$IP" '$4 ~ "^"ip"/" {print $4; exit}')}
+[[ -n $IP && -n $LAN ]] || { echo "No se pudo detectar la IP/LAN: define TAK_IP y TAK_LAN" >&2; exit 1; }
+LAN=$(python3 -c 'import ipaddress,sys; print(ipaddress.ip_network(sys.argv[1], strict=False))' "$LAN")
+export TAK_IP_REAL=$IP TAK_CIUDAD=${TAK_CA_CITY:-${STATION_QTH:-QTH}} TAK_ESTADO=${TAK_CA_STATE:-Espana}
+export TAK_ADMIN_USER=${TAK_ADMIN_USER:-admin} TAK_USER=${TAK_USER:-tak}
+# OpenTAKServer (UsernameValidator) solo admite letras, numeros, '_' y '.': un guion impide el login.
+for _u in "$TAK_ADMIN_USER" "$TAK_USER"; do
+    [[ $_u =~ ^[A-Za-z0-9_.]{1,64}$ ]] || { echo "Usuario TAK invalido '$_u': usa solo letras, numeros, '_' o '.' (sin guiones)" >&2; exit 1; }
+done
 HOME_TAK=/var/lib/bricohams-tak
 VENV=/opt/bricohams-tak/venv312
 CONFIG=$HOME_TAK/ots/config.yml
@@ -79,7 +91,9 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'bricohams_tak') \gexe
 SQL
 
 if [[ ! -e $CONFIG ]]; then
-    runuser -u opentakserver -- env HOME="$HOME_TAK" "$VENV/bin/python" - <<'PY'
+    runuser -u opentakserver -- env HOME="$HOME_TAK" TAK_IP_REAL="$TAK_IP_REAL" TAK_CIUDAD="$TAK_CIUDAD" TAK_ESTADO="$TAK_ESTADO" "$VENV/bin/python" - <<'PY'
+import os
+import re
 import secrets
 from pathlib import Path
 
@@ -94,7 +108,7 @@ config = {
 config.update(
     OTS_LISTENER_ADDRESS="127.0.0.1",
     OTS_LISTENER_PORT=8081,
-    OTS_STREAMING_INTERFACE="192.168.1.105",
+    OTS_STREAMING_INTERFACE=os.environ["TAK_IP_REAL"],
     OTS_ENABLE_TCP_STREAMING_PORT=False,
     OTS_SSL_STREAMING_PORT=8089,
     OTS_MARTI_HTTPS_PORT=8447,
@@ -107,10 +121,10 @@ config.update(
     OTS_CA_NAME="BricoHams-TAK-CA",
     OTS_CA_PASSWORD=secrets.token_hex(16),
     OTS_CA_COUNTRY="ES",
-    OTS_CA_STATE="Murcia",
-    OTS_CA_CITY="Mi QTH",
+    OTS_CA_STATE=re.sub(r"[^A-Za-z0-9 .-]", "", os.environ["TAK_ESTADO"]) or "ES",
+    OTS_CA_CITY=re.sub(r"[^A-Za-z0-9 .-]", "", os.environ["TAK_CIUDAD"]) or "QTH",
     OTS_CA_ORGANIZATION="BricoHams",
-    OTS_CA_SUBJECT="/C=ES/ST=Murcia/L=Mi QTH/O=BricoHams/OU=TAK",
+    OTS_CA_SUBJECT="/C=ES/O=BricoHams/OU=TAK",
     OTS_CA_EXPIRATION_TIME=825,
     OTS_LOG_ROTATE_INTERVAL=1,
     SQLALCHEMY_DATABASE_URI="postgresql+psycopg:///bricohams_tak",
@@ -123,7 +137,7 @@ path.write_text(yaml.safe_dump(config), encoding="utf-8")
 path.chmod(0o600)
 PY
 fi
-run_tak() { runuser -u opentakserver -- env HOME="$HOME_TAK" FLASK_APP=opentakserver.app "$@"; }
+run_tak() { runuser -u opentakserver -- env HOME="$HOME_TAK" TAK_ADMIN_USER="$TAK_ADMIN_USER" TAK_USER="$TAK_USER" FLASK_APP=opentakserver.app "$@"; }
 cd "$HOME_TAK/ots"
 run_tak "$VENV/bin/flask" db upgrade --directory "$VENV"/lib/python*/site-packages/opentakserver/migrations
 run_tak "$VENV/bin/flask" ots create-ca
@@ -131,7 +145,9 @@ run_tak "$VENV/bin/flask" ots create-ca
 if [[ ! -e /etc/bricohams/tak-access.txt ]]; then
     install -o opentakserver -g opentakserver -m 600 /dev/null "$HOME_TAK/ots/access.txt"
     run_tak "$VENV/bin/python" - <<'PY'
+import os
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask_security import hash_password
@@ -147,12 +163,14 @@ with app.app_context():
         name="administrator", permissions={"administrator"}
     )
     credentials = []
-    for username, role in (("ea5kao", "administrator"), ("ea5kao-tak", "user")):
+    for username, role in ((os.environ.get("TAK_ADMIN_USER", "admin"), "administrator"), (os.environ.get("TAK_USER", "tak"), "user")):
         if app.security.datastore.find_user(username=username):
             raise RuntimeError(f"Ya existe {username}; no se cambia su clave")
         password = secrets.token_urlsafe(24)
         app.security.datastore.create_user(
-            username=username, password=hash_password(password), roles=[role], active=True
+            username=username, password=hash_password(password), roles=[role], active=True,
+            # OpenTAKServer exige cuenta confirmada: sin esto el login responde 400
+            confirmed_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         credentials.append(f"{username}: {password}")
     db.session.commit()
@@ -368,5 +386,7 @@ for path in (kit / 'bricohams.env', pathlib.Path('/etc/bricohams/bricohams.env')
                 ports.append(port)
         admin.escribir_env(str(path), {'BLINDAJE_PUERTOS_LAN': ' '.join(ports)})
 PY
+# el panel de /settings monta /var/lib/bricohams-tak escribible al arrancar: reinicio si ya corría
+systemctl try-restart bricohams-mesh-admin.service 2>/dev/null || true
 echo "TAK instalado. Web: https://$IP:8445"
-echo "Credenciales: sudo cat /etc/bricohams/tak-access.txt"
+echo "Credenciales: /settings → Servidor TAK → «Mostrar credenciales» (o sudo cat /etc/bricohams/tak-access.txt)"

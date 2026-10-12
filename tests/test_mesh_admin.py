@@ -54,6 +54,7 @@ try:
     M = importlib.util.module_from_spec(importlib.util.spec_from_loader('mesh_admin', cargador))
     cargador.exec_module(M)
     M.TRABAJO.lanzar = lambda *a, **k: True          # nada de hablar con radios de verdad
+    M.TAK_ACCESO = os.path.join(tmp, 'tak-access.txt')  # nunca el /etc de verdad
 
     # --- funciones sueltas
     assert M.tapar('meshtastic --seturl https://meshtastic.org/e/#CgMSAQE --ch-set psk base64:QUJDREVGR0hJSktMTU5PUA==') \
@@ -70,7 +71,7 @@ try:
             raise AssertionError('acepta %r/%r' % (largo, corto))
         except ValueError:
             pass
-    assert M.validar_nombres(' Nodo Mi QTH ', 'LQ1') == ('Nodo Mi QTH', 'LQ1')
+    assert M.validar_nombres(' Nodo Murcia ', 'MU1') == ('Nodo Murcia', 'MU1')
     assert M.validar_url(urls['MESH433_CHANNEL_URL'], 'EU_433')
     for u, reg in ((urls['MESH433_CHANNEL_URL'], 'EU_868'), ('https://example.com/#abc', 'EU_433'),
                    ('https://meshtastic.org/e/#@@@@', 'EU_433')):
@@ -190,13 +191,13 @@ try:
     assert st == 200 and 'Sin datos' in pag, 'sin JSON del RAK: lo dice'
     with open(os.path.join(tmp, 'rak-aprs.json'), 'w', encoding='utf-8') as f:
         json.dump({'actualizado': '2026-10-11T15:37:42', 'puerto': '/dev/rak-aprs',
-                   'rak': {'fw': '1.0.0', 'call': 'EA5KAO-15', 'radio': 'ok', 'freq': 433775000, 'tx': True, 'rx': 11,
+                   'rak': {'fw': '1.0.0', 'call': 'N0CALL-15', 'radio': 'ok', 'freq': 433775000, 'tx': True, 'rx': 11,
                            'txn': 4, 'vbat': None, 'gps': {'present': True, 'fix': False}},
                    'aprsis': {'conectado': True, 'enviados': 9, 'activo': True},
-                   'oidos': [{'hora': '15:37:06', 'de': 'EA5KAO-10', 'rssi': -60, 'snr': 7.5, 'aprsis': True,
-                              'paquete': 'EA5KAO-10>APLRG1:<script>x</script>'}]}, f)
+                   'oidos': [{'hora': '15:37:06', 'de': 'N0CALL-10', 'rssi': -60, 'snr': 7.5, 'aprsis': True,
+                              'paquete': 'N0CALL-10>APLRG1:<script>x</script>'}]}, f)
     st, _, pag = pide('GET', APRS, cab=COOKIE)
-    assert st == 200 and 'EA5KAO-15' in pag and '433.775 MHz' in pag and 'conectado' in pag and 'APRS (RAK)' in pag
+    assert st == 200 and 'N0CALL-15' in pag and '433.775 MHz' in pag and 'conectado' in pag and 'APRS (RAK)' in pag
     assert '<script>x' not in pag and '&lt;script&gt;x' in pag, 'el registro se escapa'
     assert '12345' not in pag, 'ni passcode ni claves'
     tk2 = re.search(r'name="csrf" value="([0-9a-f]+)"', pag).group(1)
@@ -207,6 +208,125 @@ try:
     assert 'alert-danger' in pag, 'desde la página APRS solo se reinicia el RAK'
     st, _, pag = pide('GET', BASE, cab=COOKIE)
     assert 'href="%s"' % APRS in pag, 'enlace Meshtastic → APRS'
+
+    # --- v5.0: paneles TAK y Monitorización (misma sesión de /settings, lista blanca de servicios)
+    ORIGEN = dict(COOKIE, Origin='https://sdr.ejemplo.org')
+    for ruta in (M.TAK, M.MONITOR):
+        st, h, _ = pide('GET', ruta)
+        assert st == 302 and h['Location'] == '/login?ref=' + ruta.lstrip('/'), 'sin sesión: al login'
+        assert pide('POST', ruta, 'accion=tak-parar', {'Origin': 'https://sdr.ejemplo.org'})[0] == 403
+    instaladas = set()
+    real_registro = M.registro
+    M.estado_unidad = lambda u: (u in instaladas, u in instaladas, 'active (running)' if u in instaladas else 'no instalado')
+    M.registro = lambda u, lineas=40: 'arranque ok password=SuperSecreta <b>x</b>'
+    st, _, pag = pide('GET', M.TAK, cab=COOKIE)
+    assert st == 200 and 'TAK=yes' in pag and 'no está instalado' in pag
+    st, _, pag = pide('GET', M.MONITOR, cab=COOKIE)
+    assert st == 200 and 'MONITORIZACION=yes' in pag and '<iframe' not in pag
+    instaladas.update(M.TAK_UNIDADES + M.MON_UNIDADES)
+    st, h, pag = pide('GET', M.TAK, cab=COOKIE)
+    assert st == 200 and 'https://sdr.ejemplo.org:8445/' in pag and 'sdr.ejemplo.org:8089' in pag
+    assert 'tak-access.txt' in pag and 'value="tak-reiniciar-bricohams-tak"' in pag and '<b>x</b>' not in pag
+    assert "frame-ancestors 'self'" in h['Content-Security-Policy']
+    st, _, pag = pide('GET', M.TAK, cab=dict(COOKIE, Host='evil"><script>'))
+    assert '<script>' not in pag and '&lt;IP-de-la-estación&gt;' in pag, 'Host raro: no se refleja'
+    st, _, pag = pide('GET', M.MONITOR, cab=COOKIE)
+    assert st == 200 and '<iframe src="/settings/bricohams/grafana/d/bricohams/bricohams?orgId=1&amp;kiosk' in pag
+    assert 'value="mon-reiniciar-grafana-server"' in pag
+    tk3 = re.search(r'name="csrf" value="([0-9a-f]+)"', pag).group(1)
+    lanzados = []
+    M.TRABAJO.lanzar = lambda titulo, fn, **k: lanzados.append(titulo) or True
+    st, _, pag = pide('POST', M.TAK, urlencode({'accion': 'tak-reiniciar', 'csrf': tk3}), ORIGEN)
+    assert st == 200 and 'Orden enviada' in pag and 'bricohams-tak' in lanzados[-1] and 'postgresql' in lanzados[-1]
+    st, _, pag = pide('POST', M.MONITOR, urlencode({'accion': 'mon-parar-prometheus-node-exporter', 'csrf': tk3}), ORIGEN)
+    assert st == 200 and 'Orden enviada' in pag and lanzados[-1].endswith(': prometheus-node-exporter')
+    n = len(lanzados)
+    for ruta, malo in ((M.TAK, 'tak-reiniciar-ssh'), (M.TAK, 'tak-borrar'), (M.TAK, 'mon-reiniciar'),
+                       (M.MONITOR, 'tak-parar'), (M.MONITOR, 'mon-parar-openwebrx'), (BASE, 'tak-parar'),
+                       (BASE, 'mon-reiniciar'), (APRS, 'tak-parar')):
+        st, _, pag = pide('POST', ruta, urlencode({'accion': malo, 'csrf': tk3}), ORIGEN)
+        assert st == 200 and 'alert-danger' in pag, '%s no se acepta en %s' % (malo, ruta)
+    assert len(lanzados) == n, 'nada fuera de la lista blanca llega a systemctl'
+    assert pide('POST', M.TAK, urlencode({'accion': 'tak-parar', 'csrf': '0' * 40}), ORIGEN)[0] == 403
+
+    # --- credenciales TAK: ocultas por defecto, visibles solo en la respuesta al POST «Mostrar»
+    st, _, pag = pide('GET', M.TAK, cab=COOKIE)
+    assert 'No hay credenciales' in pag, 'sin tak-access.txt: lo dice'
+    with open(M.TAK_ACCESO, 'w', encoding='utf-8') as f:
+        f.write('n0call: ClaveAdminTAK_aaaaaaaa\nn0call-tak: ClaveUserTAK_bbbbbbbb\n')
+    st, h, pag = pide('GET', M.TAK, cab=COOKIE)
+    assert 'n0call-tak' in pag and 'administrador' in pag and 'value="tak-credenciales"' in pag
+    assert 'ClaveAdminTAK' not in pag and 'ClaveUserTAK' not in pag, 'GET nunca enseña claves'
+    assert h['Cache-Control'] == 'no-store'
+    st, _, pag = pide('POST', M.TAK, urlencode({'accion': 'tak-credenciales', 'csrf': tk3}), ORIGEN)
+    assert st == 200 and 'ClaveAdminTAK_aaaaaaaa' in pag and 'ClaveUserTAK_bbbbbbbb' in pag
+    assert pide('POST', M.TAK, urlencode({'accion': 'tak-credenciales', 'csrf': '0' * 40}), ORIGEN)[0] == 403
+    assert pide('POST', M.TAK, urlencode({'accion': 'tak-credenciales', 'csrf': tk3}),
+                dict(COOKIE, Origin='https://evil.example'))[0] == 403
+    for ruta in (BASE, M.MONITOR, APRS):
+        st, _, pag = pide('POST', ruta, urlencode({'accion': 'tak-credenciales', 'csrf': tk3}), ORIGEN)
+        assert 'alert-danger' in pag and 'ClaveAdminTAK' not in pag, 'credenciales solo desde la página TAK'
+    n = len(lanzados)
+    for malos in ({'usuario': 'n0call', 'clave': 'ClaveNueva_123456', 'clave2': 'ClaveNueva_654321'},
+                  {'usuario': 'n0call', 'clave': 'corta', 'clave2': 'corta'},
+                  {'usuario': 'n0call', 'clave': 'Con espacio 123456', 'clave2': 'Con espacio 123456'},
+                  {'usuario': 'root', 'generar': 'yes'}):
+        st, _, pag = pide('POST', M.TAK, urlencode(dict(malos, accion='tak-clave', csrf=tk3)), ORIGEN)
+        assert 'alert-danger' in pag, 'tak-clave rechaza %r' % malos
+    st, _, pag = pide('POST', M.MONITOR, urlencode({'accion': 'tak-clave', 'usuario': 'n0call', 'generar': 'yes',
+                                                     'csrf': tk3}), ORIGEN)
+    assert 'alert-danger' in pag and len(lanzados) == n, 'tak-clave no se acepta fuera de la página TAK'
+    st, _, pag = pide('POST', M.TAK, urlencode({'accion': 'tak-clave', 'usuario': 'n0call-tak', 'clave': 'ClaveNueva_123456',
+                                                 'clave2': 'ClaveNueva_123456', 'csrf': tk3}), ORIGEN)
+    assert 'Cambiando la clave de n0call-tak' in pag and 'ClaveNueva_123456' not in pag and len(lanzados) == n + 1
+    vistos = []
+    real_run = M.subprocess.run
+    M.subprocess.run = lambda arg, **k: vistos.append((arg, k)) or type('R', (), {'returncode': 0, 'stdout': 'ok\n', 'stderr': ''})()
+    notas = []
+
+    class T2:
+        def apunta(self, x):
+            notas.append(x)
+    try:
+        M.tarea_clave_tak('n0call-tak', 'ClaveNueva_123456')(T2())
+    finally:
+        M.subprocess.run = real_run
+    arg, k = vistos[0]
+    assert arg[:4] == ['runuser', '-u', 'opentakserver', '--'] and 'ClaveNueva_123456' not in ' '.join(arg)
+    assert k['input'] == 'n0call-tak\nClaveNueva_123456\n', 'la clave va por stdin, no por argv'
+    assert not any('ClaveNueva' in x for x in notas), 'la clave no sale en el registro del trabajo'
+    assert M.leer_acceso_tak() == [('n0call', 'ClaveAdminTAK_aaaaaaaa'), ('n0call-tak', 'ClaveNueva_123456')]
+    if os.name == 'posix':
+        assert os.stat(M.TAK_ACCESO).st_mode & 0o777 == 0o600
+    M.subprocess.run = lambda arg, **k: type('R', (), {'returncode': 3, 'stdout': '', 'stderr': ''})()
+    try:
+        M.tarea_clave_tak('n0call', 'OtraClave_1234567')(T2())
+        raise AssertionError('usuario inexistente en OTS: debe fallar')
+    except RuntimeError:
+        pass
+    finally:
+        M.subprocess.run = real_run
+    assert M.leer_acceso_tak()[0] == ('n0call', 'ClaveAdminTAK_aaaaaaaa'), 'si OTS falla, el fichero no cambia'
+    llamadas = []
+    M.systemctl = lambda *a: llamadas.append(a) or 0
+    real_sleep = M.time.sleep
+    M.time.sleep = lambda s: None
+
+    class T:
+        def apunta(self, x):
+            pass
+    try:
+        M.tarea_unidades('stop', M.TAK_UNIDADES)(T())
+    finally:
+        M.time.sleep = real_sleep
+    assert [a[1] for a in llamadas] == [u + '.service' for u in reversed(M.TAK_UNIDADES)], 'parar: al revés'
+    real_run = M.subprocess.run
+    M.subprocess.run = lambda *a, **k: type('R', (), {'stdout': 'db password=SuperSecreta token: abc123\nok', 'stderr': ''})()
+    try:
+        r = real_registro('bricohams-tak')
+    finally:
+        M.subprocess.run = real_run
+    assert 'SuperSecreta' not in r and 'abc123' not in r and 'ok' in r, 'el registro tapa claves'
     srv.shutdown()
     owrx.shutdown()
 
@@ -256,6 +376,12 @@ try:
     assert '"$FILES/bin/bricohams-mesh-admin" /usr/local/bin/bricohams-mesh-admin' in S
     assert '"$FILES/bin/bricohams-owrx-botones" /usr/local/bin/bricohams-owrx-botones' in S and '99bricohams-owrx-botones' in S
     assert 'bricohams-mesh-admin.service' in S and 'ProtectSystem=strict' in S
+    assert 'ReadWritePaths=-/var/lib/bricohams-tak' in S, 'sin esto OpenTAKServer no puede escribir al cambiar claves'
+    T = open(os.path.join(RAIZ, 'tools', 'instalar_tak.sh'), encoding='utf-8').read()
+    assert 'try-restart bricohams-mesh-admin' in T
+    assert 'confirmed_at=datetime.now(timezone.utc)' in T, 'sin confirmed_at OpenTAKServer rechaza el login (400)'
+    assert 'u.confirmed_at = datetime.now' in M.SCRIPT_CLAVE_TAK and 'u.active = True' in M.SCRIPT_CLAVE_TAK
+    assert '^[A-Za-z0-9_.]{1,64}$' in T, 'instalar_tak.sh debe rechazar usuarios TAK con guion'
     assert "listen[^;]*default_server' \"$s\"" in S and 'nginx-desactivados' in S, 'otro default_server no puede saltarse /settings→HTTPS'
     print('test_mesh_admin: OK')
 finally:

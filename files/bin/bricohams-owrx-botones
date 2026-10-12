@@ -33,14 +33,24 @@ JS = ("<script>if(location.port==='8073'){document.querySelectorAll('a[data-bric
       "var w=document.getElementById('bricohams-meshweb');if(w){w.href='https://'+location.hostname+':8443/';}</script>")
 
 
-def bloque(web=True):
+BOTON_TAK = '''
+        <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/tak">Servidor TAK</a>
+        </div>'''
+BOTON_MON = '''
+        <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/monitorizacion">Monitorización</a>
+        </div>'''
+
+
+def bloque(web=True, tak=False, mon=False):
     return MARCA_INI + '''
         <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/meshtastic">Meshtastic 433 / 868</a>
         </div>
         <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/aprs">APRS (RAK)</a>
-        </div>''' + (BOTON_WEB if web else '') + '''
+        </div>''' + (BOTON_WEB if web else '') + (BOTON_TAK if tak else '') + (BOTON_MON if mon else '') + '''
         ''' + JS + '''
         ''' + MARCA_FIN + '\n'
 
@@ -49,14 +59,32 @@ BLOQUE = bloque()
 ANCLA = re.compile(r'([ \t]*<div class="col-4">\s*<a class="btn btn-secondary" href="features">)')
 
 
-def mesh_web():
-    """MESH_WEB de bricohams.env (por defecto yes): botón del cliente web de Meshtastic en :8443."""
+def env_val(clave, defecto=''):
+    """Último valor de CLAVE en bricohams.env (en minúsculas, sin comillas); defecto si falta."""
     try:
         t = open(os.environ.get('BRICOHAMS_ENV', '/etc/bricohams/bricohams.env'), encoding='utf-8').read()
     except OSError:
-        return True
-    m = re.findall(r'^\s*MESH_WEB=["\']?([A-Za-z]*)', t, re.M)
-    return not m or m[-1].lower() != 'no'
+        return defecto
+    m = re.findall(r'^\s*' + re.escape(clave) + r'=["\']?([A-Za-z]*)', t, re.M)
+    return m[-1].lower() if m else defecto
+
+
+def mesh_web():
+    """MESH_WEB de bricohams.env (por defecto yes): botón del cliente web de Meshtastic en :8443."""
+    return env_val('MESH_WEB', 'yes') != 'no'
+
+
+def tak():
+    """Botón «Servidor TAK» si TAK=yes, o si no se indica y el servicio ya está instalado."""
+    v = env_val('TAK', '')
+    if v:
+        return v == 'yes'
+    return os.path.exists(os.environ.get('BRICOHAMS_TAK_UNIT', '/etc/systemd/system/bricohams-tak.service'))
+
+
+def monitorizacion():
+    """Botón «Monitorización» (dashboard de Grafana) si MONITORIZACION=yes."""
+    return env_val('MONITORIZACION', 'no') == 'yes'
 
 
 def plantilla():
@@ -76,7 +104,7 @@ def quitar(texto):
 
 def poner(texto):
     limpio = quitar(texto)
-    b = bloque(mesh_web())
+    b = bloque(mesh_web(), tak(), monitorizacion())
     m = ANCLA.search(limpio)
     if m:
         return limpio[:m.start()] + '        ' + b + limpio[m.start():]

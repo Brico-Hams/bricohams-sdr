@@ -69,7 +69,7 @@ poner(A, HT + '/plugins/receiver/fuga/fuga.js', 'var k = "%s";' % SECRETO)      
 poner(A, HT + '/plugins/receiver/init.js', "const LISTENERS = { key: '%s' };\nwindow.solar_config = { lat: 0.0, lon: 0.0 };\n" % ANON)
 poner(A, '/var/lib/openwebrx/settings.json', json.dumps({'receiver_gps': {'lat': 0.0, 'lon': 0.0}, 'receiver_admin': 'a@b.es'}), 0o644)
 poner(A, '/var/lib/openwebrx/users.json', '[]', 0o644)
-poner(A, '/etc/shadow', 'root:!:1::::::\nvacio::1::::::\naelm:$y$hash:1::::::\n', 0o640)
+poner(A, '/etc/shadow', 'root:!:1::::::\nvacio::1::::::\noperador:$y$hash:1::::::\n', 0o640)
 poner(A, '/etc/sudoers.d/010_pi-nopasswd', 'pi ALL=(ALL) NOPASSWD: ALL\n', 0o440)
 poner(A, '/etc/sudoers.d/bricohams', 'bricohams ALL=(root) NOPASSWD: /usr/local/sbin/bricohams-tarea\n', 0o440)
 kit = A + '/home/pi/bricohams-sdr'

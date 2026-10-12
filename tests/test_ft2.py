@@ -10,6 +10,7 @@ import importlib.machinery
 import importlib.util
 import os
 import py_compile
+import re
 import shutil
 import subprocess
 import sys
@@ -48,13 +49,13 @@ assert patch.main(['x', '--raiz', r, '--quitar', '--silencioso']) == 0
 assert orig == {f: open(os.path.join(r, f)).read() for f in orig}, 'quitar el parche no deja los ficheros como estaban'
 
 # 2. formato jt9
-lin = dec.convertir('  12:00:15.00   -9  0.1  1234  CQ EA5KAO IM98')
-assert lin == '120015  -9  0.1 1234 ~  CQ EA5KAO IM98', repr(lin)
-assert dec.convertir('  00:00:00.00  -18 -0.3   800  EA5KGV EA5KAO -12', '120018') == '120018 -18 -0.3  800 ~  EA5KGV EA5KAO -12'
+lin = dec.convertir('  12:00:15.00   -9  0.1  1234  CQ N0CALL IM98')
+assert lin == '120015  -9  0.1 1234 ~  CQ N0CALL IM98', repr(lin)
+assert dec.convertir('  00:00:00.00  -18 -0.3   800  EA5KGV N0CALL -12', '120018') == '120018 -18 -0.3  800 ~  EA5KGV N0CALL -12'
 assert dec.convertir('basura') is None
 # misma lectura que Jt9Decoder.parse de OpenWebRX+ (wsjt.py): quita "HHMMSS " y corta por columnas
 msg = lin[7:]
-assert float(msg[0:3]) == -9 and float(msg[4:8]) == 0.1 and int(msg[9:13]) == 1234 and msg[17:53].strip() == 'CQ EA5KAO IM98'
+assert float(msg[0:3]) == -9 and float(msg[4:8]) == 0.1 and int(msg[9:13]) == 1234 and msg[17:53].strip() == 'CQ N0CALL IM98'
 
 # 3. decodificación real (si hay binario)
 binario = os.environ.get('DECODIUM_RX') or shutil.which('decodium-rx')
@@ -68,6 +69,7 @@ if binario:
     shutil.copy(os.path.join(RAIZ, 'tests/datos/ft2_261004_120015.wav'), wav)
     out = subprocess.run([sys.executable, os.path.join(BIN, 'bricohams-ft2-decode'), '-d', '3', wav],
                          env=dict(os.environ, DECODIUM_RX=os.path.abspath(binario)), capture_output=True, text=True).stdout
-    assert 'CQ EA5KAO IM98' in out and out.startswith('120015'), out
+    # la muestra es una emisión FT2 real grabada en el aire (no hay simulador FT2 para regenerarla)
+    assert re.search(r'~  CQ [A-Z0-9/]{3,10} IM98', out) and out.startswith('120015'), out
     real = ' y decodificación real con decodium-rx'
 print('OK test_ft2: parche repetible y reversible, formato jt9%s' % real)

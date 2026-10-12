@@ -1,5 +1,100 @@
 # Historial
 
+## v5.0 · en desarrollo
+**Repositorio genérico (sin datos personales), botones TAK/Monitorización y gestión de bookmarks desde /settings.**
+
+**Usuarios y claves TAK** (manual 36)
+- `tools/instalar_tak.sh` rechaza nombres de usuario TAK con guion: OpenTAKServer solo acepta letras, números, `_` y `.`; con guion el login devuelve 400 aunque la clave sea correcta.
+- Los usuarios se crean con `confirmed_at` y `active=True`. «Cambiar clave» en `/settings` también los fija.
+- Manual 36: procedimiento de reset completo de claves y migración de cuentas con guion.
+
+**Importar / exportar bookmarks** (manual 32 §8)
+- `files/bin/bricohams-owrx-bookmarks-io`: añade a `/settings/bookmarks` tres botones.
+  - **Importar desde fichero…**: lee un `.json` local en el navegador y da de alta los bookmarks uno a uno con el propio formulario de OpenWebRX+.
+  - **Exportar todos** y **Exportar editables**: bajan un `.json` con todos los bookmarks o solo los tuyos.
+- La página solo existe con sesión de administrador; la web pública no cambia (regla del proyecto).
+- El controlador incrusta la lista completa como JSON escapado (`<`, `>` y `&`), así un nombre de bookmark no puede romper la página.
+- El parche es idempotente, escribe de forma atómica, compila el `.py` antes de escribirlo y se deshace con `--quitar`.
+- Se reaplica tras cada `apt` con `/etc/apt/apt.conf.d/99bricohams-owrx-bookmarks-io`.
+- Prueba: `tests/test_bookmarks_io.py`.
+
+**Clave de la API de RepeaterBook en Ajustes generales** (manual 32 §9)
+- `files/bin/bricohams-owrx-repeaterbook`: activa en `/settings/general` la sección «RepeaterBook» con un campo de contraseña `repeaterbook_api_key`, colocada antes de «Map settings».
+  - OpenWebRX+ ya guarda y usa esa clave, pero el campo venía comentado.
+  - Solo se ve con sesión de administrador; la clave no se publica.
+- Si una versión futura de OpenWebRX+ trae el campo activo, el parche no lo duplica.
+- El parche es idempotente y reversible (`--quitar`), con líneas marcadas `#@BH-RB@`.
+- Se reaplica tras cada `apt` con `/etc/apt/apt.conf.d/99bricohams-owrx-repeaterbook`.
+- Hace falta rellenar «Receiver admin», el e-mail de contacto que RepeaterBook exige en el User-Agent.
+  - Los tokens `rbuapp_` están ligados a una aplicación aprobada: si su patrón de User-Agent no coincide, la API devuelve `403 ua_mismatch`.
+- Prueba: `tests/test_repeaterbook.py`.
+
+**Subtono CTCSS en los bookmarks** (manual 32 §10)
+- `files/bin/bricohams-owrx-ctcss` + `files/share/bricohams-ctcss/` (`bricohams_ctcss.py`, `bricohams-ctcss.js`).
+  - Añade el campo opcional `ctcss` (Hz) al bookmark.
+  - Añade la columna «Subtono FM» en `/settings/bookmarks`, con los 50 tonos EIA y validación de 60–260 Hz.
+  - Añade un silenciador por subtono en la cadena FM (`CtcssSquelch`, entre la de-énfasis y el AGC).
+- El silenciador abre solo si el tono pedido es claramente el más fuerte de los 50 EIA, para no abrir con un repetidor vecino. Lleva paso-alto de 300 Hz y rampas para evitar chasquidos.
+- En la web pública se activa al sintonizar un bookmark con tono. El selector «Subtono FM» del panel afecta solo a la sesión del navegador; no hay ningún ajuste persistente fuera de `/settings`.
+- La etiqueta es siempre **FM**, nunca «NFM».
+- `install.sh` instala `python3-numpy` y `python3-scipy`. Antes no lo hacía, y el silenciador quedaba inactivo en silencio.
+- El parche es idempotente y reversible (`--quitar`), con líneas marcadas `#@BH-CTCSS@`, y tiene hook de `apt`.
+- Prueba: `tests/test_ctcss_patch.py`.
+
+**Importar repetidores de RepeaterBook** (manual 32 §11)
+- `files/bin/bricohams-owrx-rbimport` + `files/share/bricohams-rbimport/bricohams_rbimport.py`.
+  - Añade a `/settings/bookmarks` el botón «Importar repetidores (RepeaterBook)…».
+  - Filtros: país, distrito (EA1–EA9 en España), bandas, texto y «solo activos».
+  - Vista previa con selección antes de crear nada.
+- Solo se proponen repetidores FM analógicos.
+- Se guarda únicamente la frecuencia de **salida**, porque el SDR solo recibe. El subtono se toma de TSQ o, si no hay, de PL, y la entrada y el desplazamiento van en la descripción.
+- No se pisan bookmarks existentes en la misma frecuencia.
+- Acción «Asignar subtonos» (`POST /settings/bookmarks/repeaterbook/tonos`): pone el tono a bookmarks FM existentes. Desempata por el indicativo del nombre y no sobrescribe salvo que se pida.
+- La descarga se cachea 6 h para respetar el límite de peticiones de RepeaterBook.
+- Corrección: si la plantilla `bookmarks.html` no trae el ancla esperada, el bloque se inserta antes de `</body>` en lugar de fallar.
+- Prueba: `tests/test_rbimport.py`.
+- Prueba de concepto en el servidor de referencia: importado el distrito 5 en 2 m y 70 cm, con los subtonos asignados.
+
+**Paneles TAK y Monitorización + Grafana** (manual 36)
+- Accesos en `/settings/bricohams/tak` y `/settings/bricohams/monitorizacion`, siempre con sesión de administrador.
+- Grafana se sirve detrás de `/settings/bricohams/grafana/`.
+  - Contraseña inicial de `admin` en `GRAFANA_ADMIN_PASS` (`.env`); cámbiala en el primer acceso.
+- Pasos `paso_tak` y `paso_monitorizacion` en `install.sh`, con las variables `TAK`, `MONITORIZACION` y `GRAFANA_ADMIN_PASS` en `.env.example`.
+
+**Sincronización del repositorio personal con v5.0**
+- Este repositorio (estación EA5KAO) se ha igualado con el genérico v5.0 manteniendo los datos de la estación. Copia previa: `bricohams-sdr-v4.5-backup.tgz` en la carpeta superior.
+- Documentación nueva: `docs/COMPONENTES.md` (ficha por componente) y sección «Estructura» del README enlazada con `docs/ESTRUCTURA_FICHEROS.md`.
+
+**Monitorización automatizada y adopción de instalaciones manuales** (manual 36, ADR-64)
+- `paso_monitorizacion` instala Prometheus, node-exporter y Grafana si faltan y, si ya existen instalados a mano (`/usr/local/bin` + unidades propias), los **adopta** sin reinstalar.
+- Drop-ins `*.service.d/bricohams.conf` fuerzan `127.0.0.1:9090` y `127.0.0.1:9100`; `openwebrx_exporter` (si existe) queda limitado a localhost con `IPAddressDeny`.
+- `prometheus.yml` se regenera conservando los trabajos ajenos; `prometheus.yml` y `grafana.ini` previos se guardan una vez como `*.bak-manual`.
+- Clave de `admin`: `GRAFANA_ADMIN_PASS` > `/etc/bricohams/grafana-access.txt` > aleatoria; se aplica con `grafana cli admin reset-admin-password` (`grafana.ini` repite `[paths]` para que la CLI use la misma base de datos).
+- nginx: `/settings/bricohams/grafana/` pasa por `auth_request` antes de llegar a `127.0.0.1:3000`; con `MONITORIZACION=no` el bloque `#@GF@` queda comentado.
+- Prueba: `tests/test_monitorizacion.py`.
+- `tests/test_ssl_admin.py` remapea también `listen 8443` (cliente web Meshtastic) a un puerto libre: la prueba fallaba en una Pi con ese puerto ya ocupado.
+
+**Credenciales del servidor TAK desde /settings** (manual 36, ADR-63)
+- Las claves TAK no tienen valor por defecto: `instalar_tak.sh` las genera aleatorias y solo viven en `/etc/bricohams/tak-access.txt` (root, 600). Antes no había forma documentada de verlas ni de cambiarlas sin terminal.
+- Nueva tarjeta **Credenciales TAK** en `/settings/bricohams/tak`:
+  - muestra usuarios y rol con la clave enmascarada;
+  - **Mostrar credenciales** (POST + CSRF, `no-store`) las enseña en claro;
+  - **Cambiar clave**: manual (12–128 ASCII visibles) o aleatoria; lista blanca de usuarios del fichero; la clave va por stdin a OpenTAKServer (`runuser -u opentakserver`), nunca en argv ni en el log; el fichero se reescribe atómico solo si OpenTAKServer confirma.
+- Unidad `bricohams-mesh-admin`: `ReadWritePaths=-/var/lib/bricohams-tak`. Sin ello `ProtectSystem=strict` impedía a OpenTAKServer escribir su log y el cambio fallaba (comprobado en la Pi con `systemd-run`).
+- `instalar_tak.sh` reinicia `bricohams-mesh-admin` al terminar y su mensaje final indica dónde ver las credenciales.
+- Pruebas en `tests/test_mesh_admin.py`.
+
+**Pruebas y calidad**
+- `tests/run_tests.sh` incluye las pruebas de BMIO, RepeaterBook, CTCSS y RBI.
+- `tests/test_ft2.py` compara el indicativo con una expresión regular en lugar de uno fijo.
+  - El WAV de ejemplo (`tests/datos/ft2_*.wav`) es una captura real del aire y en el audio contiene el indicativo del operador que la grabó.
+- `tools/instalar_tak.sh` queda limpio en shellcheck (directiva SC1090 documentada).
+- Suite completa ejecutada en una Raspberry Pi real: todo OK. Solo se omite `test_audio_navegador`, porque requiere Playwright.
+
+**Firmware**
+- iGate LoRa APRS: compiladas de nuevo las **55/55** placas, con todos los SHA256 coincidentes (`docs/manuales/` de compilación y `SHA256SUMS`).
+- Meshtastic v2.7.26: compilación de todos los entornos con `build_all.py`; el resultado está en `build_report.json`.
+
 ## v4.6 · 11/10/2026
 **Servidor TAK local, chat APRS en el CHAT común y mapa en vivo con aviones ADS-B y trazas APRS.** Todo lo de la v4.5 se mantiene. RadarBox y MLAT no se tocan. Justificación completa en el manual 37; manejo en el manual 36.
 

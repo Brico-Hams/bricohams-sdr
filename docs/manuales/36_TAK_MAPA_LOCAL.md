@@ -105,13 +105,70 @@ El acceso de red TAK se limita a `192.168.1.0/24`. La CA local no es
 confiable para un navegador nuevo hasta importarla voluntariamente:
 no se debe desactivar la verificacion TLS como solucion.
 
-Las cuentas se conservan en `/etc/bricohams/tak-access.txt` (root, modo 600).
-El usuario administrador es `ea5kao`; el usuario cliente es `ea5kao-tak`.
-Las claves no estan en este manual ni en el repositorio. Consultarlas solo
-en una terminal administrativa local:
+### Credenciales TAK (no hay clave por defecto)
+
+`tools/instalar_tak.sh` crea **dos** cuentas en OpenTAKServer:
+
+| Cuenta | Variable `.env` | Valor por defecto | Rol |
+|---|---|---|---|
+| Administrador | `TAK_ADMIN_USER` | `admin` | `administrator` |
+| Cliente ATAK/iTAK | `TAK_USER` | `tak` | `user` |
+
+(Los nombres de usuario si tienen valor por defecto y pueden cambiarse en el
+entorno al instalar, p.ej. `TAK_ADMIN_USER=ea5xxx TAK_USER=ea5xxx_tak`.)
+
+> **Importante:** OpenTAKServer solo acepta nombres de usuario con letras,
+> numeros, `_` y `.`. Un **guion** (`ea5xxx-tak`) hace que el login devuelva
+> HTTP 400 aunque la clave sea correcta. `instalar_tak.sh` rechaza esos nombres.
+> Si heredas una cuenta con guion, crea una nueva con `_` (no se puede renombrar
+> en la BD: la tabla `certificates` referencia el nombre) y desactiva la antigua.
+
+### Reset completo de claves
+
+Para regenerar todas las claves (p.ej. si se han filtrado):
+
+1. Copia de seguridad de `/etc/bricohams/tak-access.txt`.
+2. Para cada usuario: nueva clave aleatoria, `hash_password`, `active=True`,
+   `confirmed_at` y nuevo `fs_uniquifier` (cierra las sesiones abiertas).
+3. Reescribe el fichero (root, 600) y comprueba `POST /api/login` → 200.
+
+Desde el panel (`/settings` → Servidor TAK → Credenciales) se hace lo mismo
+cuenta a cuenta con «Cambiar clave». Tras el reset, actualiza los clientes
+ATAK/iTAK con la nueva clave.
+
+**Las claves NO tienen valor por defecto**: se generan aleatoriamente en la
+instalacion (`secrets.token_urlsafe(24)`, ~32 caracteres) y solo se guardan en
+`/etc/bricohams/tak-access.txt` (root, modo 600), una linea `usuario: clave`
+por cuenta; la primera linea es el administrador. No estan en este manual ni
+en el repositorio.
+
+**Consultarlas** (requiere sesion de administrador de OpenWebRX+):
+
+1. `https://<ip>/settings` → **Servidor TAK** → tarjeta **Credenciales TAK**.
+   Por defecto muestra usuarios, rol y claves enmascaradas (`••••`).
+2. Pulsar **Mostrar credenciales** (POST con token CSRF): la respuesta,
+   marcada `Cache-Control: no-store`, muestra las claves en claro.
+3. Alternativa en terminal local: `sudo cat /etc/bricohams/tak-access.txt`.
+
+**Cambiarlas** desde la misma tarjeta: elegir usuario, escribir una clave
+nueva (12–128 caracteres ASCII visibles, sin espacios) o marcar *Generar
+aleatoria*, y pulsar **Cambiar clave**. El panel:
+
+- solo admite usuarios presentes en `tak-access.txt` (lista blanca);
+- ejecuta `runuser -u opentakserver` con el Python de OpenTAKServer y pasa la
+  clave por **stdin** (nunca en la linea de comandos ni en el log);
+- si OpenTAKServer confirma el cambio, reescribe `tak-access.txt` de forma
+  atomica (modo 600); si el usuario no existe (codigo 3) no toca el fichero.
+
+El servicio `bricohams-mesh-admin` corre con `ProtectSystem=strict`; para que
+OpenTAKServer pueda escribir su log y BD durante el cambio, la unidad incluye
+`ReadWritePaths=-/var/lib/bricohams-tak` (el `-` lo hace opcional si TAK no
+esta instalado). `instalar_tak.sh` ejecuta `systemctl try-restart
+bricohams-mesh-admin` al terminar para que el montaje tome efecto.
+
+Comprobar servicios:
 
 ```bash
-sudo cat /etc/bricohams/tak-access.txt
 systemctl is-active bricohams-tak bricohams-tak-cot bricohams-tak-ssl
 ```
 
@@ -178,3 +235,73 @@ sin HTML ejecutable y la eliminacion de la capa TAK al recibir 401.
 Para copias TAK, conservar PostgreSQL (`pg_dump bricohams_tak`), datos/config/CA
 en `/var/lib/bricohams-tak`, certificados nginx y configuraciones de servicios.
 Guardar esas copias cifradas: incluyen claves privadas y credenciales.
+
+## Monitorizacion: Prometheus, node-exporter y Grafana
+
+Se activa con `MONITORIZACION="yes"` en el `.env` y lo aplica el paso
+`monitorizacion` de `install.sh`:
+
+```bash
+sudo bash install.sh --solo monitorizacion,web
+```
+
+Que hace, en orden:
+
+1. **Paquetes.** Si `prometheus`, `prometheus-node-exporter` o `grafana`
+   no existen, los instala por apt (Grafana desde su repositorio oficial).
+   Si ya hay una **instalacion manual** (binarios en `/usr/local/bin`,
+   unidades propias `prometheus.service` / `node_exporter.service`), la
+   **adopta**: no reinstala ni borra nada.
+2. **Solo loopback.** Crea *drop-ins* `/etc/systemd/system/<unidad>.service.d/bricohams.conf`
+   que sustituyen el `ExecStart=` para escuchar en `127.0.0.1:9090`
+   (Prometheus) y `127.0.0.1:9100` (node-exporter). Nunca `0.0.0.0`.
+3. **prometheus.yml fusionado.** Garantiza los trabajos `prometheus`
+   (127.0.0.1:9090) y `node` (127.0.0.1:9100) y **conserva** cualquier
+   trabajo extra que el operador hubiera anadido a mano (por ejemplo un
+   `openwebrx_exporter` propio). Si existe la unidad `openwebrx_exporter`,
+   un drop-in con `IPAddressDeny=any` / `IPAddressAllow=localhost` le
+   impide hablar con nadie que no sea la propia Pi. La
+   fusion es idempotente: ejecutarla dos veces no cambia el fichero.
+   Copia previa en `prometheus.yml.bak-manual` la primera vez.
+4. **grafana.ini.** Fija `http_addr = 127.0.0.1`, `http_port = 3000`,
+   `root_url = %(protocol)s://%(domain)s/settings/bricohams/grafana/` y
+   `serve_from_sub_path = true`. Permisos `640` (root:grafana).
+5. **Contrasena de admin**, por prioridad:
+   `GRAFANA_ADMIN_PASS` del `.env` > la guardada en
+   `/etc/bricohams/grafana-access.txt` > una aleatoria nueva (16-20
+   caracteres alfanumericos). Se aplica con
+   `grafana cli admin reset-admin-password` (por stdin cuando la version
+   lo admite) y se guarda en `grafana-access.txt` (root, `600`).
+   Para mantener una clave concreta (p. ej. la de una instalacion manual
+   previa) basta con ponerla en `GRAFANA_ADMIN_PASS`. El `grafana.ini`
+   original se guarda una vez como `grafana.ini.bak-manual`. Grafana
+   permite ademas consulta anonima con rol *Viewer*, pero solo es alcanzable
+   tras el login de `/settings`.
+6. **Panel y nginx.** Importa el panel `files/grafana/bricohams.json`
+   (fuente de datos Prometheus) y activa en nginx las lineas `#@GF@` de
+   `bricohams-sdr-rutas.conf`: `/settings/bricohams/grafana/` pasa antes
+   por `auth_request` (sesion de administrador de OpenWebRX+) y solo
+   entonces se reenvia a `127.0.0.1:3000`. Con `MONITORIZACION="no"`
+   esas lineas quedan comentadas y Grafana no es accesible.
+
+Rotar la contrasena:
+
+```bash
+sudoedit /etc/bricohams/bricohams.env     # GRAFANA_ADMIN_PASS="nueva-clave"
+sudo bash install.sh --solo monitorizacion
+```
+
+Comprobar:
+
+```bash
+systemctl status prometheus node_exporter grafana-server   # o prometheus-node-exporter
+ss -ltnp | grep -E ':(3000|9090|9100) '                    # todo en 127.0.0.1
+curl -s 127.0.0.1:9090/api/v1/targets | grep -o '"health":"[a-z]*"'
+```
+
+Acceso: `/settings` > boton **Monitorizacion** > **Abrir Grafana**.
+Nada de esto aparece en la pagina publica.
+
+Prueba: `tests/test_monitorizacion.py` (fusion del YAML, prioridad de la
+contrasena, drop-ins en loopback y orden `auth_request` en nginx).
+

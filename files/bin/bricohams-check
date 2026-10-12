@@ -162,6 +162,20 @@ ss -ltn 2>/dev/null | grep -q ':9443 ' && aviso "meshtasticd sirve su web sin co
 if systemctl is-active --quiet bricohams-mesh-admin 2>/dev/null; then bien "panel Meshtastic 433/868 solo en /settings/bricohams/meshtastic (sesión de administrador)"
 else aviso "panel Meshtastic parado: systemctl status bricohams-mesh-admin"; fi
 
+# v5.0 · TAK y monitorización: solo si están activados en bricohams.env
+if [ "${TAK:-no}" = yes ] || [ -e /etc/systemd/system/bricohams-tak.service ]; then
+    titulo "Servidor TAK (OpenTAKServer)"
+    for u in postgresql rabbitmq-server bricohams-tak; do servicio "$u"; done
+    for p in 8081 8089 8445; do ss -ltn 2>/dev/null | grep -q ":$p " && bien "TAK escucha en $p" || aviso "TAK no escucha en $p"; done
+    bien "gestión en /settings/bricohams/tak (sesión de administrador)"
+fi
+if [ "${MONITORIZACION:-no}" = yes ]; then
+    titulo "Monitorización (Prometheus + Grafana)"
+    for u in prometheus-node-exporter prometheus grafana-server; do servicio "$u"; done
+    curl -fsS --max-time 4 http://127.0.0.1:9090/-/ready >/dev/null 2>&1 && bien "Prometheus listo (127.0.0.1:9090)" || mal "Prometheus no responde en 127.0.0.1:9090"
+    curl -fsS --max-time 4 http://127.0.0.1:3000/api/health 2>/dev/null | grep -q '"ok"' && bien "Grafana sano · panel en /settings/bricohams/monitorizacion" || mal "Grafana no responde en 127.0.0.1:3000"
+fi
+
 titulo "Cámara del mástil"
 if command -v rpicam-hello >/dev/null && rpicam-hello --list-cameras 2>&1 | grep -q '^[0-9] :'; then bien "cámara CSI detectada"; else aviso "no veo la cámara CSI (rpicam-hello --list-cameras); si MediaMTX la está usando es normal"; fi
 servicio mediamtx
