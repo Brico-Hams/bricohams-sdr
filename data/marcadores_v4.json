@@ -1,5 +1,5 @@
 {
- "_nota": "Marcadores v4 (EA5KAO · BricoHams). Los fusiona tools/marcadores.py. No se incluyen comunicaciones privadas (taxis, TETRA de emergencias, policía).",
+ "_nota": "Marcadores v4 (BricoHams). Los fusiona tools/marcadores.py. No se incluyen comunicaciones privadas (taxis, TETRA de emergencias, policía).",
  "marcadores": [
   {
    "grupo": "Radio Club Región de Murcia (EA5RCZ)",
@@ -15,7 +15,7 @@
    "mhz": 145.325,
    "modulation": "nfm",
    "description": "Frecuencia de encuentro VHF del Radio Club Región de Murcia (FM simplex)",
-   "fuente": "EA5KAO"
+   "fuente": "N0CALL"
   },
   {
    "grupo": "Radio Club Región de Murcia (EA5RCZ)",
@@ -23,7 +23,7 @@
    "mhz": 430.325,
    "modulation": "nfm",
    "description": "Frecuencia de encuentro UHF del Radio Club Región de Murcia (FM simplex)",
-   "fuente": "EA5KAO"
+   "fuente": "N0CALL"
   },
   {
    "grupo": "Banda Ciudadana 27 MHz (CEPT, Orden ETU/1033/2017)",
@@ -1222,7 +1222,7 @@
    "name": "🛰️ METEOR M2-3 / M2-4 LRPT",
    "mhz": 137.9,
    "modulation": "nfm",
-   "description": "Meteor-M2-3 (57166) y M2-4 (59051): imágenes LRPT 72k en 137,900 (decodificador LRPT)",
+   "description": "Meteor-M2-3 (57166) y M2-4 (59051): LRPT 72k en 137,900. En NFM solo se oye la portadora; las imágenes las decodifica SatDump en segundo plano y salen en el menú «Files»",
    "fuente": "https://www.amsat.org/status/"
   },
   {
@@ -1230,7 +1230,7 @@
    "name": "🛰️ METEOR LRPT (alterna)",
    "mhz": 137.1,
    "modulation": "nfm",
-   "description": "Frecuencia alternativa LRPT de los Meteor (137,100)",
+   "description": "Frecuencia alternativa LRPT de los Meteor (137,100). Imágenes: servicio de fondo SatDump → menú «Files»",
    "fuente": "https://www.amsat.org/status/"
   }
  ]

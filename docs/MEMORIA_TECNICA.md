@@ -1,4 +1,4 @@
-# Memoria técnica · Estación BricoHams SDR · EA5KAO · Mi QTH (v3.0)
+# Memoria técnica · Estación BricoHams SDR · N0CALL · tu QTH (v3.0)
 
 Aquí está **todo lo que forma la estación**: qué es cada componente, **dónde va**, **a qué se conecta** y con qué cable, y en qué manual y esquema se monta. Las decisiones de diseño están en [ARQUITECTURA.md](ARQUITECTURA.md); los pines, en [HARDWARE_Y_GPIO.md](HARDWARE_Y_GPIO.md).
 

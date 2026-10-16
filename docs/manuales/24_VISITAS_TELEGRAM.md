@@ -1,11 +1,21 @@
 # 24 · Oyentes, estadísticas y avisos por Telegram
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Oyentes, Telegram y avisos](../GUIA_VISUAL_MODULOS.md#visitas).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 **Qué hace:**
 - **Aviso por Telegram:** cada vez que alguien se conecta al SDR, el grupo de operadores recibe:
   > 🟢 **Nuevo oyente** 🇮🇹 Roma, Italia · `151.20.x.x` · 3 conectados
 - **En la web:**
   - junto al nombre del receptor sale «👥 3 ahora 🇪🇸🇪🇸🇮🇹 · 1.234 visitas»;
   - al pulsarlo, un resumen por países de los últimos 30 días.
+- **Identificación voluntaria:** la bienvenida del receptor permite compartir el
+  indicativo/nombre con consentimiento explícito. El registro separado de visitas
+  y Telegram no recibe esa identificación ni almacena la IP junto a ella; ver
+  [manual 39](39_REGISTRO_OYENTES.md).
 
 ## 1. Cómo funciona (ADR-33)
 1. **OpenWebRX+** publica cada conexión y desconexión, con la IP del oyente, en un **MQTT local** (mosquitto, solo 127.0.0.1). Hace falta `mqtt_enabled`, que el instalador activa con `VISITAS_ENABLE="yes"`.
@@ -35,10 +45,12 @@
    bricohams-telegram "prueba desde la estación"
    ```
 
-## 3. Privacidad (RGPD)
+## 3. Privacidad
 - **Por qué hay que avisar:** registrar IPs, aunque sea truncadas, y la localización es tratar datos personales. Por eso la web tiene un **aviso de privacidad** (`/bricohams/privacidad.html`, enlazado en la descripción del receptor y en el contador) que explica qué se guarda, para qué, cuánto tiempo y cómo ejercer los derechos.
 - **Contacto:** el de `ADMIN_EMAIL`. Revisa el texto con tu club. Esto no es asesoramiento legal.
-- **Si prefieres no guardar nada personal:** `VISITAS_ENABLE="no"`. El contador y los avisos desaparecen.
+- **Si no quieres activar la bienvenida de identificación:** configura
+  `VISITAS_ENABLE="no"`; también se desactivan las visitas, el contador y los avisos.
+  El detalle del registro voluntario y su retención está en el [manual 39](39_REGISTRO_OYENTES.md).
 
 ## 4. Comandos
 ```bash
@@ -50,3 +62,22 @@ journalctl -u bricohams-visitas -n 50
 
 ## 5. Bloquear a alguien
 En `https://DOMINIO/clients` (OpenWebRX+, con el usuario admin), el admin ve las IPs completas de los conectados en ese momento y puede **banear**. Esa lista es de OpenWebRX+ y no se guarda en disco.
+
+## 6. Moderador automático del chat (v5.1)
+`bricohams-visitas` vigila el CHAT común de OpenWebRX+ y puntúa a cada IP:
+
+| Motivo | Puntos |
+|---|---|
+| Intento de inyección (HTML/JS) | 10 |
+| Palabra prohibida (`CHATBOT_PALABRAS`) | 4 |
+| Enlace (si `CHATBOT_LINKS=no`) | 3 |
+| Avalancha (más de `CHATBOT_MAX_MSG`=6 mensajes en `CHATBOT_VENTANA`=30 s) | 3 |
+| Mensaje repetido | 2 |
+| Mensaje largo (> `CHATBOT_MAX_LEN`=300) | 2 |
+
+- Los puntos bajan 1 por minuto. Al llegar a `CHATBOT_UMBRAL` (10) la IP se banea 1 h con la jaula fail2ban `bricohams-chat`.
+- Variables: `CHATBOT_ENABLE`, `CHATBOT_AVISAR` (aviso por Telegram), `CHATBOT_UMBRAL` y `CHATBOT_PALABRAS` (`a,b,c` o `@/ruta/fichero`).
+- Registro en `/var/log/bricohams-chat/moderador.log`. Para ver el estado: `sudo -u openwebrx bricohams-visitas --moderador`.
+
+## 7. Aviso de inicio de sesión
+`bricohams-login-aviso` manda por Telegram cada inicio de sesión correcto en `/settings`, con la IP y la hora. No incluye el usuario, porque el registro de nginx no lo lleva. Una misma IP no repite aviso en 10 min. Se activa con `TG_AVISO_LOGIN=yes` en `bricohams.env`. Los intentos fallidos los gestiona fail2ban (ver [manual 34](34_BLINDAJE_SEGURIDAD.md)).

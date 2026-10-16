@@ -1,7 +1,7 @@
 /*
  * dsp_audio: procesado de audio para el oyente de OpenWebRX+ (v4.2)
  *
- * Autor: EA5KAO · BricoHams · licencia MIT · necesita el plugin audio_cadena
+ * Autor: BricoHams · licencia MIT · necesita el plugin audio_cadena
  *
  * Botón «DSP» en la barra superior. En la ventana:
  *   - ECUALIZADOR de 3 bandas: graves (250 Hz), medios (1,2 kHz), agudos (3 kHz), ±12 dB
@@ -18,7 +18,7 @@
  */
 
 Plugins.dsp_audio._version = '1.0.0';
-Plugins.dsp_audio._author = 'EA5KAO';
+Plugins.dsp_audio._author='BricoHams';
 Plugins.dsp_audio.no_css = true;
 
 // ---------------------------------------------------------------------
@@ -152,8 +152,8 @@ Plugins.dsp_audio.init = async function () {
     // ---- interfaz -------------------------------------------------------
     var SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<path d="M5 4v16M12 4v16M19 4v16"/><rect x="3" y="13" width="4" height="3" rx="1"/><rect x="10" y="7" width="4" height="3" rx="1"/><rect x="17" y="11" width="4" height="3" rx="1"/></svg>';
-    var ventana = C.ui.ventana('ea5kao-dsp', '🎛 DSP DE AUDIO', [820, 110]);
-    var $btn = C.ui.boton('ea5kao-dsp-button', 'DSP', SVG, 'Ecualizador, puerta de ruido y AGC (solo en tu navegador)',
+    var ventana = C.ui.ventana('bh-dsp', '🎛 DSP DE AUDIO', [820, 110]);
+    var $btn = C.ui.boton('bh-dsp-button', 'DSP', SVG, 'Ecualizador, puerta de ruido y AGC (solo en tu navegador)',
                           function () { ventana.abrir(!ventana.abierta()); });
     ventana.alCambiar = function () { vigilar(); };
     var $c = ventana.$cuerpo;

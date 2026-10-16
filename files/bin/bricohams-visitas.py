@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-visitas · EA5KAO · BricoHams  (v4)
+#  bricohams-visitas · BricoHams  (v4)
 #  Quién se conecta al SDR y desde dónde, con aviso por Telegram.
 #   - OpenWebRX+ publica por MQTT (mosquitto local, tema openwebrx/CLIENT)
 #     cada conexión/desconexión con la IP del oyente (detrás de nginx, la
@@ -12,7 +12,13 @@
 #   - Telegram: aviso de cada conexión (como mucho 1 por IP cada 10 min),
 #     chat opcional y resumen diario (--resumen).
 #   - Web: plugins/receiver/visitas/visitas.json (solo totales y países).
+#   - v5.1 · Moderador del chat (CHATBOT_*): puntúa cada mensaje (avalancha,
+#     enlaces, palabras vetadas, inyección HTML/JS, longitud, repeticiones).
+#     Lo dudoso no se reenvía a Telegram; al pasar el umbral escribe
+#     «BAN ip=…» en /var/log/bricohams-chat/moderador.log y Fail2ban
+#     (jail bricohams-chat) bloquea la IP. Nunca actúa sobre la LAN.
 #  Uso: bricohams-visitas              (servicio)
+#       bricohams-visitas --moderador  (últimos bloqueos del chat)
 #       bricohams-visitas --resumen    (manda el resumen del día a Telegram)
 #       bricohams-visitas --estado     (muestra los datos)
 #       bricohams-visitas --geoip      (descarga la base GeoIP del mes)
@@ -21,6 +27,7 @@ import gzip
 import ipaddress
 import json
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -113,8 +120,9 @@ def abrir_db(ruta=DB):
 
 
 class Visitas:
-    def __init__(self, db, geo, telegram=None, ahora=time.time):
+    def __init__(self, db, geo, telegram=None, ahora=time.time, moderador=None):
         self.db, self.geo, self.tg, self.ahora = db, geo, telegram, ahora
+        self.moderador = moderador
         self.activas = {}            # clave interna (ip completa, solo en memoria) -> fila
         self.ultimo_aviso = {}
         self.clientes = 0
@@ -128,8 +136,13 @@ class Visitas:
             return self.conectado(ip)
         if estado == 'Disconnected':
             return self.desconectado(ip)
-        if estado == 'ChatMessage' and self.tg and si(env('VISITAS_CHAT', 'yes')):
-            self.tg('💬 <b>%s</b>: %s' % (esc(m.get('name', '?')), esc(m.get('message', ''))))
+        if estado == 'ChatMessage':
+            if self.moderador and ip:
+                ok, _ = self.moderador.revisar(ip, m.get('name', '?'), m.get('message', ''))
+                if not ok:
+                    return None
+            if self.tg and si(env('VISITAS_CHAT', 'yes')):
+                self.tg('💬 <b>%s</b>: %s' % (esc(m.get('name', '?')), esc(m.get('message', ''))))
         return None
 
     def conectado(self, ip):
@@ -195,6 +208,119 @@ def esc(t):
     return str(t).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
+CHAT_LOG = env('CHATBOT_LOG', '/var/log/bricohams-chat/moderador.log')
+RE_ENLACE = re.compile(r'(https?://|www\.|\b[a-z0-9-]+\.(com|net|org|ru|cn|xyz|top|io|info|biz|me|ly|gg|tk)\b)', re.I)
+RE_INYECCION = re.compile(r'(<\s*(script|iframe|object|embed|svg|img)\b|javascript\s*:|\bon\w+\s*=)', re.I)
+
+
+def cargar_palabras(valor):
+    """CHATBOT_PALABRAS: 'a,b,c' o '@/ruta/fichero' (una por línea)."""
+    valor = (valor or '').strip()
+    if valor.startswith('@'):
+        try:
+            with open(valor[1:], encoding='utf-8') as f:
+                valor = ','.join(l.strip() for l in f if l.strip() and not l.startswith('#'))
+        except OSError:
+            return []
+    return [p.strip().lower() for p in valor.split(',') if p.strip()]
+
+
+class ModeradorChat:
+    """Puntúa los mensajes del chat por IP. Al superar el umbral escribe
+    «<ts> BAN ip=<IP> motivo=<regla>» en el log que vigila Fail2ban.
+    La IP completa solo va a ese log de seguridad (rotación corta)."""
+
+    PUNTOS = {'inyeccion': 10, 'palabra': 4, 'enlace': 3, 'avalancha': 3, 'repetido': 2, 'largo': 2}
+
+    def __init__(self, ahora=time.time, log_path=CHAT_LOG, tg=None, max_msg=None, ventana=None,
+                 umbral=None, max_len=None, enlaces=None, palabras=None):
+        self.ahora, self.log_path, self.tg = ahora, log_path, tg
+        self.max_msg = int(max_msg if max_msg is not None else env('CHATBOT_MAX_MSG', '6'))
+        self.ventana = float(ventana if ventana is not None else env('CHATBOT_VENTANA', '30'))
+        self.umbral = float(umbral if umbral is not None else env('CHATBOT_UMBRAL', '10'))
+        self.max_len = int(max_len if max_len is not None else env('CHATBOT_MAX_LEN', '300'))
+        self.enlaces = si(enlaces if enlaces is not None else env('CHATBOT_LINKS', 'no'))
+        self.palabras = palabras if palabras is not None else cargar_palabras(env('CHATBOT_PALABRAS', ''))
+        self.estado = {}             # ip -> {'pts', 't', 'msgs': [ts], 'ult': [txt]}
+        self.baneadas = {}           # ip -> ts del BAN
+        self.lock = threading.Lock()
+
+    @staticmethod
+    def moderable(ip):
+        try:
+            a = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return a.is_global
+
+    def reglas(self, st, t, message):
+        txt = str(message or '')
+        bajo = txt.lower()
+        motivos = []
+        if RE_INYECCION.search(txt):
+            motivos.append('inyeccion')
+        if self.palabras and any(p in bajo for p in self.palabras):
+            motivos.append('palabra')
+        if not self.enlaces and RE_ENLACE.search(txt):
+            motivos.append('enlace')
+        if len(txt) > self.max_len:
+            motivos.append('largo')
+        st['msgs'] = [x for x in st['msgs'] if t - x <= self.ventana] + [t]
+        if len(st['msgs']) > self.max_msg:
+            motivos.append('avalancha')
+        st['ult'] = (st['ult'] + [bajo.strip()])[-5:]
+        if bajo.strip() and st['ult'].count(bajo.strip()) >= 3:
+            motivos.append('repetido')
+        return motivos
+
+    def revisar(self, ip, name, message):
+        """Devuelve (ok, motivo). ok=False: no reenviar el mensaje."""
+        if not self.moderable(ip):
+            return True, ''
+        t = self.ahora()
+        with self.lock:
+            if t - self.baneadas.get(ip, -1e18) < 3600:
+                return False, 'baneada'
+            st = self.estado.setdefault(ip, {'pts': 0.0, 't': t, 'msgs': [], 'ult': []})
+            st['pts'] = max(0.0, st['pts'] - (t - st['t']) / 60.0)   # olvida 1 punto por minuto
+            st['t'] = t
+            motivos = self.reglas(st, t, message)
+            if not motivos:
+                return True, ''
+            st['pts'] += sum(self.PUNTOS[m] for m in motivos)
+            motivo = '+'.join(motivos)
+            if st['pts'] < self.umbral:
+                return False, motivo
+            self.baneadas[ip] = t
+            self.estado.pop(ip, None)
+        self.banear(ip, name, motivo, t)
+        return False, motivo
+
+    def banear(self, ip, name, motivo, t):
+        linea = '%s BAN ip=%s motivo=%s\n' % (datetime.fromtimestamp(t).isoformat(timespec='seconds'), ip, motivo)
+        try:
+            d = os.path.dirname(self.log_path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            fd = os.open(self.log_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o640)
+            with os.fdopen(fd, 'a', encoding='utf-8') as f:
+                f.write(linea)
+        except OSError as e:
+            print('visitas: moderador: %s' % e, file=sys.stderr, flush=True)
+        if self.tg:
+            self.tg('🚫 <b>Chat: IP bloqueada</b> <code>%s</code> · %s · motivo: %s' % (
+                ip_parcial(ip), esc(name or '?'), esc(motivo)))
+
+
+def ultimos_bloqueos(ruta=CHAT_LOG, n=20):
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            lineas = [l.rstrip('\n') for l in f if ' BAN ' in l]
+    except OSError:
+        return []
+    return lineas[-n:]
+
+
 def telegram_envio():
     tok, chat = env('TELEGRAM_TOKEN'), env('TELEGRAM_CHAT_ID')
     if not tok or not chat:
@@ -227,7 +353,7 @@ def descargar_geoip(destino=GEO):
     url = 'https://download.db-ip.com/free/dbip-city-lite-%s.mmdb.gz' % mes
     tmp = destino + '.gz.tmp'
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'BricoHams-SDR EA5KAO'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'BricoHams-SDR N0CALL'})
         with urllib.request.urlopen(req, timeout=120) as r, open(tmp, 'wb') as f:
             shutil.copyfileobj(r, f)
         with gzip.open(tmp) as g, open(destino + '.tmp', 'wb') as f:
@@ -249,7 +375,9 @@ def servicio():
     except ImportError:
         print('visitas: falta python3-paho-mqtt', file=sys.stderr)
         return 1
-    v = Visitas(abrir_db(), Geo(), telegram_envio())
+    tg = telegram_envio()
+    mod = ModeradorChat(tg=tg if si(env('CHATBOT_AVISAR', 'yes')) else None) if si(env('CHATBOT_ENABLE', 'yes')) else None
+    v = Visitas(abrir_db(), Geo(), tg, moderador=mod)
     tema = env('MQTT_TOPIC', 'openwebrx') + '/CLIENT'
 
     def on_connect(c, u, f, rc, *a):
@@ -279,6 +407,10 @@ def servicio():
 def main(argv):
     if '--geoip' in argv:
         return descargar_geoip()
+    if '--moderador' in argv:
+        b = ultimos_bloqueos()
+        print('\n'.join(b) if b else 'moderador: sin bloqueos registrados')
+        return 0
     if '--resumen' in argv or '--estado' in argv:
         v = Visitas(abrir_db(), Geo())
         r = v.resumen()

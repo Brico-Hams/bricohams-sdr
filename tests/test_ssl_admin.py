@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v4.2 · SSL_MODO (decisión de EA5KAO: «el certificado SSL es solo para la página de settings»).
+"""v4.2 · SSL_MODO (decisión de N0CALL: «el certificado SSL es solo para la página de settings»).
 Genera el sitio de nginx con nginx_sitio (la función real de install.sh) en los tres modos y,
 si hay nginx en la máquina de pruebas, lo arranca de verdad delante de un OpenWebRX+ falso:
   admin → «/» por HTTP sin redirigir; /login, /settings… → 301 a HTTPS; la cookie de sesión
@@ -22,6 +22,11 @@ RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 S = open(os.path.join(RAIZ, 'install.sh'), encoding='utf-8').read()
 PLANTILLA = open(os.path.join(RAIZ, 'files/nginx/bricohams-sdr.conf.tmpl'), encoding='utf-8').read()
 RUTAS = open(os.path.join(RAIZ, 'files/nginx/bricohams-sdr-rutas.conf'), encoding='utf-8').read()
+LOGIN_LOG = open(os.path.join(RAIZ, 'files/nginx/bricohams-login-log.conf'), encoding='utf-8').read()
+assert 'access_log /var/log/nginx/bricohams-sdr-login.access.log bricohams_login;' in RUTAS
+assert 'sent_http_location' in LOGIN_LOG and '$request' in LOGIN_LOG
+assert 'map $uri $bh_admin_cache' in PLANTILLA
+assert 'add_header Cache-Control $bh_admin_cache always;' in RUTAS
 FUNC = re.search(r'^nginx_sitio\(\) \{.*?^\}', S, re.S | re.M).group(0)
 
 
@@ -49,7 +54,7 @@ rx = re.search(r'location ~ \^/\(([^)]*)\)', sitio('admin')).group(1).split('|')
 for r in ADMIN:
     assert r in rx, r
 assert 'X-Forwarded-Proto $scheme' in RUTAS and 'X-Forwarded-For $remote_addr' in RUTAS
-assert 'case "$modo" in admin|todo|no)' in S and 'SSL_MODO="admin"' in open(os.path.join(RAIZ, 'bricohams.env.example'), encoding='utf-8').read()
+assert 'case "$modo" in admin|todo|no)' in S and 'SSL_MODO="todo"' in open(os.path.join(RAIZ, 'bricohams.env.example'), encoding='utf-8').read()
 assert 'nginx -t || fallo' in S
 
 
@@ -79,7 +84,9 @@ if nginx and os.geteuid() == 0:
 
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', p_owrx), Owrx)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    rutas = RUTAS.replace('127.0.0.1:8073', '127.0.0.1:%d' % p_owrx).replace('/var/log/nginx/bricohams-sdr.access.log', d + '/a.log')
+    rutas = RUTAS.replace('127.0.0.1:8073', '127.0.0.1:%d' % p_owrx)
+    rutas = rutas.replace('/var/log/nginx/bricohams-sdr.access.log', d + '/a.log')
+    rutas = rutas.replace('/var/log/nginx/bricohams-sdr-login.access.log', d + '/login.log')
     open(d + '/rutas.conf', 'w').write(rutas)
     c = sitio('admin', d + '/c.pem', d + '/k.pem').replace('/etc/nginx/snippets/bricohams-sdr-rutas.conf', d + '/rutas.conf')
     c = '\n'.join(l for l in c.splitlines() if '[::]' not in l)
@@ -87,7 +94,7 @@ if nginx and os.geteuid() == 0:
     # el resto de bloques (p. ej. cliente web de Meshtastic en :8443) a puertos libres: en un servidor real ya están ocupados
     c = re.sub(r'listen (\d+)(?=[ ;])', lambda mm: 'listen 127.0.0.1:%d' % libre(), c)
     open(d + '/site.conf', 'w').write(c)
-    open(d + '/nginx.conf', 'w').write('daemon off; pid %s/n.pid; error_log %s/e.log;\nevents{}\nhttp{ access_log off; include %s/site.conf; }\n' % (d, d, d))
+    open(d + '/nginx.conf', 'w').write('daemon off; pid %s/n.pid; error_log %s/e.log;\nevents{}\nhttp{ access_log off;\n%s\n include %s/site.conf; }\n' % (d, d, LOGIN_LOG, d))
     t = subprocess.run([nginx, '-t', '-c', d + '/nginx.conf', '-p', d], capture_output=True, text=True)
     assert t.returncode == 0, t.stderr
     proc = subprocess.Popen([nginx, '-c', d + '/nginx.conf', '-p', d], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -106,6 +113,7 @@ if nginx and os.geteuid() == 0:
         r = get('/')
         assert r.status == 200 and r.getheader('X-Proto') == 'http', 'el receptor público va por HTTP'
         assert 'secure' not in (r.getheader('Set-Cookie') or '').lower()
+        assert r.getheader('Cache-Control') is None
         for path in ('/login', '/settings', '/settings/sdr/rtl', '/logout', '/clients', '/pwchange'):
             r = get(path)
             assert r.status == 301 and r.getheader('Location') == 'https://sdr.ejemplo.es' + path, (path, r.status, r.getheader('Location'))
@@ -114,9 +122,14 @@ if nginx and os.geteuid() == 0:
         r = get('/login', https=True)
         ck = (r.getheader('Set-Cookie') or '').lower()
         assert r.status == 200 and 'secure' in ck and 'httponly' in ck and r.getheader('X-Proto') == 'https', ck
+        assert r.getheader('Cache-Control') == 'no-store'
+        for path in ('/settings', '/settings/sdr/rtl', '/settingsx'):
+            r = get(path, https=True)
+            assert r.getheader('Cache-Control') == (None if path == '/settingsx' else 'no-store')
         # v4.4 · blindaje: límite de intentos de /login, sin versión de nginx, cabeceras y ficheros ocultos
         estados = [get('/login', https=True).status for _ in range(12)]
         assert 429 in estados and estados[0] == 200, estados
+        assert get('/login', https=True).getheader('Cache-Control') == 'no-store'
         assert get('/', https=True).status == 200, 'el límite es solo para /login'
         r = get('/')
         assert r.getheader('Server') == 'nginx' and r.getheader('X-Frame-Options') == 'SAMEORIGIN', (r.getheader('Server'), r.getheader('X-Frame-Options'))

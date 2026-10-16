@@ -85,4 +85,4 @@ sudo owrx-clone --docker owrx-mbe import profile.owrx.tar.gz --simular
 
 More: `owrx-clone help {niveles,seguridad,dispositivos,migrar,docker,problemas}` and `man owrx-clone`.
 
-*EA5KAO · BricoHams · 2026*
+*BricoHams · 2026*

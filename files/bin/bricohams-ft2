@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  bricohams-ft2 · EA5KAO · BricoHams  (v4, EXPERIMENTAL)
+#  bricohams-ft2 · BricoHams  (v4, EXPERIMENTAL)
 #  Decodificador FT2 (IU8LMC) para OpenWebRX+:
 #    compilar  descarga Decodium 4.0 «Core Shannon» (GPLv3) y compila SOLO
 #              «decodium-rx» (decodificador de terminal) → /usr/local/bin/decodium-rx

@@ -1,5 +1,11 @@
 # 08 · Cuando llegue el SDRplay
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [OpenWebRX+, RTL-SDR y SDRplay](../GUIA_VISUAL_MODULOS.md#receptor).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 La plantilla ya trae el receptor `hf` (SDRplay) **desactivado**, con 12 perfiles `sp*` de los valores de EA7CL y escucha automática según el Sol (día 20 m, crepúsculo 40 m, noche 80 m).
 
 ## Paso a paso

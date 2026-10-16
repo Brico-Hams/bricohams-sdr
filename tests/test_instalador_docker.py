@@ -143,7 +143,10 @@ GEN = os.path.join(RAIZ, 'files/bin/bricohams-docker-compose.py')
 def gen(**e):
     return subprocess.run(['python3', GEN], capture_output=True, text=True, env=dict(os.environ, **e))
 b = gen(OWRX_DOCKER_RED='bridge', OWRX_DOCKER_PORT='8080', OWRX_DOCKER_PRIVILEGED='yes')
-assert b.returncode == 0 and '"8080:8073"' in b.stdout and 'privileged: true' in b.stdout and 'network_mode' not in b.stdout
+assert b.returncode == 0 and '"127.0.0.1:8080:8073"' in b.stdout and 'privileged: true' in b.stdout and 'network_mode' not in b.stdout
+# v5.0 · OWRX_SOLO_LOCAL=no vuelve a publicarlo en todas las interfaces
+b = gen(OWRX_DOCKER_RED='bridge', OWRX_DOCKER_PORT='8080', OWRX_SOLO_LOCAL='no')
+assert b.returncode == 0 and '"8080:8073"' in b.stdout and '127.0.0.1' not in b.stdout
 for malo in ({'OWRX_DOCKER_IMAGE': 'x; rm -rf /'}, {'OWRX_DOCKER_RED': 'macvlan'}, {'OWRX_DOCKER_PORT': '99999'},
              {'OWRX_DOCKER_CONTAINER': '../x'}):
     assert gen(**malo).returncode != 0, malo
@@ -197,7 +200,7 @@ assert nat.returncode == 0 and 'docker update --restart=no owrx-mbe' in dlog and
 T = tempfile.mkdtemp()
 open(os.path.join(T, 'bricohams.env'), 'w').write('OWRX_BACKEND="docker"\nOWRX_DOCKER_DIR="/opt/owrx-docker"\nAEMET_API_KEY="x"\n')
 vp = subprocess.run(['bash', '-c', 'KIT=%s\n%s\n%s\n%s\nfor p in meteo plugins red; do echo "$p: $(vars_paso $p | tr "\\n" " ")"; done' % (
-    T, funcion('vars_paso'), funcion('paso_meteo'), funcion('paso_plugins') + '\n' + funcion('paso_red'))], capture_output=True, text=True)
+    T, funcion('vars_paso'), funcion('paso_meteo') + '\n' + funcion('escribir_meteo_env'), funcion('paso_plugins') + '\n' + funcion('paso_red'))], capture_output=True, text=True)
 assert 'meteo: AEMET_API_KEY OWRX_BACKEND OWRX_DOCKER_DIR' in vp.stdout and 'red: ' in vp.stdout and 'OWRX' not in vp.stdout.split('red:')[1], vp.stdout
 shutil.rmtree(T)
 assert 'usuario_openwebrx' in funcion('owrx_owner') and 'usuario_openwebrx' in funcion('paso_configuracion')

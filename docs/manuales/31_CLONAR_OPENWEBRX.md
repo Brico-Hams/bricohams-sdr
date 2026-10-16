@@ -1,5 +1,11 @@
 # 31 · Clonar una instalación de OpenWebRX+ a otro equipo (owrx-clone)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Tareas, backups, limpieza, actualización y clonado](../GUIA_VISUAL_MODULOS.md#mantenimiento).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Clonar](../esquemas/21_clonar_openwebrx.png)
 
 **owrx-clone** (carpeta [`owrx-clone/`](../../owrx-clone/README.md) del kit) guarda en un solo fichero, el **perfil**, todo lo que hace única a una estación OpenWebRX+. Luego lo aplica en otro equipo:
@@ -80,8 +86,8 @@ Otra opción: grabar la serie antigua en el SDR nuevo, con `rtl_eeprom -d 0 -s 0
 
 ## 4. Procedimiento: compartir una configuración con la comunidad
 ```bash
-sudo owrx-clone exportar --publico --niveles config,etc,web --nota "Perfiles HF/VHF de EA5KAO para RTL-SDR V3" -o ea5kao-publico.owrx.tar.gz
-owrx-clone ver ea5kao-publico.owrx.tar.gz          # comprueba «claves: quitados» y la lista de claves en blanco
+sudo owrx-clone exportar --publico --niveles config,etc,web --nota "Perfiles HF/VHF de N0CALL para RTL-SDR V3" -o bh-publico.owrx.tar.gz
+owrx-clone ver bh-publico.owrx.tar.gz          # comprueba «claves: quitados» y la lista de claves en blanco
 ```
 - **Lo que quita `--publico`:** `users.json` entero, y deja en blanco toda clave de `settings.json` cuyo nombre tenga `pass`, `passcode`, `key`, `token` o `secret` (passcode APRS, claves de receiverbook y PSKreporter, magic key…).
 - **Coordenadas:** las del receptor siguen dentro. Si no quieres publicarlas, cámbialas antes en Ajustes o edita el perfil.
@@ -102,7 +108,7 @@ sudo owrx-clone deshacer /var/backups/owrx-clone/copia-20261005-120000.tar.gz   
 | `sudo bash install.sh --exportar [fichero]` | lo mismo que `owrx-clone exportar`. **No necesita `bricohams.env`**: vale en cualquier Pi con OpenWebRX+ |
 | `sudo bash install.sh --importar perfil.owrx.tar.gz` | instala la estación BricoHams entera y, en el paso `importar` (antes de `tareas`), aplica el perfil con los niveles de `IMPORTAR_NIVELES` (por defecto `config,etc,web,paquetes`) |
 | `sudo bash install.sh --solo importar --importar perfil.owrx.tar.gz` | solo aplicar el perfil en una estación BricoHams ya instalada |
-| Copia diaria (cron, manual 25) | además de la copia de siempre, guarda `/var/backups/bricohams/perfil-owrx-FECHA.owrx.tar.gz` (los 7 últimos) |
+| Copia diaria (cron, manual 25) | además de la copia de siempre, guarda `/var/backups/bricohams/perfil-owrx-FECHA.owrx.tar.gz` (retención local de cinco días, manual 09) |
 
 **Tras importar, el instalador respeta el perfil.** Deja la marca `/etc/bricohams/perfil-importado`, y desde ese momento:
 - **`configuracion`** ya no regenera `settings.json` ni los marcadores desde la plantilla de BricoHams;

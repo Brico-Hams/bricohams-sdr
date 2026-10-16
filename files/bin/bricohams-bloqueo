@@ -1,0 +1,290 @@
+#!/usr/bin/python3
+# bricohams-bloqueo {aplicar|geo-actualizar|estado|desbanear|quitar}
+#  Bloqueo manual por IP/red y por país (nftables, tabla «inet bricohams_bloqueo»),
+#  aparte del cortafuegos de bricohams-blindaje y de fail2ban.
+#  · La lista la guarda el panel /settings/bricohams/seguridad en /etc/bricohams/bloqueo.json
+#  · Nunca bloquea la LAN, loopback ni CGNAT (aunque estén en la lista o en una zona de país).
+#  · Las zonas de país (ipdeny.com) se guardan en /var/lib/bricohams-bloqueo/zonas.
+#  · «estado» deja en /var/lib/bricohams-bloqueo/estado.json lo que enseña el panel.
+import ipaddress
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+CONF = os.environ.get('BRICOHAMS_BLOQUEO_CONF', '/etc/bricohams/bloqueo.json')
+VAR = os.environ.get('BRICOHAMS_BLOQUEO_VAR', '/var/lib/bricohams-bloqueo')
+ZONAS = os.path.join(VAR, 'zonas')
+ESTADO = os.path.join(VAR, 'estado.json')
+DESBANEAR = os.path.join(VAR, 'desbanear.json')
+TABLA = 'bricohams_bloqueo'
+MAX_IPS = 500
+MAX_PAISES = 60
+URL_V4 = 'https://www.ipdeny.com/ipblocks/data/aggregated/%s-aggregated.zone'
+URL_V6 = 'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/%s-aggregated.zone'
+PAIS = re.compile(r'^[a-z]{2}$')
+JAULAS = ('bricohams-login', 'sshd', 'recidive')
+UNIDADES = ('nftables', 'bricohams-cortafuegos', 'fail2ban', 'nginx', 'openwebrx',
+            'bricohams-login-aviso')
+PROTEGIDAS = [ipaddress.ip_network(r) for r in (
+    '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8', '169.254.0.0/16',
+    '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/3',
+    '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8')]
+
+
+def red_valida(texto):
+    """IP o red pública; ValueError si no lo es o toca la LAN."""
+    texto = (texto or '').strip()
+    if not texto or len(texto) > 49:
+        raise ValueError('dirección vacía o demasiado larga')
+    red = ipaddress.ip_network(texto, strict=False)
+    if red.prefixlen < (8 if red.version == 4 else 16):
+        raise ValueError('%s: red demasiado grande' % texto)
+    for p in PROTEGIDAS:
+        if p.version == red.version and red.overlaps(p):
+            raise ValueError('%s: es de la LAN/loopback/reservada, no se bloquea' % texto)
+    return red
+
+
+def leer_conf():
+    try:
+        with open(CONF, encoding='utf-8') as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+    ips, paises = [], []
+    for x in d.get('ips') or []:
+        try:
+            r = str(red_valida(str(x.get('red') if isinstance(x, dict) else x)))
+        except ValueError:
+            continue
+        if r not in ips:
+            ips.append(r)
+    for x in d.get('paises') or []:
+        x = str(x).lower()
+        if PAIS.match(x) and x not in paises:
+            paises.append(x)
+    return ips[:MAX_IPS], paises[:MAX_PAISES]
+
+
+def leer_zona(ruta, version):
+    redes = []
+    try:
+        with open(ruta, encoding='ascii', errors='replace') as f:
+            for linea in f:
+                linea = linea.strip()
+                if not linea or linea.startswith('#'):
+                    continue
+                try:
+                    r = ipaddress.ip_network(linea, strict=False)
+                except ValueError:
+                    continue
+                if r.version != version or any(p.version == version and r.overlaps(p) for p in PROTEGIDAS):
+                    continue
+                redes.append(r)
+    except OSError:
+        pass
+    return redes
+
+
+def conjunto(nombre, tipo, redes):
+    cuerpo = '        type %s\n        flags interval\n        auto-merge\n' % tipo
+    if redes:
+        lista = [str(r) for r in ipaddress.collapse_addresses(redes)]
+        cuerpo += '        elements = { %s }\n' % ', '.join(lista)
+    return '    set %s {\n%s    }\n' % (nombre, cuerpo)
+
+
+def reglas(ips, paises):
+    v4 = [ipaddress.ip_network(r) for r in ips if ':' not in r]
+    v6 = [ipaddress.ip_network(r) for r in ips if ':' in r]
+    g4, g6 = [], []
+    for cc in paises:
+        g4 += leer_zona(os.path.join(ZONAS, cc + '.zone'), 4)
+        g6 += leer_zona(os.path.join(ZONAS, cc + '-v6.zone'), 6)
+    txt = 'table inet %s {\n' % TABLA
+    # "ip4"/"ip6" son palabras reservadas de nft: los conjuntos deben llamarse de otra forma
+    txt += conjunto('manual4', 'ipv4_addr', v4) + conjunto('manual6', 'ipv6_addr', v6)
+    txt += conjunto('geo4', 'ipv4_addr', g4) + conjunto('geo6', 'ipv6_addr', g6)
+    txt += ('    chain entrada {\n'
+            '        type filter hook input priority -10; policy accept;\n'
+            '        iif "lo" accept\n'
+            '        ip saddr @manual4 counter drop comment "bloqueo manual"\n'
+            '        ip6 saddr @manual6 counter drop comment "bloqueo manual"\n'
+            '        ip saddr @geo4 counter drop comment "bloqueo por país"\n'
+            '        ip6 saddr @geo6 counter drop comment "bloqueo por país"\n'
+            '    }\n}\n')
+    return txt, len(g4) + len(g6)
+
+
+def nft(*args, entrada=None):
+    return subprocess.run(['nft'] + list(args), input=entrada, capture_output=True, text=True, timeout=120)
+
+
+def aplicar():
+    ips, paises = leer_conf()
+    if not shutil.which('nft'):
+        raise SystemExit('Falta nftables (sudo apt install nftables)')
+    if not ips and not paises:
+        if nft('list', 'table', 'inet', TABLA).returncode == 0:
+            nft('delete', 'table', 'inet', TABLA)
+        print('Sin bloqueos: tabla %s quitada' % TABLA)
+        return
+    txt, ngeo = reglas(ips, paises)
+    # una sola transacción: nunca hay un instante sin bloqueo y, si nft falla, queda la tabla anterior
+    r = nft('-f', '-', entrada='table inet %s {}\ndelete table inet %s\n%s' % (TABLA, TABLA, txt))
+    if r.returncode:
+        raise SystemExit('nft rechazó las reglas: %s' % r.stderr.strip()[:400])
+    print('Bloqueo cargado: %d IP/redes, %d países (%d bloques)' % (len(ips), len(paises), ngeo))
+
+
+def descargar(url):
+    req = urllib.request.Request(url, headers={'User-Agent': 'bricohams-bloqueo'})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        datos = r.read(8 * 1024 * 1024 + 1)
+    if len(datos) > 8 * 1024 * 1024:
+        raise ValueError('zona demasiado grande')
+    return datos.decode('ascii', 'replace')
+
+
+def geo_actualizar():
+    _, paises = leer_conf()
+    os.makedirs(ZONAS, mode=0o755, exist_ok=True)
+    fallos = []
+    for cc in paises:
+        for url, fichero, version in ((URL_V4 % cc, cc + '.zone', 4), (URL_V6 % cc, cc + '-v6.zone', 6)):
+            try:
+                texto = descargar(url)
+                buenas = []
+                for linea in texto.splitlines():
+                    try:
+                        r = ipaddress.ip_network(linea.strip(), strict=False)
+                    except ValueError:
+                        continue
+                    if r.version == version:
+                        buenas.append(str(r))
+                if version == 4 and not buenas:
+                    raise ValueError('zona vacía')
+                fd, tmp = tempfile.mkstemp(dir=ZONAS)
+                with os.fdopen(fd, 'w', encoding='ascii') as f:
+                    f.write('\n'.join(buenas) + '\n')
+                os.chmod(tmp, 0o644)
+                os.replace(tmp, os.path.join(ZONAS, fichero))
+            except (OSError, ValueError) as ex:
+                if version == 4:
+                    fallos.append('%s (%s)' % (cc.upper(), ex))
+    if fallos:
+        print('No pude descargar: ' + ', '.join(fallos), file=sys.stderr)
+    aplicar()
+
+
+def baneados():
+    salida = {}
+    if not shutil.which('fail2ban-client'):
+        return salida
+    for jaula in JAULAS:
+        try:
+            r = subprocess.run(['fail2ban-client', 'status', jaula], capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if r.returncode:
+            continue
+        m = re.search(r'Banned IP list:\s*(.*)', r.stdout)
+        ips = []
+        for x in (m.group(1).split() if m else []):
+            try:
+                ips.append(str(ipaddress.ip_address(x)))
+            except ValueError:
+                pass
+        salida[jaula] = ips[:300]
+    return salida
+
+
+def contadores():
+    r = nft('list', 'table', 'inet', TABLA) if shutil.which('nft') else None
+    if not r or r.returncode:
+        return None
+    c = {}
+    for m in re.finditer(r'counter packets (\d+) bytes \d+ (?:drop )?comment "([^"]+)"', r.stdout):
+        c[m.group(2)] = c.get(m.group(2), 0) + int(m.group(1))
+    return c
+
+
+def unidad(u):
+    try:
+        r = subprocess.run(['systemctl', 'is-active', u + '.service'], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() or 'desconocido'
+    except (OSError, subprocess.SubprocessError):
+        return 'desconocido'
+
+
+def estado():
+    ips, paises = leer_conf()
+    zonas = {}
+    for cc in paises:
+        ruta = os.path.join(ZONAS, cc + '.zone')
+        try:
+            zonas[cc] = int(os.path.getmtime(ruta))
+        except OSError:
+            zonas[cc] = 0
+    d = {'fecha': int(time.time()), 'tabla': contadores(), 'baneados': baneados(), 'zonas': zonas,
+         'unidades': {u: unidad(u) for u in UNIDADES}, 'ips': len(ips), 'paises': paises}
+    os.makedirs(VAR, mode=0o755, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=VAR)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        json.dump(d, f, ensure_ascii=False)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, ESTADO)
+
+
+def desbanear():
+    try:
+        with open(DESBANEAR, encoding='utf-8') as f:
+            lista = json.load(f)
+    except (OSError, ValueError):
+        lista = []
+    try:
+        os.remove(DESBANEAR)
+    except OSError:
+        pass
+    if not shutil.which('fail2ban-client'):
+        return
+    for x in lista if isinstance(lista, list) else []:
+        try:
+            ip = str(ipaddress.ip_address(str(x)))
+        except ValueError:
+            continue
+        subprocess.run(['fail2ban-client', 'unban', ip], capture_output=True, timeout=20)
+        print('Desbaneada %s' % ip)
+
+
+def main(argv):
+    orden = argv[1] if len(argv) > 1 else ''
+    if orden not in ('aplicar', 'geo-actualizar', 'desbanear', 'quitar', 'estado'):
+        print('uso: bricohams-bloqueo {aplicar|geo-actualizar|estado|desbanear|quitar}', file=sys.stderr)
+        return 2
+    try:
+        if orden == 'aplicar':
+            aplicar()
+        elif orden == 'geo-actualizar':
+            geo_actualizar()
+        elif orden == 'desbanear':
+            desbanear()
+        elif orden == 'quitar':
+            if shutil.which('nft') and nft('list', 'table', 'inet', TABLA).returncode == 0:
+                nft('delete', 'table', 'inet', TABLA)
+    finally:
+        # el panel siempre ve el estado real, aunque la orden haya fallado
+        estado()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

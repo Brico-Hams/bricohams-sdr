@@ -118,8 +118,8 @@ En el kit BricoHams SDR, `install.sh` lo usa:
 
 - `sudo bash install.sh --exportar [fichero]`: igual que `owrx-clone exportar`.
 - `sudo bash install.sh --importar perfil.owrx.tar.gz`: instala la estación BricoHams y al final aplica el perfil. Desde ese momento el instalador **respeta** la configuración importada.
-- La copia diaria guarda además un perfil de OpenWebRX+ (los 7 últimos).
+- La copia diaria guarda además un perfil de OpenWebRX+ (retención local de cinco días mediante `bricohams-backup-limpieza.timer`).
 
 Detalle en [docs/manuales/31_CLONAR_OPENWEBRX.md](../docs/manuales/31_CLONAR_OPENWEBRX.md).
 
-*EA5KAO · BricoHams · Mi QTH (Región de Murcia) · 2026*
+*BricoHams · tu QTH (Región de Murcia) · 2026*

@@ -1,5 +1,5 @@
 // =====================================================================
-//  ANCLAJES IMPRESOS BricoHams SDR · EA5KAO  (v4)
+//  ANCLAJES IMPRESOS BricoHams SDR · N0CALL  (v4)
 //  Todo se sujeta con tornillería M6 inox y tuercas cautivas: sin abrazaderas
 //  en U. Material: ASA o PETG (exterior), 6 perímetros, 50 % de relleno giroide.
 //

@@ -1,5 +1,5 @@
 // =====================================================================
-//  EA5KAO · BricoHams · Plugins del MAPA OpenWebRX+
+//  BricoHams · Plugins del MAPA OpenWebRX+
 //  Ruta: /usr/lib/python3/dist-packages/htdocs/plugins/map/init.js
 //  (la cuadrícula QTH Maidenhead ya viene integrada en OpenWebRX+)
 // =====================================================================

@@ -1,5 +1,11 @@
 # 37 · Justificación de los cambios de la v4.6
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Sistema base, red, arranque y HAT](../GUIA_VISUAL_MODULOS.md#sistema).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 Este documento explica **qué se ha añadido sobre la v4.5, por qué y cómo se ha comprobado**. Sirve de auditoría del código entregado en el ZIP `bricohams-sdr-v4.6-codigo.zip`. El manejo diario está en el [manual 36](36_TAK_MAPA_LOCAL.md). Las decisiones de arquitectura están en [ARQUITECTURA.md](../ARQUITECTURA.md) (ADR-54 a ADR-57).
 
 ## 1. Cambio de versión: de v4.5 a v4.6

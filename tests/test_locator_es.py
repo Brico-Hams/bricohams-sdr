@@ -5,7 +5,7 @@
   · locator ⇄ coordenadas (ida y vuelta), dentro de la celda y detección de España;
   · datos en línea (AEMET y FM de maps.fmdx.org) con respuestas de prueba: ámbito regional /
     nacional / local, distancia, país, caché y fallos sin parar la instalación;
-  · lejos de Mi QTH se adaptan los marcadores del kit de Murcia (los tuyos no se tocan);
+  · lejos de la Región de Murcia se adaptan los marcadores del kit de Murcia (los tuyos no se tocan);
   · bricohams-locator (info, meteo, marcadores) y la zona en install.sh (coordenadas que mandan,
     locator desde coordenadas, LOCATOR_METEO, avisos)."""
 import json
@@ -57,7 +57,7 @@ for campo in ('IL', 'IM', 'IN', 'JM', 'JN'):
                         assert any(b['frequency'] == 156800000 for b in gen), ('costa sin canal 16', l6)
 assert cuadros >= 800 and costa >= 100, (cuadros, costa)
 # los tres ejemplos del manual
-for l, espera in (('IM97kx', 'LELC'), ('IN80DK', 'LEMD'), ('JN11CJ', 'LEBL'), ('IL18QC', 'GC')):
+for l, espera in (('IM97KX', 'LELC'), ('IN80DK', 'LEMD'), ('JN11CJ', 'LEBL'), ('IL18QC', 'GC')):
     _, _, cerca = bm.seleccionar(l, catalogo, 100, 3)
     assert any(espera in r['name'] for r in cerca if r['category'] == 'airport'), (l, [r['name'] for r in cerca])
 
@@ -70,8 +70,8 @@ for _ in range(500):
         assert loc.dentro_de_celda(l, lat, lon), (lat, lon, l)
         c = loc.locator_to_latlon(l)
         assert loc.latlon_to_locator(c[0], c[1], n) == l, (l, c)
-assert loc.latlon_to_locator(38.08, -1.26) == 'IM97kx' and loc.locator_to_latlon('IM98') == (38.5, -1.0)
-for nombre, (lat, lon), zona in (('Mi QTH', (38.08, -1.26), 'península'), ('Badajoz', (38.878, -6.970), 'península'),
+assert loc.latlon_to_locator(37.9838, -1.1280) == 'IM97kx' and loc.locator_to_latlon('IM98') == (38.5, -1.0)
+for nombre, (lat, lon), zona in (('Murcia', (37.9922, -1.1307), 'península'), ('Badajoz', (38.878, -6.970), 'península'),
                                  ('Palma', (39.57, 2.65), 'península'), ('Las Palmas', (28.12, -15.43), 'Canarias'),
                                  ('Ceuta', (35.889, -5.32), 'Ceuta'), ('Melilla', (35.292, -2.94), 'Melilla'),
                                  ('Lisboa', (38.72, -9.14), None), ('Porto', (41.15, -8.61), None), ('Andorra', (42.51, 1.52), None),
@@ -91,7 +91,7 @@ assert lc.canal_833('118.010')[0] == 118008333 and lc.canal_833('118.015')[0] ==
 assert subprocess.run([sys.executable, os.path.join(RAIZ, 'tools', 'locator_catalogo.py'), '--comprobar'], capture_output=True).returncode == 0
 
 # ------------------------------------------------------------------ 3. datos en línea (respuestas de prueba)
-QTH = (38.08, -1.26)
+QTH = (37.9838, -1.1280)
 FMDX = {'locations': {
     '101': {'lat': 38.0, 'lon': -1.2, 'name': 'Murcia/Carrascoy', 'itu': 'E', 'stations': [
         {'freq': 95.6, 'station': 'Onda Regional de Murcia', 'erp': 10, 'pi': 'E2A1'},
@@ -158,7 +158,7 @@ _, _, cerca_n = bm.seleccionar('IM98', cat2, 100, 3, QTH, radios_ambitos=('regio
 assert any('RNE' in r['name'] for r in cerca_n)
 assert bm.meteo_stations(cerca) == '7178I:Murcia,7031X:Murcia/San Javier'
 
-# ------------------------------------------------------------------ 4. marcadores del kit lejos de Mi QTH
+# ------------------------------------------------------------------ 4. marcadores del kit lejos de Murcia
 KIT = json.load(open(os.path.join(RAIZ, 'files', 'openwebrx', 'bookmarks.json'), encoding='utf-8'))
 mio = {'name': 'Mi repetidor ED1ZZZ', 'frequency': 145650000, 'modulation': 'nfm'}       # propio: no se toca
 _, _, vigo = bm.seleccionar('IN52PF', catalogo, 100, 3)
@@ -175,8 +175,8 @@ for generico in ('🆘 Canal 16 · socorro', '⛵ Canal 10', '⛵ Canal 65', '�
     assert generico in nombres or any(n.startswith(generico.split(' · ')[0]) for n in nombres), generico
 assert sum(1 for b in lejos if 26.9e6 < b['frequency'] < 27.5e6) == sum(1 for b in KIT if 26.9e6 < b['frequency'] < 27.5e6), 'CB intacta'
 assert any('Vigo' in n for n in nombres if '[AUTO' not in n) or any('LEVX' in b['name'] for b in lejos)
-cerca_kit = bm.merge_bookmarks(KIT, bm.bookmarks(bm.seleccionar('IM97kx', catalogo, 100, 3)[2], 'IM97kx'), KIT, lejos=False)
-assert all(b in cerca_kit for b in KIT), 'en Mi QTH el kit se queda entero'
+cerca_kit = bm.merge_bookmarks(KIT, bm.bookmarks(bm.seleccionar('IM97KX', catalogo, 100, 3)[2], 'IM97KX'), KIT, lejos=False)
+assert all(b in cerca_kit for b in KIT), 'en la Región de Murcia el kit se queda entero'
 assert bm.merge_bookmarks(lejos, nuevos, KIT, lejos=True) == lejos, 'idempotente'
 
 # ------------------------------------------------------------------ 5. bricohams-locator
@@ -195,7 +195,7 @@ r = subprocess.run([sys.executable, cli, 'meteo'], capture_output=True, text=Tru
 assert r.stdout.startswith('0201D:'), r.stdout
 r = subprocess.run([sys.executable, cli, 'marcadores', 'IM75IV'], capture_output=True, text=True, env=e)
 assert 'GECE' in r.stdout and 'NAVTEX Tarifa' in r.stdout and '--aplicar' in r.stdout, r.stdout
-assert subprocess.run([sys.executable, cli, 'locator', '38.08', '-1.26'], capture_output=True, text=True).stdout.strip() == 'IM97kx'
+assert subprocess.run([sys.executable, cli, 'locator', '37.9838', '-1.1280'], capture_output=True, text=True).stdout.strip() == 'IM97kx'
 assert subprocess.run([sys.executable, cli, 'coordenadas', 'IM98'], capture_output=True, text=True).stdout.strip() == '38.500000 -1.000000'
 shutil.rmtree(T)
 
@@ -212,9 +212,9 @@ def zona(vars_):
     return r.returncode, r.stdout + r.stderr
 
 
-rc, o = zona('STATION_LOCATOR=IM97kx; STATION_LAT=0.0; STATION_LON=0.0; LOCATOR_CATALOG=data/locator/catalogo_es.json')
-assert rc == 0 and 'LAT=38.0625 LON=-1.2917' in o.replace('0000 ', ' ').replace('00 ', ' ') or 'LAT=38.062500' in o, o
-assert 'LOC=IM97kx' in o and 'DER=STATION_LAT STATION_LON METEO_STATIONS' in o and 'MET=7158X:Archena' in o, o
+rc, o = zona('STATION_LOCATOR=im97kx; STATION_LAT=0.0; STATION_LON=0.0; LOCATOR_CATALOG=data/locator/catalogo_es.json')
+assert rc == 0 and 'LAT=37.979167 LON=-1.125000' in o, o
+assert 'LOC=IM97KX' in o and 'DER=STATION_LAT STATION_LON METEO_STATIONS' in o and 'MET=7178I:Murcia' in o, o
 rc, o = zona('STATION_LOCATOR=IM97kx; STATION_LAT=40.4; STATION_LON=-3.7; LOCATOR_CATALOG=""')
 assert rc == 0 and 'LAT=40.4 LON=-3.7' in o and 'no caen en STATION_LOCATOR' in o and 'DER= ' not in o.split('DER=')[0], o
 rc, o = zona('STATION_LOCATOR=""; STATION_LAT=41.39; STATION_LON=2.17; LOCATOR_CATALOG=data/locator/catalogo_es.json; METEO_STATIONS="X:manual"')
@@ -226,7 +226,7 @@ assert rc == 0 and 'fuera de España' in o, o
 # revisión v4.3: paso_meteo vuelve a llamar a zona_locator sin releer el env: las coordenadas siguen siendo «del locator»
 r = subprocess.run(['bash', '-c', base + '\nSTATION_LOCATOR=IM97kx; STATION_LAT=0.0; STATION_LON=0.0; LOCATOR_CATALOG=data/locator/catalogo_es.json'
                     + '\nzona_locator\nzona_locator\necho "DER=${LOCATOR_DERIVADAS[*]} LAT=$STATION_LAT"'], capture_output=True, text=True)
-assert 'DER=STATION_LAT STATION_LON METEO_STATIONS LAT=38.062500' in r.stdout, r.stdout + r.stderr
+assert 'DER=STATION_LAT STATION_LON METEO_STATIONS LAT=37.979167' in r.stdout, r.stdout + r.stderr
 rc, o = zona('STATION_LOCATOR=XX99; LOCATOR_CATALOG=""')
 assert rc != 0 and 'no es un locator Maidenhead' in o, o
 rc, o = zona('STATION_LOCATOR=""; STATION_LAT=0.0; STATION_LON=0.0; LOCATOR_CATALOG=data/locator/catalogo_es.json')
@@ -267,5 +267,5 @@ assert 'CONTROL restart' in r.stdout and 'Aeropuertos' in r.stdout and 'marcador
 shutil.rmtree(T)
 
 print('OK test_locator_es: %d puntos de España (%d en la costa) con aeropuertos, AEMET y puertos; locator ida y vuelta; '
-      'FM regional/local y AEMET en vivo con caché; kit de Murcia adaptado lejos de Mi QTH; bricohams-locator, zona del instalador y paso configuracion en Docker'
+      'FM regional/local y AEMET en vivo con caché; kit de Murcia adaptado lejos de la Región de Murcia; bricohams-locator, zona del instalador y paso configuracion en Docker'
       % (cuadros, costa))

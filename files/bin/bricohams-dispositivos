@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-dispositivos · EA5KAO · BricoHams (v4.5)
+#  bricohams-dispositivos · BricoHams (v4.5)
 #  Inventario de todo lo que cuelga de la Raspberry y nombres fijos.
 #    inventario   qué hay conectado y para qué es (SDR por su serie, RAK, LilyGO,
 #                 Pico, RS485, HAT por SPI/serie) y qué falta todavía

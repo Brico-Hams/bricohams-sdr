@@ -1,4 +1,4 @@
-/* BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE).
+/* BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE).
  *
  * Temperatura del interior de la caja, GPS y batería.
  * Sensores (se detectan solos al arrancar, por este orden):
@@ -21,7 +21,7 @@ struct SensorData {
 };
 
 // Medida válida dentro de [lo, hi]. No usa isnan(): en el RAK real se colaba "vbat": nan en el
-// JSON (v4.5, despliegue EA5KAO); con NaN cualquier comparación da false, así que esto lo filtra siempre.
+// JSON (v4.5, despliegue N0CALL); con NaN cualquier comparación da false, así que esto lo filtra siempre.
 inline bool medidaValida(float v, float lo, float hi) { return v >= lo && v <= hi; }
 
 struct GpsData {

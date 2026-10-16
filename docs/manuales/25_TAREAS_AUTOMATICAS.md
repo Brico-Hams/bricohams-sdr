@@ -1,5 +1,11 @@
 # 25 · Tareas automáticas: copias, actualizaciones, reinicios y avisos
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Tareas, backups, limpieza, actualización y clonado](../GUIA_VISUAL_MODULOS.md#mantenimiento).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 **Qué hace:** la Pi se mantiene sola con un **cron** (`/etc/cron.d/bricohams`) que ejecuta una **cuenta de servicio** llamada `bricohams`.
 
 ## 1. Por qué una cuenta de servicio y no «credenciales embebidas» (ADR-34)
@@ -18,7 +24,7 @@
 ## 2. Calendario (se cambia en `bricohams.env`)
 | Variable | Por defecto | Tarea |
 |---|---|---|
-| `CRON_COPIA` | `30 4 * * *` (cada día, 04:30) | copia en `/var/backups/bricohams` (14 últimas) y, desde la v4.2, perfil de OpenWebRX+ con owrx-clone (7 últimos); aviso solo si falla |
+| `CRON_COPIA` | `30 4 * * *` (cada día, 04:30) | copia en `/var/backups/bricohams` y perfil de OpenWebRX+ con owrx-clone; retención local de cinco días; aviso solo si falla |
 | `CRON_ACTUALIZAR` | `30 3 * * 1` (lunes, 03:30) | `apt update` + `upgrade`, sin preguntas y respetando lo retenido; aviso al terminar |
 | `CRON_REINICIO` | `0 5 * * 1` (lunes, 05:00) | reinicio preventivo; **se aplaza 20 min si hay un pase de satélite** |
 | `CRON_SALUD` | `*/30 * * * *` | `bricohams-check`; avisa por Telegram si aparece un fallo y cuando se arregla (sin repetir) |
@@ -27,6 +33,11 @@
 | (DuckDNS) | `*/5 * * * *` | actualiza la IP si `DUCKDNS_DOMAIN`/`TOKEN` están puestos |
 
 Después de cambiar el calendario: `sudo bash install.sh --solo tareas`.
+
+La limpieza local es independiente del cron: `bricohams-backup-limpieza.timer` se instala con el paso
+`herramientas` y se ejecuta diariamente a las **06:15**. Borra copias de configuración y perfiles de más de
+120 horas; no toca copias remotas ni carpetas de despliegues. Simulación, registro y desactivación:
+[manual 09](09_MANTENIMIENTO.md#limpieza-automática-de-copias-locales).
 
 ## 3. Lanzar una tarea a mano
 ```bash

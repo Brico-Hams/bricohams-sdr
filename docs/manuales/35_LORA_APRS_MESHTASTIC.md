@@ -1,10 +1,16 @@
 # 35 · iGate LoRa APRS en un RAK4631 y Meshtastic 433/868, dentro de OpenWebRX+ (v4.5)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Meshtastic HAT y LilyGO; puente al mapa](../GUIA_VISUAL_MODULOS.md#mesh).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![LoRa APRS y Meshtastic en OpenWebRX+](../esquemas/25_lora_owrx.png)
 
 | Aparato | Qué hace | Cómo se conecta | Nombre fijo |
 |---|---|---|---|
-| **RAK4631 WisBlock (L, 433 MHz)** en base RAK19007, con GPS (slot A) y sensor de temperatura | iGate y digipeater **LoRa APRS 433,775 MHz** · **EA5KAO-15** · mide la temperatura de la caja | USB a la Pi (KISS) | `/dev/rak-aprs` |
+| **RAK4631 WisBlock (L, 433 MHz)** en base RAK19007, con GPS (slot A) y sensor de temperatura | iGate y digipeater **LoRa APRS 433,775 MHz** · **N0CALL-15** · mide la temperatura de la caja | USB a la Pi (KISS) | `/dev/rak-aprs` |
 | **LilyGO T3 V1.6.1 433** | nodo **Meshtastic EU_433** de la red (URL 433) · *SDR BricoHams 433* (SB43) | USB a la Pi | `/dev/lilygo-mesh` |
 | **HAT SX1262 868** (en camino) | nodo **Meshtastic 868** de la red (URL 868) · *SDR BricoHams 868* (SB86) | SPI (meshtasticd) | 127.0.0.1:4403 |
 
@@ -59,15 +65,15 @@ Compilados con el BSP de RAKwireless 1.3.3 y RadioLib 7.6.0 (`tools/compilar_rak
 
 Cualquier programa KISS (Direwolf, APRX, Xastir) puede usar el RAK: las tramas 0x06 las ignora.
 
-## 2. Configuración clonada del iGate actual (LilyGO de la LAN)
+## 2. Configuración clonada del iGate actual (192.168.1.142)
 Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
 
-| iGate LilyGO (EA5KAO-10) | RAK4631 | Variable |
+| iGate LilyGO (N0CALL-10) | RAK4631 | Variable |
 |---|---|---|
-| callsign EA5KAO-10 | **EA5KAO-15**. «EA5KAO-SDR» no vale: en RF el SSID es un número de 0 a 15 y en APRS-IS caben 9 caracteres | `RAK_CALLSIGN` |
+| callsign N0CALL-10 | **N0CALL-15**. «N0CALL-SDR» no vale: en RF el SSID es un número de 0 a 15 y en APRS-IS caben 9 caracteres | `RAK_CALLSIGN` |
 | 433,775 · SF12 · BW 125 · CR 4/5 · 20 dBm · TX y CAD activos | igual | `RAK_TX="yes"`, `RAK_POWER="20"` |
-| baliza cada 15 min por RF y APRS-IS, «LoRa APRS igate lorqui», símbolo `L` + `a`, ruta WIDE1-1,WIDE2-1, ambigüedad 1 | igual, + `Caja 23.4C` al final del comentario | `RAK_BEACON_MIN`, `RAK_BEACON_RF`, `RAK_COMMENT`, `RAK_SYMBOL="La"`, `RAK_PATH`, `RAK_AMBIGUEDAD="1"` |
-| estado «EA5KAO-Mi QTH-IGate» | «EA5KAO-SDR BricoHams iGate» | `RAK_STATUS` |
+| baliza cada 15 min por RF y APRS-IS, «LoRa APRS igate», símbolo `L` + `a`, ruta WIDE1-1,WIDE2-1, ambigüedad 1 | igual, + `Caja 23.4C` al final del comentario | `RAK_BEACON_MIN`, `RAK_BEACON_RF`, `RAK_COMMENT`, `RAK_SYMBOL="La"`, `RAK_PATH`, `RAK_AMBIGUEDAD="1"` |
+| estado «N0CALL-tu QTH-IGate» | «N0CALL-SDR BricoHams iGate» | `RAK_STATUS` |
 | digipeater modo 1 (WIDE1-1) | **0 mientras funcione el LilyGO**: dos digis de relleno en el mismo sitio repiten dos veces cada paquete. Cuando apagues el LilyGO, `RAK_DIGI="1"` | `RAK_DIGI` |
 | APRS-IS rotate.aprs2.net · filtro m/10 · mensajes a RF | igual (objetos a RF: no) | `RAK_APRSIS_SERVER`, `RAK_APRSIS_FILTRO`, `RAK_MENSAJES_RF` |
 | recordar estaciones 30 min | igual | `RAK_RECORDAR_MIN` |
@@ -76,7 +82,7 @@ Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
 > **Aviso de seguridad del iGate viejo:** su web no tiene usuario (`webadmin.active=false`). Cualquiera en tu red puede leer en `/configuration.json` la **contraseña de la WiFi** y el passcode APRS. Activa `webadmin` con una contraseña en su web, o apágalo cuando el RAK funcione.
 
 ## 3. Procedimiento en la Pi (paso a paso)
-**Antes:** por SSH desde casa (`ssh <usuario>@192.168.1.50`); el RAK y el LilyGO enchufados al hub USB; sus antenas puestas. **Nunca transmitas sin antena.**
+**Antes:** por SSH desde casa (`ssh pi@192.168.1.50`); el RAK y el LilyGO enchufados al hub USB; sus antenas puestas. **Nunca transmitas sin antena.**
 
 1. Kit y servicios al día:
    ```bash
@@ -97,7 +103,7 @@ Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
    - Usa DFU por USB y tarda unos 40 s. Solo vale si el RAK tiene el **bootloader WisBlock/Adafruit** (USB `239a:xxxx`, como los que traen Meshtastic o Arduino).
    - `grabar` solo da el trabajo por bueno si `adafruit-nrfutil` dice «Device programmed». Ese programa devuelve 0 aunque falle.
    - **Si falla:** pulsa RESET dos veces; aparece la unidad `RAK4631`. Copia en ella `firmware/rak4631-lora-aprs/bin/bricohams-rak4631-lora-aprs.uf2` (desde la Pi: `sudo mount /dev/sdX /mnt && sudo cp …uf2 /mnt/`).
-   - **RAK con RUI3 de fábrica** (USB `1915:521f`, contesta a comandos `AT`). Su bootloader no admite este firmware. `grabar` lo detecta y se para; `bricohams-dispositivos` lo marca como `rak-rui3`. Antes hay que pasarlo a WisBlock **una sola vez** (es lo que se hizo con el de EA5KAO, ver `docs/DESPLIEGUE_EA5KAO_2026-10-11.md`):
+   - **RAK con RUI3 de fábrica** (USB `1915:521f`, contesta a comandos `AT`). Su bootloader no admite este firmware. `grabar` lo detecta y se para; `bricohams-dispositivos` lo marca como `rak-rui3`. Antes hay que pasarlo a WisBlock **una sola vez** (es lo que se hizo con el de N0CALL, ver `docs/DESPLIEGUE_N0CALL_2026-10-11.md`):
      1. Baja de RAK los paquetes `rak4631_factory_bootloader.zip`, `rak4631_factory_softdevice.zip` y `rak4631_factory_application.zip` (downloads.rakwireless.com → RUI/RUI3/Bootloader Upgrade) y guarda su SHA256.
      2. Instala `nrfutil` 6.1.7 de Nordic en un venv. En la Pi (Python 3.13, aarch64) necesita esto:
         - `pip install --ignore-requires-python --no-deps nrfutil==6.1.7`, con sus dependencias a mano;
@@ -113,12 +119,12 @@ Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
    sudo bricohams-rak-aprs prueba
    ```
    Debe salir:
-   - `firmware: BricoHams-RAK-APRS 1.0.1`;
+   - `firmware: BricoHams-RAK-APRS 1.0.0`;
    - `configuración: actualizada (…)` la primera vez y `al día` después;
    - `radio: ok · 433.775 MHz`;
    - la temperatura de la caja y el sensor (`SHTC3 (RAK1901)` o `BME680 (RAK1906)`);
    - el GPS.
-5. **LilyGO Meshtastic 433.** Ya tiene Meshtastic (pantalla «lorqui433»). Para ponerlo al último estable conservando la configuración:
+5. **LilyGO Meshtastic 433.** Ya tiene Meshtastic (pantalla con el nombre del nodo). Para ponerlo al último estable conservando la configuración:
    ```bash
    sudo bricohams-lilygo firmware      # baja el oficial (tlora-v2-1-1_6), lo graba con esptool y lo configura
    ```
@@ -134,8 +140,8 @@ Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
    Aplica la URL 868: SFNarrow, 869,618 MHz, BW 62,5 kHz, SF7, 27 dBm, más el canal EA5RCZ. El nombre es *SDR BricoHams 868* / SB86. Hasta entonces, `bricohams-mesh-owrx` reintenta solo.
 7. **Comprobar:**
    - `sudo bricohams-check`: apartados RAK4631, Mapa de OpenWebRX+ y Dispositivos;
-   - el mapa en `https://sdr.ea5kao.ampr.org/map`;
-   - en APRS: https://aprs.fi/#!call=EA5KAO-15.
+   - el mapa en `https://sdr.example.org/map`;
+   - en APRS: https://aprs.fi/#!call=N0CALL-15.
 
 ### Panel de administración Meshtastic (solo admin)
 La configuración de Meshtastic **no está en la web pública**. Para verla:
@@ -144,22 +150,16 @@ La configuración de Meshtastic **no está en la web pública**. Para verla:
 
 Los botones los añade `bricohams-owrx-botones` a la plantilla `settings.html` de OpenWebRX+, así que salen también si entras directo por `http://IP:8073/settings`. En ese caso el enlace te manda a `https://IP/settings/bricohams/…`, porque el panel solo lo sirve nginx; acepta el aviso del certificado si entras por IP. Tras un `apt upgrade` de openwebrx, el gancho `/etc/apt/apt.conf.d/99bricohams-owrx-botones` los vuelve a poner. Para quitarlos: `sudo bricohams-owrx-botones --quitar`.
 
-**APRS (RAK)** enseña:
+**APRS (RAK)** enseña, en solo lectura:
 - el estado del RAK4631: firmware, indicativo, radio y frecuencia, contadores, sensor, batería, GPS, APRS-IS y mapa;
-- v5.1: el digipeater (modo, si repite ahora y cuándo se oyó por última vez al otro iGate), la versión del bootloader y el resultado de la última «puesta en marcha»;
-- v5.1: los **mensajes APRS** (recibidos y enviados, con «ack» cuando el otro confirma) y las **estaciones oídas con posición**;
 - los últimos paquetes oídos.
 
-Desde ahí se puede:
-- reiniciar `bricohams-rak-aprs`;
-- v5.1: **enviar una baliza ahora**;
-- v5.1: **mandar un mensaje APRS** (indicativo y hasta 67 caracteres). Sale por APRS-IS y, con `RAK_TX="yes"`, por RF. Los mensajes que llegan para el indicativo del RAK se contestan con acuse automático.
-
-El passcode, la posición y la baliza siguen en `bricohams.env` y no se enseñan. La página habla con la API local de la pasarela (`127.0.0.1:8077`, `RAK_API_PUERTO`): nunca se ve fuera de la Pi, solo a través del panel con sesión de admin y CSRF.
+Desde ahí solo se puede reiniciar `bricohams-rak-aprs`. El passcode y la baliza siguen en `bricohams.env`.
 
 Qué se puede hacer:
 - **Nodo 433 (LilyGO):** leer su estado real y cambiar nombre largo y corto, rol y URL de canales. El panel para y arranca solo `bricohams-mesh-owrx` para liberar el puerto.
-- **Nodo 868 (HAT):** lo mismo por la API 127.0.0.1:4403, además del canal privado de `bricohams.env`.
+- **Nodo 868 (HAT):** lo mismo por la API 127.0.0.1:4403, además del canal privado de `bricohams.env`. El rol se guarda en `MESH868_ROLE` (por defecto `CLIENT`; v5.0, antes este nodo no tenía selector de rol) y `install.sh --solo meshtastic` también lo aplica con `meshtastic --set device.role`.
+  Para un nodo fijo en casa, Meshtastic recomienda `CLIENT` o `CLIENT_BASE`. `ROUTER` y `ROUTER_LATE` son solo para emplazamientos altos con buena cobertura, y se deben coordinar con la red local.
 - **Mapa:** elegir qué se publica (`MESH433_OWRX`, `MESH868_OWRX`, `MESH_OWRX_CHAT`).
 
 Los cambios se guardan en `bricohams.env` (el del kit y `/etc/bricohams/`), así que `install.sh --actualizar` no los deshace. Las claves (PSK) nunca se enseñan. Sin sesión de admin te lleva a `/login`. El servicio es `bricohams-mesh-admin` (127.0.0.1:8076).
@@ -175,66 +175,6 @@ Si se instala con `MESH_WEB="yes"` (por defecto en v4.5):
 - El nodo 868 (HAT) solo funciona una vez que meshtasticd detecta el SX1262; mientras tanto da "No sx1262 radio".
 - **No abrir el 8443 en el router,** porque sería internet sin cifrar. Ni el 9443. El 8073 tampoco (manual 34).
 - Sin sesión de admin: redirige a `/login?ref=settings`.
-
-## Cliente web de Meshtastic del LilyGO 433 (:8444, solo admin · v5.1)
-El LilyGO T3 no tiene WiFi en esta estación: solo habla por USB, y el puerto serie solo lo puede abrir un programa. Con `MESH433_WEB="yes"`:
-
-```
-LilyGO 433 ──USB──> bricohams-mesh-puente ──> 127.0.0.1:4404  API de Meshtastic (la de meshtasticd)
-                                           │      ├─ bricohams-mesh-owrx (mapa de OpenWebRX+)
-                                           │      ├─ bricohams-mesh-admin (panel /settings)
-                                           │      └─ meshtastic --host 127.0.0.1:4404
-                                           └──> 127.0.0.1:4480  API HTTP ──> nginx :8444 (sesión admin) ──> navegador
-```
-
-1. Instalar o actualizar:
-   ```bash
-   sudo bash install.sh --solo lilygo,web
-   ```
-   - Instala `bricohams-mesh-puente` (servicio sin root, solo `127.0.0.1`).
-   - Baja el cliente web oficial `meshtastic/web` v2.7.2 de GitHub, comprueba su SHA-256 y lo deja en `/usr/share/bricohams-meshweb`.
-   - Añade el servidor `:8444` de nginx.
-2. Comprobar:
-   ```bash
-   bricohams-mesh-puente estado
-   sudo bricohams-check
-   ```
-   `estado` debe dar `"radio": true` y 1-2 clientes TCP.
-3. En el navegador:
-   1. Entra en **Ajustes** de OpenWebRX+ con la contraseña de admin.
-   2. Pulsa **«Meshtastic Web (433)»**: abre `https://<estación>:8444/`.
-   3. En el cliente, *Nuevo dispositivo → HTTP*, con el host `<estación>:8444` y HTTPS activado.
-
-Qué tener en cuenta:
-- Acepta el aviso del certificado si entras por IP.
-- Sin sesión de admin, `:8444` manda a `/login`.
-- **No abras el 8444 en el router.** `bricohams-blindaje` lo deja solo para la LAN (`BLINDAJE_PUERTOS_LAN`).
-- `bricohams-lilygo meshtastic|firmware` para el puente mientras graba o configura, y lo vuelve a arrancar.
-- Con `MESH433_WEB="no"` todo vuelve a ser como antes: `bricohams-mesh-owrx` abre el USB directamente.
-
-## Puesta en marcha del RAK de una vez (v5.1)
-```bash
-sudo bricohams-rak-aprs puesta-en-marcha      # o con minutos de GPS: puesta-en-marcha 20
-```
-Hace, en orden, y guarda el resumen en `/var/lib/bricohams/rak-puesta.txt` (sale en el panel APRS):
-1. **Grabar** si el RAK no contesta o lleva otra versión que la de `firmware/rak4631-lora-aprs/bin/VERSION.json` (1.0.1).
-2. **Nombres fijos** `/dev/rak-aprs` y `/dev/lilygo-mesh`.
-3. **Prueba:** radio, configuración y sensor.
-4. **Bootloader:** `bricohams-rak-aprs bootloader` lleva el RAK al modo UF2, lee `INFO_UF2.TXT`, guarda la versión en `/var/lib/bricohams/rak-bootloader.json` y sale grabando el `.uf2`. Si no aparece la unidad, el bootloader es antiguo, sin UF2. La grabación por DFU serie sigue valiendo.
-5. **GPS dentro de la caja:** `bricohams-rak-aprs gps 15` enseña los satélites cada 15 s hasta tener fix. Sin fix en el tiempo dado:
-   - pon la antena GPS junto a la tapa o fuera;
-   - o deja `RAK_GPS_BALIZA="no"`, y la baliza usa `STATION_LAT/LON`.
-
-El servicio se para mientras tanto y vuelve a arrancar solo.
-
-## Digipeater automático (`RAK_DIGI="auto"`, v5.1)
-El RAK solo repite si el otro iGate de la estación (`RAK_DIGI_OTRO`, por defecto `IGATE_CALLSIGN`, el LilyGO) lleva `RAK_DIGI_AUTO_MIN` minutos (60) sin oírse por RF.
-- Cuenta como «oído» un paquete suyo o uno que él haya repetido (`indicativo*`).
-- Al arrancar espera ese tiempo antes de decidir.
-- Cuando el otro vuelve, el RAK deja de repetir. Así no hay duplicados en aprs.fi.
-- Necesita `RAK_TX="yes"`.
-
-El panel APRS enseña el modo y si repite ahora. Es lo pedido como «`RAK_DIGI="1"` cuando se apague el LilyGO iGate», pero sin tener que cambiarlo a mano.
 
 ## 4. Integración con OpenWebRX+ (ADR-50)
 OpenWebRX+ 1.2.122 y posteriores escuchan en su broker MQTT los temas `+/APRS`, `+/Meshtastic` y `+/CLIENT` (`owrx/mqtt.py`, `MqttSubscriber`). Pintan lo recibido en el mapa con su propio código: `AprsParser.updateMap` y `MeshtasticParser.updateMap`. Comprobado contra el código de OpenWebRX+ 1.2.126.
@@ -259,21 +199,19 @@ OpenWebRX+ 1.2.122 y posteriores escuchan en su broker MQTT los temas `+/APRS`, 
 |---|---|
 | `prueba`: «El RAK no contesta» | no tiene el firmware BricoHams: `sudo bricohams-rak-aprs grabar` |
 | `grabar`: «tiene RUI3» / USB `1915:521f` | conversión a WisBlock (apartado 3, paso 3) |
-| `prueba`: «estado ilegible» o `vbat: null` | firmware 1.0.0 sin batería: manda `nan` y la Pi lo convierte en `null`. Corregido en el 1.0.1 (v5.1): `sudo bricohams-rak-aprs puesta-en-marcha` lo graba solo |
+| `prueba`: «estado ilegible» o `vbat: null` | firmware 1.0.0 sin batería: manda `nan` y la Pi lo convierte en `null`. Se corrige en el código fuente; hay que recompilar con `tools/compilar_rak.sh` |
 | `grabar` no encuentra el puerto | enchufa solo el RAK (un `/dev/ttyACM*`) o usa el `.uf2` |
 | `radio: error -2` | el SX1262 no responde: ¿es un RAK4631(**L**) de 433? ¿antena puesta? |
 | `CFGERR frecuencia fuera de 410-525 MHz` | el RAK4631 normal es de 868-915: hace falta el (L) |
 | Sensor «nRF52840 interno» | no hay RAK1901/RAK1906 en un slot: mide el módulo, no el aire (súmale `RAK_TEMP_OFFSET`) |
-| GPS «sin fix» | dentro de la caja puede no ver el cielo: antena GPS activa fuera o `RAK_GPS_BALIZA="no"` (por defecto) |
+| GPS «sin fix» | dentro de la caja puede no ver el cielo: antena GPS activa fuera o `RAK_GPS_BALIZA="no"` (por defecto `yes`: con fix usa el GPS, sin fix `STATION_LAT/LON`) |
 | LED **rojo** fijo en el RAK | es el LED de carga (CHG) de la base RAK19007, por hardware; el firmware no lo controla. Fijo con USB sin batería o cargando: normal. El firmware solo usa el verde (P1.03, parpadea al recibir) y el azul (P1.04, al transmitir). Compruébalo en Ajustes → «APRS (RAK)» o con `sudo bricohams-rak-aprs prueba` |
 | No sale el botón Meshtastic/APRS en Ajustes | `sudo bricohams-owrx-botones` y Ctrl+F5 |
 | Nada en el mapa | `systemctl status mosquitto bricohams-rak-aprs bricohams-mesh-owrx` · `sudo bricohams-check` · `mqtt_aprs`/`mqtt_meshtastic` en Ajustes → Integración |
 | `mesh868: sin conexión` | normal sin HAT |
 | `meshtastic --port /dev/lilygo-mesh` dice «ocupado» | `sudo systemctl stop bricohams-mesh-owrx` (lo hace solo `bricohams-lilygo`) |
-| Duplicados en aprs.fi | dos digis: `RAK_DIGI="0"` mientras funcione el LilyGO iGate, o `RAK_DIGI="auto"` (v5.1) |
-| Panel APRS: «la pasarela del RAK no contesta» | `systemctl status bricohams-rak-aprs`; la API está en `127.0.0.1:8077` (`RAK_API_PUERTO`) |
-| `bootloader`: «No aparece la unidad» | bootloader sin UF2 (antiguo): `grabar` por DFU serie sigue valiendo; RESET para volver |
-| `:8444` da 502 | `bricohams-mesh-puente estado` · `journalctl -u bricohams-mesh-puente` (¿`/dev/lilygo-mesh` existe?) |
-| `:8444` da 404 | falta el cliente web: `sudo bash install.sh --solo lilygo,web` |
+| Duplicados en aprs.fi | dos digis: `RAK_DIGI="0"` mientras funcione el LilyGO iGate |
+| El nodo 868 no tiene rol o aparece con uno equivocado | hasta v5.0 el kit no lo fijaba en el nodo 868. Elige el rol en Ajustes → Meshtastic → Nodo 868 y pulsa *Aplicar* (con `meshtasticd` activo). También puedes ponerlo en `MESH868_ROLE` y ejecutar `sudo bash install.sh --solo meshtastic` |
+| El nodo sale con un nombre viejo (p. ej. «mi-qth») | el nombre se guarda en el propio nodo, no basta con cambiar `bricohams.env`. Ajusta `MESH_LONG_NAME`/`MESH_SHORT_NAME` (868) y `MESH433_LONG_NAME`/`MESH433_SHORT_NAME` (433) y pulsa *Aplicar* en Ajustes → Meshtastic (`bricohams-mesh-admin`, que llama a `meshtastic --set-owner`). El nodo 433 también se renombra con `sudo bricohams-lilygo`. Los vecinos tardan unos minutos en ver el nombre nuevo |
 
-Decisiones: ADR-49 a ADR-52 y ADR-66 a ADR-68 en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_rak_aprs.py` (firmware compilado en el PC + pasarela + RAK y APRS-IS de mentira), `tests/test_mesh_owrx.py`, `tests/test_v45_dispositivos.py`, `tests/test_v51_aprs_web.py` (API y panel APRS) y `tests/test_v51_mesh_puente.py` (puente, con la librería oficial de Meshtastic si está).
+Decisiones: ADR-49 a ADR-52 en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_rak_aprs.py` (firmware compilado en el PC + pasarela + RAK y APRS-IS de mentira), `tests/test_mesh_owrx.py` y `tests/test_v45_dispositivos.py`.

@@ -71,8 +71,8 @@ poner(A, HT + '/plugins/receiver/init.js', "for (const name of ['mio']) { await 
 poner(A, HT + '/plugins/receiver/mio/mio.js', 'Plugins.mio.init=function(){return true}')
 poner(A, HT + '/plugins/receiver/init.js.antes-20261001', 'viejo')
 poner(A, HT + '/plugins/receiver/mio/__pycache__/x.pyc', 'pyc')
-SET = {'receiver_name': 'EA5KAO · Mi QTH', 'aprs_igate_password': '12345', 'receiver_keys': ['abc'],
-       'magic_key': 'secreta', 'receiver_gps': {'lat': 38.08, 'lon': -1.25},
+SET = {'receiver_name': 'N0CALL · Murcia', 'aprs_igate_password': '12345', 'receiver_keys': ['abc'],
+       'magic_key': 'secreta', 'receiver_gps': {'lat': 37.98, 'lon': -1.13},
        'sdrs': {'rtl': {'name': 'HAM', 'type': 'rtl_sdr', 'device': 'serial=00000102', 'profiles': {'2m': {}, '70': {}}},
                 'v3': {'name': 'MULTI', 'type': 'rtl_sdr', 'device': '00000103', 'profiles': {'fm': {}}}}}
 poner(A, '/var/lib/openwebrx/settings.json', json.dumps(SET), 0o644)
@@ -119,7 +119,7 @@ pub = os.path.join(T, 'publico.owrx.tar.gz')
 rc, out = correr(A, 'exportar', '-o', pub, '--publico', '--niveles', 'config,web')
 m2, tmp = oc.abrir_perfil(pub)
 s2 = json.load(open(os.path.join(tmp, 'archivos/config/DATA/settings.json')))
-assert s2['aprs_igate_password'] == '' and s2['receiver_keys'] == [] and s2['magic_key'] == '' and s2['receiver_gps']['lat'] == 38.08
+assert s2['aprs_igate_password'] == '' and s2['receiver_keys'] == [] and s2['magic_key'] == '' and s2['receiver_gps']['lat'] == 37.98
 assert '{DATA}/users.json' not in {e['ruta'] for e in m2['ficheros']} and m2['secretos'] == 'quitados'
 assert set(m2['niveles']) == {'config', 'web'} and 'aprs_igate_password' in m2['secretos_quitados']
 shutil.rmtree(tmp)
@@ -149,7 +149,7 @@ def rehacer(origen, destino, cambio):
 
 
 manip = os.path.join(T, 'manip.owrx.tar.gz')
-rehacer(perfil, manip, lambda mi, d: (d.replace(b'EA5KAO', b'EA9XXX'), mi) if mi.name.endswith('settings.json') else (d, mi))
+rehacer(perfil, manip, lambda mi, d: (d.replace(b'N0CALL', b'EA9XXX'), mi) if mi.name.endswith('settings.json') else (d, mi))
 rc, out = correr(A, 'ver', manip)
 assert rc == 1 and 'SHA-256' in out, out
 malo = os.path.join(T, 'malo.owrx.tar.gz')
@@ -191,7 +191,7 @@ assert any(o.startswith('apt-get install') and 'openwebrx rtl-sdr wsjtx' in o fo
 assert 'systemctl stop openwebrx' in oc.ORDENES and 'systemctl start openwebrx' in oc.ORDENES and 'udevadm control --reload' in oc.ORDENES
 assert 'OpenWebRX+ aún no está instalado' in out, 'sin openwebrx previo los parches se dejan para después'
 s3 = json.load(open(B + '/var/lib/openwebrx/settings.json'))
-assert s3['receiver_name'] == 'EA5KAO · Mi QTH' and s3['sdrs']['rtl']['device'] == 'serial=ABCDEF12' and s3['sdrs']['v3']['device'] == '00000103'
+assert s3['receiver_name'] == 'N0CALL · Murcia' and s3['sdrs']['rtl']['device'] == 'serial=ABCDEF12' and s3['sdrs']['v3']['device'] == '00000103'
 assert open(B + HT + '/plugins/receiver/mio/mio.js').read().startswith('Plugins.mio')
 assert open(B + '/etc/udev/rules.d/99-sdr.rules').read().startswith('SUBSYSTEM') and os.path.isfile(B + '/etc/openwebrx/bookmarks.d/club.json')
 assert oct(os.stat(B + '/var/lib/openwebrx/users.json').st_mode & 0o777) == '0o600'

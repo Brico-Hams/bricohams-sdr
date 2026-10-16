@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-satpass · EA5KAO · BricoHams  (v4)
+#  bricohams-satpass · BricoHams  (v4)
 #  Calcula los próximos pases de los satélites de data/satelites.json sobre
 #  la estación y los deja en la web (plugins/receiver/satelites/pases.json)
 #  para el aviso «próximo pase» y el botón ▶ Escuchar (que cambia de perfil,
@@ -132,7 +132,7 @@ def descargar_omm(noradas, cache=CACHE, max_edad=12 * 3600):
         if e and ahora - e.get('t', 0) < max_edad:
             continue
         try:
-            req = urllib.request.Request(CELESTRAK.format(n), headers={'User-Agent': 'BricoHams-SDR EA5KAO'})
+            req = urllib.request.Request(CELESTRAK.format(n), headers={'User-Agent': 'BricoHams-SDR N0CALL'})
             j = json.load(urllib.request.urlopen(req, timeout=20))
             if j:
                 datos[str(n)] = {'t': ahora, 'omm': j[0]}
@@ -182,8 +182,8 @@ def main():
     if Satrec is None:
         print('satpass: falta python3-sgp4', file=sys.stderr)
         return 1
-    lat = float(os.environ.get('STATION_LAT', '38.08'))
-    lon = float(os.environ.get('STATION_LON', '-1.25'))
+    lat = float(os.environ.get('STATION_LAT', '0'))
+    lon = float(os.environ.get('STATION_LON', '0'))
     alt = float(os.environ.get('STATION_ASL', '200'))
     lista = json.load(open(LISTA, encoding='utf-8'))['satelites']
     omms = descargar_omm([s['norad'] for s in lista])

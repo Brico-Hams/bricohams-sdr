@@ -1,5 +1,11 @@
 # 05 · LilyGO T3 V1.6.1 de 433 MHz: nodo Meshtastic e iGate LoRa APRS
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Meshtastic HAT y LilyGO; puente al mapa](../GUIA_VISUAL_MODULOS.md#mesh).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 > **v4.5:**
 > - **El iGate pasa a un RAK4631** con firmware propio ([manual 35](35_LORA_APRS_MESHTASTIC.md)). El iGate WiFi de este manual queda como alternativa.
 > - El LilyGO es el **nodo Meshtastic 433** con la URL de la red (`MESH433_CHANNEL_URL`) y el nombre *SDR BricoHams 433* / SB43.
@@ -30,7 +36,7 @@ sudo bricohams-lilygo meshtastic
 ```
 1. Carga los **canales de la red** (`MESH_CHANNEL_URL`): SFNarrow, Murcia, Cartagena, Test y Alicante.
 2. Cambia la radio a **EU_433 LONG_FAST** (el QR trae 868).
-3. Pone el nombre `EA5KAO BricoHams 433` / `BH43`, el rol `CLIENT` y la posición fija de Mi QTH, sin GPS.
+3. Pone el nombre `N0CALL BricoHams 433` / `BH43`, el rol `CLIENT` y la posición fija de tu QTH, sin GPS.
 
 Comprueba con `meshtastic --port /dev/lilygo-mesh --info`.
 
@@ -41,16 +47,16 @@ sudo bricohams-lilygo igate
 1. Instala PlatformIO.
 2. Clona `richonguzman/LoRa_APRS_iGate` en `/opt/bricohams/LoRa_APRS_iGate`.
 3. Genera `data/igate_conf.json` desde `bricohams.env`:
-   - Indicativo **EA5KAO-10**.
+   - Indicativo **N0CALL-10**.
    - WiFi de `LILYGO_WIFI_SSID`.
-   - APRS-IS `euro.aprs2.net:14580` con el código de EA5KAO y filtro `m/10`.
+   - APRS-IS `euro.aprs2.net:14580` con el código de N0CALL y filtro `m/10`.
    - Baliza solo por APRS-IS, cada 15 min.
    - **Radio:** escucha en 433,775 (SF12, BW 125, CR 4/5), **TX desactivada**, sin digipeater.
 4. Graba el firmware (entorno `ttgo-lora32-v21`) y el sistema de archivos con la configuración. La primera vez tarda entre 10 y 15 min.
 
 **Comprobaciones:**
 - En la pantalla del LilyGO salen la IP y los paquetes recibidos.
-- En https://aprs.fi/#!call=EA5KAO-10 aparece el iGate.
+- En https://aprs.fi/#!call=N0CALL-10 aparece el iGate.
 - Su web es `http://<IP del iGate>/` (usuario `admin`, contraseña `IGATE_WEB_PASS`).
 
 ## Notas de RF

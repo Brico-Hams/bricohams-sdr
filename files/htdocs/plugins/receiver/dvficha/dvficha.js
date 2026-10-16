@@ -1,7 +1,7 @@
 /*
  * dvficha: ficha del operador en voz digital (DMR, YSF, NXDN, D-Star) para OpenWebRX+
  *
- * Autor: EA5KAO · BricoHams (v4)
+ * Autor: BricoHams (v4)
  *
  * Cuando llega una trama de voz con indicativo muestra, junto al panel de
  * voz digital, una ficha con:
@@ -16,7 +16,7 @@
  */
 
 Plugins.dvficha._version = '1.0.0';
-Plugins.dvficha._author = 'EA5KAO';
+Plugins.dvficha._author='BricoHams';
 Plugins.dvficha.no_css = true;
 
 Plugins.dvficha.init = function () {

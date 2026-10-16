@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-owrx-botones · botones «Meshtastic 433 / 868», «APRS (RAK)» y
-#  «Meshtastic Web (868)» (https://<host>:8443/, si MESH_WEB no es «no») y
-#  «Meshtastic Web (433)» (https://<host>:8444/, si MESH433_WEB=yes, v5.1)
+#  bricohams-owrx-botones · botones «Meshtastic 433 / 868», «APRS (RAK)»,
+#  «Seguridad» (backup remoto) y
+#  «Meshtastic Web (868)» (https://<host>:8443/, si MESH_WEB no es «no»)
 #  en la página /settings de OpenWebRX+ (v4.5)
 #
 #  Se añaden a la plantilla settings.html del paquete openwebrx, así salen
@@ -31,12 +31,7 @@ BOTON_WEB = '''
 # sin «$»: OpenWebRX+ pasa la plantilla por string.Template
 JS = ("<script>if(location.port==='8073'){document.querySelectorAll('a[data-bricohams]').forEach(function(a){"
       "a.href='https://'+location.hostname+'/'+a.getAttribute('href');});}"
-      "var w=document.getElementById('bricohams-meshweb');if(w){w.href='https://'+location.hostname+':8443/';}"
-      "var w4=document.getElementById('bricohams-meshweb433');if(w4){w4.href='https://'+location.hostname+':8444/';}</script>")
-BOTON_WEB433 = '''
-        <div class="col-4">
-            <a class="btn btn-secondary" id="bricohams-meshweb433" href="settings/bricohams/meshtastic">Meshtastic Web (433)</a>
-        </div>'''
+      "var w=document.getElementById('bricohams-meshweb');if(w){w.href='https://'+location.hostname+':8443/';}</script>")
 
 
 BOTON_TAK = '''
@@ -49,14 +44,20 @@ BOTON_MON = '''
         </div>'''
 
 
-def bloque(web=True, tak=False, mon=False, web433=False):
+def bloque(web=True, tak=False, mon=False):
     return MARCA_INI + '''
         <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/meshtastic">Meshtastic 433 / 868</a>
         </div>
         <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/aprs">APRS (RAK)</a>
-        </div>''' + (BOTON_WEB if web else '') + (BOTON_WEB433 if web433 else '') + (BOTON_TAK if tak else '') + (BOTON_MON if mon else '') + '''
+        </div>
+        <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/mapflights">map.flights (ADS-B)</a>
+        </div>
+        <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/seguridad">Seguridad</a>
+        </div>''' + (BOTON_WEB if web else '') + (BOTON_TAK if tak else '') + (BOTON_MON if mon else '') + '''
         ''' + JS + '''
         ''' + MARCA_FIN + '\n'
 
@@ -78,11 +79,6 @@ def env_val(clave, defecto=''):
 def mesh_web():
     """MESH_WEB de bricohams.env (por defecto yes): botón del cliente web de Meshtastic en :8443."""
     return env_val('MESH_WEB', 'yes') != 'no'
-
-
-def mesh_web433():
-    """v5.1 · MESH433_WEB=yes: cliente web del LilyGO 433 por el puente, en :8444."""
-    return env_val('MESH433_WEB', 'no') == 'yes'
 
 
 def tak():
@@ -115,7 +111,7 @@ def quitar(texto):
 
 def poner(texto):
     limpio = quitar(texto)
-    b = bloque(mesh_web(), tak(), monitorizacion(), mesh_web433())
+    b = bloque(mesh_web(), tak(), monitorizacion())
     m = ANCLA.search(limpio)
     if m:
         return limpio[:m.start()] + '        ' + b + limpio[m.start():]

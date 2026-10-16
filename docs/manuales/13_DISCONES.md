@@ -1,5 +1,11 @@
 # 13 · Discones de banda ancha (MULTIPERFIL y futuro SDR)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Plano](../esquemas/09_discones.png)
 ![NEC2](../../hardware/antenas/sim/resultados/discone.png)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rellena settings.json.tmpl con bricohams.env.example y comprueba receptores,
 perfiles, cobertura de bandas y el cambio de HF al SDRplay."""
-import json, os, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__)); RAIZ = os.path.join(AQUI, '..')
 BANDAS = {'160': (1.81e6, 2.0e6), '80': (3.5e6, 3.8e6), '60': (5.3515e6, 5.3665e6), '40': (7.0e6, 7.2e6),
@@ -18,6 +18,9 @@ def render(sdrplay, overrides=None):
     subprocess.run([sys.executable, 'files/bin/bricohams-render-settings.py', 'files/openwebrx/settings.json.tmpl', dst], cwd=RAIZ, env=env, check=True)
     return json.load(open(dst))
 
+SERIE = dict(re.findall(r'^(SERIAL_[A-Z0-9]+)="([^"]*)"', open(os.path.join(RAIZ, 'bricohams.env.example'), encoding='utf-8').read(), re.M))
+assert all(SERIE.get(k) for k in ('SERIAL_HAT', 'SERIAL_MINI', 'SERIAL_V3')), SERIE
+
 for sdrplay in (False, True):
     d = render(sdrplay)
     s = d['sdrs']
@@ -27,7 +30,7 @@ for sdrplay in (False, True):
     assert d['photo_title'] == 'N0CALL · Receptor SDR'
     assert d['aprs_callsign'] == 'N0CALL'
     assert d['aprs_igate_enabled'] is False
-    assert s['sat']['device'] == '00000101' and s['ham']['device'] == '00000102' and s['multi']['device'] == '00000103'
+    assert (s['sat']['device'], s['ham']['device'], s['multi']['device']) == (SERIE['SERIAL_HAT'], SERIE['SERIAL_MINI'], SERIE['SERIAL_V3']), s
     assert s['hf']['enabled'] is sdrplay
     hfdev = s['hf'] if sdrplay else s['multi']
     hf = {k: v for k, v in hfdev['profiles'].items() if k[:2] in ('hf', 'sp')}
@@ -53,9 +56,9 @@ fallo = subprocess.run([sys.executable, 'files/bin/bricohams-render-settings.py'
                                       'APRS_IGATE_ENABLE': 'yes'}, capture_output=True, text=True)
 assert fallo.returncode != 0 and 'CALLSIGN propio' in fallo.stderr
 # v4.3 · si STATION_LAT/LON están puestas mandan sobre el centro del locator (son más precisas)
-precisas = render(False, {'STATION_LOCATOR': 'IM98', 'STATION_LAT': '38.08', 'STATION_LON': '-1.25', 'OWRX_GPS_DECIMALES': 'exacta'})
-assert precisas['receiver_gps'] == {'lat': 38.08, 'lon': -1.25}, precisas['receiver_gps']
+precisas = render(False, {'STATION_LOCATOR': 'IM98', 'STATION_LAT': '37.9838', 'STATION_LON': '-1.1280', 'OWRX_GPS_DECIMALES': 'exacta'})
+assert precisas['receiver_gps'] == {'lat': 37.9838, 'lon': -1.1280}, precisas['receiver_gps']
 # v4.4 · por defecto la posición pública va redondeada a 2 decimales (~1 km): no se publica la casa
-publica = render(False, {'STATION_LAT': '38.08', 'STATION_LON': '-1.25'})
-assert publica['receiver_gps'] == {'lat': 38.08, 'lon': -1.25}, publica['receiver_gps']
+publica = render(False, {'STATION_LAT': '37.983812', 'STATION_LON': '-1.128011'})
+assert publica['receiver_gps'] == {'lat': 37.98, 'lon': -1.13}, publica['receiver_gps']
 print('OK test_render_settings: locator solo si faltan las coordenadas')

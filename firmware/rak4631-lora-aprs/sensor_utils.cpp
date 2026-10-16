@@ -1,4 +1,4 @@
-/* BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). */
+/* BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). */
 #include <Wire.h>
 #include <TinyGPS++.h>
 #include <Adafruit_BME280.h>

@@ -29,7 +29,7 @@ def leer(path):
 def binario(path):
     tris = leer(path)
     with open(path, 'wb') as fh:
-        fh.write(b'BricoHams SDR - caja EA5KAO'.ljust(80, b' '))
+        fh.write(b'BricoHams SDR - caja N0CALL'.ljust(80, b' '))
         fh.write(struct.pack('<I', len(tris)))
         for t in tris:
             fh.write(struct.pack('<12fH', *t[0], *t[1], *t[2], *t[3], 0))

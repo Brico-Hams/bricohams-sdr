@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-mesh-owrx · EA5KAO · BricoHams (v4.5)
+#  bricohams-mesh-owrx · BricoHams (v4.5)
 #  Nodos Meshtastic de la estación -> MAPA de OpenWebRX+ (integración directa).
 #    - LilyGO T3 433 por USB (/dev/lilygo-mesh) y nodo 868 del HAT (meshtasticd,
 #      127.0.0.1:4403, cuando llegue el HAT): cada uno con la API de Meshtastic.
@@ -56,10 +56,7 @@ def fuentes():
     """[(nombre, tipo, destino, frecuencia Hz)] según bricohams.env."""
     out = []
     if si('MESH433_OWRX', 'yes'):
-        if si('MESH433_WEB', 'no'):              # v5.1 · el puente tiene el puerto serie: entramos por su TCP
-            out.append(('mesh433', 'tcp', '127.0.0.1:%s' % env('MESH433_PUENTE_TCP', '4404'), int(env('MESH433_FREQ', '433875000'))))
-        else:
-            out.append(('mesh433', 'serie', env('MESH433_PUERTO', '/dev/lilygo-mesh'), int(env('MESH433_FREQ', '433875000'))))
+        out.append(('mesh433', 'serie', env('MESH433_PUERTO', '/dev/lilygo-mesh'), int(env('MESH433_FREQ', '433875000'))))
     if si('MESH868_OWRX', 'yes'):
         out.append(('mesh868', 'tcp', env('MESH868_HOST', '127.0.0.1'), int(env('MESH868_FREQ', '869618000'))))
     return out
@@ -183,8 +180,7 @@ class Fuente:
                 raise OSError('no existe %s' % self.destino)
             self.iface = meshtastic.serial_interface.SerialInterface(devPath=self.destino)
         else:
-            host, _, puerto = self.destino.partition(':')
-            self.iface = meshtastic.tcp_interface.TCPInterface(hostname=host, **({'portNumber': int(puerto)} if puerto else {}))
+            self.iface = meshtastic.tcp_interface.TCPInterface(hostname=self.destino)
         with self.lock:
             self.mio = getattr(getattr(self.iface, 'myInfo', None), 'my_node_num', None)
             for n in (self.iface.nodes or {}).values():

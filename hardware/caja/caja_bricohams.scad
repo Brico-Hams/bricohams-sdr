@@ -1,5 +1,5 @@
 // =====================================================================
-//  Caja de intemperie BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
+//  Caja de intemperie BricoHams SDR · BricoHams SDR
 //  Para mástil Televés. PETG (estructura) + TPU 95A (juntas), impresa en
 //  una Anycubic Kobra S1 (volumen 250 × 250 × 250 mm).
 //
@@ -228,7 +228,7 @@ module cuerpo() {
         translate([XP - 1, NOTCH_Y, NOTCH_Z]) cube([TP + 2, NOTCH_W, D]);
         // --- rótulo en el lateral derecho ---
         translate([W - 0.6, H / 2, D / 2]) rotate([90, 0, 90]) linear_extrude(1) rotate(-90)
-            text("BricoHams · EA5KAO", size = 8, font = FONT, halign = "center", valign = "center");
+            text("BricoHams · N0CALL", size = 8, font = FONT, halign = "center", valign = "center");
     }
 }
 
@@ -277,7 +277,7 @@ module tapa() {
         translate([W / 2, 52, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
             text("BricoHams SDR", size = 14, font = FONT, halign = "center", valign = "center");
         translate([W / 2, 30, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
-            text("EA5KAO · Mi QTH · Región de Murcia", size = 6.5, font = FONT, halign = "center", valign = "center");
+            text("BricoHams SDR", size = 6.5, font = FONT, halign = "center", valign = "center");
         translate([T + PWR_W / 2, 140, LID_Z0 + LID_T - 0.6]) linear_extrude(1) rotate(90)
             text("230 V", size = 10, font = FONT, halign = "center", valign = "center");
     }

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # =====================================================================
 #  owrx-clone · clonar una instalación de OpenWebRX+ a otro equipo
-#  Copyright (c) 2026 EA5KAO · BricoHams (Mi QTH, Región de Murcia) · licencia MIT
+#  Copyright (c) 2026 BricoHams contributors · licencia MIT
 #
 #  Exporta TODO lo que hace única a una estación OpenWebRX+ (receptores y
 #  perfiles, marcadores, usuarios, imágenes, plugins de la web, archivos de

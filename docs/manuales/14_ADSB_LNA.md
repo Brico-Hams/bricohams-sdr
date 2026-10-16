@@ -1,5 +1,11 @@
 # 14 · Antena ADS-B 1090 MHz con el LNA en la base
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Plano](../esquemas/10_adsb_gp.png)
 
 **Qué es:** un plano de tierra λ/4 («araña») con radiante de 62 mm y 4 radiales de 68 mm a 45° (latón Ø2).

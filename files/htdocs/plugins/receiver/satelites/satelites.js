@@ -1,7 +1,7 @@
 /*
  * satelites: aviso de próximos pases y «▶ Escuchar» con un clic (OpenWebRX+)
  *
- * Autor: EA5KAO · BricoHams (v4)
+ * Autor: BricoHams (v4)
  *
  *  - Franja bajo la cabecera: «🛰️ SO-50 en 12 min · máx 54° · 11 min · 436,795 FM  [▶ Escuchar]»
  *    y, durante el pase, «🔴 EN DIRECTO: ISS 32°».
@@ -15,7 +15,7 @@
  */
 
 Plugins.satelites._version = '1.0.0';
-Plugins.satelites._author = 'EA5KAO';
+Plugins.satelites._author='BricoHams';
 Plugins.satelites.no_css = true;
 
 Plugins.satelites.init = function () {
@@ -103,7 +103,7 @@ Plugins.satelites.init = function () {
                 (p.az_aos != null ? p.az_aos + '°→' + (p.az_los != null ? p.az_los : '?') + '°' : '') +
                 '</td><td><button onclick="Plugins.satelites.escuchar(' + i + ')">▶</button></td></tr>';
         }).join('');
-        $lista.html('<b>🛰️ Próximos pases (24 h) · Mi QTH</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-sat-lista\').hide()">✕</span>' +
+        $lista.html('<b>🛰️ Próximos pases (24 h)</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-sat-lista\').hide()">✕</span>' +
             '<table><tr><th>Hora</th><th>Satélite</th><th>Máx</th><th>Dura</th><th>Bajada</th><th>Az</th><th></th></tr>' +
             (filas || '<tr><td colspan="7">Sin datos todavía (bricohams-satpass)</td></tr>') + '</table>' +
             '<div style="opacity:.7;margin-top:4px">▶ cambia de perfil, sintoniza y activa el Doppler. Imágenes METEOR: menú «Files».</div>').toggle();

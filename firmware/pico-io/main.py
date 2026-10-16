@@ -1,5 +1,5 @@
 # =====================================================================
-#  bricohams-io · EA5KAO · BricoHams  —  firmware MicroPython para Raspberry Pi Pico
+#  bricohams-io · BricoHams  —  firmware MicroPython para Raspberry Pi Pico
 #
 #  Puente USB entre la Raspberry Pi 5 (que tiene la cabecera de 40 pines
 #  ocupada por el HAT) y los sensores/actuadores de la caja:

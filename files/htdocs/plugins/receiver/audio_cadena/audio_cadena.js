@@ -1,7 +1,7 @@
 /*
  * audio_cadena: base común de los plugins de audio de BricoHams (v4.2)
  *
- * Autor: EA5KAO · BricoHams · licencia MIT
+ * Autor: BricoHams · licencia MIT
  *
  * OpenWebRX+ reproduce el audio así (htdocs/lib/AudioEngine.js):
  *     audioNode (AudioWorklet o ScriptProcessor) → gainNode (volumen) → altavoz
@@ -23,7 +23,7 @@
  */
 
 Plugins.audio_cadena._version = '1.0.0';
-Plugins.audio_cadena._author = 'EA5KAO';
+Plugins.audio_cadena._author='BricoHams';
 Plugins.audio_cadena.no_css = true;
 
 (function (P) {
@@ -152,7 +152,7 @@ Plugins.audio_cadena.no_css = true;
         var $b = $('<div class="button bha-btn" id="' + id + '" title="' + titulo + '">' + svg + '<br>' + texto + '<span class="bha-dot"></span></div>');
         $b.on('click', alPulsar);
         (function colocar(intentos) {
-            var $tras = $('#ea5kao-dsp-button, #ea5kao-filtro-button, #ea5kao-cam-button, #ea5kao-meteo-button, #ea5kao-solar-button, #owrx-rig-dx-button').not($b).last();
+            var $tras = $('#bh-dsp-button, #bh-filtro-button, #bh-cam-button, #bh-meteo-button, #bh-solar-button, #owrx-rig-dx-button').not($b).last();
             if ($tras.length) { $tras.after($b); return; }
             if (intentos > 0) { setTimeout(function () { colocar(intentos - 1); }, 500); return; }
             var $bar = $('.openwebrx-main-buttons').first();

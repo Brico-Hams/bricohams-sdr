@@ -1,8 +1,14 @@
 # TAK local, mapa ADS-B/APRS y CHAT
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [ADS-B local, RadarBox y map.flights simultáneos](../GUIA_VISUAL_MODULOS.md#adsb).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ## Estacion desplegada
 
-Servidor OpenWebRX+: la IP fija de la Pi en la LAN, Debian 13 ARM64.
+Servidor OpenWebRX+: `192.168.1.50`, Debian 13 ARM64.
 
 - Mapa publico Leaflet: <http://192.168.1.50/map>.
 - ADS-B local: lectura de `/run/readsb/aircraft.json`, cada dos segundos.
@@ -191,51 +197,6 @@ un cortafuegos global de denegacion, su lista LAN debe incluir
 El instalador TAK incorpora esos puertos en `BLINDAJE_PUERTOS_LAN` de esta
 estacion, sin cambiar los valores por defecto de los kits que no instalan TAK.
 
-## Despliegue y verificacion
-
-Para actualizar estos componentes nativos desde el kit, sin reinstalar
-RadarBox ni modificar MLAT:
-
-```bash
-sudo bash tools/activar_mapa_local.sh 00000401
-```
-
-El argumento es la serie elegida por el operador; si se omite, se lee
-`SERIAL_ADSB` del kit. Se conservan copias root-only bajo
-`/var/backups/bricohams-mapa-FECHA`. Se actualizan el kit y su copia de ENV,
-los plugins y binarios; se reinician los servicios necesarios, incluyendo
-OpenWebRX+, lo que interrumpe brevemente las sesiones de escucha.
-
-Si el navegador conserva el plugin anterior, recargar con **Ctrl+F5**.
-
-Pruebas Linux:
-
-```bash
-python3 tests/test_live_map.py
-python3 tests/test_api.py
-python3 tests/test_rak_aprs.py
-python3 tests/test_mesh_admin.py
-```
-
-El test RAK usa puertos/firmware simulados: los mensajes de DFU que imprime
-son una prueba del manejo de errores, no un nuevo flasheo del RAK real.
-Se verificaron aviones reales en readsb y su marcador en Leaflet,
-trayectorias/deduplicacion/orden temporal con posiciones sinteticas solo
-en el navegador, y continuidad de RadarBox/MLAT. No se emitieron paquetes
-de prueba por RF ni hacia APRS-IS.
-Se comprobo tambien la recepcion de un mensaje de prueba por MQTT en el
-chat publico, una unica vez, y el escape de HTML en el navegador.
-TAK rechazo la conexion CoT sin certificado y acepto un cliente con
-certificado valido; su evento `PRUEBA-TAK-LOCAL` llego a PostgreSQL y a la
-consulta privada. La posicion de prueba caduca al cabo de 60 segundos.
-El plugin desplegado se ejercito ademas en un contexto de prueba del navegador:
-se verificaron los limites exactos de 1.000 puntos y 512 equipos, las etiquetas
-sin HTML ejecutable y la eliminacion de la capa TAK al recibir 401.
-
-Para copias TAK, conservar PostgreSQL (`pg_dump bricohams_tak`), datos/config/CA
-en `/var/lib/bricohams-tak`, certificados nginx y configuraciones de servicios.
-Guardar esas copias cifradas: incluyen claves privadas y credenciales.
-
 ## Monitorizacion: Prometheus, node-exporter y Grafana
 
 Se activa con `MONITORIZACION="yes"` en el `.env` y lo aplica el paso
@@ -305,3 +266,47 @@ Nada de esto aparece en la pagina publica.
 Prueba: `tests/test_monitorizacion.py` (fusion del YAML, prioridad de la
 contrasena, drop-ins en loopback y orden `auth_request` en nginx).
 
+## Despliegue y verificacion
+
+Para actualizar estos componentes nativos desde el kit, sin reinstalar
+RadarBox ni modificar MLAT:
+
+```bash
+sudo bash tools/activar_mapa_local.sh 00000401
+```
+
+El argumento es la serie elegida por el operador; si se omite, se lee
+`SERIAL_ADSB` del kit. Se conservan copias root-only bajo
+`/var/backups/bricohams-mapa-FECHA`. Se actualizan el kit y su copia de ENV,
+los plugins y binarios; se reinician los servicios necesarios, incluyendo
+OpenWebRX+, lo que interrumpe brevemente las sesiones de escucha.
+
+Si el navegador conserva el plugin anterior, recargar con **Ctrl+F5**.
+
+Pruebas Linux:
+
+```bash
+python3 tests/test_live_map.py
+python3 tests/test_api.py
+python3 tests/test_rak_aprs.py
+python3 tests/test_mesh_admin.py
+```
+
+El test RAK usa puertos/firmware simulados: los mensajes de DFU que imprime
+son una prueba del manejo de errores, no un nuevo flasheo del RAK real.
+Se verificaron aviones reales en readsb y su marcador en Leaflet,
+trayectorias/deduplicacion/orden temporal con posiciones sinteticas solo
+en el navegador, y continuidad de RadarBox/MLAT. No se emitieron paquetes
+de prueba por RF ni hacia APRS-IS.
+Se comprobo tambien la recepcion de un mensaje de prueba por MQTT en el
+chat publico, una unica vez, y el escape de HTML en el navegador.
+TAK rechazo la conexion CoT sin certificado y acepto un cliente con
+certificado valido; su evento `PRUEBA-TAK-LOCAL` llego a PostgreSQL y a la
+consulta privada. La posicion de prueba caduca al cabo de 60 segundos.
+El plugin desplegado se ejercito ademas en un contexto de prueba del navegador:
+se verificaron los limites exactos de 1.000 puntos y 512 equipos, las etiquetas
+sin HTML ejecutable y la eliminacion de la capa TAK al recibir 401.
+
+Para copias TAK, conservar PostgreSQL (`pg_dump bricohams_tak`), datos/config/CA
+en `/var/lib/bricohams-tak`, certificados nginx y configuraciones de servicios.
+Guardar esas copias cifradas: incluyen claves privadas y credenciales.

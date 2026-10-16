@@ -1,9 +1,15 @@
 # 22 · Estación meteorológica APRS con firmware LoRa (CA2RXU) en un LilyGO
 
-**Qué es:** la estación **EA5KAO-14** es un tercer LilyGO T3 V1.6.1 (433 MHz) con el firmware **LoRa_APRS_Wx_Station** de CA2RXU. Lee BME280, viento RS485 y pluviómetro, y **emite el paquete WX por LoRa a 433,775 MHz**. Lo recoge el iGate (EA5KAO-10) y lo sube a APRS-IS.
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Meteorología, BME280, viento/lluvia y Pico IO](../GUIA_VISUAL_MODULOS.md#wx).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
+**Qué es:** la estación **N0CALL-14** es un tercer LilyGO T3 V1.6.1 (433 MHz) con el firmware **LoRa_APRS_Wx_Station** de CA2RXU. Lee BME280, viento RS485 y pluviómetro, y **emite el paquete WX por LoRa a 433,775 MHz**. Lo recoge el iGate (N0CALL-10) y lo sube a APRS-IS.
 
 **Para qué sirve:** como estación aislada (solo con batería o panel solar, lejos de la caja) o como respaldo si la Pi se para.
-- Con la Pi en marcha, la estación principal sigue siendo **EA5KAO-13** (manuales 06, 19 y 20).
+- Con la Pi en marcha, la estación principal sigue siendo **N0CALL-13** (manuales 06, 19 y 20).
 - ⚠ **El bus RS485 solo admite un maestro:** los sensores de viento van a la Pi **o** al LilyGO, nunca a los dos.
 
 Fuente de los datos: el repositorio y el código del firmware (`platformio.ini` y `src/boards_pinout.h`), revisados en octubre de 2026 ([enlace](https://github.com/richonguzman/LoRa_APRS_Wx_Station)).
@@ -41,7 +47,7 @@ Fuente de los datos: el repositorio y el código del firmware (`platformio.ini` 
 ## 3. Grabar el firmware (desde la Pi, el camino corto)
 1. Rellena en `bricohams.env`:
    ```
-   WXLORA_CALLSIGN="EA5KAO-14"   WXLORA_POWER="17"   WXLORA_BME280="yes"
+   WXLORA_CALLSIGN="N0CALL-14"   WXLORA_POWER="17"   WXLORA_BME280="yes"
    WXLORA_WIND="yes"             WXLORA_RAIN="yes"   WXLORA_COMMENT="WX LoRa BricoHams"
    ```
 2. **Si este LilyGO hace de estación:** pon `WIND_ENABLE="no"` y `RAIN_ENABLE="no"` (el bus RS485 tiene un solo maestro) y lanza `sudo bash install.sh --solo sensor`.
@@ -80,6 +86,6 @@ Los dos sensores salen de fábrica con la dirección **0x01**. El firmware lee e
 - **Pantalla del LilyGO:** temperatura, presión, viento y lluvia.
 - **Unidades:** el firmware manda la temperatura en °F, como pide el formato APRS.
 - **Que llegan los paquetes:**
-  - en la web del iGate (`http://<IP del iGate>/`) deben aparecer los de EA5KAO-14 cada 10 min;
-  - en **aprs.fi → EA5KAO-14 → Weather**, las gráficas.
+  - en la web del iGate (`http://<IP del iGate>/`) deben aparecer los de N0CALL-14 cada 10 min;
+  - en **aprs.fi → N0CALL-14 → Weather**, las gráficas.
 - **Alcance:** con 17 dBm y SF12 sobran varios km hasta el iGate. Si no llega, sube a 20 dBm (`WXLORA_POWER`).

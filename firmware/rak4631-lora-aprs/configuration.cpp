@@ -1,5 +1,5 @@
 /* BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock
- * Copyright (C) 2026 Ricardo Guzman - CA2RXU (original) · EA5KAO / BricoHams (port nRF52)
+ * Copyright (C) 2026 Ricardo Guzman - CA2RXU (original) · BricoHams contributors (port nRF52)
  * GPL-3.0-or-later (ver LICENSE).
  */
 #include <ArduinoJson.h>

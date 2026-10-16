@@ -98,7 +98,7 @@ poner(A, '/usr/lib/python3/dist-packages/owrx/modes.py', MODES + '# parche\n')
 poner(A, HT + '/plugins/receiver/init.js', "Plugins.load('mio');\n")
 poner(A, HT + '/plugins/receiver/mio/mio.js', 'Plugins.mio={}')
 poner(A, HT + '/css/tema-propio.css', 'body{}')                       # fuera de plugins: no cabe en Docker
-SET = {'receiver_name': 'EA5KAO · Mi QTH', 'sdrs': {'rtl': {'name': 'HAM', 'type': 'rtl_sdr', 'device': 'serial=00000102', 'profiles': {}}}}
+SET = {'receiver_name': 'N0CALL · Murcia', 'sdrs': {'rtl': {'name': 'HAM', 'type': 'rtl_sdr', 'device': 'serial=00000102', 'profiles': {}}}}
 poner(A, '/var/lib/openwebrx/settings.json', json.dumps(SET))
 poner(A, '/var/lib/openwebrx/users.json', '[{"user":"admin"}]', 0o600)
 poner(A, '/var/lib/openwebrx/bookmarks.json', '[]')
@@ -119,7 +119,7 @@ poner(B, DD + '/etc/openwebrx.conf', '[core]\ndata_directory = /var/lib/openwebr
 contenedores(**{'owrx-mbe': inspect(VOL)})
 rc, out = correr(B, '--docker', 'owrx-mbe', 'importar', nat, '--todo', '--si')
 assert rc == 0, out
-assert json.loads(leer(B, DD + '/var/settings.json'))['receiver_name'] == 'EA5KAO · Mi QTH'
+assert json.loads(leer(B, DD + '/var/settings.json'))['receiver_name'] == 'N0CALL · Murcia'
 assert leer(B, DD + '/var/users.json').startswith('[{"user"')
 assert 'log_level' in leer(B, DD + '/etc/openwebrx.conf.d/90-mio.conf')
 assert leer(B, DD + '/plugins/receiver/mio/mio.js') == 'Plugins.mio={}'
@@ -162,7 +162,7 @@ poner(C, HT + '/index.html', INDEX)
 poner(C, '/etc/os-release', 'ID=debian\nVERSION_CODENAME=trixie\nPRETTY_NAME="Debian GNU/Linux 13 (trixie)"\n')
 rc, out = correr(C, 'importar', dk, '--si')
 assert rc == 0, out
-assert json.loads(leer(C, '/var/lib/openwebrx/settings.json'))['receiver_name'] == 'EA5KAO · Mi QTH'
+assert json.loads(leer(C, '/var/lib/openwebrx/settings.json'))['receiver_name'] == 'N0CALL · Murcia'
 assert leer(C, HT + '/plugins/receiver/mio/mio.js') == 'Plugins.mio={}'
 assert 'log_level' in leer(C, '/etc/openwebrx/openwebrx.conf.d/90-mio.conf')
 assert any('systemctl' in o and 'start' in o for o in oc.ORDENES) and not any('docker' in o for o in oc.ORDENES), oc.ORDENES

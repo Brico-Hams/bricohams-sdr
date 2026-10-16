@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  tools/compilar_rak.sh · EA5KAO · BricoHams (v4.5)
+#  tools/compilar_rak.sh · BricoHams (v4.5)
 #  Compila firmware/rak4631-lora-aprs para el RAK4631 y deja en bin/:
 #    bricohams-rak4631-lora-aprs.zip  (DFU serie: sudo bricohams-rak-aprs grabar)
 #    bricohams-rak4631-lora-aprs.uf2  (doble RESET y copiar a la unidad RAK4631)
@@ -40,9 +40,6 @@ UF2=$(find "${ARDUINO_DATA:-$HOME/.arduino15}" -path '*rakwireless*' -name uf2co
 if [ -n "$UF2" ]; then
     python3 "$UF2" -f 0xADA52840 -c -o "$OUT/bricohams-rak4631-lora-aprs.uf2" "$OUT/bricohams-rak4631-lora-aprs.hex"
 fi
-# v5.1 · versión para «bricohams-rak-aprs puesta-en-marcha» (graba solo si el RAK lleva otra)
-VER=$(sed -n 's/^#define FW_VERSION *"\([^"]*\)".*/\1/p' "$FW/configuration.h")
-printf '{"version": "%s", "firmware": "BricoHams-RAK-APRS"}\n' "$VER" >"$OUT/VERSION.json"
 (cd "$OUT" && sha256sum bricohams-rak4631-lora-aprs.* >SHA256SUMS)
 echo "✔ Firmware en $OUT"
 cat "$OUT/SHA256SUMS"

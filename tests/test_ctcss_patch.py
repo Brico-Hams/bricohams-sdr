@@ -17,6 +17,15 @@ RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 RUTA = os.path.join(RAIZ, 'files', 'bin', 'bricohams-owrx-ctcss')
 SRC = os.path.join(RAIZ, 'files', 'share', 'bricohams-ctcss')
 DATOS = os.path.join(RAIZ, 'tests', 'datos', 'owrx-1.2.126')
+INSTALL = os.path.join(RAIZ, 'install.sh')
+ENV_EXAMPLE = os.path.join(RAIZ, 'bricohams.env.example')
+
+with open(INSTALL, encoding='utf-8') as f:
+    instalador = f.read()
+with open(ENV_EXAMPLE, encoding='utf-8') as f:
+    configuracion = f.read()
+assert 'OWRX_CTCSS_ENABLE' in instalador and 'if si "${OWRX_CTCSS_ENABLE:-yes}"' in instalador
+assert 'OWRX_CTCSS_ENABLE="yes"' in configuracion
 
 FICHEROS = {
     'OWRX_CTCSS_BOOKMARKS_PY': 'owrx_bookmarks.py',
@@ -138,4 +147,65 @@ if np is not None:
         for mal in (85.4, 91.5, 177.3):
             assert not abre(88.5, senal(3, mal)), 'el tono %.1f no abre 88.5' % mal
         assert not abre(88.5, senal(3, None)), 'voz sin tono no abre'
+
+# ---- cliente: el subtono del bookmark no se pierde (si hay node) --------------
+# Reproduce el flujo real de OpenWebRX+ 1.2.126: UI.tuneBookmark -> setModulation ->
+# setFrequency y, después (asíncrono), hashchange -> DemodulatorPanel._apply ->
+# setMode(mismo modo). Antes ese _apply mandaba {ctcss: 0} y el subtono se perdía.
+if shutil.which('node'):
+    ARNES = r'''
+const fs = require('fs');
+const enviados = [];
+global.center_freq = 145000000;
+global.document = { readyState: 'complete', getElementById: () => null,
+                    querySelector: () => null, addEventListener: () => {} };
+function Demodulator() { this.started = true; this.offset_frequency = 0; this.modulation = 'nfm'; }
+Demodulator.prototype.send = function (p) { if ('ctcss' in p) enviados.push(p.ctcss); };
+Demodulator.prototype.set = function () {};
+Demodulator.prototype.get_modulation = function () { return this.modulation; };
+Demodulator.prototype.set_offset_frequency = function (o) { this.offset_frequency = o; this.set(); };
+const d = new Demodulator();
+function DemodulatorPanel() {}
+DemodulatorPanel.prototype.setMode = function (m) { if (d.modulation !== m) { d.modulation = m; d.set(); } };
+DemodulatorPanel.prototype._apply = function (p) { this.setMode(p.mod); d.set_offset_frequency(p.offset); };
+const panel = new DemodulatorPanel();
+global.Demodulator = Demodulator; global.DemodulatorPanel = DemodulatorPanel;
+global.UI = {
+    getDemodulator: () => d, getFrequency: () => center_freq + d.offset_frequency, showBubble: () => {},
+    setModulation: (m) => panel.setMode(m),
+    setFrequency: (f) => d.set_offset_frequency(f - center_freq),
+    tuneBookmark: function (b) { UI.setModulation(b.modulation); UI.setFrequency(b.frequency); return true; },
+};
+eval(fs.readFileSync(process.argv[2], 'utf8'));
+const hash = () => panel._apply({ mod: d.modulation, offset: d.offset_frequency });
+const ultimo = () => enviados[enviados.length - 1];
+const fallos = [];
+const comprobar = (c, m) => { if (!c) fallos.push(m + ' ' + JSON.stringify(enviados)); };
+
+UI.tuneBookmark({ frequency: 145600000, modulation: 'nfm', ctcss: 77 });
+comprobar(ultimo() === 77, 'el bookmark activa 77 Hz');
+hash();
+comprobar(ultimo() === 77 && enviados.indexOf(0) < 0, 'el hashchange con el mismo modo conserva el subtono');
+UI.setFrequency(145601000);
+comprobar(ultimo() === 77, 'un retoque de 1 kHz conserva el subtono');
+UI.setFrequency(145650000);
+comprobar(ultimo() === 0, 'alejarse más de 3 kHz anula el subtono');
+UI.tuneBookmark({ frequency: 145600000, modulation: 'nfm', ctcss: 88.5 });
+comprobar(ultimo() === 88.5, 'otro bookmark activa su subtono');
+UI.setModulation('am'); hash();
+comprobar(ultimo() === 0, 'cambiar de modo a AM anula el subtono');
+UI.setModulation('nfm'); hash();
+comprobar(ultimo() === 0, 'volver a FM a mano no recupera el subtono');
+if (fallos.length) { console.error(fallos.join('\n')); process.exit(1); }
+'''
+    d = tempfile.mkdtemp()
+    try:
+        arnes = os.path.join(d, 'arnes.js')
+        with open(arnes, 'w', encoding='utf-8') as f:
+            f.write(ARNES)
+        r = subprocess.run(['node', arnes, os.path.join(SRC, 'bricohams-ctcss.js')],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, 'cliente CTCSS: ' + r.stdout + r.stderr
+    finally:
+        shutil.rmtree(d)
 print('OK test_ctcss_patch')

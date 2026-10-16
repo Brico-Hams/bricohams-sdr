@@ -16,8 +16,8 @@ llamadas = []
 
 def rid_falso(url):
     llamadas.append(url)
-    if 'EA5KAO' in url:
-        return {'count': 1, 'results': [{'callsign': 'EA5KAO', 'fname': 'Anatol', 'surname': '', 'city': 'Mi QTH',
+    if 'N0CALL' in url:
+        return {'count': 1, 'results': [{'callsign': 'N0CALL', 'fname': 'Operador', 'surname': '', 'city': 'Murcia',
                                          'state': 'Murcia', 'country': 'Spain', 'id': 2145999}]}
     return {'count': 0, 'results': []}
 
@@ -35,10 +35,10 @@ def qrz_get(url):
 
 cache = api.Cache(os.path.join(tempfile.mkdtemp(), 'c.sqlite'))
 sin_qrz = api.Qrz('', '')
-d = api.buscar_indicativo('ea5kao', cache, sin_qrz, rid=lambda c: api.radioid(c, get=rid_falso))
-assert d['nombre'] == 'Anatol' and d['ciudad'] == 'Mi QTH' and d['fuente'] == 'RadioID' and d['foto'] == '', d
+d = api.buscar_indicativo('n0call', cache, sin_qrz, rid=lambda c: api.radioid(c, get=rid_falso))
+assert d['nombre'] == 'Operador' and d['ciudad'] == 'Murcia' and d['fuente'] == 'RadioID' and d['foto'] == '', d
 n = len(llamadas)
-assert api.buscar_indicativo('EA5KAO', cache, sin_qrz, rid=lambda c: api.radioid(c, get=rid_falso)) == d
+assert api.buscar_indicativo('N0CALL', cache, sin_qrz, rid=lambda c: api.radioid(c, get=rid_falso)) == d
 assert len(llamadas) == n, 'la segunda consulta sale de la caché'
 cache.c.execute('INSERT INTO ind VALUES (?,?,?)', ('EA5OLD', api.time.time(), '{"call":"EA5OLD","fuente":"RadioID"}'))
 assert cache.get('EA5OLD') is None, 'invalida entradas antiguas para aplicar la nueva prioridad HamQTH'
@@ -58,7 +58,7 @@ def hamqth_post(url, payload):
 
 def hamqth_get(url, headers):
     hamqth_llamadas.append(('GET', url, headers))
-    return {'callsign': 'EA5HAM', 'name': 'Ana Operadora', 'qth': 'Mi QTH', 'country': 'Spain',
+    return {'callsign': 'EA5HAM', 'name': 'Ana Operadora', 'qth': 'Murcia', 'country': 'Spain',
             'region': {'oblast': 'Murcia'}, 'picture': 'https://www.hamqth.com/foto.jpg'}
 
 
@@ -66,7 +66,7 @@ hamqth = api.HamQTH('EA5HAM', 'secreto', post=hamqth_post, get=hamqth_get)
 ham_cache = api.Cache(os.path.join(tempfile.mkdtemp(), 'c.sqlite'))
 sin_llamada = len(llamadas)
 d3 = api.buscar_indicativo('EA5HAM', ham_cache, qrz, rid=lambda c: api.radioid(c, get=rid_falso), hamqth=hamqth)
-assert d3['nombre'] == 'Ana Operadora' and d3['ciudad'] == 'Mi QTH' and d3['region'] == 'Murcia', d3
+assert d3['nombre'] == 'Ana Operadora' and d3['ciudad'] == 'Murcia' and d3['region'] == 'Murcia', d3
 assert d3['foto'].endswith('foto.jpg') and d3['fuente'] == 'HamQTH', d3
 assert len(hamqth_llamadas) == 2 and hamqth_llamadas[0][0] == 'POST', hamqth_llamadas
 assert hamqth_llamadas[0][2] == {'callsign': 'EA5HAM', 'password': 'secreto'}

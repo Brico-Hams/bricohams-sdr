@@ -14,7 +14,7 @@ Para cada módulo: qué es, si se puede integrar y cómo queda en la estación.
 - **Cómo se integra:**
   - Va al I2C-1 de la Pi (pines 1, 3, 5 y 9), compartido con el RTC del HAT (0x51).
   - `bricohams-wx` detecta el chip por su ID (0x60/0x58) y aplica la compensación de Bosch, comprobada con el ejemplo del datasheet en `tests/test_wx_bme280.py`.
-  - Publica en la ventana METEO de OpenWebRX y como **estación WX APRS EA5KAO-13**.
+  - Publica en la ventana METEO de OpenWebRX y como **estación WX APRS N0CALL-13**.
 - **Condición:** debe ir **fuera**, en una garita ventilada. Dentro de la caja mediría el calor de la Pi.
 - **Alternativa descartada:** conectarlo al LilyGO del iGate, cuyo firmware también lo admite. La Pi no vería el dato y no saldría en la web.
 

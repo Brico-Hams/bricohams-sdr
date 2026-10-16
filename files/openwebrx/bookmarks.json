@@ -74,14 +74,14 @@
   "frequency": 137900000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Meteor-M2-3 (57166) y M2-4 (59051): imágenes LRPT 72k en 137,900 (decodificador LRPT)"
+  "description": "Meteor-M2-3 (57166) y M2-4 (59051): LRPT 72k en 137,900. En NFM solo se oye la portadora; las imágenes las decodifica SatDump en segundo plano y salen en el menú «Files»"
  },
  {
   "name": "🛰️ METEOR LRPT (alterna)",
   "frequency": 137100000,
   "modulation": "nfm",
   "scannable": true,
-  "description": "Frecuencia alternativa LRPT de los Meteor (137,100)"
+  "description": "Frecuencia alternativa LRPT de los Meteor (137,100). Imágenes: servicio de fondo SatDump → menú «Files»"
  },
  {
   "name": "🟢 R0 Sierra Espuña ED5YAK",
@@ -169,14 +169,14 @@
   "description": "Subida al repetidor ED5ZAN"
  },
  {
-  "name": "🟣 DMR Hotspot EA5KAO (local)",
+  "name": "🟣 DMR Hotspot N0CALL (local)",
   "frequency": 439450000,
   "modulation": "dmr",
   "scannable": true,
   "description": "MMDVM_HS_Dual_Hat dúplex · Entrada 431.850"
  },
  {
-  "name": "🟣 DMR Hotspot EA5KAO entrada",
+  "name": "🟣 DMR Hotspot N0CALL entrada",
   "frequency": 431850000,
   "modulation": "dmr",
   "scannable": true,
@@ -1567,14 +1567,14 @@
   "description": "Bloque asignado a Murcia para la red estatal MF-I (si no hay señal, aún no emite)"
  },
  {
-  "name": "🟣 YSF Hotspot EA5KAO (local)",
+  "name": "🟣 YSF Hotspot N0CALL (local)",
   "frequency": 439375000,
   "modulation": "ysf",
   "scannable": true,
   "description": "Hotspot de casa · Entrada 431.775"
  },
  {
-  "name": "🟣 YSF Hotspot EA5KAO entrada",
+  "name": "🟣 YSF Hotspot N0CALL entrada",
   "frequency": 431775000,
   "modulation": "ysf",
   "scannable": true,

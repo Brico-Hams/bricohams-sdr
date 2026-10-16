@@ -1,7 +1,7 @@
 /*
  * meteo: tiempo en vivo de las estaciones cercanas para OpenWebRX+
  *
- * Autor: EA5KAO · BricoHams
+ * Autor: BricoHams
  *
  * Botón "METEO" en la barra superior (detrás de SOL). La ventana muestra
  * las estaciones AEMET más cercanas al QTH (temperatura, humedad, viento,
@@ -14,11 +14,11 @@
  * CORS y la clave de AEMET no sale nunca al navegador.
  *
  * Ajustes opcionales en init.js:
- *   window.meteo_config = { url: 'static/plugins/receiver/meteo/meteo.json', after: '#ea5kao-solar-button' };
+ *   window.meteo_config = { url: 'static/plugins/receiver/meteo/meteo.json', after: '#bh-solar-button' };
  */
 
 Plugins.meteo._version = '1.0.0';
-Plugins.meteo._author = 'EA5KAO';
+Plugins.meteo._author='BricoHams';
 Plugins.meteo.no_css = true;
 
 Plugins.meteo.init = function () {
@@ -26,40 +26,40 @@ Plugins.meteo.init = function () {
     var DATA_URL = cfg.url || 'static/plugins/receiver/meteo/meteo.json';
     var SENSOR_URL = cfg.sensor === undefined ? 'static/plugins/receiver/meteo/sensor.json' : cfg.sensor;
     var CAJA_URL = cfg.caja === undefined ? 'static/plugins/receiver/meteo/caja.json' : cfg.caja;
-    var AFTER = cfg.after || '#ea5kao-solar-button';
+    var AFTER = cfg.after || '#bh-solar-button';
 
     var css =
-        '#ea5kao-meteo-button{position:relative}' +
-        '#ea5kao-meteo-button svg{width:18px;height:18px}' +
-        '#ea5kao-meteo{position:fixed;top:90px;left:460px;z-index:1002;width:440px;max-width:calc(100vw - 16px);' +
+        '#bh-meteo-button{position:relative}' +
+        '#bh-meteo-button svg{width:18px;height:18px}' +
+        '#bh-meteo{position:fixed;top:90px;left:460px;z-index:1002;width:440px;max-width:calc(100vw - 16px);' +
             'display:none;flex-direction:column;padding:8px;border-radius:8px;color:#cfd4d9;font:12px roboto-mono,monospace;' +
             'background:linear-gradient(#2a2e33,#17191d);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #060708,0 6px 18px rgba(0,0,0,.65)}' +
-        '#ea5kao-meteo.open{display:flex}' +
-        '#ea5kao-meteo .mt-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#ea5kao-meteo .mt-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#ea5kao-meteo .mt-time{color:#6b7782;font-size:11px}' +
-        '#ea5kao-meteo .mt-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
-        '#ea5kao-meteo .mt-btn:hover{color:#fff}' +
-        '#ea5kao-meteo .mt-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
-        '#ea5kao-meteo .mt-st{background:#10161b;border-radius:4px;padding:8px;box-shadow:0 0 0 1px #1d242b;margin-bottom:6px}' +
-        '#ea5kao-meteo .mt-st.near{box-shadow:0 0 0 1px #A6192E}' +
-        '#ea5kao-meteo .mt-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}' +
-        '#ea5kao-meteo .mt-name{color:#e8edf1;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#ea5kao-meteo .mt-sub{color:#6b7782;font-size:10px;white-space:nowrap}' +
-        '#ea5kao-meteo .mt-body{display:flex;gap:10px;align-items:center;margin-top:4px}' +
-        '#ea5kao-meteo .mt-temp{font-size:28px;color:#fff;min-width:92px}' +
-        '#ea5kao-meteo .mt-temp small{font-size:11px;color:#93a0ab;display:block}' +
-        '#ea5kao-meteo .mt-kv{display:grid;grid-template-columns:auto auto;gap:1px 10px;font-size:11px;flex:1}' +
-        '#ea5kao-meteo .mt-kv span:nth-child(odd){color:#6b7782}' +
-        '#ea5kao-meteo .mt-arrow{display:inline-block;transition:transform .3s}' +
-        '#ea5kao-meteo canvas{width:100%;height:46px;display:block;margin-top:4px}' +
-        '#ea5kao-meteo .mt-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
-        '#ea5kao-meteo .mt-days{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
-        '#ea5kao-meteo .mt-day{background:#10161b;border-radius:4px;padding:6px;text-align:center;box-shadow:0 0 0 1px #1d242b}' +
-        '#ea5kao-meteo .mt-day b{font-size:20px;display:block}' +
-        '#ea5kao-meteo .mt-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
-        '#ea5kao-meteo a{color:#64b5f6}' +
-        '@media (max-width:600px){#ea5kao-meteo{left:8px!important;top:60px!important}}';
+        '#bh-meteo.open{display:flex}' +
+        '#bh-meteo .mt-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
+        '#bh-meteo .mt-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-meteo .mt-time{color:#6b7782;font-size:11px}' +
+        '#bh-meteo .mt-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
+        '#bh-meteo .mt-btn:hover{color:#fff}' +
+        '#bh-meteo .mt-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
+        '#bh-meteo .mt-st{background:#10161b;border-radius:4px;padding:8px;box-shadow:0 0 0 1px #1d242b;margin-bottom:6px}' +
+        '#bh-meteo .mt-st.near{box-shadow:0 0 0 1px #A6192E}' +
+        '#bh-meteo .mt-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}' +
+        '#bh-meteo .mt-name{color:#e8edf1;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-meteo .mt-sub{color:#6b7782;font-size:10px;white-space:nowrap}' +
+        '#bh-meteo .mt-body{display:flex;gap:10px;align-items:center;margin-top:4px}' +
+        '#bh-meteo .mt-temp{font-size:28px;color:#fff;min-width:92px}' +
+        '#bh-meteo .mt-temp small{font-size:11px;color:#93a0ab;display:block}' +
+        '#bh-meteo .mt-kv{display:grid;grid-template-columns:auto auto;gap:1px 10px;font-size:11px;flex:1}' +
+        '#bh-meteo .mt-kv span:nth-child(odd){color:#6b7782}' +
+        '#bh-meteo .mt-arrow{display:inline-block;transition:transform .3s}' +
+        '#bh-meteo canvas{width:100%;height:46px;display:block;margin-top:4px}' +
+        '#bh-meteo .mt-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
+        '#bh-meteo .mt-days{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
+        '#bh-meteo .mt-day{background:#10161b;border-radius:4px;padding:6px;text-align:center;box-shadow:0 0 0 1px #1d242b}' +
+        '#bh-meteo .mt-day b{font-size:20px;display:block}' +
+        '#bh-meteo .mt-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
+        '#bh-meteo a{color:#64b5f6}' +
+        '@media (max-width:600px){#bh-meteo{left:8px!important;top:60px!important}}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -100,7 +100,7 @@ Plugins.meteo.init = function () {
 
     var THERMO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<path d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/><path d="M17 6h3M17 9h2M17 12h3"/></svg>';
-    var $btn = $('<div class="button" id="ea5kao-meteo-button" title="Tiempo en vivo de las estaciones cercanas">' +
+    var $btn = $('<div class="button" id="bh-meteo-button" title="Tiempo en vivo de las estaciones cercanas">' +
         THERMO + '<br><span class="mt-label">METEO</span></div>');
 
     function placeButton(tries) {
@@ -114,7 +114,7 @@ Plugins.meteo.init = function () {
     }
     placeButton(20);
 
-    var $win = $('<div id="ea5kao-meteo" role="dialog" aria-label="Tiempo en vivo">' +
+    var $win = $('<div id="bh-meteo" role="dialog" aria-label="Tiempo en vivo">' +
         '<div class="mt-hdr"><span class="mt-title">🌡 METEO · VEGA DEL SEGURA</span>' +
         '<span class="mt-time"></span><span class="mt-btn mt-reload" title="Actualizar">⟳</span>' +
         '<span class="mt-btn mt-close" title="Cerrar">×</span></div>' +
@@ -130,7 +130,7 @@ Plugins.meteo.init = function () {
     $(window).on('resize', function () { if (open) fitHeight(); });
 
     (function () {
-        var p = (lsGet('ea5kao_meteo_pos') || '').split(',');
+        var p = (lsGet('bh_meteo_pos') || '').split(',');
         if (p.length === 2 && window.innerWidth > 600) {
             $win.css({ left: Math.max(0, Math.min(+p[0], window.innerWidth - 120)) + 'px',
                        top: Math.max(0, Math.min(+p[1], window.innerHeight - 60)) + 'px' });
@@ -148,7 +148,7 @@ Plugins.meteo.init = function () {
         }).on('pointerup pointercancel', function () {
             if (!drag) return;
             drag = null;
-            lsSet('ea5kao_meteo_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
+            lsSet('bh_meteo_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
         });
     })();
 
@@ -156,7 +156,7 @@ Plugins.meteo.init = function () {
         open = on;
         $win.toggleClass('open', on);
         $btn.toggleClass('highlighted', on);
-        lsSet('ea5kao_meteo_open', on ? '1' : '0');
+        lsSet('bh_meteo_open', on ? '1' : '0');
         if (on) { fitHeight(); render(); load(); }
     }
     Plugins.meteo._toggle = toggle;
@@ -310,6 +310,6 @@ Plugins.meteo.init = function () {
 
     load();
     setInterval(load, 5 * 60 * 1000);
-    if (lsGet('ea5kao_meteo_open') === '1') setTimeout(function () { toggle(true); }, 1500);
+    if (lsGet('bh_meteo_open') === '1') setTimeout(function () { toggle(true); }, 1500);
     return true;
 };

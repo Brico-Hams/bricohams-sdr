@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-fan · EA5KAO · BricoHams
+#  bricohams-fan · BricoHams
 #  Control de los 2 ventiladores de 60 mm (12 V, PWM de 4 hilos) de la caja.
 #   - Mide la CPU de la Pi (thermal_zone0) y el interior de la caja (DS18B20
 #     en 1-Wire, GPIO4). Calcula el ciclo con una curva con histéresis.

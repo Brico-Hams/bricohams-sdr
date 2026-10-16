@@ -6,6 +6,7 @@ Lo usa install.sh cuando OWRX_BACKEND="docker" (manual 33, ADR-44). Lee del ento
   OWRX_DOCKER_CONTAINER    container_name (por defecto owrx-mbe)
   OWRX_DOCKER_RED          host (por defecto: MQTT, rtl_tcp y nginx en 127.0.0.1 como en la Pi nativa)
                            o bridge (publica OWRX_DOCKER_PORT → 8073)
+  OWRX_SOLO_LOCAL          yes (por defecto) = en bridge publica solo en 127.0.0.1 (v5.0)
   OWRX_DOCKER_PORT         puerto en la Pi en modo bridge (por defecto 8073)
   OWRX_DOCKER_PRIVILEGED   yes = contenedor privilegiado (SDRplay, o si un SDR no aparece); por defecto no
   TZ                       zona horaria (por defecto Europe/Madrid)
@@ -67,7 +68,9 @@ def compose():
     if red == 'host':
         y += ['    network_mode: host                    # 8073, MQTT (visitas) y rtl_tcp en 127.0.0.1 como en la Pi nativa']
     else:
-        y += ['    ports:', '      - %s' % comillas('%s:8073' % puerto)]
+        # v5.0 · OWRX_SOLO_LOCAL=yes: el puerto publicado solo en 127.0.0.1 (el público entra por nginx)
+        local = '127.0.0.1:' if si(env('OWRX_SOLO_LOCAL', 'yes')) else ''
+        y += ['    ports:', '      - %s' % comillas('%s%s:8073' % (local, puerto))]
     if si(env('OWRX_DOCKER_PRIVILEGED', 'no')):
         y += ['    privileged: true                      # OWRX_DOCKER_PRIVILEGED=yes (SDRplay o SDR que no aparece)']
     else:

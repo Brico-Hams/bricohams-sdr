@@ -1,7 +1,7 @@
 /*
  * visitas: oyentes conectados y contador de visitas (OpenWebRX+)
  *
- * Autor: EA5KAO · BricoHams (v4)
+ * Autor: BricoHams (v4)
  *
  * Muestra junto al nombre del receptor «👥 3 ahora 🇪🇸🇪🇸🇮🇹 · 1.234 visitas» y,
  * al pulsar, un resumen por países de los últimos 30 días.
@@ -12,7 +12,7 @@
  */
 
 Plugins.visitas._version = '1.0.0';
-Plugins.visitas._author = 'EA5KAO';
+Plugins.visitas._author='BricoHams';
 Plugins.visitas.no_css = true;
 
 Plugins.visitas.init = function () {

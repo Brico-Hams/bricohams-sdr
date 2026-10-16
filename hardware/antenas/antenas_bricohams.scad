@@ -1,5 +1,5 @@
 // =====================================================================
-//  Piezas impresas de las antenas y soportes BricoHams SDR · EA5KAO
+//  Piezas impresas de las antenas y soportes BricoHams SDR · N0CALL
 //  PETG o ASA (exterior), TPU 95A (fundas y juntas). Anycubic Kobra S1.
 //
 //  Medidas eléctricas: hardware/antenas/sim (NEC2) y docs/manuales/11–16.

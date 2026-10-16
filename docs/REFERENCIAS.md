@@ -27,7 +27,7 @@
 ## Datos de la estación
 - Repetidores: lista de EA5RCZ en los marcadores; Sierra Espuña ED5ZAN (BrandMeister ID 214520): https://ea5gvk-dmr.zigor.es/2019/09/10/ya-tenemos-nuevamente-repetidor-dmr-brandmeister-en-murcia-ed5zan-sierra-espuna/
 - Estaciones AEMET: Archena 7158X, Molina de Segura (Los Valientes) 7237E, Alcantarilla Base Aérea 7228, Murcia 7178I
-- Canales Meshtastic: QR de la red aportado por EA5KAO (04/10/2026), en `MESH_CHANNEL_URL`
+- Canales Meshtastic: QR de la red aportado por N0CALL (04/10/2026), en `MESH_CHANNEL_URL`
 
 ## Caja y alimentación (v2.2)
 - OpenSCAD (modelo de la caja): https://openscad.org/documentation.html

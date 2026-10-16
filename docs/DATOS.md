@@ -95,14 +95,14 @@ Total en el kit: **376**. Hotspots de casa y repetidores digitales de Sierra Esp
 | Frecuencia (MHz) | Modo | Nombre | Descripción | Perfil que la cubre |
 |---|---|---|---|---|
 | 431,35 | dmr | Sierra Espuña entrada | Subida al repetidor digital de Sierra Espuña | 70in (429,9–432,1) |
-| 431,775 | ysf | YSF Hotspot EA5KAO entrada | Subida al hotspot YSF local | 70in (429,9–432,1) |
-| 431,85 | dmr | DMR Hotspot EA5KAO entrada | Subida al hotspot local | 70in (429,9–432,1) |
+| 431,775 | ysf | YSF Hotspot N0CALL entrada | Subida al hotspot YSF local | 70in (429,9–432,1) |
+| 431,85 | dmr | DMR Hotspot N0CALL entrada | Subida al hotspot local | 70in (429,9–432,1) |
 | 438,25 | dmr | DMR ED5ZAN Sierra Espuña | BrandMeister ID 214520 · CC1 · Entrada 430.650 | 70rep (437,7–439,9) |
 | 438,95 | dmr | Sierra Espuña · repetidor digital | Repetidor digital de la Región de Murcia · Entrada 431.350 | 70rep (437,7–439,9) |
-| 439,375 | ysf | YSF Hotspot EA5KAO (local) | Hotspot de casa · Entrada 431.775 | 70rep (437,7–439,9) |
-| 439,45 | dmr | DMR Hotspot EA5KAO (local) | MMDVM_HS_Dual_Hat dúplex · Entrada 431.850 | 70rep (437,7–439,9) |
+| 439,375 | ysf | YSF Hotspot N0CALL (local) | Hotspot de casa · Entrada 431.775 | 70rep (437,7–439,9) |
+| 439,45 | dmr | DMR Hotspot N0CALL (local) | MMDVM_HS_Dual_Hat dúplex · Entrada 431.850 | 70rep (437,7–439,9) |
 
-⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeister, 438,250 / entrada 430,650). EA5KAO indica ahora **438,950 / 431,350** como repetidor digital de Sierra Espuña: se han dejado los dos hasta confirmar cuál está activo.
+⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeister, 438,250 / entrada 430,650). N0CALL indica ahora **438,950 / 431,350** como repetidor digital de Sierra Espuña: se han dejado los dos hasta confirmar cuál está activo.
 
 Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo), la **entrada** es donde transmites (RX del equipo).
 
@@ -120,18 +120,15 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 | 8888/tcp | MediaMTX HLS | LAN |
 | 8554/tcp | MediaMTX RTSP `rtsp://<pi>:8554/mastil` | LAN |
 | 9997/tcp | MediaMTX API | 127.0.0.1 |
-| 9443/tcp | meshtasticd web (https) | 127.0.0.1 |
-| 8443/tcp | nginx: Meshtastic Web (solo admin) | LAN |
-| 8444/tcp | v5.1 · nginx: Meshtastic Web del LilyGO 433 (solo admin) | LAN |
-| 4404/tcp | v5.1 · bricohams-mesh-puente: API de Meshtastic del LilyGO 433 | 127.0.0.1 |
-| 4480/tcp | v5.1 · bricohams-mesh-puente: API HTTP del cliente web 433 | 127.0.0.1 |
-| 8077/tcp | v5.1 · bricohams-rak-aprs: API del panel APRS (mensajes, baliza) | 127.0.0.1 |
+| 8076/tcp | v4.5 · bricohams-mesh-admin (panel Meshtastic, detrás de nginx en /settings/bricohams/meshtastic, exige sesión de admin de OpenWebRX+) | 127.0.0.1 |
+| 8443/tcp | v4.5 · nginx: cliente web oficial de Meshtastic (proxy a 9443 con autenticación de sesión de /settings) | LAN (admin only) |
 | 8445/tcp | v4.6 · nginx: interfaz web de OpenTAKServer (usuario TAK) | LAN |
 | 8089/tcp | v4.6 · OpenTAKServer CoT TLS con certificado de cliente | LAN |
 | 8446/tcp | v4.6 · nginx: alta de certificados TAK (enrollment) | LAN |
 | 8447/tcp | v4.6 · nginx: Marti API TAK con certificado de cliente | LAN |
 | 8081/tcp | v4.6 · OpenTAKServer interno | 127.0.0.1 |
 | 5432, 5672/tcp | v4.6 · PostgreSQL y RabbitMQ de TAK (cortafuegos `bricohams-tak-fw`) | 127.0.0.1 |
+| 9443/tcp | meshtasticd web: **bloqueada por firewall** `bricohams-meshweb-fw` (nftables) desde todas las IPs excepto localhost | 127.0.0.1 |
 | 4403/tcp | meshtasticd API | LAN |
 | 30005/tcp | readsb salida Beast | local |
 | 30003, 30002, 30104/tcp | readsb SBS / raw / entrada Beast | local |
@@ -186,7 +183,7 @@ Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo),
 
 ## 8. Canales Meshtastic (QR de la red)
 
-Origen: `MESH_CHANNEL_URL` (QR aportado por EA5KAO el 04/10/2026). Claves por defecto públicas (índices 1 y 2).
+Origen: `MESH_CHANNEL_URL` (QR aportado por N0CALL el 04/10/2026). Claves por defecto públicas (índices 1 y 2).
 
 | Índice | Canal | Clave |
 |---|---|---|
@@ -219,7 +216,7 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/etc/default/readsb, /etc/rbfeeder.ini` | ADS-B |
 | `/etc/udev/rules.d/99-bricohams-lilygo.rules` | /dev/lilygo-mesh y /dev/lilygo-igate |
 | `/boot/firmware/config.txt` | bloque `# >>> BricoHams` |
-| `/var/backups/bricohams/` | copias diarias (14 últimas) |
+| `/var/backups/bricohams/` | copias diarias (retención local de cinco días) |
 | `/opt/bricohams/kit/` | copia del kit (sin claves) |
 | `/var/log/bricohams-install.log` | registro del instalador |
 | `/etc/bricohams/{web,api,visitas,telegram}.env` | v4 · variables de los servicios web (640) |
@@ -246,7 +243,7 @@ Radio del QR: EU_868, **869,618 MHz**, BW 62,5 kHz, SF7, CR 4/5, saltos 3, poten
 | `/etc/issue.net, /etc/update-motd.d/20-bricohams` | v4.5 · banner SSH: aviso legal y estado al entrar |
 | `/etc/nginx/snippets/bricohams-sdr-rutas.conf` | v4.2 · rutas comunes HTTP/HTTPS de nginx |
 | `/usr/local/bin/owrx-clone, /var/backups/owrx-clone/` | v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación |
-| `/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz` | v4.2 · perfil diario de OpenWebRX+ (7 últimos) |
+| `/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz` | v4.2 · perfil diario de OpenWebRX+ (retención local de cinco días) |
 | `/etc/bricohams/perfil-importado` | v4.2 · marca: la configuración viene de un perfil importado |
 
 ## 10. Caja v2 (en el mástil): conectores de la cara inferior (de izquierda a derecha)

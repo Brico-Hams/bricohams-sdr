@@ -1,5 +1,11 @@
 # 20 · Pico «bricohams-io»: sensores y ventiladores por USB
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Meteorología, BME280, viento/lluvia y Pico IO](../GUIA_VISUAL_MODULOS.md#wx).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Esquema](../esquemas/16_pico_io.png)
 
 **Por qué (ADR-29):** el HAT de HackerGadgets ocupa la cabecera de 40 pines. Con el HAT puesto no se pueden conectar sensores ni ventiladores a los GPIO de la Pi.

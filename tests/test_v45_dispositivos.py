@@ -93,6 +93,11 @@ S = open(os.path.join(RAIZ, 'install.sh'), encoding='utf-8').read()
 assert 'bricohams-mesh-url" contar' in S and 'no cabe el privado' in S, 'con 8 canales no se añade el privado'
 L = open(os.path.join(BIN, 'bricohams-lilygo'), encoding='utf-8').read()
 assert 'meshtastic_cli --seturl "$MESH433_CHANNEL_URL"' in L and 'no de EU_433' in L
+# v5.0 · SatDump encuentra sus plugins y el RTC se comprueba también sin root
+assert 'ln -s /usr/lib/satdump /usr/local/lib/satdump' in S, 'enlace de plugins de SatDump'
+CHK = open(os.path.join(BIN, 'bricohams-check'), encoding='utf-8').read()
+assert '/sys/class/rtc/rtc0/time' in CHK and 'sin root' in CHK, 'RTC sin root leído de /sys'
+assert 'sudo ln -s /usr/lib/satdump /usr/local/lib/satdump' in CHK, 'el check avisa del enlace de SatDump'
 
 # ------------------------------------------------------------------ 3. banner SSH
 R = os.path.join(T, 'raiz')

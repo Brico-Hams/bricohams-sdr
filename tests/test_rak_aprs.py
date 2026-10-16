@@ -37,7 +37,7 @@ def h(*a):
     return subprocess.run([host] + list(a), capture_output=True, text=True).stdout.splitlines()
 
 
-PAQ = 'EA5ZZZ-7>APLRT1,WIDE1-1:!3805.00N/00000.00W>hola LoRa'
+PAQ = 'EA5ZZZ-7>APLRT1,WIDE1-1:!3759.00N/00107.00W>hola LoRa'
 if host:
     kiss_fw = bytes.fromhex(h('kiss', PAQ)[0])
     lector = rak.LectorKISS()
@@ -47,42 +47,42 @@ if host:
     assert h('unkiss', rak.kiss_frame(0, rak.tnc2_a_ax25('EA1AAA>APRS,EA5BBB-2*,WIDE2-1:>prueba')).hex()) == \
         ['EA1AAA>APRS,EA5BBB-2*,WIDE2-1:>prueba'], 'el firmware entiende el KISS de la Pi (con *)'
     # digipeater (lógica de digi_utils.cpp del original)
-    assert h('digi', '1', PAQ) == ['EA5ZZZ-7>APLRT1,EA5KAO-10*:!3805.00N/00000.00W>hola LoRa']
-    assert h('digi', '2', 'EA5ZZZ-7>APLRT1,WIDE2-2:>x') == ['EA5ZZZ-7>APLRT1,EA5KAO-10*,WIDE2-1:>x']
+    assert h('digi', '1', PAQ) == ['EA5ZZZ-7>APLRT1,N0CALL-10*:!3759.00N/00107.00W>hola LoRa']
+    assert h('digi', '2', 'EA5ZZZ-7>APLRT1,WIDE2-2:>x') == ['EA5ZZZ-7>APLRT1,N0CALL-10*,WIDE2-1:>x']
     assert h('digi', '1', 'EA5ZZZ-7>APLRT1,EA1AAA*,WIDE1-1:>x') == [''], 'WIDE1-1 tiene que ser el primer salto'
     assert h('digi', '0', PAQ) == [''] and h('digi', '1', 'EA5ZZZ-7>APLRT1,WIDE1-1,NOGATE:>x') == ['']
-    assert h('digi', '1', 'EA5KAO-10>APZBH1,WIDE1-1:>mío') == [''], 'lo propio no se repite'
+    assert h('digi', '1', 'N0CALL-10>APZBH1,WIDE1-1:>mío') == [''], 'lo propio no se repite'
     assert h('dup', 'EA1AAA>B,WIDE1-1:hola', 'EA1AAA>B,EA5X*:hola') == ['1', '0'], 'duplicado en 25 s, no después'
     # baliza y telemetría
-    b = h('beacon', '38.08', '-1.25')
-    assert b[0] == 'EA5KAO-10>APZBH1:!0000.00NL00000.00W&/A=000755 SDR BricoHams LoRa APRS Caja 23.4C', b
-    assert b[1].startswith('EA5KAO-10>APZBH1,WIDE1-1:!'), 'por RF lleva la ruta'
+    b = h('beacon', '37.983812', '-1.128011')
+    assert b[0] == 'N0CALL-10>APZBH1:!3759.03NL00107.68W&/A=000755 SDR BricoHams LoRa APRS Caja 23.4C', b
+    assert b[1].startswith('N0CALL-10>APZBH1,WIDE1-1:!'), 'por RF lleva la ruta'
     t = h('telem')
-    assert t[0] == 'EA5KAO-10>APZBH1:T#001,143,40,205,7,2,10000000', t      # 31,5 °C -> (31,5+40)*2 = 143
-    assert t[1] == 'EA5KAO-10>APZBH1::EA5KAO-10:PARM.TempCaja,HumCaja,Bateria,RxLoRa,Digi,GPS,TX,Digi'
+    assert t[0] == 'N0CALL-10>APZBH1:T#001,143,40,205,7,2,10000000', t      # 31,5 °C -> (31,5+40)*2 = 143
+    assert t[1] == 'N0CALL-10>APZBH1::N0CALL-10:PARM.TempCaja,HumCaja,Bateria,RxLoRa,Digi,GPS,TX,Digi'
     assert t[3].endswith(':EQNS.0,0.5,-40,0,1,0,0,0.02,0,0,1,0,0,1,0')
     # la baliza por KISS se sube a APRS-IS como propia
-    assert rak.para_aprsis(b[0], True, 'EA5KAO-10') == \
-        'EA5KAO-10>APZBH1,TCPIP*:!0000.00NL00000.00W&/A=000755 SDR BricoHams LoRa APRS Caja 23.4C'
+    assert rak.para_aprsis(b[0], True, 'N0CALL-10') == \
+        'N0CALL-10>APZBH1,TCPIP*:!3759.03NL00107.68W&/A=000755 SDR BricoHams LoRa APRS Caja 23.4C'
 
 # ------------------------------------------------------------------ 2. reglas de iGate
-I = 'EA5KAO-10'
-assert rak.para_aprsis(PAQ, False, I) == 'EA5ZZZ-7>APLRT1,WIDE1-1,qAR,EA5KAO-10:!3805.00N/00000.00W>hola LoRa'
+I = 'N0CALL-10'
+assert rak.para_aprsis(PAQ, False, I) == 'EA5ZZZ-7>APLRT1,WIDE1-1,qAR,N0CALL-10:!3759.00N/00107.00W>hola LoRa'
 for malo in ('EA1A>APRS,TCPIP*:>x', 'EA1A>APRS,NOGATE:>x', 'EA1A>APRS,RFONLY:>x', 'EA1A>APRS:?APRS?',
-             'EA1A>APRS:}EA2B>APRS,TCPIP,EA1A*:>x', 'EA5KAO-10>APRS:>bucle', 'roto'):
+             'EA1A>APRS:}EA2B>APRS,TCPIP,EA1A*:>x', 'N0CALL-10>APRS:>bucle', 'roto'):
     assert rak.para_aprsis(malo, False, I) is None, malo
 assert rak.para_aprsis('EA1A>APRS:>x', True, I) is None, 'como propio solo vale mi indicativo'
 
 # ------------------------------------------------------------------ 3. configuración desde el env
 for k in [k for k in os.environ if k.startswith(('RAK_', 'IGATE_', 'STATION_'))]:
     del os.environ[k]
-os.environ.update({'IGATE_CALLSIGN': 'ea5kao-10', 'STATION_LAT': '38.08', 'STATION_LON': '-1.25',
+os.environ.update({'IGATE_CALLSIGN': 'n0call-10', 'STATION_LAT': '37.983812', 'STATION_LON': '-1.128011',
                    'STATION_ASL': '230', 'RAK_TX': 'no', 'RAK_DIGI': '1', 'RAK_TEMP_OFFSET': '-1.5'})
 c = rak.config_deseada()
-assert c['callsign'] == 'EA5KAO-10' and c['tx'] is False and c['digi'] == 1 and c['freq'] == 433775000
+assert c['callsign'] == 'N0CALL-10' and c['tx'] is False and c['digi'] == 1 and c['freq'] == 433775000
 assert c['sf'] == 12 and c['bw'] == 125000 and c['tempOffset'] == -1.5 and c['symbol'] == 'L&'
 assert 'APRS_PASSCODE' not in json.dumps(c) and not any('pass' in k.lower() for k in c), 'al RAK no van claves'
-assert rak.difiere(dict(c, lat=0.0), c) == [] and rak.difiere(dict(c, power=10), c) == ['power']
+assert rak.difiere(dict(c, lat=37.9838122), c) == [] and rak.difiere(dict(c, power=10), c) == ['power']
 cab = open(os.path.join(FW, 'configuration.h'), encoding='utf-8').read()
 for clave in c:                                            # mismas claves que entiende el firmware
     assert '"%s"' % clave in open(os.path.join(FW, 'configuration.cpp'), encoding='utf-8').read(), clave
@@ -139,8 +139,8 @@ def rak_falso():
                 os.write(maestro, rak.kiss_frame(6, b'BH:CFGOK 1234'))
             elif t == 'BH:GET':
                 st = {'fw': '1.0.0', 'radio': 'ok', 't': 27.3, 'sensor': 'SHTC3 (RAK1901)',
-                      'gps': {'present': True, 'fix': True, 'sats': 8, 'lat': 38.08, 'lon': -1.25}}
-                # el firmware 1.0.0 real manda «"vbat": nan» (despliegue EA5KAO): la Pi no puede perder el estado
+                      'gps': {'present': True, 'fix': True, 'sats': 8, 'lat': 37.983812, 'lon': -1.128011}}
+                # el firmware 1.0.0 real manda «"vbat": nan» (despliegue N0CALL): la Pi no puede perder el estado
                 os.write(maestro, rak.kiss_frame(6, ('BH:STATUS ' + json.dumps(st)[:-1] + ',"vbat": nan}').encode()))
                 if not enviado:
                     enviado = True
@@ -152,10 +152,10 @@ def rak_falso():
 threading.Thread(target=rak_falso, daemon=True).start()
 run = os.path.join(T, 'run')
 envf = os.path.join(T, 'bricohams.env')
-assert rak.quitar_comillas('"EA5KAO-15"      # vacío = IGATE_CALLSIGN') == 'EA5KAO-15'
+assert rak.quitar_comillas('"N0CALL-15"      # vacío = IGATE_CALLSIGN') == 'N0CALL-15'
 assert rak.quitar_comillas("'a # b'   # c") == 'a # b' and rak.quitar_comillas('yes  # x') == 'yes'
-open(envf, 'w').write('IGATE_CALLSIGN="EA5KAO-10"     # comentario\nAPRS_PASSCODE="12345"\nSTATION_LAT="38.08"   # «¿y esto?»\n'
-                      'STATION_LON="-1.25"\nOWRX_GPS_DECIMALES="2"\n')
+open(envf, 'w').write('IGATE_CALLSIGN="N0CALL-10"     # comentario\nAPRS_PASSCODE="12345"\nSTATION_LAT="37.983812"   # «¿y esto?»\n'
+                      'STATION_LON="-1.128011"\nOWRX_GPS_DECIMALES="2"\n')
 p = subprocess.Popen(['python3', B, 'servicio'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                      env=dict(os.environ, BRICOHAMS_ENV=envf, RAK_PUERTO=ruta_pty, RAK_RUN_DIR=run,
                               RAK_APRSIS_SERVER='127.0.0.1', RAK_APRSIS_PORT=str(srv.getsockname()[1])))
@@ -172,11 +172,11 @@ while time.time() < fin:
 p.terminate()
 salida = p.communicate(timeout=5)[0]
 assert recibido[:2] == ['BH:CONF?', recibido[1]] and recibido[1].startswith('BH:CFG '), recibido
-assert json.loads(recibido[1][7:])['callsign'] == 'EA5KAO-10'
-assert lineas and lineas[0].startswith('user EA5KAO-10 pass 12345 vers BricoHams-RAK'), lineas
-assert 'EA5ZZZ-7>APLRT1,WIDE1-1,qAR,EA5KAO-10:!3805.00N/00000.00W>hola LoRa' in lineas, (lineas, salida)
+assert json.loads(recibido[1][7:])['callsign'] == 'N0CALL-10'
+assert lineas and lineas[0].startswith('user N0CALL-10 pass 12345 vers BricoHams-RAK'), lineas
+assert 'EA5ZZZ-7>APLRT1,WIDE1-1,qAR,N0CALL-10:!3759.00N/00107.00W>hola LoRa' in lineas, (lineas, salida)
 assert not any('no se sube' in l for l in lineas), 'TCPIP no se sube'
-assert estado['t_caja'] == 27.3 and estado['rak']['gps']['lat'] == 38.08, 'posición pública redondeada'
+assert estado['t_caja'] == 27.3 and estado['rak']['gps']['lat'] == 37.98, 'posición pública redondeada'
 o = [x for x in estado['oidos'] if x['de'] == 'EA5ZZZ-7'][0]
 assert o['rssi'] == -97 and o['aprsis'] is True, estado['oidos']
 assert [x for x in estado['oidos'] if x['de'] == 'EA1AAA'][0]['aprsis'] is False

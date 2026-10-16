@@ -1,5 +1,11 @@
 # 03 · SDR y números de serie
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [OpenWebRX+, RTL-SDR y SDRplay](../GUIA_VISUAL_MODULOS.md#receptor).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 Los cuatro RTL-SDR (HAT, Mini, V3 y FlightStick) son iguales para el sistema. Por eso cada uno lleva grabada su serie en la EEPROM:
 
 | SDR | Serie | Lo usa |

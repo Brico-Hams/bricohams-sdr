@@ -1,5 +1,11 @@
 # 11 · Mástil, plan de antenas, soportes y carga de viento
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Plan del mástil](../esquemas/11_plan_mastil.png)
 
 ## 1. Qué va en el mástil y por qué ahí
@@ -74,7 +80,7 @@
 6. **Quad:** monta la quad (manual 12) con su abrazadera y orienta el boom a **205°** (cubre Sierra Espuña 229°, Peña Rubia 222°, Águilas 201° y Carrascoy 176° dentro del ancho a −3 dB).
 7. **Tierra:** une el mástil a la tierra del edificio con cable de 16 mm² (como en cualquier ICT). Los pasamuros N de la caja pueden ir a la tierra de la caja con un descargador coaxial por línea, opcional pero recomendado.
 
-## 5. Rumbos desde Mi QTH (para orientar la quad)
+## 5. Rumbos desde tu QTH (para orientar la quad)
 
 | Repetidor | Rumbo | Distancia |
 |---|---|---|

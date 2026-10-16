@@ -11,7 +11,7 @@ de OpenWebRX+ etiquetados [AUTO-LOCATOR]:
   radio    emisoras de FM regionales y locales (de la caché que baja bricohams_locator_online.py)
   other    otras frecuencias de interés (NAVTEX) dentro de su alcance (range_km)
 
-Lejos de Mi QTH (más de --kit-zona-km), los marcadores del kit propios de la Región de Murcia (FM y
+Lejos de la Región de Murcia (más de --kit-zona-km), los marcadores del kit propios de la Región de Murcia (FM y
 DAB+ de Murcia, aeropuertos de Murcia, repetidores EA5…) se quitan, y los canales marinos con
 nombre de Cartagena vuelven a su nombre genérico. Los marcadores que añadiste tú no se tocan nunca.
 """
@@ -29,7 +29,7 @@ from bricohams_locator import en_espana, latlon_to_locator, locator_to_latlon  #
 ETIQUETA = '[AUTO-LOCATOR]'
 CATEGORIAS = ('airport', 'weather', 'port', 'radio', 'other')
 MINIMO_UNO = ('airport', 'weather')        # si no hay ninguno en el radio, el más cercano (hasta 2,5 × radio)
-KIT_ORIGEN = (38.08, -1.25)             # Mi QTH (Región de Murcia): la zona de los marcadores del kit
+KIT_ORIGEN = (37.9922, -1.1307)             # Murcia capital: centro de la zona de los marcadores del kit
 LOCAL_KIT = re.compile(r'\b(E[ACD]\d\w*|Sierra Espuña|Murcia|Cartagena|Mazarrón|Lorca|Alicante|Benidorm|Granada|'
                        r'Albacete|Águilas|Carrascoy|Peña Rubia|Valencia|Radio Club|Cabo de Gata|Cabo la Nao|LE[A-Z]{2})\b')
 
@@ -192,7 +192,7 @@ def kit_local(b):
 
 
 def merge_bookmarks(existing, generated, kit=None, lejos=False):
-    """Quita los [AUTO-LOCATOR] anteriores, adapta los del kit si la estación está lejos de Mi QTH
+    """Quita los [AUTO-LOCATOR] anteriores, adapta los del kit si la estación está lejos de la Región de Murcia
     y añade los nuevos que no choquen (misma frecuencia y modo) con los que quedan."""
     generated_tag = ETIQUETA
     manual = [dict(b) for b in existing if generated_tag not in b.get('description', '')]
@@ -279,8 +279,8 @@ def main():
     parser.add_argument('--meteo-stations', action='store_true', help='imprime id:nombre para METEO_STATIONS')
     parser.add_argument('--informe', action='store_true', help='tabla de lo más cercano por categoría')
     parser.add_argument('--merge-existing', help='bookmarks.json al que reemplazar los AUTO-LOCATOR anteriores')
-    parser.add_argument('--kit', help='bookmarks.json del kit (para adaptar los de Murcia lejos de Mi QTH)')
-    parser.add_argument('--kit-zona-km', type=float, default=150, help='distancia a Mi QTH a partir de la que se adaptan')
+    parser.add_argument('--kit', help='bookmarks.json del kit (para adaptar los de Murcia lejos de la Región de Murcia)')
+    parser.add_argument('--kit-zona-km', type=float, default=150, help='distancia a Murcia capital a partir de la que se adaptan')
     parser.add_argument('--output', default='-', help='JSON de salida (por defecto stdout)')
     args = parser.parse_args()
     if not args.locator and (args.lat is None or args.lon is None):
