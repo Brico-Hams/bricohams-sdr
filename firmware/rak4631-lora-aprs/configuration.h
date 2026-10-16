@@ -1,5 +1,5 @@
 /* BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock
- * Copyright (C) 2026 Ricardo Guzman - CA2RXU (original) · EA5KAO / BricoHams (port nRF52)
+ * Copyright (C) 2026 Ricardo Guzman - CA2RXU (original) · BricoHams contributors (port nRF52)
  * GPL-3.0-or-later (ver LICENSE).
  *
  * Configuración. El original guarda /igate_conf.json en SPIFFS y la edita por su web (WiFi).
@@ -12,7 +12,7 @@
 #include <Arduino.h>
 
 #define FW_NAME     "BricoHams-RAK-APRS"
-#define FW_VERSION  "1.0.1"
+#define FW_VERSION  "1.0.0"
 #define APRS_TOCALL "APZBH1"            // APZ = experimental (hasta registrar uno propio)
 
 class Configuration {

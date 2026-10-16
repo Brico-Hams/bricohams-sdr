@@ -1,6 +1,12 @@
 # 32 · Zona de la estación por locator: aeropuertos, AEMET, puertos y FM (v4.3)
 
-![Zona por locator](../esquemas/22_zona_locator.png)
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Locator, canales y marcadores de la zona](../GUIA_VISUAL_MODULOS.md#zona).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
+![Zona por locator](../esquemas/22_zona_locator.svg)
 
 El instalador sabe **dónde está la estación** por su locator Maidenhead (`STATION_LOCATOR`) o por sus coordenadas. Con eso elige, de un catálogo de toda España:
 
@@ -73,16 +79,16 @@ sudo bricohams-locator refrescar         # vuelve a bajar AEMET y FM (caché de 
 bricohams-locator marcadores             # enseña los que pondría
 sudo bricohams-locator marcadores --aplicar   # los pone en OpenWebRX+ y lo reinicia (nativo o Docker)
 bricohams-locator meteo                  # la METEO_STATIONS que saldría
-bricohams-locator coordenadas IM97kx     # 38.062500 -1.291667
-bricohams-locator locator 38.08 -1.26   # IM97kx
+bricohams-locator coordenadas IM97kx     # 37.979167 -1.125000
+bricohams-locator locator 37.9838 -1.1280   # IM97kx
 ```
 
 ## 4. Qué pasa con los marcadores que ya tienes
 | Marcadores | Qué se hace |
 |---|---|
 | **Los tuyos** (añadidos desde la web) | Nunca se tocan. Si uno tiene la misma frecuencia y modo que uno de la zona, gana el tuyo. |
-| **Del kit, en la Región de Murcia** (a menos de `LOCATOR_KIT_ZONA_KM` de Mi QTH) | Se quedan tal cual. Los de la zona se añaden donde no choquen. |
-| **Del kit, lejos de Mi QTH** | Se quitan los propios de Murcia: FM y DAB+ de Murcia, aeropuertos de Murcia y Alicante, repetidores y hotspots EA5, Radio Club. Los que solo llevaban el nombre de Murcia vuelven al genérico: «⛵ Canal 12 · Prácticos Cartagena» → «⛵ Canal 12», y «CB 32 · … · Radio Club» → «CB 32». El canal genérico cede su sitio al de los puertos de la zona. |
+| **Del kit, en la Región de Murcia** (a menos de `LOCATOR_KIT_ZONA_KM` de tu QTH) | Se quedan tal cual. Los de la zona se añaden donde no choquen. |
+| **Del kit, lejos de tu QTH** | Se quitan los propios de Murcia: FM y DAB+ de Murcia, aeropuertos de Murcia y Alicante, repetidores y hotspots EA5, Radio Club. Los que solo llevaban el nombre de Murcia vuelven al genérico: «⛵ Canal 12 · Prácticos Cartagena» → «⛵ Canal 12», y «CB 32 · … · Radio Club» → «CB 32». El canal genérico cede su sitio al de los puertos de la zona. |
 | **Genéricos** | CB, PMR446, satélites, modos digitales, 121,5, canal 16, AIS: no se tocan. |
 | **`[AUTO-LOCATOR]` anteriores** | Se sustituyen. |
 
@@ -201,6 +207,8 @@ Muchos repetidores FM analógicos solo abren con su subtono CTCSS. Si el recepto
 
 **Qué ve el oyente.** La página principal no gana ningún ajuste nuevo.
 - Al sintonizar un bookmark con subtono, el silenciador se activa solo.
+- El subtono se mantiene mientras sigas en FM y a menos de 3 kHz de la frecuencia del bookmark. Se anula si cambias a otro modo o te alejas.
+  Tras pulsar el bookmark, OpenWebRX+ reescribe la URL (`#freq=…,mod=nfm`) y vuelve a aplicar el **mismo** modo. Eso no cuenta como cambio de modo, así que el subtono no se pierde (corregido el 16-10-2026: antes el servidor registraba «CTCSS … activado» y, ~15 ms después, «CTCSS desactivado»).
 - El panel muestra un selector **«Subtono FM»** para escuchar con otro tono. Ese cambio afecta solo a la sesión de ese navegador y no se guarda.
 - En toda la interfaz el modo se llama **FM**; internamente OpenWebRX+ lo llama `nfm`.
 
@@ -215,13 +223,19 @@ Muchos repetidores FM analógicos solo abren con su subtono CTCSS. Si el recepto
 
 Con tono 0, el módulo se retira de la cadena y OpenWebRX+ queda exactamente como el original.
 
+**Instalación y configuración.**
+- El instalador activa por defecto el detector: `OWRX_CTCSS_ENABLE="yes"` en `bricohams.env`.
+- Aplicar o repetir la configuración: `sudo bash install.sh --solo web`.
+- Para omitirlo o retirarlo, cambia a `OWRX_CTCSS_ENABLE="no"` y repite el paso `web`; el instalador quita las líneas marcadas y el gancho de apt.
+- Requiere `python3-numpy` y `python3-scipy`. Si no se instalan, OpenWebRX+ sigue funcionando, pero el detector/squelch no actúa.
+
 **Mantenimiento.**
 - Modifica cinco ficheros de OpenWebRX+: `bookmarks.py`, el controlador de bookmarks, `BookmarkTable.js`, `index.html` y `dsp.py`.
 - Las líneas añadidas llevan la marca `#@BH-CTCSS@` (o `<!--#@BH-CTCSS@-->` en el HTML).
 - Se reaplica tras cada `apt` (`/etc/apt/apt.conf.d/99bricohams-owrx-ctcss`).
 - Para quitarlo: `sudo bricohams-owrx-ctcss --quitar && sudo systemctl restart openwebrx`. El campo `ctcss` que ya está en `bookmarks.json` no estorba a OpenWebRX+ original.
-- Dependencias: `python3-numpy` y `python3-scipy`, que instala `install.sh`. Si faltan, OpenWebRX+ sigue funcionando pero el silenciador no actúa; lo verás en el registro como `bricohams ctcss: no se pudo aplicar el subtono`.
-- Prueba: `tests/test_ctcss_patch.py`. Comprueba el parche sobre copias de los ficheros y el detector con tonos sintéticos: abre con el tono correcto, no abre con un tono vecino ni con ruido.
+- El campo `ctcss` y el selector de sesión son el detector/squelch; no se guarda ninguna transmisión ni audio.
+- Prueba: `tests/test_ctcss_patch.py`. Comprueba el parche sobre copias de los ficheros y el detector con tonos sintéticos: abre con el tono correcto, no abre con un tono vecino ni con ruido. Con `node`, reproduce además el flujo del navegador (bookmark → hashchange → retoque/alejamiento/cambio de modo) y comprueba que el subtono solo se anula cuando debe.
 
 ## 11. Importar repetidores de RepeaterBook (v5.0)
 

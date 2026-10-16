@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-io · EA5KAO · BricoHams
+#  bricohams-io · BricoHams
 #  Servicio que habla con la Raspberry Pi Pico «bricohams-io» por USB
 #  (/dev/bricohams-io). La Pico lee el BME280, el DS18B20 y el pluviómetro
 #  y mueve los ventiladores, porque la cabecera de 40 pines de la Pi la

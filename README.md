@@ -1,13 +1,40 @@
-# BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
+# BricoHams SDR · N0CALL · tu QTH (Región de Murcia)
 
-Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (v4.4):
+> **Rama `openwebrxplus-generico`: kit anonimizado para cualquier estación OpenWebRX+.**
+> No lleva el indicativo, el QTH, el locator, la red local ni los usuarios de la estación
+> original, y `tests/test_anonimato.py` comprueba que no vuelvan a entrar.
+> Los ejemplos usan **N0CALL**, la **Catedral de Murcia** (37.9838, -1.1280 · `IM97kx`)
+> como QTH de muestra y la LAN `192.168.1.x`.
+> Para tu estación: `cp bricohams.env.example bricohams.env` y rellena al menos
+> `CALLSIGN`, `STATION_LOCATOR` (o `STATION_LAT`/`STATION_LON`), `ADSB_ANT_ALT` y las claves
+> (RadarBox, map.flights, Telegram, ReceiverBook). Esas claves las pones tú y no se suben al repositorio.
+> Después ejecuta `sudo ./install.sh`. Los datos regionales (repetidores, aeropuertos y AEMET de Murcia)
+> solo se usan si tu QTH está a menos de `LOCATOR_KIT_ZONA_KM` del centro de la zona.
+
+**Módulo map.flights:** [panel privado de integración ADS-B](docs/manuales/38_MAPFLIGHTS_PLUGIN.md)
+en `/settings`, con estado local e instrucciones; conserva RadarBox.
+Documentación / Documentation: [Español](docs/manuales/38_MAPFLIGHTS_PLUGIN.md) ·
+[English](docs/en/MAPFLIGHTS_PLUGIN.md). Generado, sin desplegar / Generated, not deployed.
+
+**Primera instalación o nuevo módulo:** abre la
+[guía visual de módulos](docs/GUIA_VISUAL_MODULOS.md), con ilustraciones,
+capturas reales anonimizadas y cuadros de comandos por módulo.
+
+Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.0 en desarrollo**):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
-- ADS-B para AirNav RadarBox con MLAT.
+- ADS-B para AirNav RadarBox con MLAT y, opcionalmente, también para map.flights.
 - Dos nodos Meshtastic (868 y 433) y un iGate LoRa APRS.
 - Estación meteorológica propia publicada en APRS.
 - Cámara del mástil e imagen BricoHams con Murcia.
 - **Caja de intemperie impresa en 3D** (PETG + TPU) para el mástil Televés, con compartimento de potencia aparte.
+- **v5.0 en desarrollo:**
+  - **Seguridad desde `/settings`:** bloqueo por IP/red y país, desbaneo de Fail2ban, estado de cortafuegos/nginx, usuarios y avisos de login ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
+  - **Ficha de aviones** con foto, modelo, operador y ruta mediante un proxy con caché, y **envío opcional a map.flights** además de RadarBox ([manual 04](docs/manuales/04_ADSB.md)).
+  - **Meteo desde el RAK4631** y posición APRS desde su GPS, con respaldo Pico/I2C; corrección del arranque de lgpio y nombre por defecto «BricoHams WX» ([manual 06](docs/manuales/06_SENSOR_WX.md)).
+  - **Copias remotas verificadas** por SMB, NFS, SFTP, Google Drive u OneDrive ([manual 09](docs/manuales/09_MANTENIMIENTO.md)).
+  - **Moderador automático del chat** y avisos por Telegram ([manual 24](docs/manuales/24_VISITAS_TELEGRAM.md)), y **spots DX** en la barra de frecuencias ([manual 27](docs/manuales/27_PLUGINS_WEB_V4.md)).
+  - Correcciones de los sets nftables y de logrotate para el registro opcional de MLAT. Detalles y pruebas en el [historial](CHANGELOG.md).
 - **v3.0:**
   - **antenas propias** simuladas con NEC2, con STL, lista de materiales y manuales: quad 2 m/70 cm, dos discones, ADS-B con LNA, protección del lazo MLA-30 y soportes del mástil;
   - **plan de mástil** con cálculo de viento;
@@ -28,17 +55,16 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
   - **owrx-clone:** exporta todo tu OpenWebRX+ (configuración, plugins, sistema y paquetes) a un fichero y lo importa en cualquier otro equipo. Es genérico, para la comunidad ([owrx-clone/](owrx-clone/README.md), [manual 31](docs/manuales/31_CLONAR_OPENWEBRX.md));
   - **FILTRO y DSP de audio** en el navegador de cada oyente: paso banda, notch automático, ecualizador, puerta de ruido y AGC ([manual 30](docs/manuales/30_AUDIO_DSP.md));
   - **SSL solo en la administración:** el receptor por HTTP y `/login` y `/settings` forzados a HTTPS (`SSL_MODO`);
-  - **ficha DMR/YSF con HamQTH** primero (aportación de EA5KAO);
+  - **ficha DMR/YSF con HamQTH** primero (aportación de N0CALL);
   - **arreglos de la instalación real:** claves con `$` en `bricohams.env`, cortes de red tras el paso `red`, descargas sin reintento;
   - [ayuda rápida](docs/AYUDA_RAPIDA.md) con todas las órdenes.
-- **v4.4:** **blindaje de seguridad** (`sudo bricohams-blindaje auditar | aplicar`): cortafuegos del host con vuelta atrás, SSH, fail2ban, permisos de las claves, búsqueda de fugas, límite de intentos en `/login`, y la **posición pública redondeada** a ~1 km ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
+- **v4.4:** **blindaje de seguridad** (`sudo bricohams-blindaje auditar | aplicar`): cortafuegos del host con vuelta atrás, SSH, Fail2ban para SSH y ataques al login web, permisos de las claves, búsqueda de fugas, límite de intentos en `/login`, y la **posición pública redondeada** a ~1 km ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
 - **v4.5:** **iGate LoRa APRS en un RAK4631** con firmware propio (port de CA2RXU, GPS y temperatura de la caja), **Meshtastic 433/868** con las URL de la red, y todo **en el mapa de OpenWebRX+**; banner SSH e inventario de dispositivos ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md)).
 - **v4.6:** **servidor TAK local** (OpenTAKServer aislado), aviones de readsb en el mapa sin interrumpir RadarBox/MLAT, trayectorias APRS, mensajes APRS en el CHAT común y capa TAK privada para administradores ([manual 36](docs/manuales/36_TAK_MAPA_LOCAL.md), justificación en el [manual 37](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)).
-- **v5.1:** **interfaz web del APRS** en Ajustes (mensajes con acuse, baliza a demanda, estaciones oídas, digipeater automático, bootloader y puesta en marcha del RAK), **cliente web de Meshtastic para el LilyGO 433** por USB (puente serie, `https://<estación>:8444/`, solo admin), firmware RAK 1.0.1, **GitHub sin datos personales** y reparación de la sincronización ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md), [manual 38](docs/manuales/38_GITHUB_SINCRONIZACION_PRIVACIDAD.md)).
 - **v4.3:**
   - **OpenWebRX+ en Docker** desde `bricohams.env` (`OWRX_BACKEND="docker"`): el instalador crea el `docker-compose.yaml` y el contenedor; owrx-clone 1.1 pasa una estación de nativo a Docker y al revés ([manual 33](docs/manuales/33_OPENWEBRX_DOCKER.md));
-  - **zona por locator:** con `STATION_LOCATOR` (cualquier locator de España) salen los aeropuertos, estaciones AEMET, puertos, NAVTEX y emisoras de FM regionales y locales más cercanos, como marcadores y `METEO_STATIONS`. Lejos de Mi QTH se quitan los de Murcia ([manual 32](docs/manuales/32_ZONA_LOCATOR.md), `bricohams-locator`);
-  - plantilla genérica (`N0CALL`), indicativo y QTH en `settings.json` y oyentes con bandera y enlace al perfil (aportaciones de EA5KAO).
+  - **zona por locator:** con `STATION_LOCATOR` (cualquier locator de España) salen los aeropuertos, estaciones AEMET, puertos, NAVTEX y emisoras de FM regionales y locales más cercanos, como marcadores y `METEO_STATIONS`. Lejos de tu QTH se quitan los de Murcia ([manual 32](docs/manuales/32_ZONA_LOCATOR.md), `bricohams-locator`);
+  - plantilla genérica (`N0CALL`), indicativo y QTH en `settings.json` y oyentes con bandera y enlace al perfil (aportaciones de N0CALL).
 - **v4.1:** `sudo bash install.sh --actualizar` pone al día kit (git), `bricohams.env` (variables nuevas), sistema (apt) y solo los pasos que han cambiado, conservando tus marcadores ([manual 29](docs/manuales/29_ACTUALIZAR.md)).
 
 ![Arquitectura](docs/esquemas/01_arquitectura.png)
@@ -56,8 +82,8 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
 | 📡 Meshtastic 433 (mismos canales) | LilyGO T3 V1.6.1 por USB | firmware Meshtastic + CLI |
 | 📍 iGate LoRa APRS 433,775 (solo RX) | LilyGO T3 V1.6.1 por USB | LoRa_APRS_iGate (CA2RXU) |
 | 🕒 Hora exacta | GPS + PPS y RTC PCF85063A del HAT | gpsd + chrony |
-| 🌡️ Tiempo propio + estación WX APRS (EA5KAO-13) | **BME280/BMP280** (GYBMEP) por I2C + **anemómetro y veleta RS485** + **pluviómetro** (v3) | bricohams-wx |
-| 🌬️ Estación WX LoRa alternativa (EA5KAO-14) | 3.er LilyGO con los mismos sensores | LoRa_APRS_Wx_Station (CA2RXU) · `bricohams-lilygo wxstation` |
+| 🌡️ Tiempo propio + estación WX APRS (N0CALL-13) | **BME280/BMP280** (GYBMEP) por I2C + **anemómetro y veleta RS485** + **pluviómetro** (v3) | bricohams-wx |
+| 🌬️ Estación WX LoRa alternativa (N0CALL-14) | 3.er LilyGO con los mismos sensores | LoRa_APRS_Wx_Station (CA2RXU) · `bricohams-lilygo wxstation` |
 | 🌦️ Estaciones AEMET cercanas + previsión | — | bricohams-meteo (AEMET + Open-Meteo) |
 | 📷 Cámara del mástil con visión nocturna | **cámara IP PoE por RTSP** (recomendada, v3) o WPI408 / Camera Module 3 por CSI | MediaMTX + foto para la web |
 | ☀️ Radiación solar, DX cluster, imagen BricoHams | — | plugins `solar`, `rig_skin`, `meteo`, `camara`, `bricohams` |
@@ -76,7 +102,9 @@ Repositorio para montar **desde cero** (o restaurar) la estación SDR multiusuar
 ## Puesta en marcha rápida
 
 ```bash
-git clone https://github.com/anatolbricoham/bricohams-sdr.git && cd bricohams-sdr
+git clone https://github.com/TU_USUARIO/bricohams-sdr.git && cd bricohams-sdr
+# Solo en el repositorio unificado (omite esta línea si publicaste el kit por separado):
+cd kit-generico
 cp bricohams.env.example bricohams.env && nano bricohams.env     # identidad, QTH, hardware y claves
 sudo bash install.sh                                               # instalación nueva
 # solo al restaurar una estación: sudo bash install.sh --backup copia.tar.gz
@@ -108,18 +136,18 @@ sudo owrx-clone --docker owrx-mbe importar perfil.owrx.tar.gz   # tu estación n
 **Actualizar una estación ya instalada** (v4.1):
 
 ```bash
-cd ~/bricohams-sdr
+cd ~/bricohams-sdr/kit-generico   # o la raíz del kit si lo publicaste por separado
 sudo bash install.sh --actualizar --simular   # qué haría
 sudo bash install.sh --actualizar             # hacerlo
 ```
 
-Desde la v4 la estación se abre en **https://&lt;tu dominio&gt;/** (router: puertos 80 y 443 a la Pi; [manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md)).
+Con `SSL_MODO="admin"`, el receptor público se abre en **http://&lt;tu dominio&gt;/** y `/login` y `/settings` usan **HTTPS**. Con `SSL_MODO="todo"`, toda la web usa HTTPS (router: puertos 80 y 443 a la Pi; [manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md)).
 
 ### Alcance para otros equipos
 
 Este repositorio es un **kit de instalación de referencia**, no un instalador universal de Linux. Está probado para Raspberry Pi 5, arm64, Raspberry Pi OS Bookworm o Trixie y el conjunto de receptores/periféricos descrito arriba. El arranque, HAT, GPIO, serie USB, ADS-B, Meshtastic, Pico, cámara y ventilación presuponen hardware compatible; `--solo` omite pasos, pero no convierte un equipo distinto en compatible.
 
-Antes de instalar en otra estación, personaliza `bricohams.env` (indicativo, QTH, coordenadas, país, WiFi, números de serie y servicios habilitados). La plantilla de perfiles y los marcadores de radio de `files/openwebrx/` son de Murcia/EA5KAO: cambia frecuencias, repetidores, branding y descripciones que no correspondan a tu zona. No habilites APRS ni conectes nodos transmisores hasta configurar tus propios indicativos, claves y parámetros de radio. El [manual 02](docs/manuales/02_INSTALACION.md) contiene la lista previa y los límites soportados.
+Antes de instalar en otra estación, personaliza `bricohams.env` (indicativo, QTH, coordenadas, país, WiFi, números de serie y servicios habilitados). La plantilla de perfiles y los marcadores de radio de `files/openwebrx/` son de Murcia/N0CALL: cambia frecuencias, repetidores, branding y descripciones que no correspondan a tu zona. No habilites APRS ni conectes nodos transmisores hasta configurar tus propios indicativos, claves y parámetros de radio. El [manual 02](docs/manuales/02_INSTALACION.md) contiene la lista previa y los límites soportados.
 
 El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del mástil, en el [manual 10](docs/manuales/10_CAJA_3D.md).
 
@@ -136,7 +164,6 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - v4.4: [34 Blindaje de seguridad](docs/manuales/34_BLINDAJE_SEGURIDAD.md)
 - v4.5: [35 LoRa APRS (RAK4631) y Meshtastic en OpenWebRX+](docs/manuales/35_LORA_APRS_MESHTASTIC.md)
 - v4.6: [36 TAK y mapa local](docs/manuales/36_TAK_MAPA_LOCAL.md) · [37 Justificación de los cambios v4.6](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)
-- v5.1: [38 GitHub: sincronización y repositorio sin datos personales](docs/manuales/38_GITHUB_SINCRONIZACION_PRIVACIDAD.md)
 - v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 

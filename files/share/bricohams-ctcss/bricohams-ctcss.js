@@ -28,6 +28,10 @@
         try { return UI.getDemodulator(); } catch (e) { return null; }
     }
 
+    function modulacion(d) {
+        try { return d && d.get_modulation ? d.get_modulation() : null; } catch (e) { return null; }
+    }
+
     function frecuenciaActual(d) {
         try {
             if (d && typeof center_freq !== 'undefined') return center_freq + d.offset_frequency;
@@ -84,14 +88,17 @@
             };
         }
 
-        // Cambiar de modo a mano anula el subtono
+        // Cambiar de modo a mano anula el subtono. OpenWebRX+ vuelve a llamar a setMode con el
+        // mismo modo al actualizar el #freq=…,mod=… de la URL (hashchange, asíncrono tras
+        // sintonizar un bookmark): eso no es un cambio de modo y no debe borrar el subtono.
         if (typeof DemodulatorPanel !== 'undefined' && DemodulatorPanel.prototype.setMode && !DemodulatorPanel.prototype._bhCtcss) {
             var setModeOriginal = DemodulatorPanel.prototype.setMode;
             DemodulatorPanel.prototype._bhCtcss = true;
             DemodulatorPanel.prototype.setMode = function () {
+                var antes = modulacion(demod());
                 var r = setModeOriginal.apply(this, arguments);
                 try {
-                    if (!enBookmark) tono = 0;
+                    if (!enBookmark && modulacion(demod()) !== antes) tono = 0;
                     sincronizar(demod());
                     actualizarSelector();
                 } catch (e) { /* nada */ }

@@ -5,13 +5,16 @@ export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/.."
 echo "== shellcheck";  shellcheck -x -S warning install.sh files/bin/bricohams-check files/bin/bricohams-sdr-serials files/bin/bricohams-lilygo files/bin/bricohams-ft2 files/bin/bricohams-servicios files/bin/bricohams-tarea files/bin/bricohams-telegram files/bin/bricohams-blindaje files/bin/bricohams-banner files/motd/20-bricohams owrx-clone/instalar.sh tools/*.sh tests/run_tests.sh
 echo "== bash -n";     bash -n install.sh
-echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator files/bin/bricohams-rak-aprs files/bin/bricohams-dispositivos files/bin/bricohams-mesh-url files/bin/bricohams-mesh-owrx files/bin/bricohams-mesh-admin files/bin/bricohams-mesh-puente files/bin/bricohams-owrx-bookmarks-io files/bin/bricohams-owrx-repeaterbook files/bin/bricohams-owrx-ctcss files/bin/bricohams-owrx-rbimport files/share/bricohams-ctcss/*.py files/share/bricohams-rbimport/*.py owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
+bash -n files/bin/bricohams-backup-limpieza
+shellcheck -S warning files/bin/bricohams-backup-limpieza tests/test_backup_limpieza.sh
+echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator files/bin/bricohams-rak-aprs files/bin/bricohams-dispositivos files/bin/bricohams-mesh-url files/bin/bricohams-mesh-owrx files/bin/bricohams-mesh-admin files/bin/bricohams-bloqueo files/bin/bricohams-login-aviso files/bin/bricohams-oyentes files/bin/bricohams-owrx-bookmarks-io files/bin/bricohams-owrx-repeaterbook files/bin/bricohams-owrx-mapflights files/bin/bricohams-owrx-ctcss files/bin/bricohams-owrx-rbimport files/share/bricohams-ctcss/*.py files/share/bricohams-rbimport/*.py owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
 echo "== javascript"
-for f in files/htdocs/plugins/receiver/{solar,meteo,camara,bricohams,banderas,dvficha,satelites,visitas,audio_cadena,filtro_audio,dsp_audio}/*.js files/htdocs/plugins/receiver/init.js files/htdocs/plugins/map/init.js files/htdocs/plugins/map/bricohams_live/*.js; do
-    sed -e 's/__LAT__/38.08/;s/__LON__/-1.25/;s/__CAM_SNAPSHOT_SECONDS__/60/' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
+for f in files/htdocs/plugins/receiver/{idioma,marca,consentimiento,solar,meteo,camara,bricohams,banderas,dvficha,satelites,visitas,identificacion,ea5hkx_puente,audio_cadena,filtro_audio,dsp_audio}/*.js files/htdocs/plugins/receiver/init.js files/htdocs/plugins/map/init.js files/htdocs/plugins/map/bricohams_live/*.js; do
+    sed -e 's/__LAT__/37.98/;s/__LON__/-1.13/;s/__CAM_SNAPSHOT_SECONDS__/60/;s/__OPERADOR__/N0CALL/g;s/__QTH__/Mi QTH/g' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
 done
 node --check files/share/bricohams-ctcss/bricohams-ctcss.js
 echo "== pruebas"
+bash tests/test_backup_limpieza.sh
 python3 tests/test_wx_bme280.py
 python3 tests/test_render_settings.py
 python3 tests/test_locator_bookmarks.py
@@ -27,6 +30,10 @@ python3 tests/test_pico_io.py
 python3 tests/test_satpass.py
 python3 tests/test_visitas.py
 python3 tests/test_api.py
+python3 tests/test_registro_oyentes.py
+python3 tests/test_chat_registro.py
+python3 tests/test_plugins_ea5hkx.py
+python3 tests/test_politicas_mapa_local.py
 python3 tests/test_live_map.py
 python3 tests/test_ft2.py
 python3 tests/test_anclajes.py
@@ -48,10 +55,14 @@ python3 tests/test_repeaterbook.py
 python3 tests/test_ctcss_patch.py
 python3 tests/test_rbimport.py
 python3 tests/test_monitorizacion.py
-python3 tests/test_v51_aprs_web.py
-python3 tests/test_v51_mesh_puente.py
-python3 tests/test_git_sanear.py
-echo "== datos personales"; python3 tools/datos_personales.py --env /dev/null
+python3 tests/test_bloqueo_web.py
+python3 tests/test_bloqueo_helper.py
+python3 tests/test_chat_moderador.py
+python3 tests/test_wx_rak.py
+python3 tests/test_avion.py
+python3 tests/test_mapflights_api.py
+python3 tests/test_mapflights.py
+python3 tests/test_anonimato.py
 python3 tools/marcadores.py --comprobar
 python3 tools/locator_catalogo.py --comprobar
 echo "TODO OK"

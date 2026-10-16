@@ -1,5 +1,11 @@
 # 18 · Ventilación de la caja: conexión y control
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Meteorología, BME280, viento/lluvia y Pico IO](../GUIA_VISUAL_MODULOS.md#wx).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 > **v4 · Con el HAT puesto la cabecera de 40 pines está ocupada.** La ventilación (PWM, tacómetros y DS18B20) se conecta ahora a la **Pico «bricohams-io»** por USB: PWM GP16/GP17 por 2N7002, tacómetros GP18/GP19 con 10 kΩ a 3V3 + 1 kΩ, DS18B20 en GP22 con 4,7 kΩ. La curva y los comandos (`bricohams-fan --estado`, `--forzar`) son los mismos ([manual 20](20_PICO_IO.md), [esquema 16](../esquemas/16_pico_io.png)). Lo de abajo con pines de la Pi solo vale **sin HAT** (`IO_MODE="gpio"`).
 
 ![Esquema](../esquemas/13_ventiladores.png)
@@ -7,7 +13,7 @@
 **Qué hace:** dos ventiladores de 60 mm, 12 V, PWM de 4 hilos, controlados por la Raspberry según la temperatura de la CPU y la del aire de la caja (sonda DS18B20). El servicio es `bricohams-fan`.
 
 ## 1. Por qué así (ADR-23)
-- **Carga térmica:** en verano en Mi QTH hay 40 °C de aire y sol directo sobre la caja. Dentro se disipan 16–24 W (Pi 5, 4 SDR, regleta, LilyGO). Sin ventilación forzada el interior pasaría de 60 °C.
+- **Carga térmica:** en verano en tu QTH hay 40 °C de aire y sol directo sobre la caja. Dentro se disipan 16–24 W (Pi 5, 4 SDR, regleta, LilyGO). Sin ventilación forzada el interior pasaría de 60 °C.
 - **Flujo:**
   - **entrada abajo a la izquierda** (aire fresco y sombra);
   - **salida arriba a la derecha**, donde el calor se acumula y está la Pi;

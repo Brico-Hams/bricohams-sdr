@@ -1,10 +1,14 @@
 # Componentes de BricoHams SDR (v5.0)
 
+Para instalar o comprobar un componente, sigue la
+[guía visual de módulos](GUIA_VISUAL_MODULOS.md): requisitos, diagramas,
+capturas anonimizadas, comandos y enlaces a los procedimientos completos.
+
 Ficha de cada componente: **qué hace, qué paso de `install.sh` lo instala, qué
 servicios y puertos usa, dónde guarda su configuración, desde dónde se gestiona,
 qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero está en
 [ESTRUCTURA_FICHEROS.md](ESTRUCTURA_FICHEROS.md) y las decisiones de diseño en
-[ARQUITECTURA.md](ARQUITECTURA.md) (ADR-1 … ADR-64).
+[ARQUITECTURA.md](ARQUITECTURA.md) (incluye la integración adicional map.flights, ADR-70).
 
 ## Reglas comunes a todos los componentes
 
@@ -26,19 +30,17 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 
 | Puerto | Componente | Alcance |
 |---|---|---|
-| 80 / 443 | nginx (portal, OpenWebRX+, `/settings`, tar1090, cámara) | público |
-| 8073 | OpenWebRX+ | 127.0.0.1 (detrás de nginx; opcional público) |
+| 80 / 443 | nginx (portal, OpenWebRX+, `/settings`, tar1090, cámara); desde v5.0 el 80 solo redirige a 443 | público |
+| 8073 | OpenWebRX+ | 127.0.0.1 (`OWRX_SOLO_LOCAL="yes"`, defecto v5.0; solo por nginx) |
 | 8075 | `bricohams-api` (indicativos, aviones) | 127.0.0.1 |
 | 8076 | `bricohams-mesh-admin` (paneles `/settings/bricohams/` y `auth_request`) | 127.0.0.1 |
 | 8443 | nginx → cliente web de Meshtastic (solo admin) | LAN |
-| 8444 | v5.1 · nginx → cliente web de Meshtastic del LilyGO 433 (solo admin) | LAN |
-| 4404 / 4480 | v5.1 · `bricohams-mesh-puente`: API de Meshtastic y API HTTP del LilyGO 433 | 127.0.0.1 |
-| 8077 | v5.1 · `bricohams-rak-aprs`: API del panel APRS (mensajes, baliza, estado) | 127.0.0.1 |
 | 9443 | Webserver de `meshtasticd` (sin contraseña) | solo la Pi (`bricohams-meshweb-fw`) |
 | 4403 | API TCP de `meshtasticd` | LAN |
 | 1883 | Mosquitto (MQTT interno) | 127.0.0.1 |
 | 2947 | gpsd | 127.0.0.1 |
-| 8504 | lighttpd (tar1090) | 127.0.0.1 |
+| 8504 | lighttpd (tar1090, solo si no hay configuración nginx oficial) | 127.0.0.1 |
+| 8100 | AIS-catcher (`bricohams-ais`, `/api/ships.json`) | 127.0.0.1 |
 | 8554 / 8889 / 8888 / 9997 | MediaMTX RTSP / WebRTC / HLS / API | LAN / LAN / 127.0.0.1 / 127.0.0.1 |
 | 8081 | OpenTAKServer (API y web) | 127.0.0.1 |
 | 8089 / 8445–8447 | OpenTAKServer (CoT TLS, enrolamiento) | LAN |
@@ -67,6 +69,7 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 ### 3. Bookmarks, importación/exportación y subtonos CTCSS
 - **Función:** importar/exportar marcadores desde `/settings`, guardar el subtono CTCSS en el bookmark (modo «FM») y silenciador por tono.
 - **Ficheros:** `files/bin/bricohams-owrx-bookmarks-io`, `files/bin/bricohams-owrx-ctcss`, `files/share/bricohams-ctcss/bricohams-ctcss.js`, `files/share/bricohams-ctcss/bricohams_ctcss.py`, `files/bin/bricohams-merge-bookmarks.py`.
+- **Configuración:** `OWRX_CTCSS_ENABLE=yes` lo instala y activa por defecto; `no` lo retira al repetir `--solo web`.
 - **Regla:** el bookmark guarda solo la **frecuencia de salida** del repetidor (lo que escucha el SDR) y su tono.
 - **Pruebas:** `test_bookmarks_io.py`, `test_ctcss_patch.py`.
 - **ADR:** 60.
@@ -102,9 +105,18 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 - **Manuales:** 22, 35.
 
 ### 8. ADS-B
-- **Función:** readsb + tar1090 y feeders.
-- **Paso:** `adsb`. **Ficheros:** `files/bin/bricohams-rbfeeder-ini.py`. **Puerto:** 8504 (lighttpd) tras `/tar1090/`.
-- **Manuales:** 04, 14.
+- **Función:** readsb + tar1090; RadarBox y, opcionalmente, map.flights simultáneos.
+- **Paso:** `adsb`. **Ficheros:** `files/bin/bricohams-rbfeeder-ini.py`, `files/bin/bricohams-mapflights.py`. tar1090 lo sirve nginx en `/tar1090/` (configuración oficial; respaldo: 8504 de lighttpd).
+- **Servicios:** `readsb`, `rbfeeder` y, con MLAT map.flights habilitado, `bricohams-mapflights-mlat`.
+- **Salidas map.flights:** Beast TCP 30004 y MLAT TCP 31090; mismo UUID privado, no la clave de feed.
+- **Pruebas:** `test_mapflights.py`, `test_avion.py`.
+- **Plugin del mapa:** el API local usa map.flights como proveedor principal de detalles de vuelo/foto; se habilita en General Settings. El mapa conserva los aviones locales de readsb y muestra la atribución enlazada y el logo oficial.
+- **Panel OpenWebRX+:** `/settings/bricohams/mapflights`, solo administrador, diagnóstico sin UUID visible ni cambios desde la web; [manual 38](manuales/38_MAPFLIGHTS_PLUGIN.md).
+- **Ficheros adicionales:** `files/bin/bricohams-owrx-mapflights`, `files/htdocs/plugins/map/bricohams_live/bricohams_live.js`.
+- **Pruebas adicionales:** `test_mapflights_api.py`.
+- **AIS local (v5.0):** paso `ais`, servicio `bricohams-ais` (AIS-catcher en `127.0.0.1:8100`), API `/bricohams/api/barcos` (404 si `AIS_ENABLE` no es `yes`) y capa «AIS local» en `/map`. Necesita un SDR propio (`AIS_SDR_SERIAL`).
+- **Pruebas AIS:** `test_politicas_mapa_local.py`.
+- **Manuales:** 04, 14, 40.
 
 ### 9. Meteorología y sensores
 - **Función:** BME280, viento y lluvia, Pico I/O, estaciones meteo de la zona.
@@ -123,10 +135,11 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 
 ### 12. Web, SSL, API y visitas
 - **Paso:** `web`, `visitas`.
-- **Ficheros:** `files/nginx/bricohams-sdr.conf.tmpl`, `files/nginx/bricohams-sdr-rutas.conf`, `files/web/`, `files/bin/bricohams-api.py`, `files/bin/bricohams-visitas.py`, `files/bin/bricohams-telegram`.
+- **Ficheros:** `files/nginx/bricohams-sdr.conf.tmpl`, `files/nginx/bricohams-sdr-rutas.conf`, `files/web/`, `files/bin/bricohams-api.py`, `files/bin/bricohams-oyentes`, `files/bin/bricohams-visitas.py`, `files/bin/bricohams-telegram`, `files/htdocs/plugins/receiver/identificacion/`.
 - **Servicios:** `nginx`, `bricohams-api`, `bricohams-visitas`.
-- **Pruebas:** `test_ssl_admin.py`, `test_api.py`, `test_visitas.py`, `test_live_map.py`.
-- **Manuales:** 23, 24.
+- **Pruebas:** `test_ssl_admin.py`, `test_api.py`, `test_registro_oyentes.py`, `test_visitas.py`, `test_live_map.py`.
+- **v5.0:** todo por 443 (`SSL_MODO="todo"`, HSTS), 8073 solo local; página de políticas (`files/web/politicas.html`), banner de cookies (`plugins/receiver/consentimiento`), botón ES/EN (`plugins/receiver/idioma`) y logo BricoHams en receptor, `/map` y `/settings` (`sub_filter` de nginx + `plugins/receiver/marca`). Pruebas: `test_politicas_mapa_local.py`.
+- **Manuales:** 23, 24, 39, 40; registro voluntario con consentimiento, sin IP y con retención limitada.
 
 ### 13. TAK (OpenTAKServer) y mapa local
 - **Función:** servidor TAK para ATAK/iTAK; credenciales aleatorias, visibles y cambiables solo desde `/settings` (los nombres de usuario no admiten guiones).
@@ -150,7 +163,9 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 - **Paso:** `tareas`, `importar`, `herramientas`.
 - **Ficheros:** `files/bin/bricohams-tarea`, `files/bin/bricohams-servicios`, `files/bin/bricohams-dispositivos`.
 - **Servicios:** `bricohams-backup` (+ `.timer`).
+- **Retención local:** `bricohams-backup-limpieza.timer`, diario a las 06:15, elimina solo copias elegibles de más de 120 h; diagnóstico sin borrado: `sudo bricohams-backup-limpieza --dry-run` (manual 09).
 - **Pruebas:** `test_actualizar.py`, `test_v45_dispositivos.py`.
+- **Prueba de limpieza:** `test_backup_limpieza.sh`.
 - **Manuales:** 25, 29.
 
 ### 17. Hardware y documentación generada

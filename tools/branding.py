@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """v4: rehace la imagen superior de OpenWebRX (files/branding/receiver_top_photo.png)
 con la tarjeta del logo de BricoHams MÁS PEQUEÑA, arriba a la derecha, para que no
-tape la web. Parte de la imagen v3 (paisaje de Mi QTH a la izquierda) y de
+tape la web. Parte de la imagen v3 (paisaje a la izquierda) y de
 files/branding/logo_tarjeta.png.
 
 Uso: python3 tools/branding.py [escala]     (escala de la tarjeta, por defecto 0.42)

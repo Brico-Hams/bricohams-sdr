@@ -26,7 +26,7 @@ except ImportError:
 
 HTML = r'''<!doctype html><meta charset="utf-8"><title>prueba audio</title>
 <script src="jquery.js"></script>
-<div class="openwebrx-main-buttons"><div class="button" id="ea5kao-solar-button">SOL</div></div>
+<div class="openwebrx-main-buttons"><div class="button" id="bh-solar-button">SOL</div></div>
 <script>
 var Plugins = { load: async function (name) {
     Plugins[name] = { _version: 0 };
@@ -95,38 +95,38 @@ try:
         pg.goto(url)
         assert pg.evaluate('listo') is True
         pg.wait_for_timeout(600)
-        assert pg.locator('#ea5kao-filtro-button').count() == 1 and pg.locator('#ea5kao-dsp-button').count() == 1
+        assert pg.locator('#bh-filtro-button').count() == 1 and pg.locator('#bh-dsp-button').count() == 1
         orden = pg.evaluate("$('.openwebrx-main-buttons .button').map(function(){return this.id}).get()")
-        assert orden == ['ea5kao-solar-button', 'ea5kao-filtro-button', 'ea5kao-dsp-button'], orden
+        assert orden == ['bh-solar-button', 'bh-filtro-button', 'bh-dsp-button'], orden
 
         sin = pg.evaluate('nivel(1000)')
         voz_sin = pg.evaluate('banda(300, 700)')
         assert sin > -40, 'sin filtro el 1 kHz debe oírse: %.1f dB' % sin
         # encender el filtro desde la interfaz (modo AM: 100–4500 Hz)
-        pg.click('#ea5kao-filtro-button')
-        pg.click('#ea5kao-filtro .bha-chip[data-k="am"]')
-        pg.click('#ea5kao-filtro .bha-sw:has-text("Filtro activo")')
+        pg.click('#bh-filtro-button')
+        pg.click('#bh-filtro .bha-chip[data-k="am"]')
+        pg.click('#bh-filtro .bha-sw:has-text("Filtro activo")')
         pg.wait_for_timeout(2500)
         con = pg.evaluate('nivel(1000)')
         voz_con = pg.evaluate('banda(300, 700)')
-        estado = pg.inner_text('#ea5kao-filtro')
+        estado = pg.inner_text('#bh-filtro')
         assert sin - con > 20, 'el notch automático debe quitar el 1 kHz: %.1f → %.1f dB · %s' % (sin, con, estado)
         assert abs(voz_con - voz_sin) < 4, 'la «voz» (300–700 Hz) tiene que seguir pasando: %.1f → %.1f dB' % (voz_sin, voz_con)
         assert 'quitando 99' in estado or 'quitando 100' in estado, estado
         assert pg.evaluate('nivelToma(1000)') > -40, 'otros plugins que cuelgan del audio (osciloscopio de rig_skin) siguen recibiéndolo'
 
         # DSP: encender y ver que los medidores se mueven
-        pg.click('#ea5kao-dsp-button')
-        pg.click('#ea5kao-dsp .bha-sw:has-text("DSP activo")')
+        pg.click('#bh-dsp-button')
+        pg.click('#bh-dsp .bha-sw:has-text("DSP activo")')
         pg.wait_for_timeout(800)
-        txt = pg.inner_text('#ea5kao-dsp')
+        txt = pg.inner_text('#bh-dsp')
         assert 'dBFS' in txt and 'compresión' in txt, txt
         ruta = pg.evaluate("Plugins.audio_cadena.reconectar()")
         assert ruta == ['filtro_audio', 'dsp_audio'], ruta
 
         # apagar todo: vuelve el audio original
-        pg.click('#ea5kao-filtro .bha-sw:has-text("Filtro activo")')
-        pg.click('#ea5kao-dsp .bha-sw:has-text("DSP activo")')
+        pg.click('#bh-filtro .bha-sw:has-text("Filtro activo")')
+        pg.click('#bh-dsp .bha-sw:has-text("DSP activo")')
         pg.wait_for_timeout(800)
         assert pg.evaluate("Plugins.audio_cadena.reconectar()") == []
         otra = pg.evaluate('nivel(1000)')
@@ -134,7 +134,7 @@ try:
         # los ajustes se guardan en el navegador
         assert pg.evaluate("JSON.parse(localStorage.getItem('bh_filtro_audio')).modo") == 'am'
         if os.environ.get('CAPTURA'):
-            pg.click('#ea5kao-filtro .bha-sw:has-text("Filtro activo")'); pg.click('#ea5kao-dsp .bha-sw:has-text("DSP activo")')
+            pg.click('#bh-filtro .bha-sw:has-text("Filtro activo")'); pg.click('#bh-dsp .bha-sw:has-text("DSP activo")')
             pg.wait_for_timeout(1500)
             pg.screenshot(path=os.environ['CAPTURA'])
         errores = pg.evaluate('errores')

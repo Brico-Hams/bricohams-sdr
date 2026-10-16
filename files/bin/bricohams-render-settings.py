@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-render-settings · EA5KAO · BricoHams
+#  bricohams-render-settings · BricoHams
 #  Rellena settings.json.tmpl con los valores de bricohams.env
 #  (variables de entorno) y escribe settings.json para OpenWebRX+.
 #  Uso: bricohams-render-settings.py plantilla.json salida.json
@@ -42,14 +42,14 @@ def main(src, dst):
 
     vals = {
         '__CALLSIGN__': callsign,
-        '__STATION_QTH__': env('STATION_QTH', 'Mi QTH'),
+        '__STATION_QTH__': env('STATION_QTH', ''),
         '__STATION_COUNTRY__': station_country,
         '__RECEIVER_NAME__': '%s · SDR MULTIUSUARIO' % callsign,
-        '__RECEIVER_LOCATION__': '%s, %s' % (env('STATION_QTH', 'Mi QTH'), station_country),
+        '__RECEIVER_LOCATION__': '%s, %s' % (env('STATION_QTH', ''), station_country),
         '__RECEIVER_COUNTRY__': station_country,
         '__PHOTO_TITLE__': '%s · Receptor SDR' % callsign,
         '__PHOTO_DESC__': 'Receptor SDR multiusuario de %s en %s (%s).' % (
-            callsign, env('STATION_QTH', 'Mi QTH'), station_country),
+            callsign, env('STATION_QTH', ''), station_country),
         '__APRS_IGATE_ENABLED__': aprs_igate_enabled,
         '__MAGIC_KEY__': env('MAGIC_KEY'),
         '__RECEIVERBOOK_KEY__': env('RECEIVERBOOK_KEY'),

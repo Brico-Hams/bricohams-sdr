@@ -1,10 +1,18 @@
 # 23 · Web con SSL, portal de servicios y cómo entrar a cada uno
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Portal, HTTPS, API y paneles administrativos](../GUIA_VISUAL_MODULOS.md#web).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Servicios](../esquemas/18_red_servicios.png)
 
 **Qué hace:** **nginx** va delante de OpenWebRX+ con un certificado de **Let's Encrypt** que se renueva solo.
 
-> **v4.2 · decisión de EA5KAO: el certificado SSL es solo para la administración** (`SSL_MODO="admin"`, por defecto):
+> **v5.0 · todo por 443 y 8073 decomisionado** ([manual 40](40_HTTPS_MAPA_LOCAL_POLITICAS.md)): `SSL_MODO="todo"` pasa a ser el defecto (el 80 solo redirige a HTTPS y sirve Let's Encrypt, con HSTS) y OpenWebRX+ escucha solo en `127.0.0.1:8073` (`OWRX_SOLO_LOCAL="yes"`). El modo `admin` de abajo sigue disponible si lo pones a mano.
+
+> **v4.2 · decisión de N0CALL: el certificado SSL es solo para la administración** (`SSL_MODO="admin"`, por defecto):
 > - el **receptor público** se sirve por **HTTP** (`http://<tu dominio>/`), como siempre;
 > - **`/login`, `/settings`** y el resto de páginas de administración se **fuerzan a HTTPS**: la contraseña nunca viaja sin cifrar;
 > - la cookie de sesión del administrador sale con `Secure`, así el navegador no la manda nunca por el HTTP público;
@@ -12,13 +20,13 @@
 >
 > | `SSL_MODO` | Receptor | Administración | Router |
 > |---|---|---|---|
-> | `admin` (defecto) | HTTP | **HTTPS forzado** | 80 y 443 |
-> | `todo` | HTTPS (HTTP redirige, con HSTS) | HTTPS | 80 y 443 |
+> | `admin` | HTTP | **HTTPS forzado** | 80 y 443 |
+> | `todo` (defecto desde v5.0) | HTTPS (HTTP redirige, con HSTS) | HTTPS | 80 y 443 |
 > | `no` | HTTP | HTTP (¡contraseña sin cifrar! solo LAN) | 80 |
 >
 > Cambiarlo: edita `SSL_MODO` en `bricohams.env` y `sudo bash install.sh --solo web`.
 
-- **Desde casa:** `http://<IP>:8073/` sigue funcionando.
+- **Desde casa:** `https://<IP>/` (desde v5.0 el 8073 solo responde en la propia Pi).
 
 ## 1. Qué necesitas
 1. **Un dominio** que apunte a la IP de tu casa. Vale cualquiera de estos:
@@ -32,7 +40,7 @@
    ```
    SSL_DOMAIN="bricohams-sdr.duckdns.org"    # o tu dominio
    SSL_EMAIL="tu@correo"                      # avisos de caducidad
-   SSL_MODO="admin"                           # admin (defecto) · todo · no
+   SSL_MODO="todo"                            # todo (defecto) · admin · no
    ```
 4. **Aplica los cambios:**
    ```bash
@@ -41,7 +49,7 @@
 
 - **Qué hace el paso `web`:**
   - instala nginx y certbot;
-  - pasa el mapa de aviones (lighttpd) al puerto 8504 local;
+  - sirve el mapa de aviones tar1090 desde nginx (configuración oficial; si no está, proxy al 8504 local);
   - crea el portal `/bricohams/` y la página de privacidad;
   - arranca con un certificado autofirmado y pide el de Let's Encrypt.
 - **Si Let's Encrypt falla** (el dominio aún no apunta o el puerto 80 está cerrado), se queda con el autofirmado y te avisa. Repite el paso cuando esté listo.
@@ -49,7 +57,7 @@
 ## 2. Direcciones
 | Servicio | Desde Internet | Desde casa |
 |---|---|---|
-| Receptor OpenWebRX+ | `http://DOMINIO/` | `http://IP:8073/` |
+| Receptor OpenWebRX+ | `https://DOMINIO/` | `https://IP/` |
 | Portal con todos los servicios | `http://DOMINIO/bricohams/` | `http://IP/bricohams/` |
 | Mapa de aviones tar1090 | `http://DOMINIO/tar1090/` | igual |
 | Cámara del mástil (HLS) | `http://DOMINIO/camara/mastil/` | `http://IP:8888/mastil/` |

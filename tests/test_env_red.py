@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v4.2 · Los dos fallos de la instalación real en la Pi de EA5KAO:
+"""v4.2 · Los dos fallos de la instalación real en la Pi de N0CALL:
   1. «bricohams.env: line 182: Clave2026: unbound variable»: una clave con «$».
      → bricohams-env.py lee el fichero sin ejecutarlo; los .env derivados van entre comillas simples.
   2. «curl: (6) Could not resolve host: luarvique.github.io» justo después del paso «red».
@@ -28,15 +28,15 @@ def envpy(modo, texto):
 
 # ---------------------------------------------------------------- 1. lector de bricohams.env
 CASO = r'''# comentario
-QRZ_USER="EA5KAO"
-QRZ_PASS="abc&def\$Clave2026"                       # secreta: con \$ escapado (lo que hizo EA5KAO)
+QRZ_USER="N0CALL"
+QRZ_PASS="abc&def\$Clave2026"                       # secreta: con \$ escapado (lo que hizo N0CALL)
 HAMQTH_PASS="abc$Clave2026"          # $ sin escapar: ahora literal (antes: unbound variable)
 TELEGRAM_TOKEN='123:AA$bb"cc'
 export WIFI_PASS="Wifi@Prueba!"
 VACIA=""
 SIN_COMILLAS=ES   # país
 CON_COMILLA="o'brien"
-ESPACIOS="EA5KAO WX · Mi QTH"
+ESPACIOS="N0CALL WX · Murcia"
 '''
 r = envpy('--shell', CASO)
 assert r.returncode == 0, r.stderr
@@ -44,9 +44,9 @@ assert 'HAMQTH_PASS' in r.stderr and 'LITERAL' in r.stderr, 'debe avisar del $ s
 bash = subprocess.run(['bash', '-c', 'set -Eeuo pipefail\neval "$1"\nfor v in QRZ_USER QRZ_PASS HAMQTH_PASS TELEGRAM_TOKEN WIFI_PASS VACIA SIN_COMILLAS CON_COMILLA ESPACIOS; do printf "%s=[%s]\\n" "$v" "${!v}"; done',
                        '_', r.stdout], capture_output=True, text=True)
 assert bash.returncode == 0, bash.stderr
-esperado = {'QRZ_USER': 'EA5KAO', 'QRZ_PASS': 'abc&def$Clave2026', 'HAMQTH_PASS': 'abc$Clave2026',
+esperado = {'QRZ_USER': 'N0CALL', 'QRZ_PASS': 'abc&def$Clave2026', 'HAMQTH_PASS': 'abc$Clave2026',
             'TELEGRAM_TOKEN': '123:AA$bb"cc', 'WIFI_PASS': 'Wifi@Prueba!', 'VACIA': '', 'SIN_COMILLAS': 'ES',
-            'CON_COMILLA': "o'brien", 'ESPACIOS': 'EA5KAO WX · Mi QTH'}
+            'CON_COMILLA': "o'brien", 'ESPACIOS': 'N0CALL WX · Murcia'}
 got = dict(re.findall(r'^(\w+)=\[(.*)\]$', bash.stdout, re.M))
 assert got == esperado, got
 # la copia normalizada se lee igual con bash (scripts) y con reglas de shell (systemd/python)
@@ -54,7 +54,7 @@ n = envpy('--normalizar', CASO)
 assert n.returncode == 0
 b2 = subprocess.run(['bash', '-c', 'set -u; . /dev/stdin; printf "%s|%s|%s" "$QRZ_PASS" "$CON_COMILLA" "$ESPACIOS"'],
                     input=n.stdout, capture_output=True, text=True)
-assert b2.stdout == "abc&def$Clave2026|o'brien|EA5KAO WX · Mi QTH", b2
+assert b2.stdout == "abc&def$Clave2026|o'brien|N0CALL WX · Murcia", b2
 for linea in n.stdout.splitlines():
     if linea and not linea.startswith('#'):
         k, _, v = linea.partition('=')
@@ -85,7 +85,11 @@ assert S.count('cargar_env "$KIT/bricohams.env"') >= 3
 assert 'instalar_env "$ETC_BH/bricohams.env"' in S and 'install -m 600 "$KIT/bricohams.env"' not in S
 for secreto in ('HAMQTH_PASS', 'QRZ_PASS', 'TELEGRAM_TOKEN', 'DUCKDNS_TOKEN'):
     assert 'envl %s ' % secreto in S, secreto
-assert 'APRS_PASSCODE=$(sq "${APRS_PASSCODE:-}")' in S and 'AEMET_API_KEY=$(sq "${AEMET_API_KEY:-}")' in S
+assert 'APRS_PASSCODE=$(sq "${APRS_PASSCODE:-}")' in S and 'AEMET_API_KEY=$(sq "$clave")' in S
+# v5.0 · meteo.env se rehace desde bricohams.env cada vez (la clave no se queda atrás) y se comprueba
+assert 'escribir_meteo_env() {' in S and S.count('escribir_meteo_env') >= 3
+assert '[ -e "${ETC_BH:-/etc/bricohams}/meteo.env" ]; then escribir_meteo_env; fi' in S
+assert "fallo \"meteo.env: la AEMET_API_KEY no se ha escrito" in S
 sqf = re.search(r'^sq\(\) \{.*\}$', S, re.M).group(0)
 envl = re.search(r'^envl\(\) \{.*\}$', S, re.M).group(0)
 out = subprocess.run(['bash', '-c', sqf + '\n' + envl + '\nenvl X "$1"', '_', "a'b$c d"], capture_output=True, text=True).stdout

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-wx · EA5KAO · BricoHams
+#  bricohams-wx · BricoHams
 #  Estación meteorológica propia con un BME280 (temperatura, humedad y
 #  presión) o un BMP280 (sin humedad) en el I2C de la Raspberry Pi.
 #   - Detecta solo el chip (0x60 = BME280, 0x58 = BMP280) y la dirección
@@ -14,6 +14,10 @@
 #     LoRa_APRS_Wx_Station de CA2RXU: 4800 baudios, velocidad en la
 #     dirección 1 y dirección en la 2). El paquete WX lleva entonces
 #     dirección, velocidad, racha y lluvia de 1 h, 24 h y desde medianoche.
+#   - v4: WX_FUENTE=auto toma temperatura, humedad y presión del sensor del
+#     RAK4631 (bricohams-rak-aprs, /run/bricohams-rak/rak-aprs.json) y solo
+#     cae a la Pico/I2C si el RAK no responde. WX_POS_GPS=auto usa la
+#     posición del GPS del RAK cuando tiene fix (si no, STATION_LAT/LON).
 #  Variables en /etc/bricohams/wx.env. Uso de prueba: bricohams-wx --una
 # =====================================================================
 import json
@@ -39,9 +43,18 @@ try:
     import serial  # python3-serial (RS485)
 except ImportError:
     serial = None
+# lgpio crea su FIFO de avisos (.lgd-nfy*) en el directorio de trabajo; con
+# systemd ese directorio es «/» y el import falla sin permisos de escritura.
+if not os.access(os.getcwd(), os.W_OK):
+    for _wd in (os.environ.get('STATE_DIRECTORY', ''), '/var/lib/bricohams',
+                tempfile.gettempdir()):
+        if _wd and os.path.isdir(_wd) and os.access(_wd, os.W_OK):
+            os.chdir(_wd)
+            os.environ.setdefault('LG_WD', _wd)
+            break
 try:
     import lgpio  # python3-lgpio (pluviómetro)
-except ImportError:
+except Exception:  # sin lgpio solo se pierde el pluviómetro, no el resto
     lgpio = None
 
 
@@ -201,7 +214,7 @@ def aprs_wx_packet(call, lat, lon, t_c, rh, p_sl_hpa, comment, wind_dir=None, wi
     t_f = int(round(t_c * 9 / 5 + 32))
     t = ('t%03d' % t_f) if t_f >= 0 else ('t-%02d' % -t_f)
     h = '' if rh is None else 'h%02d' % (0 if round(rh) >= 100 else max(1, int(round(rh))))
-    b = 'b%05d' % int(round(p_sl_hpa * 10))
+    b = '' if p_sl_hpa is None else 'b%05d' % int(round(p_sl_hpa * 10))
     c = _campo(None if wind_dir is None else (wind_dir % 360 or 360))
     sp = _campo(None if wind_ms is None else wind_ms * MS_A_MPH)
     g = _campo(None if gust_ms is None else gust_ms * MS_A_MPH)
@@ -248,6 +261,94 @@ class SensorPico:
             raise RuntimeError('la Pico no da BME280: %s' % (b.get('error') or 'datos de hace %d s' % edad))
         self.chip = '%s (Pico)' % b.get('chip', 'BME280')
         return float(b['t']), float(b['p']), (None if b.get('h') is None else float(b['h']))
+
+
+RAK_JSON = '/run/bricohams-rak/rak-aprs.json'
+
+
+def leer_rak(path=RAK_JSON, max_edad=180):
+    """Último estado del RAK4631 que deja bricohams-rak-aprs (None si no hay o es viejo)."""
+    try:
+        edad = time.time() - os.path.getmtime(path)
+        d = json.load(open(path, encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if edad > max_edad or not isinstance(d.get('rak'), dict):
+        return None
+    return d['rak']
+
+
+def posicion_gps(rak):
+    """(lat, lon, alt) del GPS del RAK si tiene fix; None si no."""
+    g = (rak or {}).get('gps') or {}
+    try:
+        if g.get('fix') and g.get('lat') is not None and g.get('lon') is not None:
+            lat, lon = float(g['lat']), float(g['lon'])
+            if -90 <= lat <= 90 and -180 <= lon <= 180 and (lat or lon):
+                return lat, lon, (None if g.get('alt') is None else float(g['alt']))
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+class SensorRak:
+    """v5: temperatura, humedad y presión del sensor del RAK4631 (RAK1906 BME680,
+    BME280 o RAK1901 SHTC3, este sin presión). Si el RAK no da presión, se toma
+    del sensor de respaldo (Pico o I2C) cuando lo hay."""
+
+    def __init__(self, path=RAK_JSON, max_edad=180, respaldo=None, esperas=15):
+        self.path, self.max_edad, self.respaldo = path, max_edad, respaldo
+        self.addr = 0
+        self.chip = 'RAK4631'
+        for _ in range(esperas):
+            try:
+                self.read()
+                return
+            except RuntimeError:
+                time.sleep(2)
+        self.read()
+
+    def read(self):
+        rak = leer_rak(self.path, self.max_edad)
+        if not rak or rak.get('t') is None:
+            raise RuntimeError('sin datos del RAK en %s (¿bricohams-rak-aprs en marcha?)' % self.path)
+        t = float(rak['t'])
+        h = None if rak.get('h') is None else float(rak['h'])
+        p = None if rak.get('p') is None else float(rak['p']) * 100.0   # hPa -> Pa
+        self.chip = '%s (RAK)' % (rak.get('sensor') or 'RAK4631')
+        if p is None and self.respaldo:
+            try:
+                p = self.respaldo.read()[1]
+                self.chip += ' + presión %s' % self.respaldo.chip
+            except Exception:
+                p = None
+        return t, p, h
+
+
+def elegir_sensor():
+    """WX_FUENTE: auto (RAK si da temperatura, si no Pico/I2C), rak, pico o i2c."""
+    fuente = env('WX_FUENTE', 'auto').lower()
+    rak_json = os.path.join(env('RAK_RUN_DIR', '/run/bricohams-rak'), 'rak-aprs.json')
+
+    def local():
+        if env('IO_MODE', 'pico') == 'pico':
+            return SensorPico(os.path.join(env('IO_RUN_DIR', '/run/bricohams'), 'io.json'))
+        return Sensor(int(env('WX_I2C_BUS', '1')))
+
+    if fuente == 'pico':
+        return SensorPico(os.path.join(env('IO_RUN_DIR', '/run/bricohams'), 'io.json'))
+    if fuente == 'i2c':
+        return Sensor(int(env('WX_I2C_BUS', '1')))
+    if fuente == 'rak' or (fuente == 'auto' and (leer_rak(rak_json) or {}).get('t') is not None):
+        respaldo = None
+        rak = leer_rak(rak_json) or {}
+        if rak.get('p') is None:
+            try:
+                respaldo = local()
+            except Exception as e:
+                print('wx: el RAK no da presión y no hay respaldo (%s)' % e, file=sys.stderr, flush=True)
+        return SensorRak(rak_json, respaldo=respaldo, esperas=15 if fuente == 'rak' else 1)
+    return local()
 
 
 class PluviometroIO:
@@ -474,16 +575,17 @@ def main():
         return rs485_herramienta(sys.argv)
     out = env('WX_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/sensor.json')
     hist_file = os.path.join(env('STATE_DIRECTORY', '/var/lib/bricohams'), 'wx-history.json')
-    lat, lon = float(env('STATION_LAT', '38.08')), float(env('STATION_LON', '-1.25'))
+    lat, lon = float(env('STATION_LAT', '37.9838')), float(env('STATION_LON', '-1.1280'))
     alt = float(env('STATION_ASL', '200')) + float(env('WX_SENSOR_HEIGHT', '2'))
     toff = float(env('WX_TEMP_OFFSET', '0') or 0)
     do_aprs = as_bool(env('WX_APRS', 'no'))
-    call = env('WX_APRS_CALLSIGN', 'EA5KAO-13')
+    call = env('WX_APRS_CALLSIGN', 'N0CALL-13')
     once = '--una' in sys.argv
 
     pico = env('IO_MODE', 'pico') == 'pico'
-    sensor = SensorPico(os.path.join(env('IO_RUN_DIR', '/run/bricohams'), 'io.json')) if pico \
-        else Sensor(int(env('WX_I2C_BUS', '1')))
+    sensor = elegir_sensor()
+    usar_gps = env('WX_POS_GPS', 'auto').lower() not in ('no', '0', 'false', 'off')
+    rak_json = os.path.join(env('RAK_RUN_DIR', '/run/bricohams-rak'), 'rak-aprs.json')
     print('wx: %s en 0x%02x' % (sensor.chip, sensor.addr), flush=True)
     viento = pluvio = None
     if as_bool(env('WIND_ENABLE', 'no')):
@@ -516,15 +618,18 @@ def main():
     while True:
         t, p, h = sensor.read()
         t += toff
-        p_hpa = p / 100.0
-        p_sl = sea_level(p_hpa, t, alt)
+        p_hpa = None if p is None else p / 100.0
+        p_sl = None if p_hpa is None else sea_level(p_hpa, t, alt)
+        pos = posicion_gps(leer_rak(rak_json)) if usar_gps else None
+        if pos:
+            lat, lon = pos[0], pos[1]
         now = time.time()
         iso = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
         vi = viento.resumen() if viento else None
         ll = pluvio.resumen() if pluvio else None
         if now - last_hist >= 300:
             history.append({'t': iso, 'ta': round(t, 1), 'hr': None if h is None else round(h),
-                            'p': round(p_sl, 1), 'vv': vi['vel_ms'] if vi else None, 'dv': vi['dir'] if vi else None,
+                            'p': None if p_sl is None else round(p_sl, 1), 'vv': vi['vel_ms'] if vi else None, 'dv': vi['dir'] if vi else None,
                             'll': ll['1h'] if ll else None})
             history = [x for x in history if x['t'] >= datetime.fromtimestamp(now - 86400, timezone.utc).isoformat()[:19]]
             try:
@@ -534,9 +639,11 @@ def main():
                 pass
             last_hist = now
         data = {'updated': iso, 'chip': sensor.chip, 'addr': '0x%02x' % sensor.addr,
-                'name': env('WX_NAME', 'EA5KAO · Mi QTH'),
+                'name': env('WX_NAME', 'BricoHams WX'),
                 'ta': round(t, 1), 'hr': None if h is None else round(h, 1),
-                'pres': round(p_hpa, 1), 'pres_nmar': round(p_sl, 1),
+                'pres': None if p_hpa is None else round(p_hpa, 1),
+                'pres_nmar': None if p_sl is None else round(p_sl, 1),
+                'pos': {'lat': round(lat, 4), 'lon': round(lon, 4), 'fuente': 'gps-rak' if pos else 'fija'},
                 'dew': None if h is None else round(dew_point(t, h), 1),
                 'aprs': call if do_aprs else None, 'viento': vi, 'lluvia': ll, 'history': history}
         write_atomic(out, data)

@@ -1,4 +1,4 @@
-/* BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE).
+/* BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE).
  * Paquetes propios: baliza de posición y telemetría (temperatura de la caja).
  * Equivale a la baliza de src/utils.cpp y a src/telemetry_utils.cpp del original,
  * en formato sin comprimir para no depender de APRSPacketLib.
@@ -9,9 +9,9 @@
 #include <Arduino.h>
 
 namespace APRS_Utils {
-    String latitude(double lat);                  // "3804.94N"
-    String longitude(double lon);                 // "00115.21W"
-    String header(bool viaRF);                    // "EA5KAO-10>APZBH1[,WIDE1-1]"
+    String latitude(double lat);                  // "3759.03N"
+    String longitude(double lon);                 // "00107.68W"
+    String header(bool viaRF);                    // "N0CALL-10>APZBH1[,WIDE1-1]"
     String beacon(bool viaRF);
     String status(bool viaRF);                    // ">texto" o "" si no hay
     String telemetry(bool viaRF, uint32_t rxCount, uint32_t digiCount);

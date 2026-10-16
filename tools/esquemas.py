@@ -29,7 +29,7 @@ def svg(w, h, body, title):
     return (f"<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}' viewBox='0 0 {w} {h}' {FONT}>"
             f"<rect width='{w}' height='{h}' fill='{C['bg']}'/>"
             f"<text x='24' y='36' font-size='22' font-weight='bold' fill='{C['ink']}'>{esc(title)}</text>"
-            f"<text x='24' y='58' font-size='12' fill='{C['mute']}'>BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia) · generado por tools/esquemas.py</text>"
+            f"<text x='24' y='58' font-size='12' fill='{C['mute']}'>BricoHams SDR · generado por tools/esquemas.py</text>"
             f"<rect x='0' y='{h - 8}' width='{w}' height='8' fill='{C['or']}'/><rect x='0' y='{h - 10}' width='{w}' height='2' fill='{C['cr']}'/>"
             + body + "</svg>")
 
@@ -109,7 +109,7 @@ def bloques():
     # salidas
     outs = [(140, 'Navegador · visitantes', 'http://<pi>:8073'), (250, 'AirNav RadarBox', 'Beast + MLAT'),
             (360, 'Red Meshtastic 868', 'SFNarrow · Murcia · Cartagena · Test · Alicante'),
-            (470, 'Red Meshtastic 433', 'mismos canales, EU_433'), (580, 'APRS-IS (euro.aprs2.net)', 'iGate EA5KAO-10 · WX EA5KAO-13 · OWRX EA5KAO'),
+            (470, 'Red Meshtastic 433', 'mismos canales, EU_433'), (580, 'APRS-IS (euro.aprs2.net)', 'iGate N0CALL-10 · WX N0CALL-13 · OWRX N0CALL'),
             (690, 'PSKReporter · WSPRnet', 'FT8/WSPR de OpenWebRX'), (800, 'AEMET · Open-Meteo · NOAA', 'datos de entrada')]
     b += f"<text x='1130' y='120' font-size='14' font-weight='bold' fill='{C['net']}'>SERVICIOS EXTERNOS</text>"
     for y, t, d in outs:
@@ -247,7 +247,6 @@ def red():
             ('8888/tcp', 'MediaMTX HLS', 'solo LAN', C['cam']),
             ('8554/tcp', 'MediaMTX RTSP (rtsp://<pi>:8554/mastil)', 'solo LAN', C['cam']),
             ('8443/tcp', 'Meshtastic Web (sesión admin)', 'solo LAN', C['lora']),
-            ('8444/tcp', 'Meshtastic Web 433 · LilyGO (admin)', 'solo LAN', C['lora']),
             ('4403/tcp', 'meshtasticd: API (CLI, apps)', 'solo LAN', C['lora']),
             ('30005/tcp', 'readsb: salida Beast (rbfeeder)', 'local', C['sdr']),
             ('2947/tcp', 'gpsd', 'local', C['gps']),
@@ -516,7 +515,7 @@ def sensores_wx():
     notas = ['• Un solo cable de 4 hilos (PG7 «VIENTO») lleva +12 V, GND, A y B a los dos sensores, conectados en paralelo (bus RS485).',
              '• La veleta sale de fábrica con la dirección 1, igual que el anemómetro: cámbiala a 2 antes de instalarla (manual 19).',
              '• El pluviómetro solo cierra un contacto: dos hilos al PG7 «LLUVIA». El condensador de 100 nF y el antirrebote de 20 ms evitan dobles cuentas.',
-             '• bricohams-wx publica en APRS-IS (EA5KAO-13): dirección, velocidad media de 1 min, racha de 5 min, lluvia de 1 h, 24 h y desde medianoche.',
+             '• bricohams-wx publica en APRS-IS (N0CALL-13): dirección, velocidad media de 1 min, racha de 5 min, lluvia de 1 h, 24 h y desde medianoche.',
              '• Alternativa: los mismos sensores en un 3.er LilyGO con el firmware LoRa_APRS_Wx_Station de CA2RXU (bricohams-lilygo wxstation): emite por LoRa a 433,775.']
     for k, t in enumerate(notas):
         b += txt(40, 720 + k * 24, t, 11.2)
@@ -687,7 +686,7 @@ def red_servicios():
     b += arrow(600, 675, 760, 675, C['pi'])
     b += txt(40, 780, '• Desde casa sigue funcionando http://IP:8073 sin nginx (la ficha DMR/YSF y el portal necesitan nginx).', 11.2)
     b += txt(40, 828, '• v4.2: el certificado protege la administración; SSL_MODO=todo pone todo en HTTPS y SSL_MODO=no lo quita (solo LAN).', 11.2)
-    b += txt(40, 804, '• Solo LAN: Meshtastic Web https://IP:8443 y :8444 (admin), API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
+    b += txt(40, 804, '• Solo LAN: Meshtastic Web https://IP:8443 (admin), API 4403, RTSP 8554. No abrir esos puertos en el router.', 11.2)
     return svg(W, H, b, 'Servicios web, SSL (solo administración), visitas y tareas automáticas')
 
 
@@ -816,7 +815,7 @@ def clonar_openwebrx():
                            'sudo bash install.sh --importar perfil.owrx.tar.gz   → paso «importar» (IMPORTAR_NIVELES)',
                            'marca /etc/bricohams/perfil-importado: «configuracion» no regenera settings.json y «plugins» no pisa init.js',
                            'OWRX_PLANTILLA="yes" vuelve a la plantilla de BricoHams',
-                           'copia diaria: /var/backups/bricohams/perfil-owrx-FECHA.owrx.tar.gz (7 últimos)']):
+                           'copia diaria: /var/backups/bricohams/perfil-owrx-FECHA.owrx.tar.gz (cinco días)']):
         b += txt(50, 555 + k * 30, '• ' + t, 11)
     b += txt(30, 800, 'owrx-clone es genérico: cualquier OpenWebRX+ en Debian 11-13, Ubuntu 22.04/24.04 o Raspberry Pi OS (amd64, arm64, armhf).', 11.5)
     b += txt(30, 826, 'Un solo fichero Python 3 sin dependencias · README es/en · man owrx-clone · owrx-clone ayuda {niveles,seguridad,dispositivos,migrar,problemas} · MIT', 11, C['mute'])
@@ -847,7 +846,7 @@ def zona_locator():
                            '3  los 3 más cercanos de cada categoría en 100 km', '   (aeropuerto y AEMET: al menos uno, hasta 250 km)',
                            '4  FM: regionales y locales que mejor se oyen', '   (potencia / distancia², una por frecuencia)',
                            '5  canales repetidos juntos: Canal 16 · A / B', '6  etiqueta [AUTO-LOCATOR] y distancia en km',
-                           '7  lejos de Mi QTH: fuera los del kit de Murcia']):
+                           '7  lejos de Murcia: fuera los del kit de Murcia']):
         b += txt(490, 290 + k * 28, t, 10.8)
     b += arrow(940, 330, 1060, 200, C['ink']) + txt(950, 245, 'marcadores', 10.5, C['ink'])
     b += arrow(940, 420, 1060, 470, C['ink']) + txt(948, 425, 'METEO', 10.5, C['ink'])
@@ -861,7 +860,7 @@ def zona_locator():
     for k, t in enumerate(['meteo.env: METEO_STATIONS de la zona', 'LOCATOR_METEO="no" conserva la tuya', 'plugin METEO de la web: tiempo real AEMET']):
         b += txt(1075, 450 + k * 30, t, 10.8)
     b += caja_s(1060, 610, 410, 210, 'bricohams-locator info', '', C['ink'], '#fafafa', arriba=True)
-    for k, t in enumerate(['QTH IM97kx · 38.08, -1.25 · península', 'aeropuertos, AEMET, puertos, FM y NAVTEX', 'con su distancia',
+    for k, t in enumerate(['QTH IM97KX · 37.98, -1.13 · península', 'aeropuertos, AEMET, puertos, FM y NAVTEX', 'con su distancia',
                            'refrescar · meteo · coordenadas · locator', 'bricohams-check: «zona … N marcadores»']):
         b += txt(1075, 660 + k * 28, t, 10.8)
     b += txt(30, 860, 'Vale para cualquier locator de España: IN, IM, JN, JM (península y Baleares), IL (Canarias), IM75 (Ceuta) e IM85 (Melilla). '
@@ -915,7 +914,7 @@ def blindaje():
     """Esquema 24: capas de seguridad de la estación (v4.4)."""
     W, H = 1500, 900
     b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net']])
-    b += caja_s(30, 90, 250, 300, 'Internet', 'sdr.ea5kao.ampr.org', C['cr'], '#fdecee', arriba=True)
+    b += caja_s(30, 90, 250, 300, 'Internet', 'sdr.example.org', C['cr'], '#fdecee', arriba=True)
     for k, t in enumerate(['oyentes', 'robots que prueban', 'contraseñas', 'directorios de', 'receptores']):
         b += txt(50, 160 + k * 26, t, 11)
     b += caja_s(330, 90, 230, 300, 'Cortafuegos externo', '(router)', C['or'], '#fff3e0', arriba=True)
@@ -924,8 +923,8 @@ def blindaje():
     b += txt(350, 320, '(!) /login por 8073 va', 10.5, C['cr']) + txt(350, 338, 'sin cifrar: ciérralo', 10.5, C['cr'])
     b += arrow(280, 240, 330, 240, C['cr'])
     b += arrow(560, 240, 610, 240, C['ink'])
-    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · IP fija de la LAN', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
-    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8444, 8554 · resto: descartado y registrado', C['or']),
+    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · 192.168.1.50', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
+    capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8554 · resto: descartado y registrado', C['or']),
              ('nginx', '/settings → HTTPS · /login 12/min (429) · sin versión · X-Frame · ocultos 404', C['net']),
              ('SSH', 'solo LAN · sin root · 3 intentos · solo clave si la hay · fail2ban', C['pi']),
              ('Claves', 'bricohams.env 600 · .env 640 · copias 700 · users.json 600 · fugas: buscadas', C['cr']),
@@ -936,7 +935,7 @@ def blindaje():
         b += caja_s(630, y, 820, 70, t, d, c, '#ffffff')
     b += caja_s(30, 430, 530, 260, 'Procedimiento (manual 34)', '', C['ink'], '#fafafa', arriba=True)
     for k, t in enumerate(['1  sudo bash install.sh --actualizar', '2  sudo bricohams-blindaje auditar   (no cambia nada)',
-                           '3  ssh-copy-id usuario@IP-de-la-Pi', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
+                           '3  ssh-copy-id pi@192.168.1.50', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
                            '6  sudo bricohams-blindaje confirmar  (si no, 3 min y se quita)', '7  sudo bricohams-blindaje auditar']):
         b += txt(50, 485 + k * 28, t, 11)
     b += txt(30, 760, 'La auditoría nunca enseña una clave: solo la variable y el fichero donde aparece. bricohams-check muestra el resumen cada 30 min.', 11)
@@ -950,7 +949,7 @@ def lora_owrx():
     b = markers([C['ink'], C['lora'], C['sdr'], C['or'], C['net'], C['pi']])
     b += caja_s(30, 80, 360, 250, 'RAK4631 WisBlock · 433,775 MHz', 'firmware BricoHams RAK APRS (port CA2RXU)', C['lora'], '#e0f7fa', arriba=True)
     for k, t in enumerate(['SX1262 · SF12 · BW 125 · CR 4/5 · 20 dBm', 'digipeater WIDE1-1 · baliza · estado', 'GPS slot A · sensor de la caja (SHTC3/BME)',
-                           'KISS por USB + orden 0x06 «BH:…»', 'EA5KAO-15 · /dev/rak-aprs']):
+                           'KISS por USB + orden 0x06 «BH:…»', 'N0CALL-15 · /dev/rak-aprs']):
         b += txt(50, 150 + k * 30, t, 11)
     b += caja_s(30, 370, 360, 190, 'LilyGO T3 V1.6.1 · 433', 'Meshtastic EU_433 LongFast · 10 dBm', C['or'], '#fff3e0', arriba=True)
     for k, t in enumerate(['URL de la red 433 (MESH433_CHANNEL_URL)', 'SDR BricoHams 433 · SB43', '/dev/lilygo-mesh']):
@@ -971,9 +970,9 @@ def lora_owrx():
     b += arrow(700, 630, 700, 650, C['net'])
     b += caja_s(1000, 80, 470, 200, 'APRS-IS', 'rotate.aprs2.net:14580 · filtro m/10', C['ink'], '#fafafa', arriba=True)
     b += txt(1020, 160, 'sube lo oído por RF (sin TCPIP/NOGATE/RFONLY)', 11) + txt(1020, 188, 'baja mensajes para estaciones oídas (30 min)', 11)
-    b += txt(1020, 216, 'aprs.fi · EA5KAO-15', 11, C['lora'], True)
+    b += txt(1020, 216, 'aprs.fi · N0CALL-15', 11, C['lora'], True)
     b += arrow(890, 220, 1000, 180, C['ink'], 'passcode')
-    b += caja_s(1000, 320, 470, 450, 'Mapa público de OpenWebRX+', 'https://sdr.ea5kao.ampr.org/map', C['sdr'], '#eef4fb', arriba=True)
+    b += caja_s(1000, 320, 470, 450, 'Mapa público de OpenWebRX+', 'https://sdr.example.org/map', C['sdr'], '#eef4fb', arriba=True)
     for k, t in enumerate(['estaciones LoRa APRS oídas (icono APRS, RSSI/SNR)', 'nodos Meshtastic 433 y 868 (icono M)',
                            'posición de NUESTROS nodos a 2 decimales (~1 km)', 'mensajes directos: nunca', 'chat de canales públicos: MESH_OWRX_CHAT=yes',
                            'sin HAT: el 868 espera solo (no es un fallo)']):

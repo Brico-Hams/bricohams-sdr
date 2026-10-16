@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-api · EA5KAO · BricoHams  (v4)
+#  bricohams-api · BricoHams  (v4)
 #  Pequeño servicio HTTP (127.0.0.1:8075, detrás de nginx en /bricohams/api/)
 #  para los plugins de la web:
-#    GET /bricohams/api/indicativo?call=EA5KAO
+#    GET /bricohams/api/indicativo?call=N0CALL
 #        -> {"call","nombre","ciudad","region","pais","foto","fuente"}
 #        Fuentes: HamQTH (principal), RadioID.net y, si hay credenciales de
 #        QRZ XML, QRZ como fuente complementaria. Caché de 7 días.
+#    GET /bricohams/api/avion?hex=4ca123&cs=RYR12AB
+#        -> {"modelo","matricula","operador","aerolinea","origen","destino",
+#            "pOrigen","pDestino","foto","enlace","credito"} (map.flights
+#        principal, adsbdb/Planespotters de respaldo, caché 6 h)
+#    GET /bricohams/api/barcos -> {"ships": [...]} AIS local (AIS-catcher en
+#        127.0.0.1:8100, solo con AIS_ENABLE=yes)
 #    GET /bricohams/api/salud  -> {"ok": true}
 # =====================================================================
 import json
@@ -17,16 +23,21 @@ import sqlite3
 import sys
 import threading
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ESTADO = os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams')
-UA = {'User-Agent': 'BricoHams-SDR EA5KAO (+https://t.me/bricohams)'}
+UA = {'User-Agent': 'BricoHams-SDR N0CALL (+https://t.me/bricohams)'}
 CALL_RE = re.compile(r'^[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](/[A-Z0-9]{1,4})?$|^[A-Z0-9]{1,4}/[A-Z0-9]{3,7}$')
 CACHE_VERSION = 2
 ADSB_JSON = os.environ.get('ADSB_JSON', '/run/readsb/aircraft.json')
+OWRX_SETTINGS_FILE = os.environ.get('OWRX_SETTINGS_FILE', '/var/lib/openwebrx/settings.json')
+RETENCION_OYENTES_DIAS = 180
+MAX_REGISTROS_OYENTES = 100000
+NOMBRE_RE = re.compile(r"^[^\W\d_][\w .'-]{1,79}$", re.UNICODE)
 
 
 def aviones(ruta=ADSB_JSON, ahora=None):
@@ -59,8 +70,271 @@ def aviones(ruta=ADSB_JSON, ahora=None):
     return {'now': generado, 'aircraft': resultado}
 
 
-def http_json(url, timeout=8):
-    return json.load(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout))
+AIS_ENABLE = os.environ.get('AIS_ENABLE', 'no') == 'yes'
+AIS_JSON_URL = os.environ.get('AIS_JSON_URL', 'http://127.0.0.1:8100/api/ships.json')
+AIS_MAX_EDAD = 900
+
+
+def barcos(datos, max_edad=AIS_MAX_EDAD):
+    """Barcos con posicion de AIS-catcher local (api/ships.json); sin datos de la estacion."""
+    lista = datos.get('ships') if isinstance(datos, dict) else datos
+    if not isinstance(lista, list):
+        raise ValueError('AIS-catcher no devolvio una lista de barcos')
+    resultado = []
+    for b in lista:
+        if not isinstance(b, dict):
+            continue
+        mmsi, lat, lon, edad = b.get('mmsi'), b.get('lat'), b.get('lon'), b.get('last_signal')
+        if not isinstance(mmsi, int) or isinstance(mmsi, bool) or not 0 < mmsi < 1000000000:
+            continue
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in (lat, lon, edad)):
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180 and 0 <= edad <= max_edad) or (lat == 0 and lon == 0):
+            continue
+        r = {'mmsi': mmsi, 'lat': lat, 'lon': lon, 'edad': edad}
+        for k, lim in (('speed', 102.2), ('cog', 359.9), ('heading', 359)):
+            v = b.get(k)
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and 0 <= v <= lim:
+                r[k] = v
+        for k, n in (('shipname', 32), ('callsign', 10), ('destination', 32)):
+            v = b.get(k)
+            if isinstance(v, str) and v.strip():
+                r[k] = re.sub(r'[\x00-\x1f<>]', '', v).strip()[:n]
+        v = b.get('shiptype')
+        if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 99:
+            r['shiptype'] = v
+        resultado.append(r)
+    return {'ships': resultado}
+
+
+def barcos_locales(url=AIS_JSON_URL):
+    with urllib.request.urlopen(url, timeout=4) as r:
+        return barcos(json.loads(r.read(4 * 1024 * 1024).decode('utf-8')))
+
+
+def _https(u):
+    u = str(u or '')
+    return u if u.startswith('https://') and len(u) < 500 and not any(c in u for c in '"<> \'') else ''
+
+
+def _numero(v, lo, hi):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return v if math.isfinite(v) and lo <= v <= hi else None
+
+
+def _ajustes_owrx(ruta=None):
+    ruta = ruta or OWRX_SETTINGS_FILE
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            ajustes = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        print('api map.flights: no se pudo leer General Settings: %s' % e, file=sys.stderr, flush=True)
+        return {}
+    if not isinstance(ajustes, dict):
+        print('api map.flights: General Settings no contiene un objeto JSON', file=sys.stderr, flush=True)
+        return {}
+    return ajustes
+
+
+def mapflights_habilitado(ruta=None):
+    return _ajustes_owrx(ruta).get('mapflights_api_enabled') is True
+
+
+def _clave_mapflights_valida(clave):
+    clave = clave.strip() if isinstance(clave, str) else ''
+    return clave if re.fullmatch(r'[A-Za-z0-9._~+/=-]{8,256}', clave) else ''
+
+
+def mapflights_config(ruta=None):
+    """(habilitado, clave) desde General Settings; la clave nunca sale del servidor."""
+    ajustes = _ajustes_owrx(ruta)
+    clave = ajustes.get('mapflights_api_key')
+    valida = _clave_mapflights_valida(clave)
+    if clave and not valida:
+        print('api map.flights: API key con formato no válido; uso acceso anónimo', file=sys.stderr, flush=True)
+    return ajustes.get('mapflights_api_enabled') is True, valida
+
+
+def ficha_avion(hexid, cs='', pedir=None, usar_mapflights=True, clave_mapflights=''):
+    """Ficha por ICAO: map.flights primero; adsbdb y Planespotters como respaldo."""
+    pedir = pedir or http_json
+    clave_mapflights = _clave_mapflights_valida(clave_mapflights)
+    icao = str(hexid or '').lower().lstrip('~')
+    if not re.fullmatch(r'[0-9a-f]{6}', icao):
+        return None
+    cs = str(cs or '').upper().strip()
+    cs = cs if re.fullmatch(r'[A-Z0-9]{3,8}', cs) else ''
+
+    def leer(url, fuente, cabeceras=None):
+        try:
+            d = pedir(url, cabeceras) if cabeceras else pedir(url)
+            return d if isinstance(d, dict) else None
+        except Exception as e:
+            print('api ficha avion (%s): %s' % (fuente, e), file=sys.stderr, flush=True)
+            return None
+
+    ficha = {}
+    if usar_mapflights:
+        url_mf = 'https://map.flights/api/v1/aircraft/' + icao
+        mf = None
+        if clave_mapflights:
+            mf = leer(url_mf, 'map.flights con API key', {'x-api-key': clave_mapflights})
+        if mf is None:
+            mf = leer(url_mf, 'map.flights')
+        if mf:
+            tipo = str(mf.get('typeName') or mf.get('typecode') or '')[:120]
+            matricula = str(mf.get('registration') or '')[:20]
+            operador = mf.get('operator')
+            if tipo:
+                ficha['modelo'] = tipo
+            if matricula:
+                ficha['matricula'] = matricula
+            if isinstance(operador, dict) and operador.get('name'):
+                ficha['operador'] = str(operador['name'])[:120]
+            ruta_vuelo = mf.get('route')
+            if isinstance(ruta_vuelo, dict):
+                def sitio(x):
+                    if not isinstance(x, dict):
+                        return ''
+                    nombre = str(x.get('municipality') or x.get('name') or '')[:100]
+                    codigo = x.get('iata') or x.get('icao')
+                    if codigo:
+                        nombre += ' (%s)' % str(codigo)[:8]
+                    pais = x.get('country')
+                    if pais:
+                        nombre += ', %s' % str(pais)[:60]
+                    return nombre
+
+                def punto(x):
+                    if not isinstance(x, dict):
+                        return None
+                    lat = _numero(x.get('lat'), -90, 90)
+                    lon = _numero(x.get('lon'), -180, 180)
+                    return [lat, lon] if lat is not None and lon is not None else None
+
+                origen, destino = ruta_vuelo.get('origin'), ruta_vuelo.get('dest')
+                if sitio(origen):
+                    ficha['origen'] = sitio(origen)
+                if sitio(destino):
+                    ficha['destino'] = sitio(destino)
+                punto_origen, punto_destino = punto(origen), punto(destino)
+                if punto_origen:
+                    ficha['pOrigen'] = punto_origen
+                if punto_destino:
+                    ficha['pDestino'] = punto_destino
+                aerolinea = ruta_vuelo.get('airlineIcao')
+                if aerolinea:
+                    ficha['aerolinea'] = str(aerolinea)[:20]
+            foto = mf.get('photo')
+            if isinstance(foto, dict):
+                foto_url = _https(foto.get('url') or foto.get('thumbnail'))
+                if foto_url:
+                    ficha['foto'] = foto_url
+                    ficha['enlace'] = _https(foto.get('link'))
+                    credito = str(foto.get('photographer') or '').strip()
+                    ficha['credito'] = ('© %s · Planespotters.net' % credito
+                                        if credito else 'Planespotters.net')
+            if ficha:
+                ficha['fuente'] = 'MAP.FLIGHTS'
+
+    db = None
+    if not ficha.get('modelo') or not ficha.get('matricula') or not ficha.get('operador') or \
+            not ficha.get('origen') or not ficha.get('destino'):
+        db = leer('https://api.adsbdb.com/v0/aircraft/%s%s' % (icao, '?callsign=' + cs if cs else ''),
+                  'adsbdb')
+    r = db.get('response') if db and isinstance(db.get('response'), dict) else {}
+    av = r.get('aircraft') if isinstance(r.get('aircraft'), dict) else None
+    if av:
+        modelo = ' '.join(str(x) for x in (av.get('manufacturer'), av.get('type')) if x)
+        if av.get('icao_type'):
+            modelo += ' (%s)' % av['icao_type']
+        ficha.setdefault('modelo', modelo.strip()[:120])
+        ficha.setdefault('matricula', str(av.get('registration') or '')[:20])
+        ficha.setdefault('operador', str(av.get('registered_owner') or '')[:120])
+        if not ficha.get('foto'):
+            ficha['foto'] = _https(av.get('url_photo_thumbnail'))
+            if ficha['foto']:
+                ficha['credito'] = 'airport-data.com'
+                ficha['enlace'] = _https(av.get('url_photo'))
+    fr = r.get('flightroute') if isinstance(r.get('flightroute'), dict) else None
+    if (not ficha.get('origen') or not ficha.get('destino')) and cs:
+        rc = leer('https://api.adsbdb.com/v0/callsign/' + cs, 'adsbdb')
+        rr = rc.get('response') if rc and isinstance(rc.get('response'), dict) else {}
+        fr = fr or (rr.get('flightroute') if isinstance(rr.get('flightroute'), dict) else None)
+    if fr:
+        def sitio(x):
+            if not isinstance(x, dict):
+                return ''
+            s = str(x.get('municipality') or x.get('name') or '')
+            cod = x.get('iata_code') or x.get('icao_code')
+            if cod:
+                s += ' (%s)' % cod
+            if x.get('country_name'):
+                s += ', %s' % x['country_name']
+            return s[:120]
+
+        def punto(x):
+            if not isinstance(x, dict):
+                return None
+            lat, lon = _numero(x.get('latitude'), -90, 90), _numero(x.get('longitude'), -180, 180)
+            return [lat, lon] if lat is not None and lon is not None else None
+
+        al = fr.get('airline')
+        if not ficha.get('aerolinea') and isinstance(al, dict):
+            ficha['aerolinea'] = str(al.get('name') or '')[:120]
+        if not ficha.get('origen'):
+            ficha['origen'] = sitio(fr.get('origin'))
+        if not ficha.get('destino'):
+            ficha['destino'] = sitio(fr.get('destination'))
+        if not ficha.get('pOrigen'):
+            ficha['pOrigen'] = punto(fr.get('origin'))
+        if not ficha.get('pDestino'):
+            ficha['pDestino'] = punto(fr.get('destination'))
+    ps = leer('https://api.planespotters.net/pub/photos/hex/' + icao, 'Planespotters') if not ficha.get('foto') else None
+    fotos = ps.get('photos') if ps and isinstance(ps.get('photos'), list) else []
+    if fotos and isinstance(fotos[0], dict):
+        f = fotos[0]
+        mini = f.get('thumbnail_large') or f.get('thumbnail') or {}
+        src = _https(mini.get('src') if isinstance(mini, dict) else '')
+        if src:
+            ficha['foto'] = src
+            ficha['enlace'] = _https(f.get('link'))
+            ficha['credito'] = '© %s · Planespotters.net' % str(f.get('photographer') or 'autor')[:80]
+    ficha = {k: v for k, v in ficha.items() if v}
+    return ficha or None
+
+
+class CacheFichas:
+    """Cache en memoria (6 h, 500 entradas) para no repetir consultas externas."""
+
+    def __init__(self, ttl=6 * 3600, maximo=500):
+        self.ttl, self.maximo, self.d, self.lock = ttl, maximo, {}, threading.Lock()
+
+    def obtener(self, hexid, cs, buscar=ficha_avion, variante=''):
+        clave = '%s|%s%s' % (str(hexid).lower(), str(cs).upper(),
+                             '|' + variante if variante else '')
+        ahora = time.time()
+        with self.lock:
+            hit = self.d.get(clave)
+            if hit and ahora - hit[0] < self.ttl:
+                return hit[1]
+        ficha = buscar(hexid, cs)
+        with self.lock:
+            if len(self.d) >= self.maximo:
+                self.d.pop(min(self.d, key=lambda k: self.d[k][0]))
+            # Sin datos (o fallo externo): se reintenta a los 10 minutos.
+            self.d[clave] = (ahora if ficha else ahora - self.ttl + 600, ficha)
+        return ficha
+
+
+def http_json(url, headers=None, timeout=8):
+    return json.load(urllib.request.urlopen(
+        urllib.request.Request(url, headers={**UA, **(headers or {})}), timeout=timeout))
 
 
 def http_json_con_cabeceras(url, headers, timeout=8):
@@ -225,11 +499,78 @@ def buscar_indicativo(call, cache, qrz, rid=radioid, hamqth=None):
     return d
 
 
-def servidor(host='127.0.0.1', puerto=8075):
-    cache = Cache(os.path.join(ESTADO, 'indicativos.sqlite'))
-    hamqth = HamQTH(os.environ.get('HAMQTH_USER', ''), os.environ.get('HAMQTH_PASS', ''))
-    qrz = Qrz(os.environ.get('QRZ_USER', ''), os.environ.get('QRZ_PASS', ''))
+def validar_registro_oyente(datos):
+    """Valida una identificación enviada voluntariamente; nunca recibe ni guarda IP."""
+    if not isinstance(datos, dict) or datos.get('consentimiento') is not True:
+        return None
+    valor = datos.get('identificador')
+    if not isinstance(valor, str) or len(valor) > 120:
+        return None
+    valor = unicodedata.normalize('NFKC', valor).strip()
+    if CALL_RE.fullmatch(valor.upper()):
+        return valor.upper(), 'indicativo'
+    if NOMBRE_RE.fullmatch(valor):
+        return valor, 'nombre'
+    return None
 
+
+class RegistroOyentes:
+    def __init__(self, ruta, reloj=time.time):
+        os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
+        mascara = os.umask(0o077)
+        try:
+            self.c = sqlite3.connect(ruta, check_same_thread=False)
+        finally:
+            os.umask(mascara)
+        try:
+            os.chmod(ruta, 0o600)
+        except OSError:
+            self.c.close()
+            raise
+        self.reloj = reloj
+        self.lock = threading.Lock()
+        self.c.execute('''CREATE TABLE IF NOT EXISTS registro_oyentes (
+            id INTEGER PRIMARY KEY,
+            identificador TEXT NOT NULL,
+            tipo TEXT NOT NULL CHECK(tipo IN ('indicativo', 'nombre')),
+            creado INTEGER NOT NULL,
+            consentimiento TEXT NOT NULL
+        )''')
+        self.c.execute('CREATE INDEX IF NOT EXISTS registro_oyentes_creado ON registro_oyentes(creado)')
+        self.c.commit()
+        with self.lock:
+            self._limpiar()
+
+    def _limpiar(self):
+        corte = int(self.reloj()) - RETENCION_OYENTES_DIAS * 86400
+        self.c.execute('DELETE FROM registro_oyentes WHERE creado < ?', (corte,))
+        self.c.execute('''DELETE FROM registro_oyentes WHERE id NOT IN
+            (SELECT id FROM registro_oyentes ORDER BY creado DESC, id DESC LIMIT ?)''',
+                       (MAX_REGISTROS_OYENTES,))
+        self.c.commit()
+
+    def registrar(self, datos):
+        identificacion = validar_registro_oyente(datos)
+        if identificacion is None:
+            return False
+        valor, tipo = identificacion
+        with self.lock:
+            ahora = int(self.reloj())
+            self.c.execute(
+                'INSERT INTO registro_oyentes (identificador, tipo, creado, consentimiento) VALUES (?, ?, ?, ?)',
+                (valor, tipo, ahora, 'v1'))
+            self._limpiar()
+        return True
+
+    def listar(self, limite=1000):
+        limite = max(1, min(int(limite), MAX_REGISTROS_OYENTES))
+        with self.lock:
+            return self.c.execute(
+                'SELECT identificador, tipo, creado FROM registro_oyentes ORDER BY creado DESC, id DESC LIMIT ?',
+                (limite,)).fetchall()
+
+
+def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
     class H(BaseHTTPRequestHandler):
         def _json(self, code, obj, cache_control='public, max-age=3600'):
             b = json.dumps(obj, ensure_ascii=False).encode()
@@ -249,6 +590,29 @@ def servidor(host='127.0.0.1', puerto=8075):
                     print('api ADS-B: %s' % e, file=sys.stderr, flush=True)
                     return self._json(503, {'error': 'ADS-B local no disponible o sin datos recientes'}, 'no-store')
                 return self._json(200, d, 'no-store')
+            if u.path == '/bricohams/api/barcos':
+                if not AIS_ENABLE:
+                    return self._json(404, {'error': 'AIS local no instalado'}, 'no-store')
+                try:
+                    d = barcos_locales()
+                except (OSError, ValueError, KeyError, TypeError, UnicodeDecodeError) as e:
+                    print('api AIS: %s' % e, file=sys.stderr, flush=True)
+                    return self._json(503, {'error': 'AIS local no disponible'}, 'no-store')
+                return self._json(200, d, 'no-store')
+            if u.path == '/bricohams/api/avion':
+                q = urllib.parse.parse_qs(u.query)
+                hexid = q.get('hex', [''])[0][:8]
+                if not re.fullmatch(r'~?[0-9a-fA-F]{6}', hexid):
+                    return self._json(400, {'error': 'hex no válido'}, 'no-store')
+                usar_mapflights, clave_mapflights = mapflights_config()
+                variante = ('mapflights+clave' if clave_mapflights else 'mapflights') \
+                    if usar_mapflights else 'sin-mapflights'
+                ficha = fichas.obtener(
+                    hexid, q.get('cs', [''])[0][:10],
+                    buscar=lambda h, cs: ficha_avion(h, cs, usar_mapflights=usar_mapflights,
+                                                     clave_mapflights=clave_mapflights),
+                    variante=variante)
+                return self._json(200, ficha or {}, 'public, max-age=21600')
             if u.path.endswith('/salud'):
                 return self._json(200, {'ok': True, 'hamqth': bool(hamqth.u), 'qrz': bool(qrz.u)})
             if u.path.endswith('/indicativo'):
@@ -257,12 +621,50 @@ def servidor(host='127.0.0.1', puerto=8075):
                 return self._json(200 if d else 400, d or {'error': 'indicativo no válido'})
             self._json(404, {'error': 'no existe'})
 
+        def do_POST(self):
+            u = urllib.parse.urlparse(self.path)
+            if u.path != '/bricohams/api/oyentes':
+                return self._json(404, {'error': 'no existe'}, 'no-store')
+            origen = self.headers.get('Origin')
+            host_header = self.headers.get('Host', '')
+            if origen:
+                try:
+                    if urllib.parse.urlsplit(origen).netloc.lower() != host_header.lower():
+                        return self._json(403, {'error': 'origen no permitido'}, 'no-store')
+                except ValueError:
+                    return self._json(403, {'error': 'origen no permitido'}, 'no-store')
+            if self.headers.get_content_type() != 'application/json':
+                return self._json(415, {'error': 'se requiere application/json'}, 'no-store')
+            try:
+                longitud = int(self.headers.get('Content-Length', '0'))
+            except ValueError:
+                return self._json(400, {'error': 'longitud no válida'}, 'no-store')
+            if not 0 < longitud <= 1024:
+                return self._json(413 if longitud > 1024 else 400, {'error': 'tamaño no válido'}, 'no-store')
+            try:
+                datos = json.loads(self.rfile.read(longitud))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return self._json(400, {'error': 'JSON no válido'}, 'no-store')
+            if not oyentes.registrar(datos):
+                return self._json(400, {'error': 'identificación o consentimiento no válido'}, 'no-store')
+            self._json(201, {'ok': True}, 'no-store')
+
         def log_message(self, *a):
             pass
 
+    return H
+
+
+def servidor(host='127.0.0.1', puerto=8075):
+    cache = Cache(os.path.join(ESTADO, 'indicativos.sqlite'))
+    oyentes = RegistroOyentes(os.path.join(ESTADO, 'oyentes.sqlite'))
+    hamqth = HamQTH(os.environ.get('HAMQTH_USER', ''), os.environ.get('HAMQTH_PASS', ''))
+    qrz = Qrz(os.environ.get('QRZ_USER', ''), os.environ.get('QRZ_PASS', ''))
+    fichas = CacheFichas()
+    httpd = ThreadingHTTPServer((host, puerto), crear_manejador(cache, hamqth, qrz, fichas, oyentes))
     print('api: http://%s:%d/bricohams/api/ (HamQTH %s, QRZ %s)' %
           (host, puerto, 'sí' if hamqth.u else 'no', 'sí' if qrz.u else 'no'), flush=True)
-    ThreadingHTTPServer((host, puerto), H).serve_forever()
+    httpd.serve_forever()
 
 
 if __name__ == '__main__':

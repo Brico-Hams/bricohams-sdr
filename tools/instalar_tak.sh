@@ -380,7 +380,7 @@ admin = importlib.util.module_from_spec(spec)
 loader.exec_module(admin)
 for path in (kit / 'bricohams.env', pathlib.Path('/etc/bricohams/bricohams.env')):
     if path.exists():
-        ports = admin.leer_env(str(path)).get('BLINDAJE_PUERTOS_LAN', '4403 8443 8444 8554').split()
+        ports = admin.leer_env(str(path)).get('BLINDAJE_PUERTOS_LAN', '4403 8443 8554').split()
         for port in ('8089', '8445', '8446', '8447'):
             if port not in ports:
                 ports.append(port)

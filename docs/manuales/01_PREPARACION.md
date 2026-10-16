@@ -1,5 +1,11 @@
 # 01 · Preparación del hardware y de la tarjeta
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Sistema base, red, arranque y HAT](../GUIA_VISUAL_MODULOS.md#sistema).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ## Material
 - **Placa y alimentación:**
   - Raspberry Pi 5 (4 u 8 GB).

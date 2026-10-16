@@ -1,5 +1,11 @@
 # 10 · Caja de intemperie impresa en 3D (PETG + TPU, Anycubic Kobra S1)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 Caja para el mástil Televés con toda la estación dentro. Por dentro tiene dos zonas separadas por un tabique:
 
 | Zona | Qué lleva | Por qué |

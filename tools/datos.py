@@ -72,7 +72,7 @@ for b in sorted(nuevos, key=lambda x: x['frequency']):
     f = b['frequency']
     perfil = '70rep (437,7–439,9)' if f > 435e6 else '70in (429,9–432,1)'
     L.append('| %s | %s | %s | %s | %s |' % (mhz(f), b['modulation'], limpio(b['name']), limpio(b.get('description', '')), perfil))
-L += ['', '⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeister, 438,250 / entrada 430,650). EA5KAO indica ahora **438,950 / 431,350** como repetidor digital de Sierra Espuña: se han dejado los dos hasta confirmar cuál está activo.',
+L += ['', '⚠ En los marcadores anteriores ya estaba **ED5ZAN** (DMR BrandMeister, 438,250 / entrada 430,650). N0CALL indica ahora **438,950 / 431,350** como repetidor digital de Sierra Espuña: se han dejado los dos hasta confirmar cuál está activo.',
       '', 'Convención: la **salida** del hotspot/repetidor es lo que oyes (TX del equipo), la **entrada** es donde transmites (RX del equipo).', '']
 
 L += ['## 4. Puertos de red', '', '| Puerto | Servicio | Alcance |', '|---|---|---|']
@@ -84,17 +84,16 @@ for p, s, a in [('443/tcp', 'v4.2 · nginx https: /login y /settings forzados (y
                 ('1883/tcp', 'v4 · mosquitto (informes de clientes de OpenWebRX)', '127.0.0.1'),
                 ('8889/tcp + 8189/udp', 'MediaMTX WebRTC (vídeo en directo)', 'opcional'),
                 ('8888/tcp', 'MediaMTX HLS', 'LAN'), ('8554/tcp', 'MediaMTX RTSP `rtsp://<pi>:8554/mastil`', 'LAN'),
-                ('9997/tcp', 'MediaMTX API', '127.0.0.1'), ('9443/tcp', 'meshtasticd web (https)', '127.0.0.1'), ('8443/tcp', 'nginx: Meshtastic Web (solo admin)', 'LAN'),
-                ('8444/tcp', 'v5.1 · nginx: Meshtastic Web del LilyGO 433 (solo admin)', 'LAN'),
-                ('4404/tcp', 'v5.1 · bricohams-mesh-puente: API de Meshtastic del LilyGO 433', '127.0.0.1'),
-                ('4480/tcp', 'v5.1 · bricohams-mesh-puente: API HTTP del cliente web 433', '127.0.0.1'),
-                ('8077/tcp', 'v5.1 · bricohams-rak-aprs: API del panel APRS (mensajes, baliza)', '127.0.0.1'),
+                ('9997/tcp', 'MediaMTX API', '127.0.0.1'),
+                ('8076/tcp', 'v4.5 · bricohams-mesh-admin (panel Meshtastic, detrás de nginx en /settings/bricohams/meshtastic, exige sesión de admin de OpenWebRX+)', '127.0.0.1'),
+                ('8443/tcp', 'v4.5 · nginx: cliente web oficial de Meshtastic (proxy a 9443 con autenticación de sesión de /settings)', 'LAN (admin only)'),
                 ('8445/tcp', 'v4.6 · nginx: interfaz web de OpenTAKServer (usuario TAK)', 'LAN'),
                 ('8089/tcp', 'v4.6 · OpenTAKServer CoT TLS con certificado de cliente', 'LAN'),
                 ('8446/tcp', 'v4.6 · nginx: alta de certificados TAK (enrollment)', 'LAN'),
                 ('8447/tcp', 'v4.6 · nginx: Marti API TAK con certificado de cliente', 'LAN'),
                 ('8081/tcp', 'v4.6 · OpenTAKServer interno', '127.0.0.1'),
                 ('5432, 5672/tcp', 'v4.6 · PostgreSQL y RabbitMQ de TAK (cortafuegos `bricohams-tak-fw`)', '127.0.0.1'),
+                ('9443/tcp', 'meshtasticd web: **bloqueada por firewall** `bricohams-meshweb-fw` (nftables) desde todas las IPs excepto localhost', '127.0.0.1'),
                 ('4403/tcp', 'meshtasticd API', 'LAN'), ('30005/tcp', 'readsb salida Beast', 'local'),
                 ('30003, 30002, 30104/tcp', 'readsb SBS / raw / entrada Beast', 'local'), ('2947/tcp', 'gpsd', 'local'),
                 ('14580/tcp saliente', 'APRS-IS (iGate, WX, OpenWebRX)', 'saliente'),
@@ -126,12 +125,12 @@ L += ['## 7. Indicativos y WiFi', '', '| Indicativo | Qué es | Dónde |', '|---
     '| %s | iGate APRS de OpenWebRX (packet 144,800) | settings.json `aprs_callsign` |' % ENV.get('CALLSIGN', 'CALLSIGN'),
       '| %s | iGate LoRa APRS 433,775 (LilyGO, solo RX) | `IGATE_CALLSIGN` |' % ENV['IGATE_CALLSIGN'],
       '| %s | Estación meteorológica (BME280 + viento + lluvia) | `WX_APRS_CALLSIGN` |' % ENV['WX_APRS_CALLSIGN'],
-      '| %s | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |' % ENV.get('WXLORA_CALLSIGN', 'EA5KAO-14'),
+      '| %s | Estación WX LoRa alternativa (3.er LilyGO, CA2RXU) | `WXLORA_CALLSIGN` |' % ENV.get('WXLORA_CALLSIGN', 'N0CALL-14'),
       '| %s / %s | Nodo Meshtastic 868 (HAT) | `MESH_LONG_NAME` |' % (ENV.get('MESH_LONG_NAME', ''), ENV.get('MESH_SHORT_NAME', '')),
       '| %s / %s | Nodo Meshtastic 433 (LilyGO) | `MESH433_LONG_NAME` |' % (ENV['MESH433_LONG_NAME'], ENV['MESH433_SHORT_NAME']), '']
 
 L += ['## 8. Canales Meshtastic (QR de la red)', '',
-      'Origen: `MESH_CHANNEL_URL` (QR aportado por EA5KAO el 04/10/2026). Claves por defecto públicas (índices 1 y 2).', '',
+      'Origen: `MESH_CHANNEL_URL` (QR aportado por N0CALL el 04/10/2026). Claves por defecto públicas (índices 1 y 2).', '',
       '| Índice | Canal | Clave |', '|---|---|---|', '| 0 (principal) | SFNarrow | por defecto (AQ==) |',
       '| 1 | Murcia | por defecto |', '| 2 | Cartagena | por defecto |', '| 3 | Test | por defecto nº 2 · posición activada |',
       '| 4 | Alicante | por defecto |',
@@ -148,7 +147,7 @@ for r, c in [('/etc/bricohams/bricohams.env', 'configuración y claves (600 root
              ('/etc/udev/rules.d/99-bricohams-rs485.rules', '/dev/rs485 (adaptador USB-RS485, v3)'), ('/etc/meshtasticd/config.d/hackergadgets-hat.yaml', 'pines LoRa del HAT'),
              ('/etc/mediamtx/mediamtx.yml', 'cámara'), ('/etc/default/readsb, /etc/rbfeeder.ini', 'ADS-B'),
              ('/etc/udev/rules.d/99-bricohams-lilygo.rules', '/dev/lilygo-mesh y /dev/lilygo-igate'),
-             ('/boot/firmware/config.txt', 'bloque `# >>> BricoHams`'), ('/var/backups/bricohams/', 'copias diarias (14 últimas)'),
+             ('/boot/firmware/config.txt', 'bloque `# >>> BricoHams`'), ('/var/backups/bricohams/', 'copias diarias (retención local de cinco días)'),
              ('/opt/bricohams/kit/', 'copia del kit (sin claves)'), ('/var/log/bricohams-install.log', 'registro del instalador'),
              ('/etc/bricohams/{web,api,visitas,telegram}.env', 'v4 · variables de los servicios web (640)'),
              ('/var/lib/bricohams/visitas.sqlite', 'v4 · oyentes (IP parcial, 90 días)'), ('/var/lib/bricohams/dbip-city-lite.mmdb', 'v4 · GeoIP local (DB-IP Lite)'),
@@ -171,7 +170,7 @@ for r, c in [('/etc/bricohams/bricohams.env', 'configuración y claves (600 root
              ('/etc/issue.net, /etc/update-motd.d/20-bricohams', 'v4.5 · banner SSH: aviso legal y estado al entrar'),
              ('/etc/nginx/snippets/bricohams-sdr-rutas.conf', 'v4.2 · rutas comunes HTTP/HTTPS de nginx'),
              ('/usr/local/bin/owrx-clone, /var/backups/owrx-clone/', 'v4.2 · perfiles de OpenWebRX+ y copias previas de cada importación'),
-             ('/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz', 'v4.2 · perfil diario de OpenWebRX+ (7 últimos)'),
+             ('/var/backups/bricohams/perfil-owrx-*.owrx.tar.gz', 'v4.2 · perfil diario de OpenWebRX+ (retención local de cinco días)'),
              ('/etc/bricohams/perfil-importado', 'v4.2 · marca: la configuración viene de un perfil importado')]:
     L.append('| `%s` | %s |' % (r, c))
 

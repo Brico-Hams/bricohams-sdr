@@ -1,5 +1,11 @@
 # 21 · Anclajes impresos al mástil, brazos y sensores
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Montaje](../../hardware/anclajes/render/montaje.png)
 
 **Qué cambia en la v4:** las antenas y los sensores se sujetan con **crucetas impresas de tres piezas** atornilladas. Ya no hacen falta abrazaderas en U.

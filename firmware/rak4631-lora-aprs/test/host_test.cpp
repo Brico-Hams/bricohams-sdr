@@ -38,7 +38,7 @@ static String unhex(const std::string& x) {
 int main(int argc, char** argv) {
     if (argc < 2) return 2;
     std::string c = argv[1];
-    Config.callsign = "EA5KAO-10";
+    Config.callsign = "N0CALL-10";
     if (c == "kiss") { std::cout << hex(encodeKISS(String(argv[2]))) << "\n"; return 0; }
     if (c == "unkiss") { bool d = false; std::cout << decodeKISS(unhex(argv[2]), d).c_str() << "\n"; return d ? 0 : 1; }
     if (c == "digi") { Config.digiMode = atoi(argv[2]); std::cout << DIGI_Utils::generateDigipeatedPacket(String(argv[3])).c_str() << "\n"; return 0; }
@@ -48,10 +48,10 @@ int main(int argc, char** argv) {
         Config.latitude = atof(argv[2]); Config.longitude = atof(argv[3]); Config.altitude = 230;
         sd.tempOk = true; sd.temp = 23.44f;
         std::cout << APRS_Utils::beacon(false).c_str() << "\n" << APRS_Utils::beacon(true).c_str() << "\n";
-        Config.ambiguity = 1; Config.status = "EA5KAO-SDR BricoHams"; Config.path = "WIDE1-1,WIDE2-1";
+        Config.ambiguity = 1; Config.status = "N0CALL-SDR BricoHams"; Config.path = "WIDE1-1,WIDE2-1";
         std::cout << APRS_Utils::beacon(true).c_str() << "\n" << APRS_Utils::status(false).c_str() << "\n";
         Config.ambiguity = 3;
-        std::cout << APRS_Utils::latitude(0.0).c_str() << "|" << APRS_Utils::longitude(0.0).c_str() << "\n";
+        std::cout << APRS_Utils::latitude(37.983815).c_str() << "|" << APRS_Utils::longitude(-1.128013).c_str() << "\n";
         return 0;
     }
     if (c == "telem") {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-meteo · EA5KAO · BricoHams
+#  bricohams-meteo · BricoHams
 #  Tiempo en vivo de las estaciones cercanas para el plugin "meteo".
 #
 #  - Observación horaria de las estaciones AEMET de METEO_STATIONS
@@ -161,8 +161,8 @@ def write_atomic(path, obj):
 
 
 def main():
-    lat = float(env('STATION_LAT', '38.08'))
-    lon = float(env('STATION_LON', '-1.25'))
+    lat = float(env('STATION_LAT', '0'))
+    lon = float(env('STATION_LON', '0'))
     out = env('METEO_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/meteo/meteo.json')
     key = env('AEMET_API_KEY')
     stations = parse_stations(env('METEO_STATIONS', '7158X:Archena,7237E:Molina de Segura,7228:Alcantarilla Base Aérea,7178I:Murcia'))
@@ -170,27 +170,36 @@ def main():
            'qth': {'lat': round(lat, 2), 'lon': round(lon, 2)},   # v4.4: es público (~1 km), no la casa exacta
            'stations': [], 'model': None, 'errors': []}
 
+    # meteo.json es público: ni rutas, ni nombres de variables, ni texto de excepciones.
+    # El detalle va al journal (journalctl -u bricohams-meteo).
+    if not key and stations:
+        print('meteo: sin AEMET_API_KEY en la configuración; solo modelo Open-Meteo', file=sys.stderr)
     for sid, name in stations:
         if not key:
             res['stations'].append({'id': sid, 'name': name or sid, 'source': 'AEMET',
-                                    'error': 'Falta AEMET_API_KEY en /etc/bricohams/meteo.env'})
+                                    'error': 'Observación no disponible'})
             continue
         try:
             res['stations'].append(parse_aemet(fetch_aemet(sid, key), sid, name, lat, lon))
         except Exception as e:  # una estación caída no para las demás
-            res['stations'].append({'id': sid, 'name': name or sid, 'source': 'AEMET', 'error': str(e)[:160]})
-            res['errors'].append('%s: %s' % (sid, str(e)[:80]))
+            print('meteo: AEMET %s: %s' % (sid, str(e)[:200]), file=sys.stderr)
+            res['stations'].append({'id': sid, 'name': name or sid, 'source': 'AEMET', 'error': 'Sin datos ahora'})
+            res['errors'].append('AEMET %s sin datos' % sid)
         time.sleep(1)  # AEMET limita peticiones seguidas
     res['stations'].sort(key=lambda s: s.get('dist_km', 999))
 
     try:
         res['model'] = fetch_openmeteo(lat, lon)
     except Exception as e:
-        res['errors'].append('Open-Meteo: %s' % str(e)[:80])
+        print('meteo: Open-Meteo: %s' % str(e)[:200], file=sys.stderr)
+        res['errors'].append('Modelo Open-Meteo sin datos')
 
     write_atomic(out, res)
     ok = sum(1 for s in res['stations'] if 'ta' in s)
     print('meteo: %d/%d estaciones, modelo %s -> %s' % (ok, len(stations), 'ok' if res['model'] else 'NO', out))
+    if not key and stations:   # v5.0: que no pase en silencio (systemctl --failed / bricohams-check)
+        print('meteo: ERROR falta la clave de AEMET; reinstala con: sudo bash install.sh --solo meteo', file=sys.stderr)
+        return 2
     return 0 if (ok or res['model']) else 1
 
 

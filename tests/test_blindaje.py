@@ -45,7 +45,7 @@ def nft(raiz, extra=''):
 T = tempfile.mkdtemp()
 r = nft(T)
 assert 'policy drop' in r and 'tcp dport { 80, 443, 8073 } ct state new accept' in r, r
-assert 'ip saddr @lan4 tcp dport { 22, 4403, 8443, 8444, 8554 }' in r and 'elements = { 192.168.1.0/24 }' in r
+assert 'ip saddr @lan4 tcp dport { 22, 4403, 8443, 8554 }' in r and 'elements = { 192.168.1.0/24 }' in r
 assert 'ct state established,related accept' in r and 'iif "lo" accept' in r and 'ipv6-icmp' in r
 r2 = nft(T, 'BLINDAJE_8073="lan"\nBLINDAJE_SSH="todos"\nBLINDAJE_PUERTOS_LAN=""\n')
 assert 'tcp dport { 80, 443, 22 } ct state new accept' in r2 and 'ip saddr @lan4 tcp dport { 8073 }' in r2, r2
@@ -66,9 +66,13 @@ poner(A, '/etc/bricohams/bricohams.env', "CALLSIGN='EA5ZZZ'\nQRZ_PASS='%s'\nLIST
       "BLINDAJE_8073='publico'\nOWRX_DATA='/var/lib/openwebrx'\nOWRX_HTDOCS='%s'\n" % (SECRETO, ANON, HT), 0o644)
 poner(A, '/etc/bricohams/meteo.env', "AEMET_API_KEY='x'\n", 0o644)
 poner(A, HT + '/plugins/receiver/fuga/fuga.js', 'var k = "%s";' % SECRETO)                     # fuga de verdad
-poner(A, HT + '/plugins/receiver/init.js', "const LISTENERS = { key: '%s' };\nwindow.solar_config = { lat: 0.0, lon: 0.0 };\n" % ANON)
-poner(A, '/var/lib/openwebrx/settings.json', json.dumps({'receiver_gps': {'lat': 0.0, 'lon': 0.0}, 'receiver_admin': 'a@b.es'}), 0o644)
+poner(A, HT + '/plugins/receiver/init.js', "const LISTENERS = { key: '%s' };\nwindow.solar_config = { lat: 37.983812, lon: -1.128011 };\n" % ANON)
+poner(A, '/var/lib/openwebrx/settings.json', json.dumps({'receiver_gps': {'lat': 37.983812, 'lon': -1.128011}, 'receiver_admin': 'a@b.es'}), 0o644)
 poner(A, '/var/lib/openwebrx/users.json', '[]', 0o644)
+poner(A, '/etc/nginx/conf.d/bricohams-login-log.conf',
+      'log_format bricohams_login \'$remote_addr - [$time_local] "$request" $status "$sent_http_location";\'\n')
+poner(A, '/etc/nginx/snippets/bricohams-sdr-rutas.conf',
+      'access_log /var/log/nginx/bricohams-sdr-login.access.log bricohams_login;\n')
 poner(A, '/etc/shadow', 'root:!:1::::::\nvacio::1::::::\noperador:$y$hash:1::::::\n', 0o640)
 poner(A, '/etc/sudoers.d/010_pi-nopasswd', 'pi ALL=(ALL) NOPASSWD: ALL\n', 0o440)
 poner(A, '/etc/sudoers.d/bricohams', 'bricohams ALL=(root) NOPASSWD: /usr/local/sbin/bricohams-tarea\n', 0o440)
@@ -104,9 +108,22 @@ rc, out = correr(A, 'aplicar', '--sudo-con-clave')
 assert rc == 0, out
 assert SECRETO not in out
 for f in ('/etc/sysctl.d/90-bricohams.conf', '/etc/fail2ban/jail.d/bricohams.conf', '/etc/bricohams/cortafuegos.nft',
+          '/etc/fail2ban/filter.d/bricohams-login.conf',
           '/etc/systemd/system/bricohams-cortafuegos.service', '/etc/systemd/system/openwebrx.service.d/bricohams-umask.conf',
           '/etc/ssh/sshd_config.d/90-bricohams.conf'):
     assert os.path.exists(A + f), f
+f2b = open(A + '/etc/fail2ban/jail.d/bricohams.conf').read()
+assert '[bricohams-login]' in f2b and 'maxretry = 5' in f2b and 'findtime = 10m' in f2b
+assert 'port = http,https,8073' in f2b
+assert 'logpath = /var/log/nginx/bricohams-sdr-login.access.log' in f2b
+assert os.path.exists(A + '/etc/nginx/conf.d/bricohams-login-log.conf')
+assert 'bricohams-sdr-login.access.log bricohams_login' in open(A + '/etc/nginx/snippets/bricohams-sdr-rutas.conf').read()
+filtro = open(A + '/etc/fail2ban/filter.d/bricohams-login.conf').read()
+failregex = re.search(r'^failregex = (.*)$', filtro, re.M).group(1).replace('<HOST>', r'\S+')
+assert re.search(failregex, '203.0.113.8 - [14/Oct/2026:12:00:00 +0000] "POST /login HTTP/1.1" 303 "login?ref=%2Fsettings"')
+assert re.search(failregex, '2001:db8::8 - [] "POST /login HTTP/1.1" 303 "login?ref=%2Fsettings"')
+assert not re.search(failregex, '203.0.113.8 - [14/Oct/2026:12:00:00 +0000] "POST /login HTTP/1.1" 303 "/settings"')
+assert not re.search(failregex, '203.0.113.8 - [14/Oct/2026:12:00:00 +0000] "GET /login HTTP/1.1" 200 "-"')
 ssh = open(A + '/etc/ssh/sshd_config.d/90-bricohams.conf').read()
 assert 'PermitRootLogin no' in ssh and 'MaxAuthTries 3' in ssh
 assert 'PasswordAuthentication no' not in ssh, 'sin claves en authorized_keys NO se quita la contraseña (te quedarías fuera)'
@@ -132,7 +149,8 @@ rc, out = correr(A, 'deshacer')
 assert rc == 0 and 'PasswordAuthentication no' not in open(A + '/etc/ssh/sshd_config.d/90-bricohams.conf').read(), out
 rc, out = correr(A, 'deshacer')
 assert rc == 0, out
-for f in ('/etc/sysctl.d/90-bricohams.conf', '/etc/fail2ban/jail.d/bricohams.conf', '/etc/ssh/sshd_config.d/90-bricohams.conf',
+for f in ('/etc/sysctl.d/90-bricohams.conf', '/etc/fail2ban/jail.d/bricohams.conf',
+          '/etc/fail2ban/filter.d/bricohams-login.conf', '/etc/ssh/sshd_config.d/90-bricohams.conf',
           '/etc/bricohams/cortafuegos.nft', '/etc/systemd/system/openwebrx.service.d/bricohams-umask.conf'):
     assert not os.path.exists(A + f), ('deshacer debe quitar lo creado', f)
 assert open(A + '/etc/apt/apt.conf.d/20auto-upgrades').read() == '// el de antes\n'

@@ -87,7 +87,9 @@ assert "guardar=(--exclude 'receiver/init.js')" in funcion('paso_plugins') and '
 assert 'owrx-clone.1' in funcion('paso_herramientas') and 'importar tareas)' in S
 assert S.index('if [ -n "$EXPORTAR" ]') < S.index('[ -r "$KIT/bricohams.env" ] || fallo')
 tarea = open(os.path.join(RAIZ, 'files/bin/bricohams-tarea'), encoding='utf-8').read()
-assert 'owrx-clone ${OWRX_CLONE_DOCKER:+--docker "$OWRX_CLONE_DOCKER"} exportar -o "$d/perfil-owrx-' in tarea and 'tail -n +8' in tarea
+assert 'owrx-clone ${OWRX_CLONE_DOCKER:+--docker "$OWRX_CLONE_DOCKER"} exportar -o "$d/perfil-owrx-' in tarea
+assert 'tail -n +8' not in tarea
+assert 'systemctl enable --now bricohams-backup-limpieza.timer' in funcion('paso_herramientas')
 shutil.rmtree(T)
 print('OK test_instalador_perfil: --exportar sin bricohams.env, paso_importar (niveles, MQTT, marca, error), '
       'configuracion/plugins respetan el perfil, copia diaria con perfil')

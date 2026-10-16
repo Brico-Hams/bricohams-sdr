@@ -10,7 +10,7 @@ Se guardan en una caché (/var/lib/bricohams/locator/{aemet,fmdx}.json) que se r
 o si no hay red; así la instalación nunca se para por esto.
 
 Uso:
-  bricohams_locator_online.py refrescar --cache DIR --lat 38.08 --lon -1.25 [--fuentes aemet,fmdx] [--forzar]
+  bricohams_locator_online.py refrescar --cache DIR --lat 37.98 --lon -1.13 [--fuentes aemet,fmdx] [--forzar]
   bricohams_locator_online.py ver --cache DIR
 La clave de AEMET se lee de la variable de entorno AEMET_API_KEY (nunca de la línea de órdenes).
 """

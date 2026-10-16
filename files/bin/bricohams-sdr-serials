@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  bricohams-sdr-serials · EA5KAO · BricoHams
+#  bricohams-sdr-serials · BricoHams
 #  Graba en la EEPROM de cada RTL-SDR el número de serie que esperan
 #  OpenWebRX y readsb, para que cada uno coja siempre su SDR:
 #     HAT HackerGadgets (R860)        -> SERIAL_HAT  (SATÉLITES)

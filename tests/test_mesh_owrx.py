@@ -90,14 +90,14 @@ assert mq.simbolo(',', 'M') == {'symbol': ',', 'table': 'M', 'index': 11, 'table
 M = cargar('mesh', os.path.join(BIN, 'bricohams-mesh-owrx'))
 nodo = {'num': 0x1234abcd, 'user': {'longName': 'SDR BricoHams 433', 'shortName': 'SB43', 'hwModel': 'TLORA_V2_1_1P6',
                                     'role': 'CLIENT'},
-        'position': {'latitude': 38.08, 'longitude': -1.25, 'altitude': 230},
+        'position': {'latitude': 37.983812, 'longitude': -1.128011, 'altitude': 230},
         'deviceMetrics': {'voltage': 4.1, 'channelUtilization': 3.2, 'airUtilTx': 0.5, 'uptimeSeconds': 600}}
 d = M.nodo_a_owrx(nodo['num'], nodo, 'mesh433', 433875000, decimales=2)
-assert d['mode'] == 'Meshtastic' and d['src'] == 0x1234abcd and (d['lat'], d['lon']) == (38.08, -1.25), d
+assert d['mode'] == 'Meshtastic' and d['src'] == 0x1234abcd and (d['lat'], d['lon']) == (37.98, -1.13), d
 assert d['nickName'] == 'SB43' and d['longName'] == 'SDR BricoHams 433' and d['device'] == 'TLORA_V2_1_1P6'
 assert d['battery'] == 4.1 and d['symbol']['table'] == 'M' and d['freq'] == 433875000 and d['timestamp'] > 1.7e12
 assert M.nodo_a_owrx(1, {'user': {}}, 'mesh433', 1) is None, 'sin posición no va al mapa'
-assert M.nodo_a_owrx(1, {'position': {'latitudeI': 380800000, 'longitudeI': -12500000}}, 'm', 1)['lat'] == 38.08
+assert M.nodo_a_owrx(1, {'position': {'latitudeI': 379838120, 'longitudeI': -11280110}}, 'm', 1)['lat'] == 37.983812
 nodos = {}
 n, t, extra = M.paquete(nodos, {'from': 7, 'to': M.BROADCAST, 'rxSnr': 6.25, 'rxRssi': -95, 'hopStart': 3, 'hopLimit': 1,
                                 'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'hola Murcia'}}, 'mesh433')
@@ -163,7 +163,7 @@ time.sleep(1)
 pr.terminate()
 salida = pr.communicate(timeout=5)[0]
 mesh = {m['src']: m for t, m in br.msgs if t == 'mesh433/Meshtastic'}
-assert (mesh[0x1234abcd]['lat'], mesh[0x1234abcd]['lon']) == (38.08, -1.25), 'nuestro nodo, redondeado (manual 34)'
+assert (mesh[0x1234abcd]['lat'], mesh[0x1234abcd]['lon']) == (37.98, -1.13), 'nuestro nodo, redondeado (manual 34)'
 assert mesh[7]['lat'] == 37.605 and mesh[7]['nickName'] == 'CT01' and mesh[9]['lat'] == 38.0
 assert 8 not in mesh, 'nodo sin posición: no va al mapa'
 assert ('mesh433/CLIENT', {'state': 'ChatMessage', 'name': 'CT01', 'message': 'QSO de prueba'}) in br.msgs
@@ -174,25 +174,25 @@ assert 'bricohams-mesh-owrx' in br.clientes
 
 # ------------------------------------------------------------------ LoRa APRS (RAK) -> formato de OpenWebRX+
 R = cargar('rak', os.path.join(BIN, 'bricohams-rak-aprs'))
-a = R.aprs_mapa('EA5ZZZ-7>APLRT1,WIDE1-1:!3805.00N/00000.00W>hola LoRa', {'rssi': -97, 'snr': 6.5})
+a = R.aprs_mapa('EA5ZZZ-7>APLRT1,WIDE1-1:!3759.00N/00107.00W>hola LoRa', {'rssi': -97, 'snr': 6.5})
 assert a['mode'] == 'APRS' and a['source'] == 'EA5ZZZ-7' and a['path'] == ['WIDE1-1'] and a['freq'] == 433775000
-assert (round(a['lat'], 4), round(a['lon'], 4)) == (0.0, -1.25) and a['symbol'] == mq.simbolo('>', '/')
+assert (round(a['lat'], 4), round(a['lon'], 4)) == (37.9833, -1.1167) and a['symbol'] == mq.simbolo('>', '/')
 assert a['comment'] == 'hola LoRa · LoRa 433,775 · -97 dBm · SNR 6.5 dB'
 c = R.aprs_mapa('EA5YYY-9>APLRT1:=/5L!!<*e7>{?!test')          # comprimida (ejemplo de la especificación APRS)
 assert abs(c['lat'] - 49.5) < 0.01 and abs(c['lon'] + 72.75) < 0.01 and c['symbol']['symbol'] == '>'
-o = R.aprs_mapa('EA5KAO-10>APZBH1:;REPE70   *111111z3804.94N/00115.21Wr438.775')
-assert o['type'] == 'object' and o['object'] == 'REPE70' and round(o['lat'], 2) == 38.08
+o = R.aprs_mapa('N0CALL-10>APZBH1:;REPE70   *111111z3759.03N/00107.68Wr438.775')
+assert o['type'] == 'object' and o['object'] == 'REPE70' and round(o['lat'], 2) == 37.98
 assert R.aprs_mapa('EA5ZZZ>APRS:>solo estado') is None and R.aprs_mapa('roto') is None
 assert R.aprs_mapa('EA5ZZZ>APRS:@111111z3804.9 N/00115.2 W-')['lat'] > 38, 'con ambigüedad'
 # mensajes de APRS-IS a RF (messagesToRF): solo para estaciones oídas por RF y no si el remitente está en RF
 oidas = {'EA5ZZZ-7': time.time() - 60, 'EA5LOC': time.time() - 30}
-m = R.mensaje_a_rf('EA1AAA>APRS,TCPIP*,qAC,T2::EA5ZZZ-7 :hola{12', 'EA5KAO-10', oidas, time.time())
-assert m == 'EA5KAO-10>APZBH1,WIDE1-1:}EA1AAA>APRS,TCPIP,EA5KAO-10*::EA5ZZZ-7 :hola{12', m
-assert R.mensaje_a_rf('EA1AAA>APRS,TCPIP*::EA9XXX   :hola', 'EA5KAO-10', oidas, time.time()) is None
-assert R.mensaje_a_rf('EA5LOC>APRS,TCPIP*::EA5ZZZ-7 :hola', 'EA5KAO-10', oidas, time.time()) is None
-assert R.mensaje_a_rf('EA1AAA>APRS,TCPXX*::EA5ZZZ-7 :hola', 'EA5KAO-10', oidas, time.time()) is None
-assert R.mensaje_a_rf('# aprsc 2.1', 'EA5KAO-10', oidas, time.time()) is None
-assert R.mensaje_a_rf('EA1AAA>APRS,TCPIP*::EA5ZZZ-7 :viejo', 'EA5KAO-10', {'EA5ZZZ-7': 0}, time.time()) is None
+m = R.mensaje_a_rf('EA1AAA>APRS,TCPIP*,qAC,T2::EA5ZZZ-7 :hola{12', 'N0CALL-10', oidas, time.time())
+assert m == 'N0CALL-10>APZBH1,WIDE1-1:}EA1AAA>APRS,TCPIP,N0CALL-10*::EA5ZZZ-7 :hola{12', m
+assert R.mensaje_a_rf('EA1AAA>APRS,TCPIP*::EA9XXX   :hola', 'N0CALL-10', oidas, time.time()) is None
+assert R.mensaje_a_rf('EA5LOC>APRS,TCPIP*::EA5ZZZ-7 :hola', 'N0CALL-10', oidas, time.time()) is None
+assert R.mensaje_a_rf('EA1AAA>APRS,TCPXX*::EA5ZZZ-7 :hola', 'N0CALL-10', oidas, time.time()) is None
+assert R.mensaje_a_rf('# aprsc 2.1', 'N0CALL-10', oidas, time.time()) is None
+assert R.mensaje_a_rf('EA1AAA>APRS,TCPIP*::EA5ZZZ-7 :viejo', 'N0CALL-10', {'EA5ZZZ-7': 0}, time.time()) is None
 shutil.rmtree(T)
 print('OK test_mesh_owrx: MQTT mínimo, Meshtastic y LoRa APRS al formato de OpenWebRX+ (posición propia '
       'redondeada, objetos, comprimidas, ambigüedad), chat opcional, servicio sin HAT y mensajes APRS-IS → RF')

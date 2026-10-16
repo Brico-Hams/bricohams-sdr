@@ -1,5 +1,11 @@
 # 02 · Instalación
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Sistema base, red, arranque y HAT](../GUIA_VISUAL_MODULOS.md#sistema).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ## 1. Personalizar `bricohams.env`
 Antes de instalar, copia `bricohams.env.example` a `bricohams.env`. El ejemplo no contiene contraseñas y deja vacíos el correo y las redes WiFi. Cambia como mínimo el indicativo, QTH, país, latitud, longitud y altitud; usa `N0CALL` y `0,0` solo como valores de muestra, nunca para emitir.
 
@@ -35,7 +41,7 @@ Antes de instalar, copia `bricohams.env.example` a `bricohams.env`. El ejemplo n
 ## Alcance y compatibilidad
 El instalador solo admite **Raspberry Pi OS arm64 Bookworm (Debian 12) o Trixie (Debian 13)** y está diseñado alrededor de Raspberry Pi 5. La receta completa espera el HAT HackerGadgets, SDR USB con sus series configuradas, FlightStick RadarBox, dispositivos LilyGO, Pico y periféricos descritos en los manuales. No está validado para Raspberry Pi anteriores ni otras distribuciones. Desde la v4.3, OpenWebRX+ puede ir en Docker en la misma Pi (`OWRX_BACKEND="docker"`, manual 33); lo demás del kit sigue en el sistema.
 
-Los archivos `files/openwebrx/settings.json.tmpl`, `files/openwebrx/bookmarks.json`, branding y datos de radio incluyen decisiones/perfiles de EA5KAO y Murcia. Indicativo, QTH y país del receptor ya se toman de `bricohams.env`. Desde la v4.3, con `STATION_LOCATOR` los marcadores de aeropuertos, puertos, NAVTEX y FM y las estaciones AEMET salen de tu zona, y lejos de Mi QTH se quitan los de Murcia (manual 32). Revisa aun así imágenes y cualquier hotspot propio. `--solo` evita pasos seleccionados; no adapta el cableado ni la configuración de hardware. Si no tienes un periférico, desactiva su función en `bricohams.env` y comprueba sus dependencias antes de ejecutar la receta completa.
+Los archivos `files/openwebrx/settings.json.tmpl`, `files/openwebrx/bookmarks.json`, branding y datos de radio incluyen decisiones/perfiles de N0CALL y Murcia. Indicativo, QTH y país del receptor ya se toman de `bricohams.env`. Desde la v4.3, con `STATION_LOCATOR` los marcadores de aeropuertos, puertos, NAVTEX y FM y las estaciones AEMET salen de tu zona, y lejos de tu QTH se quitan los de Murcia (manual 32). Revisa aun así imágenes y cualquier hotspot propio. `--solo` evita pasos seleccionados; no adapta el cableado ni la configuración de hardware. Si no tienes un periférico, desactiva su función en `bricohams.env` y comprueba sus dependencias antes de ejecutar la receta completa.
 
 ## 2. Lanzar el instalador
 
@@ -78,7 +84,7 @@ sudo bash install.sh --backup copia.tar.gz   # solo para restaurar usuarios/marc
 > sudo apt-get install --allow-downgrades librtlsdr0 librtlsdr-dev rtl-sdr
 > ```
 
-Pasos (`sudo bash install.sh --lista`, 25 desde la v4.2):
+Pasos (`sudo bash install.sh --lista`, 29 en la versión actual):
 
 | Paso | Qué hace |
 |---|---|
@@ -100,11 +106,15 @@ Pasos (`sudo bash install.sh --lista`, 25 desde la v4.2):
 | adsb | readsb + tar1090 + rbfeeder + MLAT |
 | meshtastic | meshtasticd en el HAT + canales del QR + posición fija |
 | lilygo | herramienta `bricohams-lilygo` (incluye `wxstation`) y CLI de Meshtastic |
+| rak | puente USB del RAK4631: APRS, GPS y sensores según configuración |
 | satelites | v4: pases de satélites cada 15 min + SatDump (imágenes METEOR) |
 | ft2 | v4: compila `decodium-rx` y añade el modo FT2 (experimental, 20–40 min) |
+| tak | servidor TAK opcional (`TAK=yes`); requiere arm64 |
+| monitorizacion | Prometheus, exporters y Grafana privados (`MONITORIZACION=yes`) |
 | web | v4: nginx + Let's Encrypt (v4.2: `SSL_MODO`, por defecto HTTPS solo en la administración), portal `/bricohams/`, privacidad, `bricohams-api` |
 | visitas | v4: mosquitto + `bricohams-visitas` (GeoIP local, Telegram) |
 | herramientas | `bricohams-check`, `bricohams-sdr-serials`, `owrx-clone`, copia diaria, kit en `/opt/bricohams/kit` |
+| banner | resumen de la estación al entrar por SSH |
 | importar | v4.2: solo con `--importar perfil.owrx.tar.gz`: aplica un perfil de OpenWebRX+ con owrx-clone (manual 31) |
 | tareas | v4: cuenta de servicio «bricohams», sudoers limitado y `/etc/cron.d/bricohams` (manual 25) |
 

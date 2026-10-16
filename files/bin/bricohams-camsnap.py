@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-camsnap · EA5KAO · BricoHams
+#  bricohams-camsnap · BricoHams
 #  Saca una foto de la cámara del mástil cada CAM_SNAPSHOT_SECONDS desde
 #  el RTSP de MediaMTX y la deja en la carpeta del plugin "camara", que
 #  OpenWebRX sirve por su mismo puerto. La carpeta snap/ es un tmpfs
@@ -15,7 +15,7 @@ from datetime import datetime
 RTSP = os.environ.get('CAM_RTSP', 'rtsp://127.0.0.1:8554/mastil')
 OUT = os.environ.get('CAM_SNAPSHOT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/camara/snap/mastil.jpg')
 EVERY = max(10, int(os.environ.get('CAM_SNAPSHOT_SECONDS', '60')))
-LABEL = os.environ.get('CAM_LABEL', 'EA5KAO · Mi QTH (Murcia) · BricoHams')
+LABEL = os.environ.get('CAM_LABEL', 'BricoHams SDR')
 WIDTH = int(os.environ.get('CAM_SNAPSHOT_WIDTH', '1280'))
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 TXT = os.path.join(os.environ.get('RUNTIME_DIRECTORY', '/run/bricohams'), 'camsnap.txt')

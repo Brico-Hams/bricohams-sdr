@@ -1,5 +1,11 @@
 # 29 · Actualizar la estación: `install.sh --actualizar`
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Tareas, backups, limpieza, actualización y clonado](../GUIA_VISUAL_MODULOS.md#mantenimiento).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 **Qué hace:** con una sola orden pone al día el kit (desde el git), el sistema (apt) y **solo** las partes de la estación que han cambiado. No pierdes usuarios, claves, marcadores propios ni datos.
 
 ```bash
@@ -31,7 +37,7 @@ Cada vez que un paso termina bien, el instalador guarda en `/var/lib/bricohams/k
 
 - En el fichero solo hay huellas (resúmenes SHA-256 cortados), **nunca valores** de las variables.
 - No hay que mantener ninguna tabla «fichero → paso»: sale sola del código de cada paso.
-- La primera vez (estaciones instaladas antes de la v4.1, como la de EA5KAO con v3.3) no hay huellas: se aplican **todos** los pasos. Es igual que una instalación completa, pero sin perder nada.
+- La primera vez (estaciones instaladas antes de la v4.1, como la de N0CALL con v3.3) no hay huellas: se aplican **todos** los pasos. Es igual que una instalación completa, pero sin perder nada.
 - Si se corta a medias (luz, red), vuelve a lanzarlo: los pasos ya hechos tienen su huella y no se repiten.
 
 ## 3. Lo que se conserva

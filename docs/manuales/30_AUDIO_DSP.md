@@ -1,5 +1,11 @@
 # 30 · Filtro de audio y DSP en el navegador (plugins `filtro_audio` y `dsp_audio`)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Plugins, registro de oyentes, CTCSS y RepeaterBook](../GUIA_VISUAL_MODULOS.md#plugins).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Cadena de audio](../esquemas/20_audio_navegador.png)
 
 Desde la v4.2 hay dos botones nuevos en la barra superior del receptor, **FILTRO** y **DSP**. Los dos procesan el audio **en el navegador de cada oyente** (Web Audio API):
@@ -52,8 +58,10 @@ Si mueves un control a mano, el preajuste se desmarca.
 - **FM de repetidores:** FILTRO en *FM* (quita zumbido y siseo alto), DSP en *FM estrecha*.
 - **Escuchar modos digitales:** no hace falta nada: los decodificadores van en el servidor y no les afecta.
 
-## 5. Instalación y ajustes
-Vienen en el paso `plugins` (`files/htdocs/plugins/receiver/{audio_cadena,filtro_audio,dsp_audio}`). `init.js` los carga en este orden:
+## 5. Configuración de los plugins
+La instalación de `audio_cadena`, `filtro_audio` y `dsp_audio` está centralizada
+en [manual 27](27_PLUGINS_WEB_V4.md#instalacion-plugins-propios). `init.js`
+los carga en este orden:
 
 ```js
 window.filtro_audio_config = { modo: 'voz', activo: false };   // valores iniciales para quien entra por primera vez

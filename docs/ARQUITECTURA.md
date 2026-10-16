@@ -13,7 +13,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - El instalador detecta cuál es (`DEB`, `DEB_NUM`) y elige los repositorios de cada una.
 - **Por qué:**
   - En la v3.0 el kit solo admitía Bookworm, porque la página del repositorio de OpenWebRX+ solo documenta Bullseye, Bookworm y Ubuntu.
-  - Al probarlo en la Pi de EA5KAO (Trixie) se comprobó que el repositorio de luarvique **sí publica `ppa/trixie`**: firmado, arm64, OpenWebRX+ 1.2.125 compilado para Python 3.13.
+  - Al probarlo en la Pi de N0CALL (Trixie) se comprobó que el repositorio de luarvique **sí publica `ppa/trixie`**: firmado, arm64, OpenWebRX+ 1.2.125 compilado para Python 3.13.
   - Meshtastic tiene `Debian_13` y AirNav tiene el repositorio `apt.rb24.com trixie`.
   - No hace falta regrabar una Pi que ya tiene Trixie.
 - **Implica:**
@@ -113,19 +113,19 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 ## ADR-07 · iGate LoRa APRS solo en recepción, con su propio SSID
 - **Decisión:**
   - LilyGO T3 V1.6.1 con el firmware **LoRa_APRS_iGate de CA2RXU (richonguzman)**, compilado y grabado desde la Pi con PlatformIO.
-  - Escucha 433,775 MHz (SF12, BW 125, CR 4/5) y sube a APRS-IS como **EA5KAO-10**, con baliza solo por APRS-IS.
+  - Escucha 433,775 MHz (SF12, BW 125, CR 4/5) y sube a APRS-IS como **N0CALL-10**, con baliza solo por APRS-IS.
   - Sin transmisión por RF ni digipeater.
 - **Por qué:**
   - Va en la misma caja que los SDR: transmitir en 433 a pocos centímetros satura el receptor de 70 cm.
   - La LilyGO T3S3 de iGate actual queda libre.
-  - El SSID -10 no choca con el iGate APRS de OpenWebRX (EA5KAO, packet de 144,800).
+  - El SSID -10 no choca con el iGate APRS de OpenWebRX (N0CALL, packet de 144,800).
 - **Implica:** el iGate necesita WiFi (`LILYGO_WIFI_SSID`). Su web de administración está en su propia IP.
 
 ## ADR-08 · Sensor BME280/BMP280 en el I2C de la Pi, con la estación WX APRS hecha desde la Pi
 - **Decisión:**
   - El módulo GYBMEP va a la Pi por I2C-1 (pines 1, 3, 5 y 9), en una garita en el exterior.
   - `bricohams-wx` lee cada minuto con las fórmulas de Bosch, reconoce el chip solo y escribe `sensor.json` para la ventana METEO.
-  - Cada 10 min manda un paquete WX a APRS-IS como **EA5KAO-13**.
+  - Cada 10 min manda un paquete WX a APRS-IS como **N0CALL-13**.
 - **Por qué:**
   - Una sola lectura sirve para la web y para APRS.
   - El firmware del iGate también admite el BME280, pero entonces la Pi no vería el dato.
@@ -179,7 +179,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `install.sh` está dividido en 18 pasos (v3.0: + `ventilacion`). Se pueden lanzar sueltos con `--solo`, y cada uno se puede repetir sin efectos raros.
   - Los ficheros del sistema se tocan en bloques marcados (`# >>> BricoHams`).
   - Con `--backup` se restauran usuarios y marcadores, añadiendo los nuevos del kit.
-  - `bricohams-backup` guarda cada día la configuración (últimas 14 copias).
+  - `bricohams-backup` guarda cada día la configuración (retención local de cinco días mediante `bricohams-backup-limpieza.timer`).
 - **Por qué:** restaurar la estación tras un fallo de tarjeta tiene que ser un solo comando.
 
 ## ADR-14 · Alimentación: fuente oficial de 27 W y hub USB alimentado; el LX-LBU2C no alimenta la Pi
@@ -348,7 +348,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `CAM_RTSP_URL` lleva usuario y clave: **solo en `bricohams.env`**.
   - `mediamtx.yml` pasa a ser `root:mediamtx 640`.
 
-## ADR-25 · Viento y lluvia: en la Pi (EA5KAO-13) y, como alternativa, en un LilyGO (EA5KAO-14)
+## ADR-25 · Viento y lluvia: en la Pi (N0CALL-13) y, como alternativa, en un LilyGO (N0CALL-14)
 - **Decisión:**
   - Anemómetro y veleta RS485 Modbus (4800 8N1, direcciones 1 y 2), por un adaptador USB que el sistema llama `/dev/rs485`.
   - Pluviómetro de reed en GPIO17.
@@ -438,7 +438,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **Implica:**
   - RTSP y MQTT quedan solo en la LAN. La web de meshtasticd (9443) se quita en v4.5 (ADR-52).
   - `bricohams-check` vigila la caducidad del certificado.
-  - **v4.2:** por decisión de EA5KAO, el HTTPS se usa solo para la administración (ADR-40).
+  - **v4.2:** por decisión de N0CALL, el HTTPS se usa solo para la administración (ADR-40).
 
 ## ADR-33 · Visitas: MQTT de OpenWebRX+ + GeoIP local + Telegram, con IP truncada
 - **Decisión:**
@@ -508,7 +508,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
     - comentarios;
     - un `$` suelto es **literal** y da un aviso.
   - La copia de `/etc/bricohams/bricohams.env` y los `.env` derivados (api, telegram, duckdns, web, meteo, wx) se escriben con **comillas simples** (`sq`/`envl`). Así los leen igual bash, systemd `EnvironmentFile` y los lectores de Python.
-- **Por qué:** en la Pi de EA5KAO, `QRZ_PASS="…$Clave2026"` paró el instalador con «unbound variable». Sin `set -u` habría sido peor: la clave se habría guardado recortada sin avisar. Una contraseña no tiene por qué saber de sintaxis de bash.
+- **Por qué:** en la Pi de N0CALL, `QRZ_PASS="…$Clave2026"` paró el instalador con «unbound variable». Sin `set -u` habría sido peor: la clave se habría guardado recortada sin avisar. Una contraseña no tiene por qué saber de sintaxis de bash.
 - **Implica:**
   - Hace falta python3 desde el primer paso (viene en Raspberry Pi OS).
   - Las sustituciones `${VAR}` dentro de `bricohams.env` ya no se expanden. El `.example` no las usa: `test_env_red` comprueba que da lo mismo que bash.
@@ -520,11 +520,11 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **`esperar_red`:** antes de cada paso espera DNS (hasta 2 min) y, si no llega, se para con el estado de la red.
   - **Claves de repositorios (`clave_apt`) e instaladores de terceros (`script_remoto`):** se bajan con `curl --retry 5 --retry-all-errors` y fallan con un mensaje claro.
   - **`nginx -t`:** si falla, para el paso y enseña el error.
-- **Por qué:** en la segunda ejecución en la Pi de EA5KAO, `red` tumbó la WiFi por la que estaba conectada. El paso `openwebrx` falló con «Could not resolve host» y `gpg: no valid OpenPGP data` (había llegado una clave vacía por la tubería). Con `bash -c "$(wget …)"`, una descarga fallida ejecutaba un texto vacío y el paso seguía sin readsb.
-- **Implica:** relanzar el instalador sigue donde se quedó. La auditoría de `test_env_red` impide funciones que acaben en `[ … ] && …`, que devuelven 1 con `set -e` (el fallo de `paso_web` que corrigió EA5KAO).
+- **Por qué:** en la segunda ejecución en la Pi de N0CALL, `red` tumbó la WiFi por la que estaba conectada. El paso `openwebrx` falló con «Could not resolve host» y `gpg: no valid OpenPGP data` (había llegado una clave vacía por la tubería). Con `bash -c "$(wget …)"`, una descarga fallida ejecutaba un texto vacío y el paso seguía sin readsb.
+- **Implica:** relanzar el instalador sigue donde se quedó. La auditoría de `test_env_red` impide funciones que acaben en `[ … ] && …`, que devuelven 1 con `set -e` (el fallo de `paso_web` que corrigió N0CALL).
 
 ## ADR-40 · HTTPS solo para la administración (SSL_MODO)
-- **Decisión (de EA5KAO: «el certificado SSL es solo para la página de settings»):** `SSL_MODO="admin"` por defecto.
+- **Decisión (de N0CALL: «el certificado SSL es solo para la página de settings»):** `SSL_MODO="admin"` por defecto.
   - **En el 80:** nginx sirve el receptor y el portal por HTTP.
   - **Rutas de OpenWebRX+ con usuario:** `/login`, `/logout`, `/pwchange`, `/settings…`, `/imageupload`, `/clients`, `/services`, `/ban`, `/unban`, `/broadcast` y `/files/delete` reciben un 301 a HTTPS.
   - **En el 443:** sirve todo, con la cookie `owrx-session` marcada `Secure; HttpOnly; SameSite=Lax` y sin HSTS.
@@ -547,7 +547,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **Por qué:**
   - En la Pi, un DSP por oyente multiplicaría la CPU y cambiaría lo que oyen todos.
   - En el navegador cuesta cero al servidor y cada uno lo ajusta a su oído.
-  - No hay plugins de audio en el repositorio de 0xAF (los enlaces que mencionó EA5KAO no llegaron; eligió que se hicieran).
+  - No hay plugins de audio en el repositorio de 0xAF (los enlaces que mencionó N0CALL no llegaron; eligió que se hicieran).
 - **Implica:**
   - Los decodificadores y la grabación (REC) usan la señal original.
   - El notch automático exige dos detecciones seguidas y un pico estrecho (<120 Hz a −6 dB) para no tomar la voz por un pitido.
@@ -577,7 +577,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **Implica:**
   - **En el kit:** `install.sh --exportar` (sin `bricohams.env`) y `--importar` (paso `importar`).
   - **Marca:** `/etc/bricohams/perfil-importado` hace que `configuracion` y `plugins` respeten lo importado (`OWRX_PLANTILLA="yes"` vuelve a la plantilla).
-  - **Copia diaria:** guarda además un perfil (7 últimos).
+  - **Copia diaria:** guarda además un perfil (retención local de cinco días mediante `bricohams-backup-limpieza.timer`).
   - **No se deshacen:** los paquetes instalados.
   - **Sistemas:** solo los que tienen repositorio de OpenWebRX+.
 
@@ -585,10 +585,10 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **Decisión:** `STATION_LOCATOR` (o `STATION_LAT/LON`) + `LOCATOR_CATALOG` (por defecto `data/locator/catalogo_es.json`) eligen lo más cercano de cada categoría y lo convierten en marcadores `[AUTO-LOCATOR]` y en `METEO_STATIONS`.
   - **Categorías:** `airport`, `weather`, `port`, `radio`, `other`.
   - **Catálogo:** generado por `tools/locator_catalogo.py` desde CSV con fuente (`data/locator/fuentes`).
-  - **Selección:** `files/bin/bricohams_locator_bookmarks.py`, el selector que empezó EA5KAO en su V4.3, conservado y ampliado.
+  - **Selección:** `files/bin/bricohams_locator_bookmarks.py`, el selector que empezó N0CALL en su V4.3, conservado y ampliado.
   - **Paso `configuracion`:** lo usa, y `bricohams-locator` lo deja a mano.
 - **Por qué:**
-  - **Cualquier estación de España**, no solo Mi QTH. Los marcadores y la meteo dependen del sitio; el kit traía los de Murcia.
+  - **Cualquier estación de España**, no solo tu QTH. Los marcadores y la meteo dependen del sitio; el kit traía los de Murcia.
   - **Catálogo en el kit, no consultas en vivo:**
     - la instalación funciona sin Internet y es reproducible;
     - se prueba (`test_locator_es`: 895 puntos de toda España con aeropuerto, AEMET y, en la costa, canal 16);
@@ -597,7 +597,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **8,33 kHz:** el «canal» no es la frecuencia (121,330 → 121,325 MHz). Se convierte, porque OpenWebRX+ sintoniza la frecuencia.
   - **Mínimo garantizado:** aeropuerto y AEMET, al menos el más cercano (hasta 2,5 × radio). Así ningún sitio de interior queda sin meteo.
   - **Una entrada por frecuencia:** los canales 12/14/16 son iguales en todos los puertos; se juntan con los nombres de los puertos.
-  - **Los marcadores de Murcia del kit lejos de Mi QTH** (más de `LOCATOR_KIT_ZONA_KM`):
+  - **Los marcadores de Murcia del kit lejos de tu QTH** (más de `LOCATOR_KIT_ZONA_KM`):
     - se quitan los locales: FM y DAB de Murcia, aeropuertos, repetidores EA5;
     - se dejan genéricos los que solo llevaban el nombre de Murcia, y el genérico cede ante el de la zona;
     - lo tuyo no se toca: solo se adapta lo que es idéntico a un marcador del kit (nombre, frecuencia y modo).
@@ -608,7 +608,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **`--actualizar`:** repite `configuracion` si cambia el catálogo.
 
 ## ADR-44 · OpenWebRX+ en Docker desde bricohams.env, con red host y volúmenes en carpetas de la Pi (v4.3)
-- **Decisión:** `OWRX_BACKEND="docker"` (lo introdujo EA5KAO en su V4.3: rutas, `owrx_control`, comprobación de volúmenes). El kit lo completa así:
+- **Decisión:** `OWRX_BACKEND="docker"` (lo introdujo N0CALL en su V4.3: rutas, `owrx_control`, comprobación de volúmenes). El kit lo completa así:
   - **Despliegue (`docker_preparar`):**
     - `docker.io` y `docker-compose` de Debian si faltan;
     - para el OpenWebRX+ nativo;
@@ -673,9 +673,9 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
     - fail2ban, unattended-upgrades, sysctl, permisos de todo lo que lleva claves, `UMask=0027` para OpenWebRX+ y Bluetooth apagado.
   - **Copia y vuelta atrás:** cada cambio guarda copia en `/var/backups/bricohams-blindaje/FECHA` y `deshacer` la restaura.
   - **El cortafuegos** se carga con un temporizador de vuelta atrás de 3 minutos (`systemd-run`) y solo se hace permanente con `confirmar`.
-  - **nginx (kit):** `server_tokens off`, `limit_req` de 12/min en `/login` y `/pwchange` (regex, para que en `SSL_MODO=admin` gane la redirección a HTTPS), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos 404.
+  - **nginx (kit):** `server_tokens off`, `limit_req` de 12/min en `/login` y `/pwchange` (regex, para que en `SSL_MODO=admin` gane la redirección a HTTPS), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos 404. Fail2ban bloquea una IP tras 5 POST fallidos al login (HTTP 303 de vuelta al formulario) en 10 min.
 - **Por qué:**
-  - **Sin acceso remoto a la Pi:** EA5KAO pidió revisar y blindar el servidor (`sdr.ea5kao.ampr.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
+  - **Sin acceso remoto a la Pi:** N0CALL pidió revisar y blindar el servidor (192.168.1.50, `sdr.example.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
   - **Herramienta para la Pi:** él la ejecuta en la Pi, se puede repetir y queda en el kit para cualquier estación.
   - **Lo visto desde fuera** (`/status.json`) confirmó una fuga real: la posición exacta de la casa (ADR-48).
   - **Contraseña solo con claves:** quitar la contraseña de SSH sin una clave instalada deja a la gente fuera.
@@ -693,14 +693,14 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `OWRX_GPS_DECIMALES="2"` (por defecto) redondea `receiver_gps` en `settings.json` (mapa, `/status.json`, directorios de receptores).
   - `meteo.json`, `pases.json` e `init.js` (todos públicos) llevan siempre 2 decimales.
   - `STATION_LAT/LON` siguen exactas para los cálculos (distancias AEMET, pases, Open-Meteo) y el APRS.
-- **Por qué:** `https://sdr.ea5kao.ampr.org/status.json` publicaba la posición con 6 decimales, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
+- **Por qué:** `https://sdr.example.org/status.json` publicaba 37.983812, -1.128011, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
 - **Implica:**
   - **El APRS WX sigue publicando su posición:** el protocolo lo exige; queda a elección del operador.
   - **Volver a publicar la posición exacta:** `"exacta"`.
 
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
-2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de EA5KAO) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
+2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de N0CALL) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
 3. **WPI408**: comprobar si el filtro IR es fijo o se puede quitar, para elegir `CAM_TUNING`.
 4. **SDRplay**: modelo (RSP1A/1B/dx) para `SDRPLAY_ANTENNA`.
 5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8).
@@ -713,7 +713,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
 13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
 14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.
-15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real**: comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña del usuario de la Pi (salió en un chat).
+15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real** (192.168.1.50): comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña de `pi` (salió en un chat).
 16. **v4:**
     - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
     - **Token y chat de Telegram.**
@@ -727,7 +727,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 
 
 ## ADR-49 · iGate LoRa APRS en un RAK4631: radio en el RAK, Internet en la Pi (v4.5)
-**Contexto:** EA5KAO quiere el iGate en el RAK4631(L) que ya tiene (433 MHz, GPS y sensor de temperatura), partiendo de LoRa_APRS_iGate de CA2RXU. Ese firmware solo existe para ESP32 y depende de la WiFi: web de configuración, APRS-IS, OTA, NTP, MQTT y syslog. El nRF52840 no tiene WiFi.
+**Contexto:** N0CALL quiere el iGate en el RAK4631(L) que ya tiene (433 MHz, GPS y sensor de temperatura), partiendo de LoRa_APRS_iGate de CA2RXU. Ese firmware solo existe para ESP32 y depende de la WiFi: web de configuración, APRS-IS, OTA, NTP, MQTT y syslog. El nRF52840 no tiene WiFi.
 **Decisión:** port parcial al nRF52840:
 - **en el RAK**, lo que no depende de la red, reutilizando el código del original donde se puede:
   - KISS sin cambios;
@@ -736,7 +736,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 - **en la Pi**, lo de Internet: `bricohams-rak-aprs` (APRS-IS con reglas de iGate, mensajes a RF y configuración);
 - **entre los dos**, KISS por USB, con la orden estándar 0x06 (SetHardware) para configuración y estado. Así cualquier cliente KISS sigue valiendo.
 
-Indicativo EA5KAO-15: «EA5KAO-SDR» no es válido en AX.25 ni en APRS-IS. Destino APZBH1 (experimental) hasta registrar uno.
+Indicativo N0CALL-15: «N0CALL-SDR» no es válido en AX.25 ni en APRS-IS. Destino APZBH1 (experimental) hasta registrar uno.
 **Consecuencias:**
 - Sin la Pi el RAK sigue escuchando, digipeateando y balizando por RF, pero no sube a APRS-IS.
 - Configurar el RAK es editar `bricohams.env`: el servicio compara y reenvía.
@@ -766,8 +766,8 @@ Indicativo EA5KAO-15: «EA5KAO-SDR» no es válido en AX.25 ni en APRS-IS. Desti
 
 Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO CH9102 1a86:55d4). `HARDWARE_PENDIENTE` separa «no aparece» de «en camino».
 
-## ADR-53 · Configuración de Meshtastic solo dentro de /settings (v4.5, despliegue EA5KAO)
-**Contexto:** EA5KAO exige que la configuración de Meshtastic no sea accesible desde la web pública de OpenWebRX+. Solo se puede tocar en Ajustes, que pide contraseña.
+## ADR-53 · Configuración de Meshtastic solo dentro de /settings (v4.5, despliegue N0CALL)
+**Contexto:** N0CALL exige que la configuración de Meshtastic no sea accesible desde la web pública de OpenWebRX+. Solo se puede tocar en Ajustes, que pide contraseña.
 **Decisión:**
 - `bricohams-mesh-admin` (127.0.0.1:8076) se publica en `/settings/bricohams/meshtastic`:
   - nginx lo fuerza a HTTPS (`SSL_MODO=admin`);
@@ -777,10 +777,10 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - Desde ahí se configuran el nodo 433 (LilyGO USB) y el 868 (HAT, API 4403), y qué sale en el mapa (`MESH433_OWRX`, `MESH868_OWRX`, `MESH_OWRX_CHAT`). Se guarda en los dos `bricohams.env`.
 - Se quita la web propia de meshtasticd (9443), que no tenía contraseña.
 - La web pública solo muestra los nodos en el mapa (ADR-50). El RAK solo envía información del nodo (baliza, estado, telemetría) y el log de estaciones oídas a APRS-IS/aprs.fi.
-- `escribir_nginx` desactiva cualquier otro site `default_server` (copia en `/etc/bricohams/nginx-desactivados/`). En la Pi de EA5KAO, un site antiguo `openwebrx` se saltaba HTTPS y las protecciones de /settings.
+- `escribir_nginx` desactiva cualquier otro site `default_server` (copia en `/etc/bricohams/nginx-desactivados/`). En la Pi de N0CALL, un site antiguo `openwebrx` se saltaba HTTPS y las protecciones de /settings.
 
 ## ADR-54 · TAK local aislado con Python 3.12 (v4.6)
-**Contexto:** EA5KAO quiere un servidor TAK local. El instalador oficial de OpenTAKServer borra los sites de nginx y ocupa 443/8443, donde ya están OpenWebRX+ HTTPS y Meshtastic. Además, el gevent que fija OTS 1.7.13 falla al hacer fork con el Python 3.13 del sistema.
+**Contexto:** N0CALL quiere un servidor TAK local. El instalador oficial de OpenTAKServer borra los sites de nginx y ocupa 443/8443, donde ya están OpenWebRX+ HTTPS y Meshtastic. Además, el gevent que fija OTS 1.7.13 falla al hacer fork con el Python 3.13 del sistema.
 **Decisión:**
 - `tools/instalar_tak.sh` instala OTS 1.7.13 y la UI 1.7.5 (sha256 fijo) en `/opt/bricohams-tak`:
   - Python 3.12.15 de uv, con dependencias fijadas;
@@ -915,80 +915,47 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - Los exportadores ajenos que escuchen en `0.0.0.0` se limitan a localhost con `IPAddressDeny`/`IPAddressAllow` en lugar de tocar su código.
 - Si el operador cambia la clave dentro de Grafana, la próxima ejecución la vuelve a fijar a la del `.env`/fichero: hay que rotarla por `GRAFANA_ADMIN_PASS`.
 
-## ADR-65 · Repositorio público sin datos personales, comprobado por huellas (v5.1)
-**Contexto:** el GitHub del kit es público. El diagnóstico del 12/10/2026 encontró en el historial, en el árbol y en los `.zip` de `Claude outputs/` estos datos:
-- la red de casa;
-- el usuario del sistema de la Pi;
-- la posición exacta;
-- los SSID de las WiFi;
-- la IP de un visitante.
-
-No había contraseñas, passcodes ni PSK. Además, la carpeta del PC estaba dentro de una carpeta sincronizada en la nube (formato de conflictos de Proton Drive), que rompía `.git`. Y en la web de GitHub se había borrado `.gitignore`.
+## ADR-65 · Bloqueo por IP y por país con nftables, gestionado desde /settings (v5.0)
+**Contexto:** fail2ban solo reacciona a intentos fallidos; faltaba vetar a mano IPs, redes o países enteros sin abrir una terminal.
 **Decisión:**
-- Árbol despersonalizado:
-  - ejemplos con `192.168.1.50` y `<usuario>`;
-  - coordenadas de ejemplo con 2 decimales;
-  - sin IP de terceros.
-- `tools/datos_personales.py` busca de dos formas y nunca imprime un valor:
-  - **huellas SHA-256** de los datos a esconder (`tools/datos_personales_huellas.txt`), para que la lista no publique lo que protege;
-  - si hay un `bricohams.env` personal, sus claves, PSK de Meshtastic, coordenadas y `DATOS_PERSONALES`.
-  - Se puede pasar al árbol, al historial y a un zip; `run_tests.sh` lo pasa siempre.
-- `tools/git_sanear.sh` diagnostica y, con `--reparar`, aparta (sin borrar) las copias de conflicto, las refs rotas y los `.lock` viejos, y hace `fetch --prune`.
-- `.gitignore` ampliado:
-  - `*.env` salvo el ejemplo;
-  - claves `*.key`/`*.pem`;
-  - copias de conflicto de la nube;
-  - `firmware-compilado/` (322 MB, va como Release).
-- Reescribir el historial queda como decisión del usuario (manual 38 §6): cambia todos los hashes.
+- `bricohams-bloqueo` (`/usr/local/sbin`) mantiene su propia tabla `inet bricohams_bloqueo` con conjuntos de IPs y redes, separada del cortafuegos de `bricohams-blindaje`.
+- Configuración en `/etc/bricohams/bloqueo.json` y estado en `/var/lib/bricohams-bloqueo`. Las zonas de país se bajan de ipdeny.com (`geo-actualizar`), con caché.
+- Órdenes: `estado`, `aplicar`, `geo-actualizar`, `desbanear` (lee `desbanear.json`) y `quitar` (borra la tabla).
+- Nunca se bloquean la LAN, el loopback ni CGNAT, aunque se pidan.
+- La tarjeta «Bloqueo por IP y país» del panel Seguridad (`/settings/bricohams/seguridad`) edita la lista y muestra las IPs baneadas por fail2ban con botón para desbanear.
 **Consecuencias:**
-- Un `push` con datos personales falla en las pruebas antes de llegar a GitHub.
-- El historial antiguo sigue público hasta que el usuario decida limpiarlo.
-- El indicativo, el dominio y el locator se consideran públicos y se quedan.
+- `quitar` deja la máquina como antes sin tocar el resto del cortafuegos.
+- Los baneos automáticos (fail2ban y moderador) solo surten efecto con nftables activo y fail2ban instalado: hace falta `bricohams-blindaje aplicar`.
 
-## ADR-66 · Un único dueño del USB del LilyGO 433: puente serie con API TCP y HTTP (v5.1)
-**Contexto:** se pidió la interfaz web de Meshtastic también para el nodo 433.
-- El LilyGO T3 de la estación solo habla por USB, y un puerto serie lo abre un único programa. Hasta ahora era `bricohams-mesh-owrx` (mapa), y el panel lo paraba para configurar.
-- El cliente web oficial necesita la API HTTP del firmware (`/api/v1/toradio`, `/api/v1/fromradio`), que en un nodo sin WiFi no existe.
+## ADR-66 · Usuarios de OpenWebRX y cortafuegos desde el panel Seguridad (v5.0)
 **Decisión:**
-- `bricohams-mesh-puente` es el único que abre `/dev/lilygo-mesh`. Reparte las tramas serie de Meshtastic (`0x94 0xC3 len`):
-  - a la **API stream** en `127.0.0.1:4404`, el mismo protocolo que meshtasticd en 4403. La usan el mapa, el panel y la CLI con `--host 127.0.0.1:4404`, cada uno con su `want_config_id`;
-  - a la **API HTTP** en `127.0.0.1:4480`, con su propia cola que solo se llena mientras la web mira.
-- nginx sirve el cliente oficial `meshtastic/web` (v2.7.2, SHA-256 fijado) en `:8444` con `auth_request` a la sesión de `/settings`, igual que el 868 en `:8443`.
-- El servicio va sin root, con `DynamicUser`, `IPAddressAllow=localhost` y el env como credencial; solo lee `MESH433_*`.
-- `MESH433_WEB="no"` deja todo como en v4.5.
-**Consecuencias:**
-- Mapa, panel y web funcionan a la vez sin pararse unos a otros. `bricohams-lilygo` para el puente solo mientras graba.
-- Probado con la librería oficial: dos `TCPInterface` simultáneas sobre un nodo falso reciben su configuración completa.
-- Un fallo del puente deja sin 433 a los tres consumidores: lo vigilan systemd (`Restart=always`) y `bricohams-check`.
+- Tarjeta «Usuarios de la web»: alta, cambio de clave, activar/desactivar y borrar mediante `openwebrx admin --noninteractive` (nativo o `docker exec`). La clave va por la variable `OWRX_PASSWORD`, nunca en argv; los hashes de `users.json` no se leen ni se muestran.
+- No se puede borrar ni desactivar el último usuario activo, y borrar exige escribir el nombre en «confirmar».
+- Tarjeta «Cortafuegos y nginx»: estado de las unidades, últimas líneas del registro y botón «Recargar» (reinicia nftables y fail2ban, recarga nginx sin cortar sesiones y vuelve a aplicar el bloqueo).
+- Todas las acciones van por POST con CSRF y la sesión de OpenWebRX+.
+**Consecuencias:** el administrador gestiona accesos sin SSH; un error no puede dejar la web sin usuarios.
 
-## ADR-67 · Panel APRS con mensajes y baliza por una API local de la pasarela (v5.1)
-**Contexto:** se pidió una interfaz web del APRS.
-- v5.0 ya tenía `/settings/bricohams/aprs`, en solo lectura y leyendo `/run/bricohams-rak/rak-aprs.json`.
-- Mandar mensajes o balizas exige hablar con el proceso que tiene el puerto serie y la conexión APRS-IS.
-**Decisión:**
-- `bricohams-rak-aprs` se reorganiza en una clase `Pasarela`:
-  - el bucle principal es el único que toca el serie y APRS-IS;
-  - un hilo HTTP en `127.0.0.1:8077` (`RAK_API_PUERTO`) da `GET /estado` (completo, sin passcode) y `POST /baliza`;
-  - `POST /mensaje` valida el indicativo y 1-67 caracteres, y deja órdenes en una cola.
-- Los mensajes para el indicativo del RAK se registran y se contestan con `ack`. Los `ack` recibidos marcan los enviados.
-- La página de `bricohams-mesh-admin` usa esa API con la misma sesión y CSRF de los demás paneles. Si la API no contesta, vuelve al JSON de `/run`.
-- Se integró con lo que v5.0 añadió a la pasarela: chat APRS en OpenWebRX+, APRS-IS en el mapa, `json_rak` tolerante a `nan` y detección de RUI3.
-**Consecuencias:**
-- Nada nuevo escucha fuera de la Pi.
-- Enviar por RF sigue requiriendo `RAK_TX="yes"` (licencia).
-- La pasarela es algo más compleja, pero queda probada sin hardware (`tests/test_v51_aprs_web.py`).
+## ADR-67 · Aviso por Telegram de los inicios de sesión (v5.0)
+**Decisión:** `bricohams-login-aviso` lee `/var/log/nginx/bricohams-sdr-login.access.log` y envía al bot solo la IP y la hora de cada login correcto, con una pausa de 600 s por IP. Se activa con `TG_AVISO_LOGIN="yes"`.
+**Consecuencias:** no viaja ningún usuario ni clave; un acceso inesperado se ve en el móvil al momento.
 
-## ADR-68 · Digipeater automático y puesta en marcha guiada del RAK (v5.1)
-**Contexto:**
-- Pendientes de la estación: «`RAK_DIGI="1"` cuando se apague el LilyGO iGate», la versión del bootloader del RAK, el fix del GPS dentro de la caja y grabarlo y probarlo en real.
-- Además, el firmware 1.0.0 llegó a mandar `nan` en su JSON.
+## ADR-68 · Moderador del chat dentro de bricohams-visitas (v5.0)
+**Decisión:** el mismo servicio que lee el MQTT de OpenWebRX+ vigila el chat: límite de mensajes por ventana, longitud, enlaces y palabras vetadas (`CHATBOT_ENABLE`, `CHATBOT_MAX_MSG`, `CHATBOT_VENTANA`, `CHATBOT_MAX_LEN`, `CHATBOT_LINKS`, `CHATBOT_PALABRAS`, `CHATBOT_UMBRAL`, `CHATBOT_AVISAR`, `CHATBOT_LOG`). Al superar el umbral avisa y escribe en su registro para que fail2ban banee.
+**Consecuencias:** sin proceso nuevo; el baneo real depende de fail2ban (ver ADR-65).
+
+## ADR-69 · Ficha del avión (foto, modelo y ruta) por un proxy con caché (v5.0)
+**Contexto:** el navegador del oyente no debe llamar a servicios externos ni revelar su IP a terceros.
 **Decisión:**
-- `RAK_DIGI="auto"`: el RAK repite (modo `RAK_DIGI_AUTO_MODO`) solo si `RAK_DIGI_OTRO` lleva `RAK_DIGI_AUTO_MIN` minutos sin oírse por RF, ya sea un paquete suyo o uno repetido por él. Al arrancar espera ese tiempo antes de decidir.
-- Nuevas órdenes de `bricohams-rak-aprs`:
-  - `bootloader`: modo UF2, lee `INFO_UF2.TXT` y sale grabando el `.uf2`;
-  - `gps [min]`: espera al fix e informa de los satélites;
-  - `puesta-en-marcha`: graba solo si la versión difiere de `bin/VERSION.json`, nombres fijos, prueba, bootloader y GPS, con resumen en `/var/lib/bricohams` que enseña el panel.
-- Firmware 1.0.1: nunca `nan`/`inf` en el JSON de estado.
-**Consecuencias:**
-- Sin duplicados en aprs.fi cuando funcionan los dos iGates, y sin hueco cuando el LilyGO cae.
-- La primera `puesta-en-marcha` regraba los RAK que llevan 1.0.0.
+- `bricohams-api` (127.0.0.1:8075) sirve `/bricohams/api/avion?hex=ICAO&cs=INDICATIVO`: modelo, matrícula y operador de api.adsbdb.com, ruta origen/destino por indicativo y foto de api.planespotters.net (solo URLs https validadas).
+- Caché en memoria de 6 h y 500 entradas; las respuestas vacías se reintentan a los 10 minutos.
+- `bricohams_live.js` añade la ficha al globo del avión en el mapa.
+**Consecuencias:** si un servicio externo cae, el globo sale sin foto pero el mapa sigue. Que no aparezcan aviones no es culpa de la ficha: depende de que readsb use el dongle de 1090 MHz correcto (`--device` en `/etc/default/readsb`).
+
+## ADR-70 · map.flights como segundo destino ADS-B, sin tocar RadarBox (v5.1)
+**Contexto:** se quiere compartir los aviones también con map.flights. RadarBox (rbfeeder + su MLAT) debe seguir igual.
+**Decisión:**
+- Conector Beast nativo de readsb (`--net-connector=feed.map.flights,30004,beast_reduce_plus_out,uuid=<UUID>`), sin cliente nuevo para posiciones. Solo `beast_reduce_plus_out` lleva la etiqueta `uuid`.
+- MLAT con un `mlat-client` aparte (`bricohams-mapflights-mlat`, `DynamicUser`) contra `mlat.map.flights:31090`; sus resultados no se reinyectan en readsb (ADR-55).
+- El UUID va en `bricohams.env` y en `/etc/bricohams/mapflights.env` (600), nunca en el repositorio. No se usa la clave `mf_feed_` del cliente JSON alternativo.
+- Opcional (`MAPFLIGHTS_FEED="no"` por defecto); desactivarlo quita el conector y la unidad.
+**Consecuencias:** sin proceso nuevo para posiciones; un segundo mlat-client lee 30005. El UUID viaja en claro por TCP: si se filtra, se cambia en map.flights.

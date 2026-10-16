@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-mesh-url · EA5KAO · BricoHams (v4.5)
+#  bricohams-mesh-url · BricoHams (v4.5)
 #  Lee una URL de canales de Meshtastic (https://meshtastic.org/e/#…) sin
 #  instalar nada (protobuf ChannelSet decodificado a mano) y NUNCA enseña claves:
 #    ver URL       canales (nombre, tipo de clave, precisión de posición) y radio

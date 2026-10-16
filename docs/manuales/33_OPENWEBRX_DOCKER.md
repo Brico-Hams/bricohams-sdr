@@ -1,5 +1,11 @@
 # 33 · OpenWebRX+ en Docker (v4.3)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [OpenWebRX+, RTL-SDR y SDRplay](../GUIA_VISUAL_MODULOS.md#receptor).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![OpenWebRX+ en Docker](../esquemas/23_openwebrx_docker.png)
 
 Con `OWRX_BACKEND="docker"` el instalador **no instala el paquete** de OpenWebRX+: despliega la imagen oficial de Docker Hub, `slechev/openwebrxplus` (o `-softmbe`, con DMR, D-Star, YSF, NXDN…), con un `docker-compose.yaml` que sale de `bricohams.env`. Lo demás de BricoHams se queda en la Pi y trabaja igual, porque las carpetas del contenedor son carpetas de la Pi:
@@ -92,7 +98,7 @@ También vale `OWRX_DOCKER_DESPLEGAR="yes"` sin `docker-compose.yaml` en `OWRX_D
 | Actualizar la imagen | sola, en la tarea semanal (`bricohams-tarea actualizar`: `compose pull` + `up -d`), o a mano: `cd /opt/owrx-docker && sudo docker compose pull && sudo docker compose up -d` |
 | Fijar una versión | `OWRX_DOCKER_IMAGE="slechev/openwebrxplus-softmbe:1.2.xxx"` y `sudo bash install.sh --solo openwebrx` |
 | Registro | `sudo docker logs -f owrx-mbe` |
-| Copia diaria | `/var/backups/bricohams` guarda `docker-compose.yaml` y las tres carpetas; además un perfil `owrx-clone --docker` (7 últimos) |
+| Copia diaria | `/var/backups/bricohams` guarda `docker-compose.yaml` y las tres carpetas; además un perfil `owrx-clone --docker` (retención local de cinco días, manual 09) |
 | Series de los SDR | `sudo bricohams-sdr-serials --grabar` para también el contenedor |
 | Cambiar de red | `OWRX_DOCKER_RED="bridge"` + `OWRX_DOCKER_PORT`. Pierdes el MQTT de visitas (127.0.0.1 es el propio contenedor) |
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-ft2-patch · EA5KAO · BricoHams  (v4, experimental)
+#  bricohams-ft2-patch · BricoHams  (v4, experimental)
 #  Añade el modo FT2 a OpenWebRX+ (que no lo trae) tocando 3 ficheros del
 #  paquete instalado, con marcas «BRICOHAMS-FT2» para poder repetir o quitar:
 #    owrx/wsjt.py        clase Ft2Profile (ciclo 3,75 s, decodifica con

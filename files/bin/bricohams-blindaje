@@ -15,10 +15,11 @@
 #
 #  Ajustes en /etc/bricohams/bricohams.env (manual 34):
 #    BLINDAJE_8073="publico"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
+#                                · cerrado = nadie desde fuera de la Pi (v5.0: todo por el 443 de nginx)
 #    BLINDAJE_SSH="lan"          lan = SSH solo desde la red de casa · todos
 #    BLINDAJE_LAN=""             redes de casa (vacío = la de la interfaz, p. ej. 192.168.1.0/24)
-#    BLINDAJE_PUERTOS_LAN="4403 8443 8444 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin 868 y 433, RTSP)
-#  Lo que se abre a todo el mundo en el host: 80, 443 y (si «publico») 8073.
+#    BLINDAJE_PUERTOS_LAN="4403 8443 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin, RTSP)
+#  Lo que se abre a todo el mundo en el host: 80, 443 y (si «publico») 8073 («cerrado»: el 8073 ni en la LAN).
 # =====================================================================
 set -u
 umask 077
@@ -30,6 +31,9 @@ UNIDAD=$RAIZ/etc/systemd/system/bricohams-cortafuegos.service
 SSHD_D=$RAIZ/etc/ssh/sshd_config.d/90-bricohams.conf
 SYSCTL=$RAIZ/etc/sysctl.d/90-bricohams.conf
 F2B=$RAIZ/etc/fail2ban/jail.d/bricohams.conf
+F2B_FILTER=$RAIZ/etc/fail2ban/filter.d/bricohams-login.conf
+NGINX_LOGIN_LOG=$RAIZ/etc/nginx/conf.d/bricohams-login-log.conf
+NGINX_ROUTES=$RAIZ/etc/nginx/snippets/bricohams-sdr-rutas.conf
 OWRX_UMASK=$RAIZ/etc/systemd/system/openwebrx.service.d/bricohams-umask.conf
 VUELTA_SEG=${BH_VUELTA_SEG:-180}
 
@@ -64,7 +68,7 @@ leer_env() {
     done <"$ENV"
 }
 env_de() { local n="E_$1"; printf '%s' "${!n:-${2:-}}"; }
-puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8444 8554}"; }   # vacío = ninguno
+puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8554}"; }   # vacío = ninguno
 
 # --------------------------------------------------------------------- red de casa
 # redes IPv4 conectadas (las de las interfaces, sin docker ni lo), p. ej. 192.168.1.0/24
@@ -76,13 +80,13 @@ redes_lan() {
 }
 
 # --------------------------------------------------------------------- cortafuegos (nftables)
-# genera_nft PUERTO8073(publico|lan) SSH(lan|todos) "PUERTOS_LAN" "REDES" → ruleset en stdout
+# genera_nft PUERTO8073(publico|lan|cerrado) SSH(lan|todos) "PUERTOS_LAN" "REDES" → ruleset en stdout
 genera_nft() {
     local p8073=$1 ssh=$2 plan=$3 redes=$4 lan4 pub lanp
     lan4=$(echo "$redes" | tr '\n' ',' | sed 's/,$//; s/,/, /g')
     [ -n "$lan4" ] || lan4="192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12"
     pub="80, 443"; lanp="$plan"
-    [ "$p8073" = publico ] && pub="$pub, 8073" || lanp="$lanp 8073"
+    case "$p8073" in publico) pub="$pub, 8073" ;; cerrado) ;; *) lanp="$lanp 8073" ;; esac
     if [ "$ssh" = todos ]; then pub="$pub, 22"; else lanp="$lanp 22"; fi
     lanp=$(echo "$lanp" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -nu | tr '\n' ',' | sed 's/,$//; s/,/, /g')
     cat <<EOF
@@ -250,9 +254,13 @@ auditar() {
     titulo "5. OpenWebRX+ (lo que ve el público)"
     if [ "$(env_de BLINDAJE_8073 publico)" = publico ]; then
         if [ "$(env_de SSL_MODO admin)" != no ]; then
-            hallazgo ALTO "el router abre el 8073 a Internet: por ahí /login y /settings van SIN cifrar y sin pasar por nginx (la contraseña de admin viaja en claro)" \
+            hallazgo ALTO "el router abre el 8073 a Internet: por ahí /login y /settings van SIN cifrar y sin pasar por nginx ni el bloqueo web de Fail2ban (la contraseña de admin viaja en claro)" \
                 "cierra el 8073 en el router (el receptor ya va por el 80/443 de nginx) y pon BLINDAJE_8073=\"lan\"; o entra a /settings solo por https://"
         fi
+    elif [ "$(env_de BLINDAJE_8073 publico)" = cerrado ]; then
+        if [ -z "$RAIZ" ] && existe ss && ss -Hltn "sport = :8073" 2>/dev/null | awk '{print $4}' | grep -qvE '^(127\.|\[::1\])'; then
+            hallazgo MEDIO "BLINDAJE_8073=cerrado pero OpenWebRX+ escucha en toda la red (el cortafuegos lo tapa)" "OWRX_SOLO_LOCAL=\"yes\" y sudo bash install.sh --solo configuracion"
+        else bien "8073 cerrado: OpenWebRX+ solo se ve a través de nginx (443)"; fi
     else bien "8073 solo en la LAN (el público entra por nginx)"; fi
     if [ -s "$data/settings.json" ] || [ -s "$RAIZ$data/settings.json" ]; then
         f=$RAIZ$data/settings.json
@@ -339,14 +347,27 @@ lat=str(g.get("lat","")); print(max(len(lat.split(".")[1]) if "." in lat else 0,
     fi
 
     titulo "8. Servicios que sobran"
+    if [ -r "$F2B" ] && grep -Fqs '[bricohams-login]' "$F2B" \
+        && [ -r "$F2B_FILTER" ] && grep -Eqs 'HTTP/.*" 303 .*login' "$F2B_FILTER" \
+        && [ -r "$NGINX_LOGIN_LOG" ] && grep -Fqs 'log_format bricohams_login' "$NGINX_LOGIN_LOG" \
+        && [ -r "$NGINX_ROUTES" ] && grep -Fqs 'bricohams-sdr-login.access.log bricohams_login' "$NGINX_ROUTES"; then
+        bien "Fail2ban configurado para bloquear intentos fallidos de /login"
+    else
+        hallazgo MEDIO "sin bloqueo Fail2ban para intentos fallidos en /login" "sudo bricohams-blindaje aplicar"
+    fi
     if [ -z "$RAIZ" ]; then
         for s in telnet.socket vsftpd smbd nmbd rpcbind cups cups-browsed xrdp vncserver-x11-serviced; do
             systemctl is-active --quiet "$s" 2>/dev/null && hallazgo MEDIO "servicio $s activo (no lo usa la estación)" "sudo systemctl disable --now $s"
         done
         systemctl is-active --quiet bluetooth 2>/dev/null && hallazgo BAJO "Bluetooth activo (la estación no lo usa)" "«aplicar» lo apaga"
         systemctl is-active --quiet avahi-daemon 2>/dev/null && nota "avahi anuncia «$(hostname).local» en la LAN (cómodo; el cortafuegos lo deja solo en la LAN)"
-        existe fail2ban-client && systemctl is-active --quiet fail2ban && bien "fail2ban activo ($(fail2ban-client status 2>/dev/null | sed -n 's/.*Jail list:[[:space:]]*//p'))" \
-            || hallazgo MEDIO "sin fail2ban (bloqueo de IPs que prueban contraseñas)" "lo instala «aplicar»"
+        if existe fail2ban-client && systemctl is-active --quiet fail2ban; then
+            fail2ban-client status bricohams-login >/dev/null 2>&1 \
+                && bien "jail Fail2ban bricohams-login activo" \
+                || hallazgo MEDIO "Fail2ban activo, pero el jail bricohams-login no está cargado" "sudo bricohams-blindaje aplicar"
+        else
+            hallazgo MEDIO "sin fail2ban activo (bloqueo de IPs que prueban contraseñas)" "lo instala «aplicar»"
+        fi
     fi
 
     titulo "9. Núcleo (sysctl)"
@@ -520,9 +541,10 @@ aplicar() {
     fi
 
     # 8. fail2ban
-    guardar "$F2B"; install -d "$(dirname "$F2B")"
+    guardar "$F2B" "$F2B_FILTER"
+    install -d "$(dirname "$F2B")" "$(dirname "$F2B_FILTER")"
     cat >"$F2B" <<'EOF'
-# bricohams-blindaje (v4.4): 5 fallos en 10 min → 1 h fuera; reincidentes, 1 semana
+# bricohams-blindaje: 5 fallos en 10 min → 1 h fuera; reincidentes, 1 semana
 [DEFAULT]
 bantime = 1h
 findtime = 10m
@@ -533,6 +555,13 @@ ignoreip = 127.0.0.1/8 ::1
 [sshd]
 enabled = true
 
+[bricohams-login]
+enabled = true
+filter = bricohams-login
+logpath = /var/log/nginx/bricohams-sdr-login.access.log
+backend = auto
+port = http,https,8073
+
 [recidive]
 enabled = true
 backend = auto
@@ -540,9 +569,20 @@ logpath = /var/log/fail2ban.log
 bantime = 1w
 findtime = 1d
 EOF
+    cat >"$F2B_FILTER" <<'EOF'
+# OpenWebRX redirige el login fallido (303) al propio formulario; el correcto va a /settings.
+[Definition]
+failregex = ^<HOST> - \[[^\]]*\] "POST /login(?:\?[^ ]*)? HTTP/[^"]+" 303 "(?:\.\./)*login\?[^"]*"\s*$
+ignoreregex =
+EOF
     chmod 644 "$F2B"
-    [ -n "$RAIZ" ] || { systemctl enable --now fail2ban >/dev/null 2>&1; systemctl restart fail2ban 2>/dev/null || echo "  ! fail2ban no arranca: journalctl -u fail2ban"; }
-    echo "  ✔ fail2ban (SSH y reincidentes)"
+    chmod 644 "$F2B_FILTER"
+    if [ -z "$RAIZ" ]; then
+        fail2ban-client -t || fallo "Fail2ban rechazó la configuración; revisa $F2B y $F2B_FILTER"
+        systemctl enable --now fail2ban >/dev/null 2>&1 || fallo "no pude activar fail2ban (journalctl -u fail2ban)"
+        systemctl restart fail2ban 2>/dev/null || fallo "fail2ban no pudo cargar la nueva regla (journalctl -u fail2ban)"
+    fi
+    echo "  ✔ fail2ban (SSH, login web y reincidentes)"
 
     # 9. Bluetooth (la estación no lo usa)
     if [ -z "$RAIZ" ] && systemctl is-active --quiet bluetooth 2>/dev/null; then

@@ -1,4 +1,4 @@
-/* BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). */
+/* BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). */
 #include "configuration.h"
 #include "sensor_utils.h"
 #include "aprs_utils.h"
@@ -57,7 +57,7 @@ namespace APRS_Utils {
         return Config.status.length() ? header(viaRF) + ":>" + Config.status : String("");
     }
 
-    static String addressee() {       // "::EA5KAO-10:" (mensaje a uno mismo, destinatario relleno a 9)
+    static String addressee() {       // "::N0CALL-10:" (mensaje a uno mismo, destinatario relleno a 9)
         String a = Config.callsign;
         while (a.length() < 9) a += ' ';
         return "::" + a + ":";

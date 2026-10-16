@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  bricohams-tarea · EA5KAO · BricoHams (v4)
+#  bricohams-tarea · BricoHams (v4)
 #  Tareas de mantenimiento con verbos FIJOS. La cuenta de servicio «bricohams»
 #  (sin contraseña ni shell) puede ejecutarlas como root SIN clave gracias a
 #  /etc/sudoers.d/bricohams, que solo permite este programa. Así el cron no
@@ -41,12 +41,11 @@ case "${1:-}" in
         fi ;;
     copia)
         if /usr/local/sbin/bricohams-backup >>"$LOG" 2>&1; then log "copia: ok"; else log "copia: ERROR"; tg "⚠️ Falló la copia de seguridad"; fi
-        # v4.2 · además, un perfil completo de OpenWebRX+ (owrx-clone) para llevarlo a otro equipo (7 últimos)
+        # Perfil completo de OpenWebRX+; retencion por bricohams-backup-limpieza.timer.
         if command -v owrx-clone >/dev/null; then
             d=/var/backups/bricohams
             if owrx-clone ${OWRX_CLONE_DOCKER:+--docker "$OWRX_CLONE_DOCKER"} exportar -o "$d/perfil-owrx-$(date +%F).owrx.tar.gz" >>"$LOG" 2>&1; then
                 log "perfil owrx-clone: ok"
-                find "$d" -maxdepth 1 -name 'perfil-owrx-*.owrx.tar.gz' -printf '%T@ %p\n' | sort -rn | tail -n +8 | cut -d' ' -f2- | xargs -r rm -f
             else
                 log "perfil owrx-clone: ERROR"
             fi

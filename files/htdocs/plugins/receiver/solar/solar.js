@@ -1,7 +1,7 @@
 /*
  * solar: radiación solar y propagación HF para OpenWebRX+
  *
- * Autor: EA5KAO · BricoHams
+ * Autor: BricoHams
  *
  * Añade un botón "SOL" en la barra superior, junto al de DX cluster
  * (rig_skin). Abre una ventana flotante con datos en vivo de NOAA SWPC:
@@ -14,17 +14,17 @@
  * El punto del botón toma el color de la escala NOAA más alta.
  *
  * Ajustes opcionales en init.js (antes de cargar el plugin):
- *   window.solar_config = { lat: 38.08, lon: -1.25, after: '#owrx-rig-dx-button' };
+ *   window.solar_config = { lat: 37.98, lon: -1.13, after: '#owrx-rig-dx-button' };
  */
 
 Plugins.solar._version = '1.0.0';
-Plugins.solar._author = 'EA5KAO';
+Plugins.solar._author='BricoHams';
 Plugins.solar.no_css = true;
 
 Plugins.solar.init = function () {
     var cfg = window.solar_config || {};
-    var LAT = (typeof cfg.lat === 'number') ? cfg.lat : 38.08;
-    var LON = (typeof cfg.lon === 'number') ? cfg.lon : -1.25;
+    var LAT = (typeof cfg.lat === 'number') ? cfg.lat : 0;
+    var LON = (typeof cfg.lon === 'number') ? cfg.lon : 0;
     var AFTER = cfg.after || '#owrx-rig-dx-button';
 
     var SW = 'https://services.swpc.noaa.gov';
@@ -50,39 +50,39 @@ Plugins.solar.init = function () {
     //  estilos (un solo archivo: no hace falta solar.css)
     // ---------------------------------------------------------------
     var css =
-        '#ea5kao-solar-button{position:relative}' +
-        '#ea5kao-solar-button svg{width:18px;height:18px}' +
-        '#ea5kao-solar-button .sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#555;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
-        '#ea5kao-solar{position:fixed;top:90px;left:420px;z-index:1002;width:430px;max-width:calc(100vw - 16px);max-height:calc(100vh - 20px);' +
+        '#bh-solar-button{position:relative}' +
+        '#bh-solar-button svg{width:18px;height:18px}' +
+        '#bh-solar-button .sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#555;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
+        '#bh-solar{position:fixed;top:90px;left:420px;z-index:1002;width:430px;max-width:calc(100vw - 16px);max-height:calc(100vh - 20px);' +
             'display:none;flex-direction:column;padding:8px;border-radius:8px;color:#cfd4d9;font:12px roboto-mono,monospace;' +
             'background:linear-gradient(#2a2e33,#17191d);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #060708,0 6px 18px rgba(0,0,0,.65)}' +
-        '#ea5kao-solar.open{display:flex}' +
-        '#ea5kao-solar .sol-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#ea5kao-solar .sol-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#ea5kao-solar .sol-time{color:#6b7782;font-size:11px}' +
-        '#ea5kao-solar .sol-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
-        '#ea5kao-solar .sol-btn:hover{color:#fff}' +
-        '#ea5kao-solar .sol-tabs{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}' +
-        '#ea5kao-solar .sol-chip{cursor:pointer;padding:2px 7px;border-radius:3px;background:#10161b;color:#93a0ab;box-shadow:0 0 0 1px #1d242b;font-size:11px}' +
-        '#ea5kao-solar .sol-chip.on{color:#0f0;box-shadow:0 0 0 1px #2e7d32}' +
-        '#ea5kao-solar .sol-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
-        '#ea5kao-solar .sol-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
-        '#ea5kao-solar .sol-tile{background:#10161b;border-radius:4px;padding:6px;box-shadow:0 0 0 1px #1d242b;min-width:0}' +
-        '#ea5kao-solar .sol-k{color:#6b7782;font-size:10px;letter-spacing:1px;text-transform:uppercase}' +
-        '#ea5kao-solar .sol-v{font-size:19px;color:#e8edf1;margin:2px 0 1px;white-space:nowrap}' +
-        '#ea5kao-solar .sol-s{font-size:10px;color:#93a0ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#ea5kao-solar .sol-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #161d23}' +
-        '#ea5kao-solar .sol-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
-        '#ea5kao-solar canvas{width:100%;height:150px;display:block;background:#0b0f12}' +
-        '#ea5kao-solar img{max-width:100%;display:block;margin:0 auto 6px;border-radius:3px}' +
-        '#ea5kao-solar table{width:100%;border-collapse:collapse}' +
-        '#ea5kao-solar td,#ea5kao-solar th{padding:3px 4px;text-align:center;border-bottom:1px solid #161d23}' +
-        '#ea5kao-solar th{color:#6b7782;font-weight:normal;font-size:10px;letter-spacing:1px}' +
-        '#ea5kao-solar td:first-child{text-align:left}' +
-        '#ea5kao-solar .c-good{color:#4caf50}#ea5kao-solar .c-fair{color:#ffc107}#ea5kao-solar .c-poor{color:#f44336}' +
-        '#ea5kao-solar .sol-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
-        '#ea5kao-solar a{color:#64b5f6}' +
-        '@media (max-width:600px){#ea5kao-solar{left:8px!important;top:60px!important}#ea5kao-solar .sol-grid{grid-template-columns:repeat(2,1fr)}}';
+        '#bh-solar.open{display:flex}' +
+        '#bh-solar .sol-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
+        '#bh-solar .sol-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-solar .sol-time{color:#6b7782;font-size:11px}' +
+        '#bh-solar .sol-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
+        '#bh-solar .sol-btn:hover{color:#fff}' +
+        '#bh-solar .sol-tabs{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}' +
+        '#bh-solar .sol-chip{cursor:pointer;padding:2px 7px;border-radius:3px;background:#10161b;color:#93a0ab;box-shadow:0 0 0 1px #1d242b;font-size:11px}' +
+        '#bh-solar .sol-chip.on{color:#0f0;box-shadow:0 0 0 1px #2e7d32}' +
+        '#bh-solar .sol-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
+        '#bh-solar .sol-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
+        '#bh-solar .sol-tile{background:#10161b;border-radius:4px;padding:6px;box-shadow:0 0 0 1px #1d242b;min-width:0}' +
+        '#bh-solar .sol-k{color:#6b7782;font-size:10px;letter-spacing:1px;text-transform:uppercase}' +
+        '#bh-solar .sol-v{font-size:19px;color:#e8edf1;margin:2px 0 1px;white-space:nowrap}' +
+        '#bh-solar .sol-s{font-size:10px;color:#93a0ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-solar .sol-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #161d23}' +
+        '#bh-solar .sol-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
+        '#bh-solar canvas{width:100%;height:150px;display:block;background:#0b0f12}' +
+        '#bh-solar img{max-width:100%;display:block;margin:0 auto 6px;border-radius:3px}' +
+        '#bh-solar table{width:100%;border-collapse:collapse}' +
+        '#bh-solar td,#bh-solar th{padding:3px 4px;text-align:center;border-bottom:1px solid #161d23}' +
+        '#bh-solar th{color:#6b7782;font-weight:normal;font-size:10px;letter-spacing:1px}' +
+        '#bh-solar td:first-child{text-align:left}' +
+        '#bh-solar .c-good{color:#4caf50}#bh-solar .c-fair{color:#ffc107}#bh-solar .c-poor{color:#f44336}' +
+        '#bh-solar .sol-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
+        '#bh-solar a{color:#64b5f6}' +
+        '@media (max-width:600px){#bh-solar{left:8px!important;top:60px!important}#bh-solar .sol-grid{grid-template-columns:repeat(2,1fr)}}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -162,7 +162,7 @@ Plugins.solar.init = function () {
     // ---------------------------------------------------------------
     var SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
-    var $btn = $('<div class="button" id="ea5kao-solar-button" title="Radiación solar y propagación (NOAA SWPC)">' +
+    var $btn = $('<div class="button" id="bh-solar-button" title="Radiación solar y propagación (NOAA SWPC)">' +
         SUN_SVG + '<br>SOL<span class="sol-dot"></span></div>');
 
     function placeButton(tries) {
@@ -179,7 +179,7 @@ Plugins.solar.init = function () {
     // ---------------------------------------------------------------
     //  ventana
     // ---------------------------------------------------------------
-    var $win = $('<div id="ea5kao-solar" role="dialog" aria-label="Radiación solar">' +
+    var $win = $('<div id="bh-solar" role="dialog" aria-label="Radiación solar">' +
         '<div class="sol-hdr"><span class="sol-title">☀ SOL · RADIACIÓN Y PROPAGACIÓN</span>' +
         '<span class="sol-time"></span><span class="sol-btn sol-reload" title="Actualizar">⟳</span>' +
         '<span class="sol-btn sol-close" title="Cerrar">×</span></div>' +
@@ -192,12 +192,12 @@ Plugins.solar.init = function () {
     $('body').append($win);
     var $lcd = $win.find('.sol-lcd');
 
-    var tab = lsGet('ea5kao_solar_tab') || 'datos';
+    var tab = lsGet('bh_solar_tab') || 'datos';
     var data = {}, loadedAt = 0, timer = null, open = false;
 
     function setTab(t) {
         tab = t;
-        lsSet('ea5kao_solar_tab', t);
+        lsSet('bh_solar_tab', t);
         $win.find('.sol-chip').removeClass('on').filter('[data-tab="' + t + '"]').addClass('on');
         render();
     }
@@ -208,7 +208,7 @@ Plugins.solar.init = function () {
 
     // posición guardada y arrastre por la cabecera
     (function () {
-        var p = (lsGet('ea5kao_solar_pos') || '').split(',');
+        var p = (lsGet('bh_solar_pos') || '').split(',');
         if (p.length === 2 && window.innerWidth > 600) {
             $win.css({ left: Math.max(0, Math.min(+p[0], window.innerWidth - 120)) + 'px',
                        top: Math.max(0, Math.min(+p[1], window.innerHeight - 60)) + 'px' });
@@ -226,7 +226,7 @@ Plugins.solar.init = function () {
         }).on('pointerup pointercancel', function () {
             if (!drag) return;
             drag = null;
-            lsSet('ea5kao_solar_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
+            lsSet('bh_solar_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
         });
     })();
 
@@ -242,7 +242,7 @@ Plugins.solar.init = function () {
         $win.toggleClass('open', on);
         if (on) fitHeight();
         $btn.toggleClass('highlighted', on);
-        lsSet('ea5kao_solar_open', on ? '1' : '0');
+        lsSet('bh_solar_open', on ? '1' : '0');
         if (on) {
             if (Date.now() - loadedAt > 5 * 60 * 1000) load(true); else render();
             if (!timer) timer = setInterval(function () { load(true); }, 5 * 60 * 1000);
@@ -466,7 +466,7 @@ Plugins.solar.init = function () {
 
     // reabrir si el visitante la dejó abierta
     $win.find('.sol-chip').removeClass('on').filter('[data-tab="' + tab + '"]').addClass('on');
-    if (lsGet('ea5kao_solar_open') === '1') setTimeout(function () { toggle(true); }, 1500);
+    if (lsGet('bh_solar_open') === '1') setTimeout(function () { toggle(true); }, 1500);
 
     return true;
 };

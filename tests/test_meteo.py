@@ -31,4 +31,13 @@ assert m.main() == 0
 d = json.load(open(out)); a = d['stations'][0]
 assert a['name'] == 'Sample' and a['dist_km'] == 5.6 and a['vv_kmh'] == 8.3 and a['prec_24h'] == 0.2 and len(a['history']) == 24
 assert 'error' in d['stations'][1] and d['model']['current']['temperature_2m'] == 21.3
+assert 'No hay datos' not in json.dumps(d) and 'Observación' not in d['stations'][1]['error']
+
+# Sin clave: el JSON público no revela rutas ni nombres de variables (solo un aviso genérico)
+# y el servicio sale con error (2) para que se vea en systemctl --failed
+os.environ['AEMET_API_KEY'] = ''
+assert m.main() == 2
+pub = open(out, encoding='utf-8').read()
+assert '/etc/' not in pub and 'AEMET_API_KEY' not in pub and 'meteo.env' not in pub, pub
+assert json.loads(pub)['stations'][0]['error'] == 'Observación no disponible'
 print('OK test_meteo: Sample %.1f °C a %.1f km, Offline con error controlado, modelo Open-Meteo' % (a['ta'], a['dist_km']))

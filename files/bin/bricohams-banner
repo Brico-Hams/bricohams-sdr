@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  bricohams-banner · EA5KAO · BricoHams (v4.5)
+#  bricohams-banner · BricoHams (v4.5)
 #  Banner de las conexiones SSH en dos partes:
 #   1. ANTES de entrar (/etc/issue.net, «Banner» de sshd): logo y aviso legal.
 #      No dice nada que ayude a un atacante: ni sistema, ni versiones, ni IP.

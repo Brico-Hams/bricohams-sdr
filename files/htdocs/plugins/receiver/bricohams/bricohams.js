@@ -1,7 +1,7 @@
 /*
- * bricohams: imagen de BricoHams (Mi QTH, Región de Murcia) para OpenWebRX+
+ * bricohams: imagen de BricoHams (Región de Murcia) para OpenWebRX+
  *
- * Autor: EA5KAO · BricoHams
+ * Autor: BricoHams
  *
  *  - Franja carmesí (bandera de la Región de Murcia) y naranja BricoHams
  *    bajo la barra superior.
@@ -15,7 +15,7 @@
  */
 
 Plugins.bricohams._version = '1.1.0';
-Plugins.bricohams._author = 'EA5KAO';
+Plugins.bricohams._author='BricoHams';
 Plugins.bricohams.no_css = true;
 
 Plugins.bricohams.init = function () {
@@ -59,7 +59,7 @@ Plugins.bricohams.init = function () {
     // bandera junto al nombre del receptor
     var $title = $('.webrx-rx-title').first();
     if ($title.length && !document.getElementById('bh-murcia-flag')) {
-        $title.prepend($('<span id="bh-murcia-flag" title="Mi QTH · Región de Murcia"></span>').html(flag(24)));
+        $title.prepend($('<span id="bh-murcia-flag" title="Región de Murcia"></span>').html(flag(24)));
     }
 
     // botón de Telegram

@@ -1,7 +1,7 @@
 /*
  * filtro_audio: filtro de audio para el oyente de OpenWebRX+ (v4.2)
  *
- * Autor: EA5KAO · BricoHams · licencia MIT · necesita el plugin audio_cadena
+ * Autor: BricoHams · licencia MIT · necesita el plugin audio_cadena
  *
  * Botón «FILTRO» en la barra superior. En la ventana:
  *   - PASO BANDA de 24 dB/octava (2 pasa-altos + 2 pasa-bajos) con modos:
@@ -18,7 +18,7 @@
  */
 
 Plugins.filtro_audio._version = '1.0.0';
-Plugins.filtro_audio._author = 'EA5KAO';
+Plugins.filtro_audio._author='BricoHams';
 Plugins.filtro_audio.no_css = true;
 
 // ---------------------------------------------------------------------
@@ -160,8 +160,8 @@ Plugins.filtro_audio.init = async function () {
     // ---- interfaz -------------------------------------------------------
     var SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<path d="M2 18h4l3-12h6l3 12h4"/><path d="M12 3v3" opacity=".5"/></svg>';
-    var ventana = C.ui.ventana('ea5kao-filtro', '🎚 FILTRO DE AUDIO', [460, 110]);
-    var $btn = C.ui.boton('ea5kao-filtro-button', 'FILTRO', SVG, 'Filtro de audio: paso banda y notch (solo en tu navegador)',
+    var ventana = C.ui.ventana('bh-filtro', '🎚 FILTRO DE AUDIO', [460, 110]);
+    var $btn = C.ui.boton('bh-filtro-button', 'FILTRO', SVG, 'Filtro de audio: paso banda y notch (solo en tu navegador)',
                           function () { ventana.abrir(!ventana.abierta()); });
     ventana.alCambiar = function () { vigilar(); };
     var $c = ventana.$cuerpo;

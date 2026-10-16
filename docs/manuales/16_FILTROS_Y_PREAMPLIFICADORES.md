@@ -1,5 +1,11 @@
 # 16 · Filtros, preamplificadores y bias-tee
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ![Cadena de RF](../esquemas/12_cadena_rf.png)
 
 ## 1. Dónde va cada uno
@@ -22,7 +28,7 @@
 4. **Inyector del MLA-30:** igual, con su cable USB a la regleta.
 
 ## 3. Cómo saber si el filtro sirve (prueba de 1 semana)
-1. **3 días sin filtro:** apunta los paquetes recibidos por el iGate al día (su web, o aprs.fi → EA5KAO-10 → «Raw packets»).
+1. **3 días sin filtro:** apunta los paquetes recibidos por el iGate al día (su web, o aprs.fi → N0CALL-10 → «Raw packets»).
 2. **3 días con el filtro**, en las mismas condiciones.
 3. **Decisión:**
    - **Más paquetes con filtro** (o menos paquetes «corruptos» en el log): se queda.

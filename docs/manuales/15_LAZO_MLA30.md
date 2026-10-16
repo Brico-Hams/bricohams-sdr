@@ -1,5 +1,11 @@
 # 15 · Lazo MLA-30 para HF: protección de intemperie y montaje
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 **Qué es:** el MLA-30 es un lazo magnético **activo** de recepción (0,1–30 MHz).
 - **Alimentación:** el amplificador va en la base del lazo y recibe 12 V por el coaxial, desde un inyector alimentado por USB. El kit trae 10 m de coaxial.
 - **Problema:** **ni su caja ni sus conectores son estancos**. Esta guía los protege con piezas impresas y deja el lazo redondo y firme.

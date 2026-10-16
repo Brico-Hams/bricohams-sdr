@@ -1,5 +1,5 @@
 // =====================================================================
-//  Caja v3 BricoHams SDR · EA5KAO — DOS MÓDULOS al pie del mástil (~5 m)
+//  Caja v3 BricoHams SDR · N0CALL — DOS MÓDULOS al pie del mástil (~5 m)
 //
 //   MÓDULO DE ELECTRÓNICA  (VARIANTE="electronica")
 //     - Rejilla universal de montaje (insertos M3 cada 20 mm + ranuras de bridas):
@@ -153,7 +153,7 @@ module cuerpo() {
         if (EL) {
             for (x = [30 : 9 : W - 30]) translate([x, H - T - 1, 34]) cube([3.5, T + 2, 44]);       // salida pasiva bajo el tejadillo
             translate([W - 0.6, 110, D / 2]) rotate([90, 0, 90]) linear_extrude(1) rotate(-90)
-                text("BricoHams SDR · EA5KAO", size = 8, font = FONT, halign = "center", valign = "center");
+                text("BricoHams SDR · N0CALL", size = 8, font = FONT, halign = "center", valign = "center");
         }
     }
 }
@@ -201,7 +201,7 @@ module tapa() {
         translate([W / 2, 48, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
             text(EL ? "BricoHams SDR" : "POTENCIA 230 V", size = EL ? 15 : 11, font = FONT, halign = "center", valign = "center");
         translate([W / 2, 26, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
-            text(EL ? "EA5KAO · Mi QTH · Región de Murcia" : "NO ABRIR CON TENSIÓN", size = 6, font = FONT, halign = "center", valign = "center");
+            text(EL ? "BricoHams SDR" : "NO ABRIR CON TENSIÓN", size = 6, font = FONT, halign = "center", valign = "center");
     }
 }
 

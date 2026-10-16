@@ -1,6 +1,6 @@
 #!/bin/bash
 # =====================================================================
-#  BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia)
+#  BricoHams SDR · instalador genérico
 #  Instalación y restauración COMPLETA desde una Raspberry Pi 5 limpia
 #  con Raspberry Pi OS Lite 64 bits: Debian 13 "Trixie" (actual) o
 #  Debian 12 "Bookworm" (Legacy). El instalador detecta cuál es (v3.1).
@@ -17,7 +17,7 @@
 #   - LilyGO T3 V1.6.1 433 por USB: nodo Meshtastic EU_433 e iGate LoRa
 #     APRS (CA2RXU), con nombres fijos /dev/lilygo-mesh y /dev/lilygo-igate.
 #   - Sensor BME280/BMP280 por I2C: tiempo propio en la web y estación
-#     WX APRS (EA5KAO-13).
+#     WX APRS (N0CALL-13).
 #   - Cámara CSI WPI408 (OV5647 + IR) con MediaMTX y foto para la web.
 #   - Plugins: rig_skin (DX cluster), solar, meteo (sensor + AEMET +
 #     Open-Meteo), cámara e imagen BricoHams con Murcia; marcadores.
@@ -63,7 +63,7 @@ OWRX_ETC=/etc/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb ais meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
 BACKUP=""
 SOLO=""
 REINICIAR=0
@@ -306,6 +306,8 @@ instalar_env() {   # el temporal también es 600: lleva todas las claves
     grep -E '^(STATION_[A-Z_]*|LOCATOR_[A-Z_]*|METEO_STATIONS|OWRX_BACKEND|OWRX_DOCKER_[A-Z_]*|OWRX_DATA|OWRX_ETC|OWRX_HTDOCS|OWRX_CLONE_DOCKER)=' "$1" \
         >"$(dirname "$1")/zona.env" || true
     chmod 644 "$(dirname "$1")/zona.env"
+    # v5.0 · si la meteo ya está instalada, su meteo.env se rehace con la clave y la zona nuevas
+    if [ "$1" = "${ETC_BH:-/etc/bricohams}/bricohams.env" ] && [ -e "${ETC_BH:-/etc/bricohams}/meteo.env" ]; then escribir_meteo_env; fi
 }
 # NOMBRE='valor' para los .env derivados (systemd EnvironmentFile y bash los leen igual)
 sq() { local s=${1//\'/\'\\\'\'}; printf "'%s'" "$s"; }
@@ -321,8 +323,6 @@ nginx_sitio() {
     esac
     # v4.5 · cliente web de Meshtastic en :8443 (solo admin) si MESH_WEB=yes
     if [ "${MESH_WEB:-yes}" = yes ]; then e+=(-e 's/^#@MW@//'); else e+=(-e '/^#@MW@/d'); fi
-    # v5.1 · cliente web de Meshtastic del LilyGO 433 en :8444 (solo admin) si MESH433_WEB=yes y está el cliente
-    if [ "${MESH433_WEB:-no}" = yes ] && [ -f /usr/share/bricohams-meshweb/index.html ]; then e+=(-e 's/^#@M4@//'); else e+=(-e '/^#@M4@/d'); fi
     sed "${e[@]}" -e "s#__DOMINIO__#${dom}#g" -e "s#__CERT__#${cert}#" -e "s#__KEY__#${key}#"
 }
 cargar_env "$KIT/bricohams.env"
@@ -348,7 +348,7 @@ apt_update() {
     done
     fallo "apt-get update sigue fallando. Prueba la red: getent ahostsv4 archive.raspberrypi.com · curl -4 -sI http://archive.raspberrypi.com/debian/dists/$DEB/Release"
 }
-# v4.2 · Red: espera a que haya DNS y salida antes de bajar nada. En la Pi de EA5KAO el
+# v4.2 · Red: espera a que haya DNS y salida antes de bajar nada. En la Pi de N0CALL el
 # paso «red» reactivaba el WiFi y el paso «openwebrx» fallaba con «Could not resolve host».
 esperar_red() {
     local i
@@ -409,6 +409,8 @@ rtlsdr_debian() {
 }
 
 si() { case "${1,,}" in 1|y|yes|s|si|sí|true|on) return 0 ;; *) return 1 ;; esac; }
+# texto seguro como reemplazo de sed con delimitador #
+sed_esc() { printf '%s' "$1" | sed -e 's/[\\#&]/\\&/g'; }
 
 # bloque gestionado en un fichero (entre marcadores), idempotente
 bloque() {  # fichero etiqueta <contenido por stdin>
@@ -458,15 +460,16 @@ vars_paso() {
     [ -n "$todas" ] || return 0
     if [ "$1" = configuracion ]; then echo "$todas"; return 0; fi
     # v4.3 · los pasos que escriben en las carpetas de OpenWebRX+ dependen también del backend (nativo/Docker)
-    { { declare -f "paso_$1" | grep -oE '\$\{?[A-Z][A-Z0-9_]*' | tr -d '${'
-        if declare -f "paso_$1" | grep -qE 'HTDOCS|OWRX_DATA|OWRX_ETC|owrx_'; then printf '%s\n' OWRX_BACKEND OWRX_DOCKER_DIR; fi
+    { { { declare -f "paso_$1"; [ "$1" != meteo ] || declare -f escribir_meteo_env || true; } | grep -oE '\$\{?[A-Z][A-Z0-9_]*' | tr -d '${'
+        if { declare -f "paso_$1"; [ "$1" != meteo ] || declare -f escribir_meteo_env || true; } | grep -qE 'HTDOCS|OWRX_DATA|OWRX_ETC|owrx_'; then printf '%s\n' OWRX_BACKEND OWRX_DOCKER_DIR; fi
       } | sort -u | grep -Fx -f <(echo "$todas") || true; }
 }
 
+# (meteo: su clave y rutas se escriben en escribir_meteo_env, que cuenta como parte del paso)
 # Huella de un paso: «código ficheros variables» (16 hex cada una).
 huella_paso() {
     local c fh va f v
-    c=$(declare -f "paso_$1" | h16)
+    c=$({ declare -f "paso_$1"; [ "$1" != meteo ] || declare -f escribir_meteo_env || true; } | h16)
     fh=$(ficheros_paso "$1" | while read -r f; do printf '%s %s\n' "${f#"$KIT"/}" "$(sha256sum <"$f" | cut -c1-64)"; done | h16)
     va=$(vars_paso "$1" | while read -r v; do printf '%s=%s\n' "$v" "${!v-}"; done | h16)
     echo "$c $fh $va"
@@ -932,6 +935,13 @@ paso_configuracion() {
     install -m 664 "$FILES/branding/receiver_top_photo.png" "$OWRX_DATA/receiver_top_photo.png"
     install -d "$OWRX_ETC/openwebrx.conf.d"
     install -m 644 "$FILES"/openwebrx/conf.d/*.conf "$OWRX_ETC/openwebrx.conf.d/"
+    # v5.0 · OWRX_SOLO_LOCAL=yes: el 8073 solo escucha en la propia Pi; el público entra por nginx (443)
+    if si "${OWRX_SOLO_LOCAL:-yes}" && ! { [ "${OWRX_BACKEND:-native}" = docker ] && [ "${OWRX_DOCKER_RED:-host}" = bridge ]; }; then
+        printf '[web]\nbind_address = 127.0.0.1\n' >"$OWRX_ETC/openwebrx.conf.d/22-solo-local.conf"
+        chmod 644 "$OWRX_ETC/openwebrx.conf.d/22-solo-local.conf"
+    else
+        rm -f "$OWRX_ETC/openwebrx.conf.d/22-solo-local.conf"
+    fi
     # restaurar desde una copia (usuarios y marcadores)
     if [ -n "$BACKUP" ]; then
         [ -r "$BACKUP" ] || fallo "No puedo leer la copia $BACKUP"
@@ -972,6 +982,33 @@ paso_configuracion() {
     bien "OpenWebRX configurado: receptores, marcadores, imágenes BricoHams/Murcia"
 }
 
+# v5.1 · plugins de EA5HKX (gitlab.com/openwebrx-plugins, manual 41). No publican licencia: no van
+# dentro del kit; se descargan en un commit fijo y solo se instalan si coincide el sha256.
+EA5HKX_PLUGINS=(
+    "callsign_gate dcd55b51e51a2a3b2e7fd2d20dd7821d686fcb0b aedb2bc8e43d5da36f379f1924f00a2910e96352afeeeef9ad37dcc112e2add8"
+    "tone_detector 9d048ccb5532018349369c3a1a0cc8e9cd11ac10 e2acfec0b368a8c52c498f179f9376da2cf3782ed3f581b0af4ba0cfc7200c25"
+)
+plugin_ea5hkx() {   # $1 = nombre · deja htdocs/plugins/receiver/<nombre>/<nombre>.js verificado
+    local nombre=$1 linea n commit suma f tmp
+    for linea in "${EA5HKX_PLUGINS[@]}"; do
+        read -r n commit suma <<<"$linea"
+        [ "$n" = "$nombre" ] && break
+        n=""
+    done
+    [ -n "$n" ] || return 1
+    f="$HTDOCS/plugins/receiver/$nombre/$nombre.js"
+    [ -f "$f" ] && echo "$suma  $f" | sha256sum -c --status && return 0
+    tmp=$(mktemp)
+    if "${CURL[@]}" "https://gitlab.com/openwebrx-plugins/$nombre/-/raw/$commit/$nombre.js" -o "$tmp" \
+        && echo "$suma  $tmp" | sha256sum -c --status; then
+        install -D -m 644 "$tmp" "$f"
+        rm -f "$tmp"
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
 paso_plugins() {
     local R="$HTDOCS/plugins/receiver"
     local listeners_country=${LISTENERS_COUNTRY:-${STATION_COUNTRY:-}}
@@ -981,6 +1018,10 @@ paso_plugins() {
     else
         listeners_country=${listeners_country^^}
     fi
+    local visitas_enable=no
+    si "${VISITAS_ENABLE:-yes}" && visitas_enable=yes
+    local chat_registro=no
+    si "${CHAT_REGISTRO_OBLIGATORIO:-yes}" && chat_registro=yes
     [ -d "$HTDOCS" ] || fallo "No existe $HTDOCS (¿OpenWebRX instalado?)"
     [ -f "$R/init.js" ] && cp "$R/init.js" "$R/init.js.antes-$(date +%Y%m%d-%H%M%S)"
     local guardar=()
@@ -990,12 +1031,28 @@ paso_plugins() {
     fi
     rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
+    local callsign_gate=no tone_detector=no callsign_anuncio=no p
+    local -A pedido=([callsign_gate]="${PLUGIN_CALLSIGN_GATE:-yes}" [tone_detector]="${PLUGIN_TONE_DETECTOR:-yes}")
+    si "${CALLSIGN_GATE_ANUNCIO:-no}" && callsign_anuncio=yes
+    for p in callsign_gate tone_detector; do
+        si "${pedido[$p]}" || continue
+        if plugin_ea5hkx "$p"; then
+            printf -v "$p" yes
+            bien "plugin $p de EA5HKX descargado y verificado (sha256)"
+        else
+            aviso "No pude descargar o verificar el plugin $p de EA5HKX: queda desactivado (manual 41)"
+        fi
+    done
     # v4.4 · init.js lo descarga cualquiera: la posición va redondeada (~1 km), no la de la casa
     local plat plon; plat=$(LC_ALL=C printf '%.2f' "${STATION_LAT:-0}"); plon=$(LC_ALL=C printf '%.2f' "${STATION_LON:-0}")
     sed -i -e "s/__LAT__/${plat}/" -e "s/__LON__/${plon}/" \
         -e "s/__CAM_SNAPSHOT_SECONDS__/${CAM_SNAPSHOT_SECONDS}/" \
         -e "s#__LISTENERS_URL__#${LISTENERS_SUPABASE_URL:-}#" -e "s#__LISTENERS_KEY__#${LISTENERS_SUPABASE_KEY:-}#" \
-        -e "s#__LISTENERS_COUNTRY__#${listeners_country}#" "$R/init.js"
+        -e "s#__LISTENERS_COUNTRY__#${listeners_country}#" \
+        -e "s#__VISITAS_ENABLE__#${visitas_enable}#" -e "s#__CHAT_REGISTRO__#${chat_registro}#" \
+        -e "s#__CALLSIGN_GATE__#${callsign_gate}#" -e "s#__TONE_DETECTOR__#${tone_detector}#" \
+        -e "s#__CALLSIGN_ANUNCIO__#${callsign_anuncio}#" -e "s#__SSL_MODO__#${SSL_MODO:-todo}#" \
+        -e "s#__OPERADOR__#$(sed_esc "${CALLSIGN:-N0CALL}")#g" -e "s#__QTH__#$(sed_esc "${STATION_QTH:-}")#g" "$R/init.js"
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
         mkdir -p "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
         owrx_owner
@@ -1005,19 +1062,39 @@ paso_plugins() {
     bien "plugins: rig_skin (DX), solar, meteo, cámara, BricoHams y los de 0xAF"
 }
 
+# v5.0 · meteo.env sale SIEMPRE de bricohams.env (lo llama también instalar_env): una clave
+# añadida después ya no se queda fuera. Si el kit no la trae y la copia vieja sí, se conserva.
+# Nunca se muestra la clave: solo se comprueba que ha llegado.
+escribir_meteo_env() {
+    local f="$ETC_BH/meteo.env" tmp clave="${AEMET_API_KEY:-}" vieja=""
+    if [ -z "$clave" ] && [ -r "$f" ]; then
+        vieja=$(sed -n "s/^AEMET_API_KEY='\(.*\)'$/\1/p" "$f" | head -n1)
+        if [ -n "$vieja" ]; then
+            clave=$vieja
+            aviso "bricohams.env no trae AEMET_API_KEY: conservo la que ya tenía meteo.env"
+        fi
+    fi
+    tmp=$(umask 077; mktemp "$f.XXXXXX")
+    {
+        echo "# generado por install.sh desde bricohams.env: no lo edites aquí"
+        echo "AEMET_API_KEY=$(sq "$clave")"
+        echo "METEO_STATIONS=$(sq "${METEO_STATIONS:-}")"
+        echo "STATION_LAT=${STATION_LAT:-}"
+        echo "STATION_LON=${STATION_LON:-}"
+        echo "METEO_OUT=${HTDOCS}/plugins/receiver/meteo/meteo.json"
+    } >"$tmp"
+    chown root:openwebrx "$tmp"; chmod 640 "$tmp"; mv -f "$tmp" "$f"
+    if [ -n "$clave" ] && ! grep -q "^AEMET_API_KEY='..*'$" "$f"; then
+        fallo "meteo.env: la AEMET_API_KEY no se ha escrito (revisa $f)"
+    fi
+}
+
 paso_meteo() {
     install -m 755 "$FILES/bin/bricohams-meteo.py" /usr/local/bin/bricohams-meteo
     if [ -n "$LOCATOR_CATALOG_PATH" ]; then        # v4.3 · con la lista de AEMET recién bajada (paso configuracion)
         zona_locator; instalar_env "$ETC_BH/bricohams.env"
     fi
-    cat >"$ETC_BH/meteo.env" <<EOF
-AEMET_API_KEY=$(sq "${AEMET_API_KEY:-}")
-METEO_STATIONS=$(sq "${METEO_STATIONS:-}")
-STATION_LAT=${STATION_LAT}
-STATION_LON=${STATION_LON}
-METEO_OUT=${HTDOCS}/plugins/receiver/meteo/meteo.json
-EOF
-    chown root:openwebrx "$ETC_BH/meteo.env"; chmod 640 "$ETC_BH/meteo.env"
+    escribir_meteo_env
     cat >/etc/systemd/system/bricohams-meteo.service <<'EOF'
 [Unit]
 Description=BricoHams: tiempo de las estaciones cercanas (AEMET + Open-Meteo)
@@ -1045,7 +1122,7 @@ EOF
     systemctl daemon-reload
     systemctl enable --now bricohams-meteo.timer
     systemctl start bricohams-meteo.service || aviso "La primera lectura de meteo falló (mira: journalctl -u bricohams-meteo)"
-    [ -n "$AEMET_API_KEY" ] && bien "meteo AEMET ($METEO_STATIONS) + Open-Meteo" || aviso "Sin AEMET_API_KEY: solo modelo Open-Meteo. Pide la clave gratis y vuelve a lanzar: sudo bash install.sh --solo meteo"
+    if grep -q "^AEMET_API_KEY='..*'$" "$ETC_BH/meteo.env"; then bien "meteo AEMET ($METEO_STATIONS) + Open-Meteo"; else aviso "Sin AEMET_API_KEY: solo modelo Open-Meteo. Pide la clave gratis, ponla en bricohams.env y vuelve a lanzar: sudo bash install.sh --solo meteo"; fi
 }
 
 paso_camara() {
@@ -1107,8 +1184,9 @@ After=network-online.target
 
 [Service]
 User=mediamtx
-Group=video
-SupplementaryGroups=render
+# grupo propio (lee mediamtx.yml 640 root:mediamtx) + video/render para la cámara
+Group=mediamtx
+SupplementaryGroups=video render
 ExecStart=/usr/local/bin/mediamtx /etc/mediamtx/mediamtx.yml
 Restart=always
 RestartSec=5
@@ -1182,6 +1260,9 @@ RAIN_GPIO=${RAIN_GPIO:-17}
 RAIN_MM=${RAIN_MM:-0.2794}
 IO_MODE=${IO_MODE:-pico}
 IO_RUN_DIR=/run/bricohams
+WX_FUENTE=${WX_FUENTE:-auto}
+WX_POS_GPS=${WX_POS_GPS:-auto}
+RAK_RUN_DIR=/run/bricohams-rak
 EOF
     chown root:openwebrx "$ETC_BH/wx.env"; chmod 640 "$ETC_BH/wx.env"
     for g in dialout gpio; do getent group "$g" >/dev/null && usermod -aG "$g" openwebrx; done
@@ -1196,6 +1277,7 @@ Wants=network-online.target
 User=openwebrx
 SupplementaryGroups=i2c dialout gpio
 StateDirectory=bricohams
+WorkingDirectory=/var/lib/bricohams
 EnvironmentFile=/etc/bricohams/wx.env
 ExecStart=/usr/local/bin/bricohams-wx
 Restart=always
@@ -1307,15 +1389,124 @@ paso_adsb() {
             rm -rf "$mt"
         fi
     fi
+    # el paquete mlat-client rota /var/log/mlat-client.log sin missingok: si el log no existe, logrotate.service falla
+    if [ -f /etc/logrotate.d/mlat-client ] && ! grep -q missingok /etc/logrotate.d/mlat-client; then
+        sed -i 's/^\([[:space:]]*\)daily$/\1daily\n\1missingok\n\1notifempty/' /etc/logrotate.d/mlat-client
+        systemctl reset-failed logrotate.service 2>/dev/null || true
+    fi
     if [ -f /etc/rbfeeder.ini ]; then
         if [ -n "$RADARBOX_KEY" ]; then rbfeeder --setkey "$RADARBOX_KEY" >/dev/null 2>&1 || true; fi
         python3 "$FILES/bin/bricohams-rbfeeder-ini.py" /etc/rbfeeder.ini "$STATION_LAT" "$STATION_LON" "$ADSB_ANT_ALT"
     fi
+    mapflights
     systemctl daemon-reload
     systemctl enable readsb rbfeeder 2>/dev/null || true
     systemctl restart readsb rbfeeder 2>/dev/null || true
-    bien "ADS-B: readsb (serie ${SERIAL_ADSB}) -> rbfeeder + MLAT; tar1090 en http://<pi>/tar1090"
+    if [ -f /etc/systemd/system/bricohams-mapflights-mlat.service ]; then
+        systemctl enable bricohams-mapflights-mlat >/dev/null 2>&1 || true
+        systemctl restart bricohams-mapflights-mlat 2>/dev/null || aviso "No arranca el MLAT de map.flights: journalctl -u bricohams-mapflights-mlat"
+    fi
+    bien "ADS-B: readsb (serie ${SERIAL_ADSB}) -> rbfeeder + MLAT; tar1090 en https://<pi>/tar1090/"
     aviso "Asocia la estación a tu cuenta: sudo rbfeeder --showkey y https://www.airnavradar.com/raspberry-pi/claim"
+}
+
+# v5.0 · AIS local: AIS-catcher con un RTL-SDR propio (162 MHz). Los barcos salen en el mapa
+# de OpenWebRX+ (capa «AIS local», vía /bricohams/api/barcos); nada se toma de webs externas.
+# El visor de AIS-catcher solo escucha en 127.0.0.1:8100 (no se publica).
+paso_ais() {
+    if ! si "${AIS_ENABLE:-no}"; then
+        aviso "AIS local omitido (AIS_ENABLE)"
+        systemctl disable --now bricohams-ais 2>/dev/null || true
+        return
+    fi
+    local serie=${AIS_SDR_SERIAL:-} bin
+    [[ "$serie" =~ ^[A-Za-z0-9._-]+$ ]] || fallo "AIS_ENABLE=yes necesita AIS_SDR_SERIAL (serie del RTL-SDR de AIS: rtl_test lo muestra)"
+    [ "$serie" != "${SERIAL_ADSB:-}" ] || fallo "AIS_SDR_SERIAL no puede ser el mismo SDR que SERIAL_ADSB"
+    if ! command -v AIS-catcher >/dev/null; then
+        script_remoto https://raw.githubusercontent.com/jvde-github/AIS-catcher/main/scripts/aiscatcher-install -p --no-systemd \
+            || fallo "No pude instalar AIS-catcher. Repite: sudo bash install.sh --solo ais"
+    fi
+    bin=$(command -v AIS-catcher) || fallo "AIS-catcher no ha quedado instalado"
+    # el servicio propio del instalador (si lo hubiera) abriría la consola en 0.0.0.0:8118
+    systemctl disable --now ais-catcher 2>/dev/null || true
+    cat >/etc/systemd/system/bricohams-ais.service <<EOF
+[Unit]
+Description=BricoHams: AIS local (AIS-catcher, SDR ${serie}) solo en 127.0.0.1:8100
+After=network-online.target
+
+[Service]
+DynamicUser=yes
+SupplementaryGroups=plugdev
+ExecStart=${bin} -d ${serie} -gr TUNER auto -q -N 8100 IP_BIND 127.0.0.1
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable bricohams-ais >/dev/null 2>&1 || true
+    systemctl restart bricohams-ais || aviso "No arranca AIS-catcher: journalctl -u bricohams-ais (¿está conectado el SDR ${serie}?)"
+    bien "AIS local: AIS-catcher (SDR ${serie}) -> capa «AIS local» del mapa de OpenWebRX+"
+}
+
+# v5.1 · map.flights como destino ADICIONAL a RadarBox (manual 04): conector Beast de readsb
+# con la etiqueta uuid de la estación + mlat-client propio. No toca rbfeeder.
+# Solo usa el UUID de la estación: la clave mf_feed_ no hace falta y no se guarda.
+mapflights() {
+    local uuid="" mlat
+    if si "${MAPFLIGHTS_FEED:-no}"; then
+        uuid=$(python3 "$FILES/bin/bricohams-mapflights.py" --uuid "${MAPFLIGHTS_UUID:-}") || {
+            aviso "map.flights: MAPFLIGHTS_UUID vacío o no válido (36 caracteres de la página de tu estación). No envío a map.flights"
+            uuid=""
+        }
+    fi
+    python3 "$FILES/bin/bricohams-mapflights.py" /etc/default/readsb "$uuid" \
+        "${MAPFLIGHTS_HOST:-feed.map.flights}" "${MAPFLIGHTS_PORT:-30004}" || aviso "map.flights: no pude ajustar /etc/default/readsb"
+    if [ -z "$uuid" ]; then
+        if [ -f /etc/systemd/system/bricohams-mapflights-mlat.service ]; then
+            systemctl disable --now bricohams-mapflights-mlat >/dev/null 2>&1 || true
+            rm -f /etc/systemd/system/bricohams-mapflights-mlat.service "$ETC_BH/mapflights.env"
+            bien "map.flights desactivado (RadarBox sigue igual)"
+        fi
+        return 0
+    fi
+    install -d -m 755 "$ETC_BH"
+    ( umask 077
+      { envl MAPFLIGHTS_UUID "$uuid"
+        envl MAPFLIGHTS_MLAT_HOST "${MAPFLIGHTS_MLAT_HOST:-mlat.map.flights}"
+        envl MAPFLIGHTS_MLAT_PORT "${MAPFLIGHTS_MLAT_PORT:-31090}"
+        envl STATION_LAT "$STATION_LAT"; envl STATION_LON "$STATION_LON"; envl ADSB_ANT_ALT "$ADSB_ANT_ALT"
+      } >"$ETC_BH/mapflights.env" )
+    chmod 600 "$ETC_BH/mapflights.env"
+    mlat=$(command -v mlat-client || true)
+    if ! si "${MAPFLIGHTS_MLAT:-yes}" || [ -z "$mlat" ]; then
+        [ -z "$mlat" ] && si "${MAPFLIGHTS_MLAT:-yes}" && aviso "map.flights: sin mlat-client, envío solo posiciones (sin MLAT)"
+        systemctl disable --now bricohams-mapflights-mlat >/dev/null 2>&1 || true
+        rm -f /etc/systemd/system/bricohams-mapflights-mlat.service
+    else
+        cat >/etc/systemd/system/bricohams-mapflights-mlat.service <<EOF
+[Unit]
+Description=BricoHams: MLAT para map.flights (mlat-client, además del de RadarBox)
+Wants=network-online.target
+After=network-online.target readsb.service
+
+[Service]
+EnvironmentFile=/etc/bricohams/mapflights.env
+ExecStart=$mlat --input-type dump1090 --input-connect 127.0.0.1:30005 --server \${MAPFLIGHTS_MLAT_HOST}:\${MAPFLIGHTS_MLAT_PORT} --user \${MAPFLIGHTS_UUID} --lat \${STATION_LAT} --lon \${STATION_LON} --alt \${ADSB_ANT_ALT}
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
+    bien "map.flights: readsb -> ${MAPFLIGHTS_HOST:-feed.map.flights}:${MAPFLIGHTS_PORT:-30004} (beast_reduce_plus_out) + MLAT; RadarBox sin cambios"
 }
 
 # v4.5 · broker MQTT solo para la Pi: visitas y mapa LoRa/Meshtastic de OpenWebRX+ (ADR-50)
@@ -1375,76 +1566,12 @@ UNIDAD
     else
         systemctl disable --now bricohams-mesh-owrx >/dev/null 2>&1 || true
     fi
-    meshweb_433
     if [ -f /etc/udev/rules.d/99-bricohams-lilygo.rules ]; then
         bien "LilyGO ya identificados: $(ls /dev/lilygo-* 2>/dev/null | tr '\n' ' ')"
     else
         aviso "Falta identificar los LilyGO (una vez): sudo bricohams-lilygo identificar"
     fi
     aviso "Después: sudo bricohams-lilygo meshtastic  ·  sudo bricohams-lilygo igate  (docs/MANUAL_LILYGO.md)"
-}
-
-# v5.1 · interfaz web de Meshtastic para el LilyGO 433 (manual 35 §9, ADR-66): bricohams-mesh-puente
-# es el único que abre /dev/lilygo-mesh y lo reparte (TCP 4404 para el mapa y el panel, HTTP 4480 para
-# el cliente web); nginx sirve el cliente oficial en https://<estación>:8444/ solo con sesión de admin.
-MESHWEB_VER="v2.7.2"
-MESHWEB_SHA256="62657b85b4c24af4d44da2932b64143abdbf6e65a79fcb51fd0801d9540616e2"
-meshweb_433() {
-    install -m 755 "$FILES/bin/bricohams-mesh-puente" /usr/local/bin/bricohams-mesh-puente
-    if ! si "${MESH433_WEB:-no}"; then
-        systemctl disable --now bricohams-mesh-puente >/dev/null 2>&1 || true
-        return 0
-    fi
-    apt_i python3-serial >/dev/null 2>&1 || aviso "No pude instalar python3-serial"
-    if [ ! -f /usr/share/bricohams-meshweb/.version ] || [ "$(cat /usr/share/bricohams-meshweb/.version)" != "$MESHWEB_VER" ]; then
-        local t; t=$(mktemp -d)
-        if curl -fsSL --retry 3 -o "$t/build.tar" "https://github.com/meshtastic/web/releases/download/$MESHWEB_VER/build.tar" \
-           && echo "$MESHWEB_SHA256  $t/build.tar" | sha256sum -c --quiet -; then
-            rm -rf /usr/share/bricohams-meshweb.nuevo && install -d /usr/share/bricohams-meshweb.nuevo
-            tar -xf "$t/build.tar" -C /usr/share/bricohams-meshweb.nuevo --no-same-owner
-            find /usr/share/bricohams-meshweb.nuevo -name '*.gz' -exec gunzip -f {} +
-            echo "$MESHWEB_VER" >/usr/share/bricohams-meshweb.nuevo/.version
-            rm -rf /usr/share/bricohams-meshweb && mv /usr/share/bricohams-meshweb.nuevo /usr/share/bricohams-meshweb
-            bien "Cliente web de Meshtastic $MESHWEB_VER en /usr/share/bricohams-meshweb"
-        else
-            aviso "No pude bajar (o no cuadra el SHA-256) el cliente web de Meshtastic $MESHWEB_VER: sin :8444"
-        fi
-        rm -rf "$t"
-    fi
-    cat >/etc/systemd/system/bricohams-mesh-puente.service <<'UNIDAD'
-[Unit]
-Description=BricoHams · puente del LilyGO 433 (Meshtastic USB -> TCP 4404 + web 4480, solo 127.0.0.1)
-After=dev-lilygo\x2dmesh.device
-Before=bricohams-mesh-owrx.service
-
-[Service]
-ExecStart=/usr/bin/python3 /usr/local/bin/bricohams-mesh-puente servicio
-DynamicUser=yes
-SupplementaryGroups=dialout
-LoadCredential=env:/etc/bricohams/bricohams.env
-RuntimeDirectory=bricohams-mesh-puente
-Environment=MESH_RUN_DIR=/run/bricohams-mesh-puente
-DevicePolicy=closed
-DeviceAllow=char-ttyUSB rw
-DeviceAllow=char-ttyACM rw
-ProtectSystem=strict
-ProtectHome=yes
-PrivateTmp=yes
-NoNewPrivileges=yes
-RestrictAddressFamilies=AF_INET AF_UNIX
-IPAddressDeny=any
-IPAddressAllow=localhost
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-UNIDAD
-    systemctl daemon-reload
-    systemctl enable bricohams-mesh-puente >/dev/null 2>&1 || true
-    systemctl restart bricohams-mesh-puente || true
-    systemctl try-restart bricohams-mesh-owrx 2>/dev/null || true     # pasa a entrar por 127.0.0.1:4404
-    bien "Meshtastic 433 por web: https://<estación>:8444/ (solo admin) · puente: bricohams-mesh-puente estado"
 }
 
 paso_rak() {
@@ -1598,9 +1725,10 @@ EOF
                 fi
             fi
             "${M[@]}" --set-owner "$MESH_LONG_NAME" --set-owner-short "$MESH_SHORT_NAME" && sleep 10
+            "${M[@]}" --set device.role "${MESH868_ROLE:-CLIENT}" && sleep 10
             "${M[@]}" --setlat "$STATION_LAT" --setlon "$STATION_LON" --setalt "$STATION_ASL" && sleep 5
             "${M[@]}" --set position.gps_mode NOT_PRESENT || true
-            bien "nodo Meshtastic 868: $MESH_LONG_NAME ($MESH_SHORT_NAME), canales de MESH_CHANNEL_URL, posición fija"
+            bien "nodo Meshtastic 868: $MESH_LONG_NAME ($MESH_SHORT_NAME), rol ${MESH868_ROLE:-CLIENT}, canales de MESH_CHANNEL_URL, posición fija"
             systemctl start bricohams-mesh-owrx 2>/dev/null || true
         else
             aviso "meshtasticd no abre el puerto 4403 (¿pines LoRa? journalctl -u meshtasticd). Configura luego con: sudo bash install.sh --solo meshtastic"
@@ -1650,14 +1778,45 @@ tar -czf "$f" --ignore-failed-read -C / \
   etc/openwebrx usr/lib/python3/dist-packages/htdocs/plugins \
   "$OD/docker-compose.yaml" "$OD/etc" "$OD/var" "$OD/plugins" \
   etc/bricohams etc/meshtasticd etc/mediamtx etc/default/gpsd etc/chrony/conf.d boot/firmware/config.txt \
-  etc/default/readsb etc/rbfeeder.ini etc/udev/rules.d/99-bricohams-lilygo.rules etc/udev/rules.d/99-bricohams-rs485.rules \
+  etc/default/readsb etc/rbfeeder.ini etc/systemd/system/bricohams-mapflights-mlat.service etc/udev/rules.d/99-bricohams-lilygo.rules etc/udev/rules.d/99-bricohams-rs485.rules \
   etc/udev/rules.d/99-bricohams-io.rules etc/nginx/sites-available/bricohams-sdr etc/letsencrypt etc/mosquitto/conf.d \
-  etc/cron.d/bricohams etc/sudoers.d/bricohams var/www/bricohams var/lib/bricohams 2>/dev/null
+  etc/cron.d/bricohams etc/sudoers.d/bricohams var/www/bricohams var/lib/bricohams \
+  usr/local/sbin/bricohams-backup-limpieza etc/systemd/system/bricohams-backup-limpieza.service \
+  etc/systemd/system/bricohams-backup-limpieza.timer 2>/dev/null
 chmod 600 "$f"
-ls -1t "$d"/backup-openwebrx-*.tar.gz | tail -n +15 | xargs -r rm -f
 echo "$f"
 EOF
     chmod 755 /usr/local/sbin/bricohams-backup
+    install -m 700 "$FILES/bin/bricohams-backup-limpieza" /usr/local/sbin/bricohams-backup-limpieza
+    cat >/etc/systemd/system/bricohams-backup-limpieza.service <<'EOF'
+[Unit]
+Description=BricoHams: borrar copias locales de mas de cinco dias
+After=bricohams-backup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bricohams-backup-limpieza
+UMask=0077
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=-/var/backups/bricohams /run/lock
+NoNewPrivileges=yes
+EOF
+    cat >/etc/systemd/system/bricohams-backup-limpieza.timer <<'EOF'
+[Unit]
+Description=BricoHams: limpieza diaria de copias antiguas
+
+[Timer]
+OnCalendar=*-*-* 06:15
+Persistent=true
+Unit=bricohams-backup-limpieza.service
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now bricohams-backup-limpieza.timer
     cat >/etc/systemd/system/bricohams-backup.service <<'EOF'
 [Unit]
 Description=BricoHams: copia de seguridad de la configuración
@@ -1683,6 +1842,122 @@ EOF
     else
         systemctl enable --now bricohams-backup.timer
     fi
+    # v5.0 · copia remota (SMB/CIFS, NFS, SFTP, Google Drive, OneDrive) desde /settings → Seguridad
+    #  credenciales solo en /etc/bricohams/backup-remoto.secret (600, root); temporizador apagado hasta configurarlo
+    apt_i cifs-utils nfs-common rclone openssh-client || aviso "No pude instalar cifs-utils/nfs-common/rclone: la copia remota fallará con esos destinos"
+    install -m 700 "$FILES/bin/bricohams-backup-remoto" /usr/local/sbin/bricohams-backup-remoto
+    install -d -m 700 /var/lib/bricohams-backup-remoto
+    install -d -m 755 /etc/bricohams
+    cat >/etc/systemd/system/bricohams-backup-remoto@.service <<'EOF'
+[Unit]
+Description=BricoHams: copia remota (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/bricohams-backup-remoto %i
+RuntimeDirectory=bricohams-backup-remoto
+RuntimeDirectoryMode=0700
+UMask=0077
+PrivateTmp=yes
+TimeoutStartSec=3h
+EOF
+    cat >/etc/systemd/system/bricohams-backup-remoto.timer <<'EOF'
+[Unit]
+Description=BricoHams: copia remota diaria
+
+[Timer]
+OnCalendar=*-*-* 05:15
+RandomizedDelaySec=20m
+Persistent=true
+Unit=bricohams-backup-remoto@copiar.service
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload
+    # solo se activa si ya hay un destino guardado (reinstalación); si no, lo enciende el panel al guardar
+    if [ -f /etc/bricohams/backup-remoto.json ] && grep -q '"programado": *true' /etc/bricohams/backup-remoto.json; then
+        systemctl enable --now bricohams-backup-remoto.timer
+    fi
+    # v5.0 · bloqueo por IP / país (nftables, /settings → Seguridad) y aviso Telegram de inicios de sesión
+    install -m 700 "$FILES/bin/bricohams-bloqueo" /usr/local/sbin/bricohams-bloqueo
+    install -m 700 "$FILES/bin/bricohams-login-aviso" /usr/local/sbin/bricohams-login-aviso
+    install -d -m 755 /var/lib/bricohams-bloqueo
+    cat >/etc/systemd/system/bricohams-bloqueo@.service <<'EOF'
+[Unit]
+Description=BricoHams: bloqueo IP/país (%i)
+After=network-online.target nftables.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/bricohams-bloqueo %i
+UMask=0022
+PrivateTmp=yes
+TimeoutStartSec=15m
+EOF
+    cat >/etc/systemd/system/bricohams-bloqueo-arranque.service <<'EOF'
+[Unit]
+Description=BricoHams: aplicar bloqueo IP/país al arrancar
+After=network-online.target nftables.service bricohams-cortafuegos.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 /usr/local/sbin/bricohams-bloqueo aplicar
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    cat >/etc/systemd/system/bricohams-bloqueo-geo.timer <<'EOF'
+[Unit]
+Description=BricoHams: actualizar rangos de países bloqueados (semanal)
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=2h
+Persistent=true
+Unit=bricohams-bloqueo@geo-actualizar.service
+
+[Install]
+WantedBy=timers.target
+EOF
+    cat >/etc/systemd/system/bricohams-bloqueo-estado.timer <<'EOF'
+[Unit]
+Description=BricoHams: estado del bloqueo para el panel (cada 5 min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=bricohams-bloqueo@estado.service
+
+[Install]
+WantedBy=timers.target
+EOF
+    cat >/etc/systemd/system/bricohams-login-aviso.service <<EOF
+[Unit]
+Description=BricoHams: aviso Telegram de inicios de sesión en la web
+After=network-online.target nginx.service
+
+[Service]
+Environment=BRICOHAMS_KIT_ENV=$KIT/bricohams.env
+ExecStart=/usr/bin/python3 /usr/local/sbin/bricohams-login-aviso
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable bricohams-bloqueo-arranque.service
+    systemctl enable --now bricohams-bloqueo-geo.timer bricohams-bloqueo-estado.timer bricohams-login-aviso.service
     bien "bricohams-check, bricohams-sdr-serials, copia diaria en /var/backups/bricohams y kit en /opt/bricohams/kit"
 }
 
@@ -1799,6 +2074,12 @@ EOF
         else
             aviso "No encuentro un paquete SatDump arm64 para $DEB en GitHub: https://github.com/SatDump/SatDump/releases"
         fi
+    fi
+    # Algunas compilaciones de SatDump 2.x buscan los plugins solo en /usr/local/lib/satdump aunque
+    # el paquete los deja en /usr/lib/satdump: sin el enlace no carga ninguno y METEOR LRPT se salta.
+    if command -v satdump >/dev/null && [ -d /usr/lib/satdump/plugins ] && [ ! -e /usr/local/lib/satdump ]; then
+        install -d /usr/local/lib && ln -s /usr/lib/satdump /usr/local/lib/satdump \
+            && bien "SatDump: plugins enlazados en /usr/local/lib/satdump"
     fi
     bien "pases de satélites cada 15 min ($(jq -r '.satelites | length' "$KIT/data/satelites.json") satélites) · aviso y ▶ Escuchar en la web"
 }
@@ -2015,11 +2296,12 @@ DP
 paso_web() {
     apt_i nginx certbot openssl
     install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
+    install -m 755 "$FILES/bin/bricohams-oyentes" /usr/local/bin/bricohams-oyentes
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
     local ip dom cert key modo
     ip=$(hostname -I | awk '{print $1}')
     dom=${SSL_DOMAIN:-}
-    modo=${SSL_MODO:-admin}
+    modo=${SSL_MODO:-todo}
     case "$modo" in admin|todo|no) ;; *) fallo "SSL_MODO=\"$modo\" no vale: admin, todo o no" ;; esac
     # tar1090 (lighttpd) deja el puerto 80 a nginx y solo escucha en local
     if [ -f /etc/lighttpd/lighttpd.conf ]; then
@@ -2029,9 +2311,13 @@ paso_web() {
     fi
     # web estática del portal
     install -d /var/www/bricohams /var/www/letsencrypt
-    sed -e "s#__OPERADOR__#${CALLSIGN:-EA5KAO}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
+    local op_sed qth_sed
+    op_sed=$(sed_esc "${CALLSIGN:-N0CALL}"); qth_sed=$(sed_esc "${STATION_QTH:-}")
+    sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
         -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/privacidad.html" >/var/www/bricohams/privacidad.html
-    sed -e "s#__LAN__#${ip}#g" -e "s#__WX_CALL__#${WX_APRS_CALLSIGN:-EA5KAO-13}#g" -e "s#__RADARBOX_ID__#${RADARBOX_STATION_ID:-}#g" \
+    sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
+        -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/politicas.html" >/var/www/bricohams/politicas.html
+    sed -e "s#__LAN__#${ip}#g" -e "s#__WX_CALL__#${WX_APRS_CALLSIGN:-N0CALL-13}#g" -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__RADARBOX_ID__#${RADARBOX_STATION_ID:-}#g" \
         "$FILES/web/index.html.tmpl" >/var/www/bricohams/index.html
     # certificado: primero uno autofirmado para que nginx arranque
     install -d -m 700 /etc/bricohams/ssl
@@ -2041,9 +2327,10 @@ paso_web() {
     fi
     cert=/etc/bricohams/ssl/autofirmado.crt; key=/etc/bricohams/ssl/autofirmado.key
     [ -n "$dom" ] && [ -s "/etc/letsencrypt/live/$dom/fullchain.pem" ] && { cert="/etc/letsencrypt/live/$dom/fullchain.pem"; key="/etc/letsencrypt/live/$dom/privkey.pem"; }
-    # v4.2 · SSL_MODO: admin = receptor por HTTP y administración por HTTPS (decisión de EA5KAO)
+    # v4.2 · SSL_MODO: admin = receptor por HTTP y administración por HTTPS (decisión de N0CALL)
     escribir_nginx() {
-        install -d /etc/nginx/snippets
+        install -d /etc/nginx/snippets /etc/nginx/conf.d
+        install -m 644 "$FILES/nginx/bricohams-login-log.conf" /etc/nginx/conf.d/bricohams-login-log.conf
         # v5.0 · proxy de Grafana (botón «Monitorización») solo si MONITORIZACION=yes
         if [ "${MONITORIZACION:-no}" = yes ]; then
             sed -e 's/^#@GF@//' "$FILES/nginx/bricohams-sdr-rutas.conf" >/etc/nginx/snippets/bricohams-sdr-rutas.conf
@@ -2051,6 +2338,13 @@ paso_web() {
             sed -e '/^#@GF@/d' "$FILES/nginx/bricohams-sdr-rutas.conf" >/etc/nginx/snippets/bricohams-sdr-rutas.conf
         fi
         chmod 644 /etc/nginx/snippets/bricohams-sdr-rutas.conf
+        # v5.0 · tar1090 servido por nginx (ADS-B local) sin depender de lighttpd
+        if [ -f /usr/local/share/tar1090/nginx-tar1090.conf ]; then
+            install -m 644 /usr/local/share/tar1090/nginx-tar1090.conf /etc/nginx/snippets/bricohams-tar1090.conf
+        else
+            printf 'location /tar1090/ {\n    proxy_pass http://127.0.0.1:8504/tar1090/;\n    proxy_set_header Host $host;\n}\n' >/etc/nginx/snippets/bricohams-tar1090.conf
+            chmod 644 /etc/nginx/snippets/bricohams-tar1090.conf
+        fi
         nginx_sitio "$modo" "${dom:-$(hostname)}" "$1" "$2" <"$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
         ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr
         rm -f /etc/nginx/sites-enabled/default
@@ -2084,13 +2378,15 @@ paso_web() {
     install -d /etc/letsencrypt/renewal-hooks/deploy
     printf '#!/bin/sh\nsystemctl reload nginx\n' >/etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
     chmod 755 /etc/letsencrypt/renewal-hooks/deploy/bricohams-nginx.sh
-    { envl SSL_DOMAIN "$dom"; envl SSL_MODO "${SSL_MODO:-admin}"; envl OWRX_BACKEND "${OWRX_BACKEND:-native}"; } >/etc/bricohams/web.env
+    { envl SSL_DOMAIN "$dom"; envl SSL_MODO "$modo"; envl OWRX_BACKEND "${OWRX_BACKEND:-native}"; } >/etc/bricohams/web.env
     # API de los plugins (ficha de indicativos); HamQTH principal y QRZ opcional
     {
+        envl OWRX_SETTINGS_FILE "$OWRX_DATA/settings.json"
         envl HAMQTH_USER "${HAMQTH_USER:-}"
         envl HAMQTH_PASS "${HAMQTH_PASS:-}"
         envl QRZ_USER "${QRZ_USER:-}"
         envl QRZ_PASS "${QRZ_PASS:-}"
+        envl AIS_ENABLE "${AIS_ENABLE:-no}"
     } >/etc/bricohams/api.env
     chown root:openwebrx /etc/bricohams/api.env; chmod 640 /etc/bricohams/api.env
     cat >/etc/systemd/system/bricohams-api.service <<'EOF'
@@ -2130,15 +2426,26 @@ EOF
     echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-repeaterbook ]; then /usr/local/bin/bricohams-owrx-repeaterbook -q; fi"; };' \
         >/etc/apt/apt.conf.d/99bricohams-owrx-repeaterbook
     /usr/local/bin/bricohams-owrx-repeaterbook || aviso "No he podido poner el campo RepeaterBook API key en /settings/general de OpenWebRX+"
-    # v5.0 · subtono CTCSS por bookmark («Subtono FM») con silenciador en el demodulador FM
-    # el detector usa numpy/scipy; sin ellos OpenWebRX+ sigue funcionando, pero el silenciador no actúa
-    apt_i python3-numpy python3-scipy || aviso "No he podido instalar python3-numpy/python3-scipy: el silenciador CTCSS no actuará"
-    install -d -m 755 /usr/local/share/bricohams-ctcss
-    install -m 644 "$FILES/share/bricohams-ctcss/bricohams_ctcss.py" "$FILES/share/bricohams-ctcss/bricohams-ctcss.js" /usr/local/share/bricohams-ctcss/
-    install -m 755 "$FILES/bin/bricohams-owrx-ctcss" /usr/local/bin/bricohams-owrx-ctcss
-    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-ctcss ]; then /usr/local/bin/bricohams-owrx-ctcss -q; fi"; };' \
-        >/etc/apt/apt.conf.d/99bricohams-owrx-ctcss
-    /usr/local/bin/bricohams-owrx-ctcss || aviso "No he podido añadir el subtono CTCSS a los bookmarks de OpenWebRX+"
+    # map.flights como proveedor opcional de ruta y foto en General Settings
+    install -m 755 "$FILES/bin/bricohams-owrx-mapflights" /usr/local/bin/bricohams-owrx-mapflights
+    echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-mapflights ]; then /usr/local/bin/bricohams-owrx-mapflights -q; fi"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-mapflights
+    /usr/local/bin/bricohams-owrx-mapflights || aviso "No he podido poner el selector map.flights en /settings/general de OpenWebRX+"
+    # v5.0 · detector/squelch CTCSS y «Subtono FM» en bookmarks, configurable desde bricohams.env
+    if si "${OWRX_CTCSS_ENABLE:-yes}"; then
+        # El detector usa numpy/scipy; sin ellos OpenWebRX+ sigue funcionando, pero el squelch no actúa.
+        apt_i python3-numpy python3-scipy || aviso "No he podido instalar python3-numpy/python3-scipy: el detector CTCSS no actuará"
+        install -d -m 755 /usr/local/share/bricohams-ctcss
+        install -m 644 "$FILES/share/bricohams-ctcss/bricohams_ctcss.py" "$FILES/share/bricohams-ctcss/bricohams-ctcss.js" /usr/local/share/bricohams-ctcss/
+        install -m 755 "$FILES/bin/bricohams-owrx-ctcss" /usr/local/bin/bricohams-owrx-ctcss
+        echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-ctcss ]; then /usr/local/bin/bricohams-owrx-ctcss -q; fi"; };' \
+            >/etc/apt/apt.conf.d/99bricohams-owrx-ctcss
+        /usr/local/bin/bricohams-owrx-ctcss || aviso "No he podido añadir el detector CTCSS a OpenWebRX+"
+    elif [ -x /usr/local/bin/bricohams-owrx-ctcss ]; then
+        /usr/local/bin/bricohams-owrx-ctcss --quitar || aviso "No he podido retirar los parches CTCSS"
+        rm -f /etc/apt/apt.conf.d/99bricohams-owrx-ctcss
+        systemctl restart openwebrx || aviso "No se pudo reiniciar OpenWebRX+ después de retirar CTCSS"
+    fi
     # v5.0 · importador de repetidores de RepeaterBook (solo frecuencia de salida) en /settings/bookmarks
     install -d -m 755 /usr/local/share/bricohams-rbimport
     install -m 644 "$FILES/share/bricohams-rbimport/bricohams_rbimport.py" /usr/local/share/bricohams-rbimport/
@@ -2165,6 +2472,10 @@ ProtectSystem=strict
 ReadWritePaths=/etc/bricohams $KIT/bricohams.env
 # v5.0: el cambio de clave TAK arranca OpenTAKServer, que escribe su log aquí ("-": opcional si no hay TAK)
 ReadWritePaths=-/var/lib/bricohams-tak
+# v5.0: el panel borra known_hosts del backup remoto al cambiar de servidor SFTP
+ReadWritePaths=-/var/lib/bricohams-backup-remoto
+# v5.0: bloqueo IP/país (desbanear.json) y alta/baja de usuarios de OpenWebRX (users.json nativo o Docker)
+ReadWritePaths=-/var/lib/bricohams-bloqueo -/var/lib/openwebrx -${OWRX_DOCKER_DIR:-/opt/owrx-docker}/var
 ProtectHome=read-only
 PrivateTmp=yes
 NoNewPrivileges=yes
@@ -2371,10 +2682,10 @@ cat <<EOF
    6. Comprueba todo:                               sudo bricohams-check · sudo bricohams-dispositivos
 
   Servicios:  bricohams-servicios        (lista con estado y direcciones)
-  Web:        http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · admin https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings (SSL_MODO=${SSL_MODO:-admin})
+  Web:        $([ "${SSL_MODO:-todo}" = todo ] && echo https || echo http)://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · admin https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings (SSL_MODO=${SSL_MODO:-todo}; OpenWebRX+ 8073 solo en la Pi)
   Meshtastic: https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings/bricohams/meshtastic  (solo administrador)
   Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
-  Aviones:    http://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
+  Aviones:    https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
   Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado
   TAK:        /settings → «Servidor TAK» (TAK=${TAK:-no})   Grafana: /settings → «Monitorización» (MONITORIZACION=${MONITORIZACION:-no})
 EOF

@@ -48,7 +48,10 @@ try:
     threading.Thread(target=owrx.serve_forever, daemon=True).start()
 
     os.environ.update(MESH_ADMIN_OWRX='127.0.0.1:%d' % owrx.server_port, BRICOHAMS_ENV=etc, BRICOHAMS_KIT_ENV=kit,
-                      RAK_RUN_DIR=tmp, MESH_URL_CLI=os.path.join(BIN, 'bricohams-mesh-url'))
+                      RAK_RUN_DIR=tmp, MESH_URL_CLI=os.path.join(BIN, 'bricohams-mesh-url'),
+                      BACKUP_REMOTO_CONF=os.path.join(tmp, 'br', 'backup-remoto.json'),
+                      BACKUP_REMOTO_SECRET=os.path.join(tmp, 'br', 'backup-remoto.secret'),
+                      BACKUP_REMOTO_DIR=os.path.join(tmp, 'brdat'))
     ruta = os.path.join(BIN, 'bricohams-mesh-admin')
     cargador = importlib.machinery.SourceFileLoader('mesh_admin', ruta)
     M = importlib.util.module_from_spec(importlib.util.spec_from_loader('mesh_admin', cargador))
@@ -177,6 +180,13 @@ try:
     st, _, pag = pide('POST', BASE, urlencode(dict(datos, accion='guardar868', url=urls['MESH433_CHANNEL_URL'])),
                       dict(COOKIE, Origin='https://sdr.ejemplo.org'))
     assert 'EU_433' in pag and 'alert-danger' in pag, 'URL de 433 en el nodo 868: no'
+    # v5.0 · el nodo 868 también tiene rol (MESH868_ROLE)
+    assert pag.count('name="rol"') == 2, 'selector de rol en los dos nodos'
+    d868 = dict(datos, accion='guardar868', largo='SDR 868', corto='S86', rol='CLIENT_BASE')
+    st, _, pag = pide('POST', BASE, urlencode(dict(d868, rol='JEFE')), dict(COOKIE, Origin='https://sdr.ejemplo.org'))
+    assert 'alert-danger' in pag and 'MESH868_ROLE' not in open(etc, encoding='utf-8').read(), 'rol no válido'
+    st, _, pag = pide('POST', BASE, urlencode(d868), dict(COOKIE, Origin='https://sdr.ejemplo.org'))
+    assert st == 200 and 'Guardado' in pag and "MESH868_ROLE='CLIENT_BASE'" in open(etc, encoding='utf-8').read()
     st, _, pag = pide('POST', BASE, urlencode({'accion': 'mapa', 'MESH433_OWRX': 'yes', 'csrf': tk}),
                       dict(COOKIE, Origin='https://sdr.ejemplo.org'))
     assert st == 200 and "MESH868_OWRX='no'" in open(etc, encoding='utf-8').read()
@@ -211,7 +221,7 @@ try:
 
     # --- v5.0: paneles TAK y Monitorización (misma sesión de /settings, lista blanca de servicios)
     ORIGEN = dict(COOKIE, Origin='https://sdr.ejemplo.org')
-    for ruta in (M.TAK, M.MONITOR):
+    for ruta in (M.TAK, M.MONITOR, M.MAPFLIGHTS):
         st, h, _ = pide('GET', ruta)
         assert st == 302 and h['Location'] == '/login?ref=' + ruta.lstrip('/'), 'sin sesión: al login'
         assert pide('POST', ruta, 'accion=tak-parar', {'Origin': 'https://sdr.ejemplo.org'})[0] == 403
@@ -219,6 +229,21 @@ try:
     real_registro = M.registro
     M.estado_unidad = lambda u: (u in instaladas, u in instaladas, 'active (running)' if u in instaladas else 'no instalado')
     M.registro = lambda u, lineas=40: 'arranque ok password=SuperSecreta <b>x</b>'
+    st, h, pag = pide('GET', M.MAPFLIGHTS, cab=COOKIE)
+    assert st == 200 and 'desactivado' in pag and 'rbfeeder' in pag
+    assert h['Cache-Control'] == 'no-store' and '<form' not in pag
+    assert pide('POST', M.MAPFLIGHTS, 'accion=guardar', ORIGEN)[0] == 405
+    with open(etc, 'a', encoding='utf-8') as f:
+        f.write('\nMAPFLIGHTS_FEED="yes"\nMAPFLIGHTS_UUID="0123abcd-4567-89ef-0123-456789abcdef"\n')
+    st, _, pag = pide('GET', M.MAPFLIGHTS, cab=COOKIE)
+    assert st == 200 and 'activado' in pag and 'formato válido' in pag
+    assert '0123abcd' not in pag and 'ClaveSecretaPSK123456' not in pag
+    assert 'no confirma' in pag and 'no reinyecta' in pag
+    with open(etc, 'a', encoding='utf-8') as f:
+        f.write('MAPFLIGHTS_UUID="<script>alert(1)</script>"\n')
+    st, _, pag = pide('GET', M.MAPFLIGHTS, cab=COOKIE)
+    assert 'formato no válido' in pag and '<script>alert' not in pag
+    assert pide('HEAD', M.MAPFLIGHTS, cab=COOKIE)[0] == 200
     st, _, pag = pide('GET', M.TAK, cab=COOKIE)
     assert st == 200 and 'TAK=yes' in pag and 'no está instalado' in pag
     st, _, pag = pide('GET', M.MONITOR, cab=COOKIE)
@@ -327,6 +352,106 @@ try:
     finally:
         M.subprocess.run = real_run
     assert 'SuperSecreta' not in r and 'abc123' not in r and 'ok' in r, 'el registro tapa claves'
+
+    # --- página Seguridad · backup remoto (SMB/NFS/SFTP/Drive/OneDrive): secretos nunca vuelven al navegador
+    st, h, _ = pide('GET', M.SEGURIDAD)
+    assert st == 302 and h['Location'] == '/login?ref=' + M.SEGURIDAD.lstrip('/')
+    ordenes = []
+    real_run = M.subprocess.run
+    # «systemctl show» (estado del temporizador al pintar la página) no cuenta como orden
+    M.subprocess.run = lambda arg, **k: (None if arg[:2] == ['systemctl', 'show'] else ordenes.append(list(arg))) or type(
+        'R', (), {'returncode': 0, 'stdout': 'LoadState=loaded\nActiveState=inactive\n', 'stderr': ''})()
+    try:
+        st, h, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
+        assert st == 200 and 'Backup remoto' in pag and h['Cache-Control'] == 'no-store'
+        assert 'value="seg-copiar"' in pag and 'name="password"' in pag and 'Todavía no se ha ejecutado' in pag
+        tks = re.search(r'name="csrf" value="([0-9a-f]+)"', pag).group(1)
+
+        def seg(**campos):
+            return pide('POST', M.SEGURIDAD, urlencode(dict(campos, csrf=tks)), ORIGEN)
+        smb = dict(accion='seg-guardar', protocolo='cifs', destino='\\\\192.168.1.10\\fw\\backup',
+                   usuario='DOMINIO\\backup', smb_version='3.0', retencion='7', programado='yes')
+        n = len(ordenes)
+        st, _, pag = seg(accion='seg-copiar')
+        assert 'alert-danger' in pag and 'primero guarda' in pag and len(ordenes) == n, 'sin configuración no se lanza'
+        for malo in (dict(smb, password='ClaveSMB_123', password2='Otra_123'),            # no coinciden
+                     dict(smb, password=''),                                               # SMB sin contraseña
+                     dict(smb, destino='\\\\srv\\a;rm -rf', password='x', password2='x'),
+                     dict(smb, protocolo='ftp', password='x', password2='x'),
+                     dict(smb, retencion='0', password='x', password2='x'),
+                     dict(smb, password='a\nb', password2='a\nb'),
+                     dict(accion='seg-guardar', protocolo='nfs', destino='nas:/x;reboot'),
+                     dict(accion='seg-guardar', protocolo='sftp', servidor='evil host', usuario='u', password='x', password2='x'),
+                     dict(accion='seg-guardar', protocolo='sftp', servidor='sftp.ej.org', puerto='70000', usuario='u',
+                          password='x', password2='x'),
+                     dict(accion='seg-guardar', protocolo='sftp', servidor='sftp.ej.org', ruta='../etc', usuario='u',
+                          password='x', password2='x'),
+                     dict(accion='seg-guardar', protocolo='gdrive', token='no es json'),
+                     dict(accion='seg-guardar', protocolo='gdrive', token='{"refresh_token":"r"}'),
+                     dict(accion='seg-guardar', protocolo='onedrive', token='{"access_token":"a"}', drive_id=''),
+                     dict(accion='seg-guardar', protocolo='onedrive', token='{"access_token":"a"}', drive_id='a b;c')):
+            st, _, pag = seg(**malo)
+            assert st == 200 and 'alert-danger' in pag, 'backup remoto rechaza %r' % malo
+        assert not os.path.exists(M.BR_CONF) and not os.path.exists(M.BR_SECRETO), 'nada se guarda si algo falla'
+        st, _, pag = seg(**dict(smb, password='ClaveSMB_Secreta_123', password2='ClaveSMB_Secreta_123'))
+        assert st == 200 and 'guardada' in pag and 'ClaveSMB_Secreta_123' not in pag, 'la contraseña no vuelve'
+        assert ['systemctl', 'enable', '--now', 'bricohams-backup-remoto.timer'] in ordenes
+        c = json.load(open(M.BR_CONF, encoding='utf-8'))
+        assert c == {'protocolo': 'cifs', 'destino': '\\\\192.168.1.10\\fw\\backup', 'usuario': 'backup',
+                     'dominio': 'DOMINIO', 'smb_version': '3.0', 'retencion': 7, 'incluir_secretos': False,
+                     'programado': True}, c
+        assert 'ClaveSMB' not in open(M.BR_CONF, encoding='utf-8').read(), 'la configuración no lleva secretos'
+        assert json.load(open(M.BR_SECRETO, encoding='utf-8')) == {'password': 'ClaveSMB_Secreta_123'}
+        if os.name == 'posix':
+            assert os.stat(M.BR_SECRETO).st_mode & 0o777 == 0o600 and os.stat(M.BR_CONF).st_mode & 0o777 == 0o600
+        st, _, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
+        assert 'ClaveSMB_Secreta_123' not in pag and 'DOMINIO\\backup' in pag and '<span class="text-success">guardada' in pag
+        st, _, pag = seg(**dict(smb, password='', programado=''))
+        assert 'alert-danger' not in pag, 'contraseña vacía = conservar la guardada'
+        assert json.load(open(M.BR_SECRETO, encoding='utf-8')) == {'password': 'ClaveSMB_Secreta_123'}
+        assert ['systemctl', 'disable', '--now', 'bricohams-backup-remoto.timer'] in ordenes
+        for orden in M.BR_ORDENES:
+            st, _, pag = seg(accion='seg-' + orden)
+            assert 'Lanzado' in pag and ordenes[-1] == ['systemctl', 'start', '--no-block',
+                                                         'bricohams-backup-remoto@%s.service' % orden]
+        n = len(ordenes)
+        for malo in ('seg-borrar', 'seg-estado', 'seg-copiar;id', 'seg-'):
+            st, _, pag = seg(accion=malo)
+            assert 'alert-danger' in pag, malo
+        assert len(ordenes) == n, 'solo las órdenes de la lista llegan a systemctl'
+        for ruta in (BASE, M.TAK, M.MONITOR, APRS):
+            st, _, pag = pide('POST', ruta, urlencode({'accion': 'seg-copiar', 'csrf': tks}), ORIGEN)
+            assert 'alert-danger' in pag, 'seg-* solo desde la página Seguridad (%s)' % ruta
+        assert len(ordenes) == n
+        assert pide('POST', M.SEGURIDAD, urlencode({'accion': 'seg-copiar', 'csrf': '0' * 40}), ORIGEN)[0] == 403
+        assert pide('POST', M.SEGURIDAD, urlencode({'accion': 'seg-copiar', 'csrf': tks}),
+                    dict(COOKIE, Origin='https://evil.example'))[0] == 403
+        # cambiar de protocolo no arrastra la contraseña SMB a otro destino
+        st, _, pag = seg(accion='seg-guardar', protocolo='sftp', servidor='sftp.ej.org', usuario='u', puerto='22')
+        assert 'falta la contraseña' in pag
+        os.makedirs(os.path.dirname(M.BR_ESTADO), exist_ok=True)
+        kh = os.path.join(os.path.dirname(M.BR_ESTADO), 'known_hosts')
+        open(kh, 'w').write('vieja')
+        st, _, pag = seg(accion='seg-guardar', protocolo='sftp', servidor='sftp.ej.org', usuario='u', puerto='22',
+                         password='ClaveSFTP_1', password2='ClaveSFTP_1')
+        assert 'Obtener huella' in pag and not os.path.exists(kh), 'servidor SFTP nuevo: huella olvidada'
+        assert json.load(open(M.BR_SECRETO, encoding='utf-8')) == {'password': 'ClaveSFTP_1'}
+        tokj = '{"access_token":"ya29.SECRETO","refresh_token":"1//RefrescoSecreto","expiry":"2030-01-01T00:00:00Z"}'
+        st, _, pag = seg(accion='seg-guardar', protocolo='onedrive', token=tokj, drive_id='b!AbC-123_x', drive_type='business')
+        assert 'alert-danger' not in pag and 'SECRETO' not in pag and 'RefrescoSecreto' not in pag
+        assert json.loads(json.load(open(M.BR_SECRETO, encoding='utf-8'))['token'])['refresh_token'] == '1//RefrescoSecreto'
+        assert json.load(open(M.BR_CONF, encoding='utf-8'))['ruta'] == 'bricohams-backup'
+        with open(M.BR_ESTADO, 'w', encoding='utf-8') as f:
+            json.dump({'copiar': {'fecha': '2025-01-01 04:30', 'ok': False, 'mensaje': 'token: abc123 <b>x</b>'},
+                       'ultima_copia': 'bricohams-<i>.tar.gz', 'ultimo_tamano': 3 * 1024 * 1024}, f)
+        st, _, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
+        assert 'abc123' not in pag and '<b>x</b>' not in pag and '<i>' not in pag and '3.0 MB' in pag
+        assert 'SECRETO' not in pag and 'value="b!AbC-123_x"' in pag
+        st, _, pag = seg(accion='seg-olvidar')
+        assert not os.path.exists(M.BR_CONF) and not os.path.exists(M.BR_SECRETO), 'olvidar borra credenciales'
+    finally:
+        M.subprocess.run = real_run
+    assert M.tapar('{"access_token":"ya29.abc","refresh_token":"1//xyz"}').count('ya29') == 0
     srv.shutdown()
     owrx.shutdown()
 
@@ -334,7 +459,9 @@ try:
     R = open(os.path.join(RAIZ, 'files', 'nginx', 'bricohams-sdr-rutas.conf'), encoding='utf-8').read()
     assert 'location /settings/bricohams/ {' in R and 'proxy_pass http://127.0.0.1:8076;' in R
     assert '^~ /settings' not in R and '= /settings' not in R, 'sin ^~ ni =: en HTTP manda la redirección a HTTPS'
-    assert 'sub_filter' not in R, 'los botones van en la plantilla de OpenWebRX+, no en nginx (también por :8073)'
+    subs = [l.strip() for l in R.splitlines() if l.strip().startswith('sub_filter ')]
+    assert len(subs) == 1 and 'webrx-top-logo' in subs[0] and 'bh-marca-logo' in subs[0], 'nginx solo cambia el logo'
+    assert 'settings/bricohams' not in ''.join(subs), 'los botones van en la plantilla de OpenWebRX+, no en nginx (también por :8073)'
     # botones en settings.html de OpenWebRX+: idempotente y reversible
     orig = ('<div class="row settings-grid">\n        <div class="col-4">\n            <a class="btn btn-secondary" '
             'href="settings/wifi">WiFi setup</a>\n        </div>\n        <div class="col-4">\n'
@@ -348,6 +475,8 @@ try:
     assert B.main(['-q']) == 0 and B.main(['-q']) == 0
     p = open(plant, encoding='utf-8').read()
     assert p.count('href="settings/bricohams/meshtastic"') == 2 and p.count('href="settings/bricohams/aprs"') == 1
+    assert p.count('data-bricohams href="settings/bricohams/seguridad"') == 1, 'botón Seguridad (pasa a HTTPS desde :8073)'
+    assert '/' + 'settings/bricohams/seguridad' == M.SEGURIDAD
     assert p.count('id="bricohams-meshweb"') == 1 and ":8443/'" in p and '$' not in p
     assert p.index('settings/bricohams/aprs') < p.index('href="features"') < p.index('</body>')
     assert B.main(['-q', '--quitar']) == 0 and open(plant, encoding='utf-8').read() == orig
@@ -377,6 +506,14 @@ try:
     assert '"$FILES/bin/bricohams-owrx-botones" /usr/local/bin/bricohams-owrx-botones' in S and '99bricohams-owrx-botones' in S
     assert 'bricohams-mesh-admin.service' in S and 'ProtectSystem=strict' in S
     assert 'ReadWritePaths=-/var/lib/bricohams-tak' in S, 'sin esto OpenTAKServer no puede escribir al cambiar claves'
+    # v5.0 · copia remota: helper root, plantilla por orden, temporizador apagado hasta configurarlo
+    assert 'ReadWritePaths=-/var/lib/bricohams-backup-remoto' in S, 'el panel borra known_hosts al cambiar de servidor'
+    assert 'install -m 700 "$FILES/bin/bricohams-backup-remoto" /usr/local/sbin/bricohams-backup-remoto' in S
+    assert 'apt_i cifs-utils nfs-common rclone openssh-client' in S
+    assert 'bricohams-backup-remoto@.service' in S and 'bricohams-backup-remoto %i' in S and 'UMask=0077' in S
+    assert 'Unit=bricohams-backup-remoto@copiar.service' in S and 'OnCalendar=*-*-* 05:15' in S
+    assert "grep -q '\"programado\": *true' /etc/bricohams/backup-remoto.json" in S, 'el timer no se enciende sin destino'
+    assert M.BR_UNIDAD == 'bricohams-backup-remoto'
     T = open(os.path.join(RAIZ, 'tools', 'instalar_tak.sh'), encoding='utf-8').read()
     assert 'try-restart bricohams-mesh-admin' in T
     assert 'confirmed_at=datetime.now(timezone.utc)' in T, 'sin confirmed_at OpenTAKServer rechaza el login (400)'

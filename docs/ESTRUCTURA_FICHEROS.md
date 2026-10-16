@@ -3,21 +3,20 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **538 ficheros** en **104 carpetas**.
+El repositorio tiene **535 ficheros** en **102 carpetas**.
 
 ## Árbol de carpetas
 
 ```
 .                                     6  Raíz del repositorio
-  .vscode/                            1
   data/                               3  Datos de entrada: repetidores, marcadores, satélites y catálogo de localizadores
     locator/                          2  Catálogo de localidades → locator Maidenhead y repetidores por zona (bricohams-locator)
       fuentes/                        5
-  docs/                              11  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
+  docs/                              10  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
     esquemas/                        46  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
-    manuales/                        38  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
+    manuales/                        37  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
   files/                              0  Todo lo que install.sh copia al sistema
-    bin/                             41  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
+    bin/                             43  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
     branding/                         4  Imagen BricoHams (cabecera, avatar, favicon) que se aplica a OpenWebRX+
     grafana/                          1  Paneles de Grafana aprovisionados por install.sh
     htdocs/                           0  Recursos web servidos por OpenWebRX+ (plugins del cliente)
@@ -74,7 +73,7 @@ El repositorio tiene **538 ficheros** en **104 carpetas**.
           utils/                      2
           visitas/                    1
     motd/                             1  Mensaje de bienvenida de la consola
-    nginx/                            2  Plantillas del sitio nginx (proxy, TLS, rutas /settings/bricohams/...)
+    nginx/                            3  Plantillas del sitio nginx (proxy, TLS, rutas /settings/bricohams/...)
     openwebrx/                        2  Plantillas de configuración de OpenWebRX+ (settings, marcadores, conf.d)
       conf.d/                         2
     share/                            0  Módulos compartidos que los parcheadores insertan en OpenWebRX+
@@ -84,7 +83,7 @@ El repositorio tiene **538 ficheros** en **104 carpetas**.
   firmware/                           0  Firmware para los microcontroladores de la estación
     pico-io/                          1  MicroPython de la Raspberry Pi Pico (sensores y ventiladores)
     rak4631-lora-aprs/               18  Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO)
-      bin/                            5
+      bin/                            4
       test/                           1
         shim/                         1
   hardware/                           0  Diseño mecánico y de RF (OpenSCAD, STL, NEC2)
@@ -102,16 +101,15 @@ El repositorio tiene **538 ficheros** en **104 carpetas**.
     caja_v3/                          1  Caja v3 en dos módulos (electrónica + potencia)
       render/                         5
       stl/                           30
-    gcode/                            1
   owrx-clone/                         6  Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+
-  tests/                             41  Pruebas automáticas (bash tests/run_tests.sh)
+  tests/                             43  Pruebas automáticas (bash tests/run_tests.sh)
     datos/                            2  Datos de prueba (fixtures) usados por los tests
       owrx/                           0
         htdocs/                       0
           lib/                        2
         owrx/                         2
       owrx-1.2.126/                   5
-  tools/                             21  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
+  tools/                             18  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
 ```
 
 ## Qué hace cada fichero
@@ -128,12 +126,6 @@ Raíz del repositorio.
 | `CHANGELOG.md` | Historial de versiones y de cada cambio |
 | `install.sh` | Instalador por pasos, idempotente: dependencias, servicios, parches de OpenWebRX+, nginx, Meshtastic, APRS, TAK, Grafana/Prometheus y copias (--lista, --solo, --backup, --actualizar) |
 | `README.md` | Presentación del proyecto, puesta en marcha rápida, estructura resumida y reglas |
-
-### `.vscode/`
-
-| Fichero | Qué hace |
-|---|---|
-| `settings.json` | Datos JSON: settings |
 
 ### `data/`
 
@@ -175,11 +167,10 @@ Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructu
 | `CANALES_Y_FRECUENCIAS.md` | Canales y frecuencias de todos los grupos de marcadores (generado por tools/canales.py) |
 | `COMPONENTES.md` | Ficha de cada componente: función, ficheros, servicio, puertos, configuración y pruebas |
 | `DATOS.md` | Conjuntos de datos: SDR, perfiles, marcadores, puertos, servicios, I2C (generado por tools/datos.py) |
-| `DESPLIEGUE_EA5KAO_2026-10-11.md` | Despliegue en la estación de EA5KAO · 11/10/2026 |
 | `ESTRUCTURA_FICHEROS.md` | Este documento (generado por tools/estructura.py) |
 | `EVALUACION_MODULOS.md` | Evaluación de módulos |
 | `HARDWARE_Y_GPIO.md` | Hardware, GPIO, buses y alimentación |
-| `MEMORIA_TECNICA.md` | Memoria técnica · Estación BricoHams SDR · EA5KAO · Mi QTH (v3.0) |
+| `MEMORIA_TECNICA.md` | Memoria técnica · Estación BricoHams SDR · N0CALL · tu QTH (v3.0) |
 | `REFERENCIAS.md` | Referencias |
 
 ### `docs/esquemas/`
@@ -226,7 +217,6 @@ Diagramas generados por tools/esquemas.py (SVG fuente + PNG).
 | `20_audio_navegador.svg` | Diagrama vectorial: 20 audio navegador |
 | `21_clonar_openwebrx.png` | Imagen / vista renderizada: 21 clonar openwebrx |
 | `21_clonar_openwebrx.svg` | Diagrama vectorial: 21 clonar openwebrx |
-| `22_zona_locator.png` | Imagen / vista renderizada: 22 zona locator |
 | `22_zona_locator.svg` | Diagrama vectorial: 22 zona locator |
 | `23_openwebrx_docker.png` | Imagen / vista renderizada: 23 openwebrx docker |
 | `23_openwebrx_docker.svg` | Diagrama vectorial: 23 openwebrx docker |
@@ -278,7 +268,6 @@ Manuales paso a paso numerados (instalación, cada servicio y cada panel).
 | `35_LORA_APRS_MESHTASTIC.md` | 35 · iGate LoRa APRS en un RAK4631 y Meshtastic 433/868, dentro de OpenWebRX+ (v4.5) |
 | `36_TAK_MAPA_LOCAL.md` | TAK local, mapa ADS-B/APRS y CHAT |
 | `37_JUSTIFICACION_CAMBIOS_V4_6.md` | 37 · Justificación de los cambios de la v4.6 |
-| `38_GITHUB_SINCRONIZACION_PRIVACIDAD.md` | 38 · GitHub: sincronización y repositorio sin datos personales (v5.1) |
 
 ### `files/bin/`
 
@@ -286,27 +275,29 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 
 | Fichero | Qué hace |
 |---|---|
-| `bricohams-api.py` | bricohams-api · EA5KAO · BricoHams (v4) |
-| `bricohams-banner` | bricohams-banner · EA5KAO · BricoHams (v4.5) |
+| `bricohams-api.py` | bricohams-api · BricoHams (v4) |
+| `bricohams-backup-remoto` | bricohams-backup-remoto · copia de la configuración fuera de la estación |
+| `bricohams-banner` | bricohams-banner · BricoHams (v4.5) |
 | `bricohams-blindaje` | bricohams-blindaje · auditoría y blindaje de seguridad de la estación (v4.4) |
-| `bricohams-camsnap.py` | bricohams-camsnap · EA5KAO · BricoHams |
+| `bricohams-bloqueo` | bricohams-bloqueo {aplicar/geo-actualizar/estado/desbanear/quitar} |
+| `bricohams-camsnap.py` | bricohams-camsnap · BricoHams |
 | `bricohams-check` | Diagnóstico de la estación: SDR, servicios, GPS, sensores, red y certificados |
-| `bricohams-dispositivos` | bricohams-dispositivos · EA5KAO · BricoHams (v4.5) |
+| `bricohams-dispositivos` | bricohams-dispositivos · BricoHams (v4.5) |
 | `bricohams-docker-compose.py` | v4.3 · docker-compose.yaml de OpenWebRX+ (imagen de slechev) a partir de bricohams.env. |
 | `bricohams-env.py` | Lee y valida bricohams.env; lo usan install.sh y los servicios |
-| `bricohams-fan.py` | bricohams-fan · EA5KAO · BricoHams |
-| `bricohams-ft2` | bricohams-ft2 · EA5KAO · BricoHams (v4, EXPERIMENTAL) |
-| `bricohams-ft2-decode` | bricohams-ft2-decode · EA5KAO · BricoHams (v4, experimental) |
-| `bricohams-ft2-patch.py` | bricohams-ft2-patch · EA5KAO · BricoHams (v4, experimental) |
-| `bricohams-io.py` | bricohams-io · EA5KAO · BricoHams |
-| `bricohams-lilygo` | bricohams-lilygo · EA5KAO · BricoHams |
+| `bricohams-fan.py` | bricohams-fan · BricoHams |
+| `bricohams-ft2` | bricohams-ft2 · BricoHams (v4, EXPERIMENTAL) |
+| `bricohams-ft2-decode` | bricohams-ft2-decode · BricoHams (v4, experimental) |
+| `bricohams-ft2-patch.py` | bricohams-ft2-patch · BricoHams (v4, experimental) |
+| `bricohams-io.py` | bricohams-io · BricoHams |
+| `bricohams-lilygo` | bricohams-lilygo · BricoHams |
 | `bricohams-locator` | Zona de la estación según su locator: coordenadas, AEMET y FM cercanas, marcadores [AUTO-LOCATOR] y METEO_STATIONS (manual 32) |
+| `bricohams-login-aviso` | bricohams-login-aviso · avisa por Telegram de cada inicio de sesión correcto en /settings. |
 | `bricohams-merge-bookmarks.py` | Une marcadores de OpenWebRX (clave: frecuencia + modo). |
 | `bricohams-mesh-admin` | Panel de administración (solo /settings, con sesión): Meshtastic 433/868, iGate RAK, APRS, TAK (credenciales) y Monitorización |
 | `bricohams-mesh-owrx` | Integra Meshtastic en la web de OpenWebRX+ (solo información de nodos y registro APRS, sin configuración) |
-| `bricohams-mesh-puente` | bricohams-mesh-puente · BricoHams SDR (v5.1, manual 35 §9, ADR-66) |
 | `bricohams-mesh-url` | Genera/lee las URL de canales Meshtastic compartidas entre los nodos 433 y 868 |
-| `bricohams-meteo.py` | bricohams-meteo · EA5KAO · BricoHams |
+| `bricohams-meteo.py` | bricohams-meteo · BricoHams |
 | `bricohams-mqtt-settings.py` | v4.2 · Tras importar un perfil (install.sh --importar), activa en settings.json el informe |
 | `bricohams-owrx-bookmarks-io` | Parche de OpenWebRX+: importar/exportar bookmarks en /settings/bookmarks |
 | `bricohams-owrx-botones` | Parche de OpenWebRX+: botones TAK y Monitorización en /settings (nunca en la página pública) |
@@ -315,14 +306,14 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 | `bricohams-owrx-repeaterbook` | Parche de OpenWebRX+: campo de clave API de RepeaterBook en /settings/general |
 | `bricohams-rak-aprs` | Puente del iGate RAK4631 (USB serie) hacia APRS-IS y el registro mostrado en la web |
 | `bricohams-rbfeeder-ini.py` | BricoHams: deja /etc/rbfeeder.ini leyendo la salida Beast de readsb |
-| `bricohams-render-settings.py` | bricohams-render-settings · EA5KAO · BricoHams |
-| `bricohams-satpass.py` | bricohams-satpass · EA5KAO · BricoHams (v4) |
-| `bricohams-sdr-serials` | bricohams-sdr-serials · EA5KAO · BricoHams |
+| `bricohams-render-settings.py` | bricohams-render-settings · BricoHams |
+| `bricohams-satpass.py` | bricohams-satpass · BricoHams (v4) |
+| `bricohams-sdr-serials` | bricohams-sdr-serials · BricoHams |
 | `bricohams-servicios` | Lista y controla los servicios BricoHams (estado, arranque, logs) |
-| `bricohams-tarea` | bricohams-tarea · EA5KAO · BricoHams (v4) |
+| `bricohams-tarea` | bricohams-tarea · BricoHams (v4) |
 | `bricohams-telegram` | bricohams-telegram "texto" · manda un aviso al grupo/canal de Telegram de la estación. |
-| `bricohams-visitas.py` | bricohams-visitas · EA5KAO · BricoHams (v4) |
-| `bricohams-wx.py` | bricohams-wx · EA5KAO · BricoHams |
+| `bricohams-visitas.py` | bricohams-visitas · BricoHams (v4) |
+| `bricohams-wx.py` | bricohams-wx · BricoHams |
 | `bricohams_locator.py` | Locator Maidenhead ⇄ coordenadas (v4.3). |
 | `bricohams_locator_bookmarks.py` | Select nearby radio sites from a curated JSON catalog for an OpenWebRX+ QTH. |
 | `bricohams_locator_online.py` | v4.3 · Datos de zona que se bajan EN LA PI al instalar (cambian a menudo, no van en el kit) |
@@ -351,7 +342,7 @@ Paneles de Grafana aprovisionados por install.sh.
 
 | Fichero | Qué hace |
 |---|---|
-| `init.js` | EA5KAO · BricoHams · Plugins del MAPA OpenWebRX+ |
+| `init.js` | BricoHams · Plugins del MAPA OpenWebRX+ |
 | `init.js.sample` | Plugin loader. |
 
 ### `files/htdocs/plugins/map/bricohams_live/`
@@ -381,7 +372,7 @@ Paneles de Grafana aprovisionados por install.sh.
 
 | Fichero | Qué hace |
 |---|---|
-| `init.js` | EA5KAO · BricoHams · Plugins del RECEPTOR OpenWebRX+ |
+| `init.js` | BricoHams · Plugins del RECEPTOR OpenWebRX+ |
 | `init.js.sample` | Receiver plugins initialization. |
 
 ### `files/htdocs/plugins/receiver/accessible_bookmark_search/`
@@ -418,7 +409,7 @@ Paneles de Grafana aprovisionados por install.sh.
 
 | Fichero | Qué hace |
 |---|---|
-| `bricohams.js` | bricohams: imagen de BricoHams (Mi QTH, Región de Murcia) para OpenWebRX+ |
+| `bricohams.js` | bricohams: imagen de BricoHams (Región de Murcia) para OpenWebRX+ |
 
 ### `files/htdocs/plugins/receiver/camara/`
 
@@ -749,8 +740,9 @@ Plantillas del sitio nginx (proxy, TLS, rutas /settings/bricohams/...).
 
 | Fichero | Qué hace |
 |---|---|
+| `bricohams-login-log.conf` | Configuración: bricohams login log |
 | `bricohams-sdr-rutas.conf` | nginx · BricoHams SDR · rutas comunes a HTTP y HTTPS (v4.2) |
-| `bricohams-sdr.conf.tmpl` | nginx · BricoHams SDR · EA5KAO (v4.2) — lo genera install.sh (paso «web») |
+| `bricohams-sdr.conf.tmpl` | nginx · BricoHams SDR · N0CALL (v4.2) — lo genera install.sh (paso «web») |
 
 ### `files/openwebrx/`
 
@@ -796,7 +788,7 @@ MicroPython de la Raspberry Pi Pico (sensores y ventiladores).
 
 | Fichero | Qué hace |
 |---|---|
-| `main.py` | bricohams-io · EA5KAO · BricoHams — firmware MicroPython para Raspberry Pi Pico |
+| `main.py` | bricohams-io · BricoHams — firmware MicroPython para Raspberry Pi Pico |
 
 ### `firmware/rak4631-lora-aprs/`
 
@@ -804,8 +796,8 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 
 | Fichero | Qué hace |
 |---|---|
-| `aprs_utils.cpp` | BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). |
-| `aprs_utils.h` | BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). |
+| `aprs_utils.cpp` | BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). |
+| `aprs_utils.h` | BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). |
 | `board_pinout.h` | BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock |
 | `bricohams_rak_aprs.cpp` | BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock |
 | `configuration.cpp` | BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock |
@@ -820,8 +812,8 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 | `lora_utils.cpp` | BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock |
 | `lora_utils.h` | BricoHams RAK4631 LoRa APRS · port de LoRa APRS iGate (CA2RXU) a WisBlock |
 | `rak4631-lora-aprs.ino` | BricoHams RAK4631 LoRa APRS (port de LoRa APRS iGate de CA2RXU a WisBlock RAK4631). |
-| `sensor_utils.cpp` | BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). |
-| `sensor_utils.h` | BricoHams RAK4631 LoRa APRS · EA5KAO / BricoHams · GPL-3.0-or-later (ver LICENSE). |
+| `sensor_utils.cpp` | BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). |
+| `sensor_utils.h` | BricoHams RAK4631 LoRa APRS · BricoHams contributors · GPL-3.0-or-later (ver LICENSE). |
 
 ### `firmware/rak4631-lora-aprs/bin/`
 
@@ -831,7 +823,6 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 | `bricohams-rak4631-lora-aprs.uf2` | Firmware iGate precompilado (UF2, arrastrar a la unidad del bootloader) |
 | `bricohams-rak4631-lora-aprs.zip` | Paquete DFU del firmware iGate (adafruit-nrfutil por USB serie, el que usa el instalador) |
 | `SHA256SUMS` | Sumas SHA-256 de los binarios del firmware iGate |
-| `VERSION.json` | Datos JSON: VERSION |
 
 ### `firmware/rak4631-lora-aprs/test/`
 
@@ -851,7 +842,7 @@ Crucetas y soportes impresos del mástil.
 
 | Fichero | Qué hace |
 |---|---|
-| `anclajes_bricohams.scad` | ANCLAJES IMPRESOS BricoHams SDR · EA5KAO (v4) |
+| `anclajes_bricohams.scad` | ANCLAJES IMPRESOS BricoHams SDR · N0CALL (v4) |
 
 ### `hardware/anclajes/render/`
 
@@ -886,7 +877,7 @@ Antenas propias: modelo OpenSCAD, piezas STL y simulación NEC2.
 
 | Fichero | Qué hace |
 |---|---|
-| `antenas_bricohams.scad` | Piezas impresas de las antenas y soportes BricoHams SDR · EA5KAO |
+| `antenas_bricohams.scad` | Piezas impresas de las antenas y soportes BricoHams SDR · N0CALL |
 
 ### `hardware/antenas/render/`
 
@@ -955,7 +946,7 @@ Caja de intemperie v2 (mástil).
 
 | Fichero | Qué hace |
 |---|---|
-| `caja_bricohams.scad` | Caja de intemperie BricoHams SDR · EA5KAO · Mi QTH (Región de Murcia) |
+| `caja_bricohams.scad` | Caja de intemperie BricoHams SDR · BricoHams SDR |
 | `README.md` | Caja de intemperie BricoHams SDR |
 
 ### `hardware/caja/render/`
@@ -1005,7 +996,7 @@ Caja v3 en dos módulos (electrónica + potencia).
 
 | Fichero | Qué hace |
 |---|---|
-| `caja_v3.scad` | Caja v3 BricoHams SDR · EA5KAO — DOS MÓDULOS al pie del mástil (~5 m) |
+| `caja_v3.scad` | Caja v3 BricoHams SDR · N0CALL — DOS MÓDULOS al pie del mástil (~5 m) |
 
 ### `hardware/caja_v3/render/`
 
@@ -1052,12 +1043,6 @@ Caja v3 en dos módulos (electrónica + potencia).
 | `potencia_tapon_pg.stl` | Pieza 3D lista para imprimir: potencia tapon pg |
 | `potencia_tejadillo.stl` | Pieza 3D lista para imprimir: potencia tejadillo |
 
-### `hardware/gcode/`
-
-| Fichero | Qué hace |
-|---|---|
-| `1004-1742-electronica_tapa_plate(01)_PETG_0.16_8h42m34s.gcode` | HEADER_BLOCK_START |
-
 ### `owrx-clone/`
 
 Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+.
@@ -1084,14 +1069,17 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_api.py` | v4: bricohams-api (ficha de indicativos) con HamQTH, RadioID y QRZ simulados. |
 | `test_audio_navegador.py` | v4.2 · Plugins de audio en un navegador DE VERDAD (Chromium sin pantalla, Playwright). |
 | `test_audio_plugins.py` | v4.2 · Plugins de audio (audio_cadena, filtro_audio, dsp_audio) con node |
+| `test_avion.py` | v5.1: ficha de avión (/bricohams/api/avion) con adsbdb y planespotters simulados. |
 | `test_blindaje.py` | v4.4 · bricohams-blindaje sobre un sistema de mentira (BH_RAIZ): el cortafuegos que genera |
+| `test_bloqueo_helper.py` | v5.1 · bricohams-bloqueo (root) y bricohams-login-aviso (Telegram). |
+| `test_bloqueo_web.py` | v5.1 · Ajustes > Seguridad: bloqueo por IP/país, panel del cortafuegos y alta/baja de usuarios. |
 | `test_bookmarks_io.py` | v5.0 · bricohams-owrx-bookmarks-io: botones Importar/Exportar en /settings/bookmarks (solo |
 | `test_caja.py` | Comprueba la caja: que están todas las piezas, que caben en la Kobra S1 |
+| `test_chat_moderador.py` | v5.1: moderador del chat de bricohams-visitas. Reglas (inyección, enlaces, |
 | `test_ctcss_patch.py` | v5.0 · bricohams-owrx-ctcss: subtono CTCSS («Subtono FM») en bookmarks y squelch CTCSS. |
-| `test_env_red.py` | v4.2 · Los dos fallos de la instalación real en la Pi de EA5KAO |
+| `test_env_red.py` | v4.2 · Los dos fallos de la instalación real en la Pi de N0CALL |
 | `test_fan.py` | Curva de los ventiladores de la caja (bricohams-fan). |
 | `test_ft2.py` | v4 (experimental): FT2 en OpenWebRX+. |
-| `test_git_sanear.py` | v5.1 · tools/git_sanear.sh y tools/datos_personales.py (manual 38). |
 | `test_instalador_docker.py` | Verifica backend Docker de OpenWebRX+ sin requerir un daemon Docker. |
 | `test_instalador_os.py` | v3.1: el instalador vale para Trixie (Debian 13) y Bookworm (Debian 12). |
 | `test_instalador_perfil.py` | v4.2 · owrx-clone dentro del instalador BricoHams |
@@ -1110,14 +1098,13 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_render_settings.py` | Rellena settings.json.tmpl con bricohams.env.example y comprueba receptores, |
 | `test_repeaterbook.py` | v5.0 · bricohams-owrx-repeaterbook: campo «RepeaterBook API key» en /settings/general (solo |
 | `test_satpass.py` | v4: pases de satélites (bricohams-satpass) comparados con Skyfield cuando está |
-| `test_ssl_admin.py` | v4.2 · SSL_MODO (decisión de EA5KAO: «el certificado SSL es solo para la página de settings»). |
+| `test_ssl_admin.py` | v4.2 · SSL_MODO (decisión de N0CALL: «el certificado SSL es solo para la página de settings»). |
 | `test_v3_hardware.py` | v3: comprueba las piezas de antenas y de la caja v3 (selector en el .scad, |
 | `test_v45_dispositivos.py` | v4.5 · inventario de dispositivos con un /sys de mentira (SDR por su serie, RAK4631, LilyGO, lo que falta |
-| `test_v51_aprs_web.py` | v5.1 · Interfaz web del APRS: la pasarela del RAK (bricohams-rak-aprs) con su API local |
-| `test_v51_mesh_puente.py` | v5.1 · bricohams-mesh-puente: interfaz web de Meshtastic para el LilyGO 433 por USB. |
 | `test_viento_lluvia.py` | Viento RS485 (Modbus RTU), pluviómetro y paquete APRS WX completo. |
 | `test_visitas.py` | v4: bricohams-visitas. IP parcial, GeoIP (simulada), avisos de Telegram con |
 | `test_wx_bme280.py` | Compensación BME280/BMP280 contra el ejemplo de la hoja de datos de Bosch |
+| `test_wx_rak.py` | v5: la estación meteo toma T/HR/P y la posición del RAK4631 (rak-aprs.json). |
 
 ### `tests/datos/`
 
@@ -1167,11 +1154,8 @@ Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilació
 | `canales.py` | v4: genera docs/CANALES_Y_FRECUENCIAS.md a partir de data/marcadores_v4.json y de |
 | `compilar_rak.sh` | Compila el firmware iGate para todas las placas (PlatformIO) y deja los binarios |
 | `datos.py` | Genera docs/DATOS.md a partir de los ficheros del repositorio |
-| `datos_personales.py` | tools/datos_personales.py · BricoHams SDR (v5.1, manual 38) |
-| `datos_personales_huellas.txt` | Huellas SHA-256 de datos personales que no deben ir al GitHub público (manual 38). |
 | `esquemas.py` | Genera los esquemas de docs/esquemas/ (SVG, y PNG si hay cairosvg). |
 | `estructura.py` | Genera docs/ESTRUCTURA_FICHEROS.md (este árbol con descripciones) |
-| `git_sanear.sh` | tools/git_sanear.sh · BricoHams SDR (v5.1, manual 38) |
 | `instalar_tak.sh` | Instala OpenTAKServer (venv, PostgreSQL, CA, usuarios con clave aleatoria en /etc/bricohams/tak-access.txt) |
 | `locator_catalogo.py` | v4.3 · Construye data/locator/catalogo_es.json, el catálogo nacional que usa el instalador |
 | `marcadores.py` | Genera y fusiona marcadores de OpenWebRX |

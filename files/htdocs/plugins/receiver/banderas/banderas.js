@@ -1,7 +1,7 @@
 /*
  * banderas: bandera del país en los mensajes FT8 / FT4 / FT2 / WSPR / JT65… de OpenWebRX+
  *
- * Autor: EA5KAO · BricoHams (v4)
+ * Autor: BricoHams (v4)
  *
  * El servidor de OpenWebRX+ ya calcula el país de cada indicativo (campos
  * «ccode» y «country» del mensaje). Este plugin pone la bandera delante del
@@ -12,7 +12,7 @@
  */
 
 Plugins.banderas._version = '1.0.0';
-Plugins.banderas._author = 'EA5KAO';
+Plugins.banderas._author='BricoHams';
 Plugins.banderas.no_css = true;
 
 Plugins.banderas.bandera = function (cc) {

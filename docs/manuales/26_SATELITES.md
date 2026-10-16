@@ -1,5 +1,11 @@
 # 26 · Satélites: aviso de próximos pases, ▶ Escuchar con Doppler e imágenes METEOR
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Satélites, Doppler y FT2 experimental](../GUIA_VISUAL_MODULOS.md#satelites).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ## 1. Qué ve el oyente
 - **Franja en lo alto de la web:**
   - antes del pase: «🛰️ **SO-50** en 12 min (18:42) · máx 54° · 11 min · 436,795 NFM **[▶ Escuchar]**»;
@@ -14,6 +20,8 @@
   - las decodifica **SatDump** como servicio de fondo de OpenWebRX+ cuando el receptor de satélites está libre;
   - aparecen en el menú **Files** de la web;
   - el instalador baja SatDump de GitHub si `SATDUMP_ENABLE="yes"`.
+  - en el waterfall la señal LRPT solo se oye como ruido digital: la imagen no se ve en directo, sale en **Files** al acabar el pase;
+  - algunas compilaciones de SatDump 2.x buscan sus plugins solo en `/usr/local/lib/satdump`. Si faltan, el pase se salta sin imagen; el instalador crea el enlace `/usr/local/lib/satdump → /usr/lib/satdump` y `bricohams-check` avisa si no está.
 
 ## 2. Cómo se calcula (ADR-31)
 - **`bricohams-satpass`**, cada 15 min (temporizador systemd):
@@ -44,5 +52,6 @@ La estación **solo recibe**. «Autoconfigurar el duplex» aquí significa sinto
 sudo -u openwebrx bricohams-satpass --ver    # pases de las próximas 24 h
 systemctl list-timers bricohams-satpass.timer
 command -v satdump && satdump --help | head -3
+ls -l /usr/local/lib/satdump                 # enlace a /usr/lib/satdump
 ```
 - **En la web:** pulsa **PASES** y después ▶ en un pase en curso. La frecuencia del receptor debe moverse sola unos pocos kHz durante el pase.

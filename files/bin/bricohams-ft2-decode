@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # =====================================================================
-#  bricohams-ft2-decode · EA5KAO · BricoHams  (v4, experimental)
+#  bricohams-ft2-decode · BricoHams  (v4, experimental)
 #  Decodifica un trozo WAV de 3,75 s (12 kHz, 16 bits, mono) en modo FT2 con
 #  «decodium-rx» (Decodium 4.0 Core Shannon, IU8LMC, GPLv3) y escribe cada
 #  mensaje en el MISMO formato que «jt9», para que OpenWebRX+ lo lea con su
 #  analizador de FT8/FT4 sin cambios:
-#     decodium-rx:  "  12:00:15.00   -9  0.1  1234  CQ EA5KAO IM98"
-#     salida:       "120015  -9  0.1 1234 ~  CQ EA5KAO IM98"
+#     decodium-rx:  "  12:00:15.00   -9  0.1  1234  CQ N0CALL IM98"
+#     salida:       "120015  -9  0.1 1234 ~  CQ N0CALL IM98"
 #  Uso (lo llama OpenWebRX+ con el modo FT2): bricohams-ft2-decode [-d N] fichero.wav
 # =====================================================================
 import os

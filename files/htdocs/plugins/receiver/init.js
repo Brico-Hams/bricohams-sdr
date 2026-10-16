@@ -1,5 +1,5 @@
 // =====================================================================
-//  EA5KAO · BricoHams · Plugins del RECEPTOR OpenWebRX+
+//  BricoHams · Plugins del RECEPTOR OpenWebRX+
 //  Ruta: /usr/lib/python3/dist-packages/htdocs/plugins/receiver/init.js
 //  Lo instala bricohams-install. Tras cambiarlo basta con recargar la web (Ctrl+F5).
 // =====================================================================
@@ -19,15 +19,42 @@ window.rig_skin_config = {
     smeter: { offset_hf: 7, offset_vhf: -50, iaru_vhf: true }
 };
 
+// v5.1 · las páginas /bricohams/ (privacidad, políticas, portal) las sirve nginx en el 443, no
+// OpenWebRX+: si se entra directo por un puerto propio (p. ej. :8073) los enlaces van a https://<host>/
+// (http:// solo con SSL_MODO=no). Por el 443 quedan relativos.
+const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' : 'https://') + location.hostname : '';
+
 // Botones propios de la barra superior: DX (rig_skin) · SOL · 21,3° (METEO) · CAM
 window.solar_config     = { lat: __LAT__, lon: __LON__ };                   // QTH para día/noche
 window.meteo_config     = { url: 'static/plugins/receiver/meteo/meteo.json' };
-window.camara_config    = { live: 'auto', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · Mi QTH' };
+window.camara_config    = { live: 'auto', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · __QTH__' };
 window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
 // v4
 window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
-window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: '/bricohams/privacidad.html' };
+window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: BH_WEB + '/bricohams/privacidad.html' };
 window.dvficha_config   = { api: '/bricohams/api/indicativo', segundos: 20 };
+window.identificacion_config = {
+    enabled: '__VISITAS_ENABLE__' === 'yes',
+    endpoint: '/bricohams/api/oyentes',
+    health: '/bricohams/api/salud',
+    privacidad: BH_WEB + '/bricohams/privacidad.html',
+    chat_obligatorio: '__CHAT_REGISTRO__' !== 'no',   // CHAT_REGISTRO_OBLIGATORIO en bricohams.env
+    chat_dias: 14
+};
+// v5.1 · plugins de EA5HKX (gitlab.com/openwebrx-plugins). Los descarga install.sh en un commit fijo
+// y comprueba su sha256; si no se pudieron verificar quedan en 'no'. Manual 41.
+window.ea5hkx_config = {
+    callsign_gate: '__CALLSIGN_GATE__' === 'yes',      // PLUGIN_CALLSIGN_GATE: indicativo o nombre antes de entrar
+    tone_detector: '__TONE_DETECTOR__' === 'yes',      // PLUGIN_TONE_DETECTOR: panel CTCSS en el navegador
+    anuncio: '__CALLSIGN_ANUNCIO__' === 'yes',          // CALLSIGN_GATE_ANUNCIO: «Chat iniciado por …» en cada visita
+    titulo: '__OPERADOR__',
+    telegram: window.bricohams_config.telegram,
+    privacidad: BH_WEB + '/bricohams/privacidad.html'
+};
+// v5 · aviso de cookies, idioma ES/EN y logo BricoHams
+window.consentimiento_config = { politicas: BH_WEB + '/bricohams/politicas.html', privacidad: BH_WEB + '/bricohams/privacidad.html', dias: 180 };
+window.idioma_config = { defecto: 'navegador' };   // 'es', 'en' o 'navegador'
+window.marca_config  = { logo: 'static/plugins/receiver/marca/bricohams-logo.png', url: BH_WEB + '/bricohams/', titulo: 'BricoHams' };
 // v4.2 · audio en el navegador del oyente (botones FILTRO y DSP). Por defecto apagados:
 // cada oyente los enciende y sus ajustes se guardan en su navegador.
 window.filtro_audio_config = { modo: 'voz', activo: false };
@@ -99,17 +126,21 @@ const PluginsOpcionales = [
         await Plugins.load(rig_url);
         if (RIG_POR_DEFECTO) setTimeout(function () {
             try {
-                if (localStorage.getItem('ea5kao_rig_default')) return;
+                if (localStorage.getItem('bh_rig_default')) return;
                 if (typeof UI !== 'undefined' && UI.setTheme) UI.setTheme('rig');
-                localStorage.setItem('ea5kao_rig_default', '1');
+                localStorage.setItem('bh_rig_default', '1');
             } catch (e) { /* sin almacenamiento: no pasa nada */ }
         }, 500);
     } catch (e) { console.warn('rig_skin', e); }
 
-    // Plugins locales de EA5KAO (htdocs/plugins/receiver/<nombre>/)
+    // Plugins locales de BricoHams (htdocs/plugins/receiver/<nombre>/)
     // audio_cadena va antes que filtro_audio y dsp_audio (es su base común)
-    for (const name of ['solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha', 'satelites', 'visitas',
-                        'audio_cadena', 'filtro_audio', 'dsp_audio']) {
+    // ea5hkx_puente va antes que callsign_gate (adapta su ventana y filtra su anuncio en el chat)
+    const externoActivo = { callsign_gate: window.ea5hkx_config.callsign_gate, tone_detector: window.ea5hkx_config.tone_detector };
+    for (const name of ['idioma', 'marca', 'consentimiento', 'solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha',
+                        'satelites', 'visitas', 'identificacion', 'ea5hkx_puente', 'callsign_gate',
+                        'audio_cadena', 'filtro_audio', 'dsp_audio', 'tone_detector']) {
+        if (externoActivo[name] === false) continue;
         try { await Plugins.load(name); } catch (e) { console.warn(name, e); }
     }
 
@@ -174,7 +205,7 @@ const PluginsOpcionales = [
                 return section;
             };
             await Plugins.listeners.setup({ supabaseUrl: LISTENERS.url, supabaseKey: LISTENERS.key, network: 'bricohams',
-                                           receiverName: 'EA5KAO · Mi QTH', receiverUrl: location.origin });
+                                           receiverName: '__OPERADOR__ · __QTH__', receiverUrl: location.origin });
         } catch (e) { console.warn('listeners', e); }
     }
 

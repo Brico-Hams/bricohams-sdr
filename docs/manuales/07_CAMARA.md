@@ -1,5 +1,11 @@
 # 07 · Cámara del mástil (Waveshare RPi Camera (F) · OV5647 con visión nocturna)
 
+<!-- guia-visual:inicio -->
+> **Ruta visual:** [Cámara y MediaMTX](../GUIA_VISUAL_MODULOS.md#camara).
+> Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
+> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+<!-- guia-visual:fin -->
+
 ## 1. Cámara y conexión (v4)
 - **Cámara:** **Waveshare RPi Camera (F)**.
   - OV5647 de 5 MP, enfoque manual, 50° de diagonal y dos LED IR de 850 nm.
