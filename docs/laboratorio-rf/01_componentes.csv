@@ -1,0 +1,2 @@
+componente_id;revision;componente_padre_id;tipo;fabricante;modelo;serie_o_etiqueta;fecha_recepcion;conector_entrada;conector_salida;puerto_tercero;banda_min_Hz;banda_max_Hz;alimentacion_V;corriente_max_A;potencia_RF_max_dBm;ficha_archivo;foto_archivo;estado;observaciones
+;;;;;;;;;;;;;;;;;;NO_ENSAYADO;

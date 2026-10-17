@@ -8,6 +8,10 @@
 
 ![Plan del mástil](../esquemas/11_plan_mastil.png)
 
+**Comprobación RF antes del montaje:** [laboratorio y hojas de ensayo](../laboratorio-rf/README.md)
+y [manual NanoVNA](45_NANOVNA.md). Una ROE baja no acredita ganancia ni eficiencia.
+Medir sin transmisores conectados y con el plano de referencia documentado.
+
 ## 1. Qué va en el mástil y por qué ahí
 
 | Altura sobre la abrazadera superior | Antena | Por qué |
