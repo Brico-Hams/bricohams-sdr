@@ -9,7 +9,10 @@ import os
 import sys
 import tempfile
 import time
+import json
+import urllib.error
 from contextlib import redirect_stderr
+from unittest.mock import patch
 
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 BIN = os.path.join(RAIZ, 'files', 'bin')
@@ -66,6 +69,27 @@ with redirect_stderr(err):
     b.avisar('x')
     esperar(lambda: 'Telegram' in err.getvalue())
 assert 'SECRETO' not in err.getvalue() and '***' in err.getvalue(), err.getvalue()
+
+def respuesta_ok(*args, **kwargs):
+    return io.BytesIO(json.dumps({'ok': True, 'result': {'message_id': 123}}).encode())
+with patch.object(tgm.urllib.request, 'urlopen', respuesta_ok):
+    assert tgm.enviar_mensaje('123:SECRETO', '-100', 'prueba')['message_id'] == 123
+def respuesta_migrada(*args, **kwargs):
+    cuerpo = json.dumps({'ok': False, 'error_code': 400, 'description': 'group upgraded 123:SECRETO',
+                         'parameters': {'migrate_to_chat_id': -100123}}).encode()
+    raise urllib.error.HTTPError('url', 400, 'Bad Request', {}, io.BytesIO(cuerpo))
+with patch.object(tgm.urllib.request, 'urlopen', respuesta_migrada):
+    try:
+        tgm.enviar_mensaje('123:SECRETO', '-100', 'prueba')
+        raise AssertionError('Confunde error HTTP con entrega')
+    except RuntimeError as ex:
+        assert 'migrado' in str(ex) and 'SECRETO' not in str(ex)
+login = cargar('login_aviso', os.path.join(BIN, 'bricohams-login-aviso'))
+linea = '192.168.1.5 - [17/Oct/2026:17:00:00 +0200] "POST /login HTTP/2.0" 303 "/settings"'
+avisador = login.Avisador(enviar=lambda texto: False)
+assert not avisador.linea(linea) and not avisador.ultimo, 'un fallo no debe bloquear el siguiente aviso'
+avisador.enviar = lambda texto: True
+assert avisador.linea(linea) and not avisador.linea(linea)
 
 # ------------------------------------------------------------------ registro de oyentes
 api = cargar('api', os.path.join(BIN, 'bricohams-api.py'))
@@ -154,6 +178,16 @@ for k in ('CALLSIGN', 'IGATE_CALLSIGN', 'RAK_CALLSIGN'):
 
 # ------------------------------------------------------------------ APRS que decodifica OpenWebRX+ (MQTT openwebrx/APRS)
 vis = cargar('visitas', os.path.join(BIN, 'bricohams-visitas.py'))
+with tempfile.TemporaryDirectory() as d:
+    db_resumen = vis.abrir_db(os.path.join(d, 'resumen.sqlite'))
+    with patch.object(vis, 'abrir_db', return_value=db_resumen), patch(
+            'bricohams_telegram.enviar_mensaje') as enviar_resumen:
+        assert vis.main(['visitas', '--resumen']) == 0
+        assert enviar_resumen.call_count == 1 and 'resumen' in enviar_resumen.call_args.args[2]
+        enviar_resumen.side_effect = RuntimeError('fallo simulado de entrega')
+        with redirect_stderr(io.StringIO()):
+            assert vis.main(['visitas', '--resumen']) == 1, 'resumen no debe terminar antes de confirmar envio'
+    db_resumen.close()
 os.environ.update(APRS_TELEGRAM='propios', APRS_TELEGRAM_CALLS='EA0TST,EA0TST-10,')
 avisos = []
 with tempfile.TemporaryDirectory() as d:

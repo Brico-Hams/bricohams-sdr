@@ -9,6 +9,7 @@
 #   copia        copia de seguridad (bricohams-backup) + perfil de OpenWebRX+ (owrx-clone)
 #   reinicio     reinicio preventivo (se aplaza si hay un pase de satélite en curso)
 #   salud        bricohams-check; avisa por Telegram si algo falla
+#   estado       estado periódico del servidor, aunque no haya averías
 #   geoip        actualiza la base GeoIP de las visitas
 #   resumen      resumen diario de visitas por Telegram
 #   satpass      recalcula los pases de satélites
@@ -21,6 +22,7 @@ log() { echo "$(date '+%F %T') $*" >>"$LOG"; }
 # v4.3 · backend de OpenWebRX+ (nativo o Docker) y rutas que calcula install.sh
 # shellcheck source=/dev/null
 [ -r /etc/bricohams/bricohams.env ] && . /etc/bricohams/bricohams.env
+export TELEGRAM_TOKEN TELEGRAM_CHAT_ID
 HTDOCS=${OWRX_HTDOCS:-/usr/lib/python3/dist-packages/htdocs}
 
 case "${1:-}" in
@@ -63,10 +65,29 @@ case "${1:-}" in
         if [ "$ko" -gt 0 ]; then
             resumen=$(echo "$out" | grep '✘' | head -8 | sed 's/\x1b\[[0-9;]*m//g')
             if [ ! -f "$marca" ] || [ "$(cat "$marca")" != "$resumen" ]; then
-                mkdir -p /run/bricohams; echo "$resumen" >"$marca"; tg "🩺 Problemas en la estación:
-$resumen"
+                if tg "🩺 Problemas en la estación:
+$resumen"; then
+                    mkdir -p /run/bricohams; echo "$resumen" >"$marca"
+                else
+                    log "salud: Telegram no enviado; se reintentara"; exit 1
+                fi
             fi
-        elif [ -f "$marca" ]; then rm -f "$marca"; tg "✅ La estación vuelve a estar bien"; fi ;;
+        elif [ -f "$marca" ]; then
+            if tg "✅ La estación vuelve a estar bien"; then rm -f "$marca"
+            else log "salud: recuperacion no notificada; se reintentara"; exit 1; fi
+        fi ;;
+    estado)
+        servicios=""
+        for unidad in openwebrx bricohams-satrec bricohams-visitas bricohams-api bricohams-mesh-admin; do
+            estado=$(systemctl is-active "$unidad" 2>/dev/null) || estado="${estado:-desconocido}"
+            servicios="${servicios}
+${unidad}: ${estado}"
+        done
+        tg "Estado del servidor · $(date '+%F %T %Z')
+Tiempo encendido: $(uptime -p)
+Disco raíz: $(df -h --output=pcent,avail / | tail -n 1)
+${servicios}" || { log "estado: Telegram no enviado"; exit 1; }
+        log "estado: enviado" ;;
     geoip)   /usr/local/bin/bricohams-visitas --geoip >>"$LOG" 2>&1 ;;
     resumen) /usr/local/bin/bricohams-visitas --resumen >>"$LOG" 2>&1 ;;
     satpass) systemctl start bricohams-satpass.service ;;

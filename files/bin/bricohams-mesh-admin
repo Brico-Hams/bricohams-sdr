@@ -2060,12 +2060,35 @@ def informes_capturas(capturas, catalogo, env):
             '<th>Resultado de captura</th><th>Informe manual</th></tr>' + ''.join(filas) + '</table></div>')
 
 
-def pagina_satelites(s, aviso='', error=''):
+def filtro_satelites(parametros):
+    banda = parametros.get('banda', '')
+    limites = {'': (0, 100000), '2m': (144, 148), '70cm': (430, 440),
+               '137': (137, 138), '400': (400, 401)}
+    if banda not in limites:
+        raise ValueError('Banda no válida.')
+    valores = []
+    for clave in ('desde_mhz', 'hasta_mhz'):
+        texto = parametros.get(clave, '').strip().replace(',', '.')
+        if texto and (not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,6})?', texto)
+                      or not 0 < float(texto) <= 100000):
+            raise ValueError('Frecuencia no válida: usa MHz positivos (máximo 100000).')
+        valores.append(float(texto) if texto else None)
+    desde, hasta = valores
+    if desde is not None and hasta is not None and desde > hasta:
+        raise ValueError('La frecuencia inicial no puede superar la final.')
+    minimo, maximo = limites[banda]
+    return max(minimo, desde if desde is not None else minimo), min(maximo, hasta if hasta is not None else maximo)
+
+
+def pagina_satelites(s, aviso='', error='', filtros=None):
     inicio = cabecera('Satélites y agendas de captura', SATELITES)
     try:
         env = leer_env()
         lista, pases_f, estado_f, _ = rutas_agenda(env)
         catalogo = agenda_json(lista)['satelites']
+        filtros = filtros or {}
+        minimo, maximo = filtro_satelites(filtros)
+        frecuencias = {x['norad']: x.get('mhz') for x in catalogo}
         pases = agenda_json(pases_f)['pases']
         estado = agenda_json(estado_f)
         excluir = {x.strip().upper() for x in env.get('SATREC_EXCLUIR', '').split(',')}
@@ -2084,22 +2107,41 @@ def pagina_satelites(s, aviso='', error=''):
         for p in sorted(pases, key=lambda x: x['aos']):
             if p['los'] <= time.time():
                 continue
+            mhz = p['hz'] / 1e6 if p.get('hz') else frecuencias.get(p['norad'])
+            if (filtros.get('banda') or filtros.get('desde_mhz') or filtros.get('hasta_mhz')) and (
+                    mhz is None or not minimo <= mhz <= maximo):
+                continue
+            bajada = 'Sin frecuencia' if mhz is None else '%.6f MHz' % mhz
             ident = '%s:%s' % (p['norad'], int(p['aos']))
             omitido = ident in omitidos
             estado_p = 'Omitido' if omitido else ('Programado' if ident in planificados else 'No programado (filtros, solape o ya capturado)')
             fecha = time.strftime('%d/%m %H:%M', time.localtime(p['aos']))
-            filas.append('<tr><td>%s</td><td>%s</td><td>%s°</td><td>%s</td><td>'
+            filas.append('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s°</td><td>%s</td><td>'
                          '<form method="post" action="%s">%s<input type="hidden" name="pase" value="%s">'
                          '<button class="btn btn-sm btn-secondary" name="accion" value="%s">%s</button></form></td></tr>' % (
-                             e(p['nombre']), fecha, e(p['max_el']), estado_p, SATELITES, oculto, e(ident),
+                             e(p['nombre']), e(bajada), fecha, e(p['max_el']), estado_p, SATELITES, oculto, e(ident),
                              'sat-incluir' if omitido else 'sat-omitir', 'Reconsiderar' if omitido else 'Omitir este pase'))
         capturas = informes_capturas(estado.get('capturas', []), catalogo, env)
+        selector = '<form method="get" action="%s"><label>Banda de bajada <select name="banda">' % SATELITES
+        selector += ''.join('<option value="%s"%s>%s</option>' % (
+            valor, ' selected' if filtros.get('banda', '') == valor else '', titulo)
+            for valor, titulo in (('', 'Todas'), ('2m', '2 m (144–148 MHz)'),
+                                  ('70cm', '70 cm (430–440 MHz)'), ('137', '137–138 MHz'),
+                                  ('400', '400–401 MHz (telemetría)')))
+        selector += '</select></label>'
+        selector += ''.join('<label>%s <input type="text" inputmode="decimal" name="%s" value="%s"></label>' % (
+            titulo, clave, e(filtros.get(clave, '')))
+            for clave, titulo in (('desde_mhz', 'Desde MHz'), ('hasta_mhz', 'Hasta MHz')))
+        selector += ('<button class="btn btn-secondary">Filtrar pases</button> '
+                     '<a href="%s">Quitar filtros</a></form>'
+                     '<p>Filtros de consulta, inclusivos y combinables: no cambian las capturas programadas '
+                     'ni la selección de satélites. Para una frecuencia exacta, usa el mismo valor en ambos campos.</p>') % SATELITES
         return (inicio + avisos(aviso, error) + '<h1>Satélites y agendas de captura</h1>'
                 '<p>Un solo receptor: los pases solapados se priorizan por inicio. Reconsiderar un pase no evita '
                 'los filtros ni garantiza recepción. Horas locales del servidor. Los cambios no se aplican durante un pase.</p>'
                 + formulario + '<h2>Próximos pases</h2><p><a href="/static/plugins/receiver/satelites/pases.ics">'
                 'Descargar agenda de capturas (ICS)</a> · <a href="/files">Grabaciones e imágenes (Files)</a></p>'
-                '<div class="table-responsive"><table class="table"><tr><th>Satélite</th><th>Inicio</th>'
+                + selector + '<div class="table-responsive"><table class="table"><tr><th>Satélite</th><th>Bajada</th><th>Inicio</th>'
                 '<th>Máxima</th><th>Estado</th><th>Agenda</th></tr>' + ''.join(filas[:100]) + '</table></div>'
                 + capturas + '</div></div></div></body></html>')
     except (OSError, ValueError, KeyError, TypeError) as x:
@@ -2267,6 +2309,9 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         if ruta == MESH_CHAT:
             return pagina_chat(s, aviso, error, auto=parse_qs(urlsplit(self.path).query).get('auto') == ['1'],
                                host=self.headers.get('Host', ''))
+        if ruta == SATELITES:
+            filtros = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}
+            return pagina_satelites(s, aviso, error, filtros=filtros)
         return PAGINAS[ruta](s, aviso, error)
 
     do_HEAD = do_GET

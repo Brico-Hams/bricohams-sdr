@@ -346,6 +346,7 @@ def ultimos_bloqueos(ruta=CHAT_LOG, n=20):
 
 
 def telegram_envio():
+    from bricohams_telegram import enviar_mensaje
     tok, chat = env('TELEGRAM_TOKEN'), env('TELEGRAM_CHAT_ID')
     if not tok or not chat:
         return None
@@ -353,10 +354,8 @@ def telegram_envio():
     def enviar(texto):
         def _t():
             try:
-                datos = urllib.parse.urlencode({'chat_id': chat, 'text': texto, 'parse_mode': 'HTML',
-                                                'disable_web_page_preview': 'true'}).encode()
-                urllib.request.urlopen('https://api.telegram.org/bot%s/sendMessage' % tok, datos, timeout=15).read()
-            except Exception as e:
+                enviar_mensaje(tok, chat, texto)
+            except (RuntimeError, ValueError) as e:
                 print('visitas: Telegram: %s' % e, file=sys.stderr)
         threading.Thread(target=_t, daemon=True).start()
     return enviar
@@ -445,11 +444,15 @@ def main(argv):
         if '--estado' in argv:
             print(json.dumps(r, indent=1, ensure_ascii=False))
             return 0
-        tg = telegram_envio()
         top = ' '.join('%s%d' % (bandera(p['cc']), p['n']) for p in r['paises_30d'][:10])
-        if tg:
-            tg('📊 <b>BricoHams SDR · resumen</b>\nHoy: <b>%d</b> visitas · total %d\n30 días: %s' % (r['hoy'], r['total'], top))
-            time.sleep(5)
+        from bricohams_telegram import enviar_mensaje
+        try:
+            enviar_mensaje(env('TELEGRAM_TOKEN'), env('TELEGRAM_CHAT_ID'),
+                           '📊 <b>BricoHams SDR · resumen</b>\nHoy: <b>%d</b> visitas · total %d\n30 días: %s' %
+                           (r['hoy'], r['total'], top))
+        except (ValueError, RuntimeError) as ex:
+            print('visitas: resumen no enviado: %s' % ex, file=sys.stderr)
+            return 1
         return 0
     return servicio()
 

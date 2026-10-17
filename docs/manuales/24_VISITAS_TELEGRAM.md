@@ -28,6 +28,8 @@
    - borra las visitas a los **90 días** (`VISITAS_DIAS`) y conserva solo los contadores diarios por país.
 3. **Cron** (manual 25):
    - resumen diario a las 21:00;
+   - estado del servidor cada seis horas (`CRON_ESTADO`, verbo `estado`);
+     `salud` solo notifica fallos nuevos y recuperaciones, no un estado periódico;
    - actualización de la GeoIP el día 2 de cada mes.
 
 ## 2. Crear el bot y el grupo de Telegram
@@ -59,8 +61,20 @@ empieza por `-100`. El antiguo deja de funcionar.
 
 1. Haz una copia de `/etc/bricohams/*.env` (`sudo tar czf /var/backups/bricohams/pre-telegram.tar.gz /etc/bricohams/*.env`).
 2. Obtén el id nuevo con `getUpdates` (punto 3) o en el campo `migrate_to_chat_id` del error.
-3. Sustituye `TELEGRAM_CHAT_ID` en `bricohams.env` y aplica con `sudo bash install.sh --solo visitas,tareas`.
-4. Prueba con `bricohams-telegram "prueba"`.
+3. Sincroniza el destino en el kit instalado, `/etc/bricohams/bricohams.env`,
+   `telegram.env`, `visitas.env` y `api.env`. Reinicia `bricohams-visitas`,
+   `bricohams-api` y `bricohams-login-aviso`: los procesos activos conservan su
+   entorno anterior aunque el archivo ya esté corregido. No es necesario
+   reiniciar OpenWebRX para corregir Telegram.
+4. Prueba con `sudo bricohams-telegram "prueba"` y
+   `sudo bricohams-tarea estado`. El emisor devuelve error si Telegram rechaza
+   el mensaje y muestra el motivo sin el token; una cola aceptada no confirma entrega.
+
+Los oyentes LAN no se notifican por defecto: para incluirlos usa
+`VISITAS_AVISAR_LAN="yes"` en el kit y en `visitas.env`, y reinicia visitas.
+Los avisos de sesión requieren `TG_AVISO_LOGIN="yes"` y un inicio de sesión
+correcto nuevo; abrir Settings con una cookie existente no genera un inicio.
+Se mantiene el límite de un aviso por IP cada diez minutos.
 
 ## 3. Privacidad
 - **Por qué hay que avisar:** registrar IPs, aunque sea truncadas, y la localización es tratar datos personales. Por eso la web tiene un **aviso de privacidad** (`/bricohams/privacidad.html`, enlazado en la descripción del receptor y en el contador) que explica qué se guarda, para qué, cuánto tiempo y cómo ejercer los derechos.
@@ -118,3 +132,9 @@ sudo nano /etc/bricohams/bricohams.env         # OYENTES_TELEGRAM, MESH_TELEGRAM
 sudo bash install.sh --solo web,visitas,lilygo,rak
 journalctl -u bricohams-mesh-owrx -u bricohams-rak-aprs | grep telegram
 ```
+
+## v5.4: agendas, avisos y acceso
+
+![Acceso, administración y Files protegidos](../esquemas/29_acceso_administracion.png)
+
+sudo tools/desplegar-agenda-telegram.sh <kit-nuevo> <kit-instalado> actualiza agendas, avisos de login y paneles privados con copia previa en /var/backups/bricohams/ y restauración automática si falla; no actúa durante un pase protegido. Prueba: 	ests/test_agendas_admin.py, 	ests/test_login_rate.py (12 intentos/min, ráfaga 5, 429) y 	ests/test_files_protegidos.py (Files sin borrado, 403 incluso autenticado).

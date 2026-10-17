@@ -3,7 +3,7 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **1031 ficheros** en **206 carpetas**.
+El repositorio tiene **1065 ficheros** en **209 carpetas**.
 
 ## Árbol de carpetas
 
@@ -15,11 +15,12 @@ El repositorio tiene **1031 ficheros** en **206 carpetas**.
       fuentes/                        5
   docs/                              12  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
     capturas/                         2
-    en/                               1
-    esquemas/                        48  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
+    demo-sdr/                         3
+    en/                               2
+    esquemas/                        56  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
     manuales/                        43  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
   files/                              0  Todo lo que install.sh copia al sistema
-    bin/                             52  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
+    bin/                             54  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
     branding/                         4  Imagen BricoHams (cabecera, avatar, favicon) que se aplica a OpenWebRX+
     grafana/                          1  Paneles de Grafana aprovisionados por install.sh
     htdocs/                           0  Recursos web servidos por OpenWebRX+ (plugins del cliente)
@@ -80,6 +81,7 @@ El repositorio tiene **1031 ficheros** en **206 carpetas**.
           uikit/                     10
           utils/                      2
           visitas/                    1
+    meshweb/                          1
     motd/                             1  Mensaje de bienvenida de la consola
     nginx/                            3  Plantillas del sitio nginx (proxy, TLS, rutas /settings/bricohams/...)
     openwebrx/                        2  Plantillas de configuración de OpenWebRX+ (settings, marcadores, conf.d)
@@ -87,6 +89,7 @@ El repositorio tiene **1031 ficheros** en **206 carpetas**.
     share/                            0  Módulos compartidos que los parcheadores insertan en OpenWebRX+
       bricohams-ctcss/                2
       bricohams-rbimport/             1
+    systemd/                          1
     web/                              4  Portal estático /bricohams/ y página de privacidad
   firmware/                           0  Firmware para los microcontroladores de la estación
     pico-io/                          1  MicroPython de la Raspberry Pi Pico (sensores y ventiladores)
@@ -206,14 +209,14 @@ El repositorio tiene **1031 ficheros** en **206 carpetas**.
       stl/                           45
     gcode/                            1
   owrx-clone/                         6  Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+
-  tests/                             61  Pruebas automáticas (bash tests/run_tests.sh)
+  tests/                             70  Pruebas automáticas (bash tests/run_tests.sh)
     datos/                            2  Datos de prueba (fixtures) usados por los tests
       owrx/                           0
         htdocs/                       0
           lib/                        2
         owrx/                         2
       owrx-1.2.126/                   5
-  tools/                             23  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
+  tools/                             32  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
 ```
 
 ## Qué hace cada fichero
@@ -294,11 +297,20 @@ Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructu
 | `mapa-capas.png` | Imagen / vista renderizada: mapa capas |
 | `mapa-herramientas.png` | Imagen / vista renderizada: mapa herramientas |
 
+### `docs/demo-sdr/`
+
+| Fichero | Qué hace |
+|---|---|
+| `README.md` | Demostración SDR narrada y anonimizada |
+| `SDR_Demo_ES.srt` | Fichero SDR Demo ES |
+| `SDR_Demo_ES_anonimizada.mp4` | Fichero SDR Demo ES anonimizada |
+
 ### `docs/en/`
 
 | Fichero | Qué hace |
 |---|---|
 | `MAPFLIGHTS_PLUGIN.md` | map.flights module for OpenWebRX+ |
+| `MODULE_DEVELOPMENT.md` | Modules and how they were developed |
 
 ### `docs/esquemas/`
 
@@ -352,8 +364,16 @@ Diagramas generados por tools/esquemas.py (SVG fuente + PNG).
 | `24_blindaje.svg` | Diagrama vectorial: 24 blindaje |
 | `25_lora_owrx.png` | Imagen / vista renderizada: 25 lora owrx |
 | `25_lora_owrx.svg` | Diagrama vectorial: 25 lora owrx |
+| `26_procedimiento_seguro.png` | Imagen / vista renderizada: 26 procedimiento seguro |
 | `26_procedimiento_seguro.svg` | Diagrama vectorial: 26 procedimiento seguro |
+| `27_adsb_destinos.png` | Imagen / vista renderizada: 27 adsb destinos |
 | `27_adsb_destinos.svg` | Diagrama vectorial: 27 adsb destinos |
+| `28_meshtastic_dual.png` | Imagen / vista renderizada: 28 meshtastic dual |
+| `28_meshtastic_dual.svg` | Diagrama vectorial: 28 meshtastic dual |
+| `29_acceso_administracion.png` | Imagen / vista renderizada: 29 acceso administracion |
+| `29_acceso_administracion.svg` | Diagrama vectorial: 29 acceso administracion |
+| `30_despliegues_acotados.png` | Imagen / vista renderizada: 30 despliegues acotados |
+| `30_despliegues_acotados.svg` | Diagrama vectorial: 30 despliegues acotados |
 
 ### `docs/manuales/`
 
@@ -436,11 +456,13 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 | `bricohams-mesh-owrx` | Integra Meshtastic en la web de OpenWebRX+ (solo información de nodos y registro APRS, sin configuración) |
 | `bricohams-mesh-puente` | bricohams-mesh-puente · BricoHams SDR (v5.1, manual 35 §9, ADR-66) |
 | `bricohams-mesh-url` | Genera/lee las URL de canales Meshtastic compartidas entre los nodos 433 y 868 |
+| `bricohams-meshweb` | Fichero bricohams meshweb |
 | `bricohams-meteo.py` | bricohams-meteo · BricoHams |
 | `bricohams-mqtt-settings.py` | v4.2 · Tras importar un perfil (install.sh --importar), activa en settings.json el informe |
 | `bricohams-owrx-bookmarks-io` | Parche de OpenWebRX+: importar/exportar bookmarks en /settings/bookmarks |
 | `bricohams-owrx-botones` | Parche de OpenWebRX+: botones TAK y Monitorización en /settings (nunca en la página pública) |
 | `bricohams-owrx-ctcss` | Parche de OpenWebRX+: subtono CTCSS (FM) en bookmarks y silenciador por tono |
+| `bricohams-owrx-files` | Fichero bricohams owrx files |
 | `bricohams-owrx-mapflights` | Fichero bricohams owrx mapflights |
 | `bricohams-owrx-rbimport` | Parche de OpenWebRX+: importar repetidores de RepeaterBook por región a bookmarks (con subtono) |
 | `bricohams-owrx-repeaterbook` | Parche de OpenWebRX+: campo de clave API de RepeaterBook en /settings/general |
@@ -902,6 +924,12 @@ Paneles de Grafana aprovisionados por install.sh.
 |---|---|
 | `visitas.js` | visitas: oyentes conectados y contador de visitas (OpenWebRX+) |
 
+### `files/meshweb/`
+
+| Fichero | Qué hace |
+|---|---|
+| `favoritos.js` | Adapter for the SHA-256-pinned Meshtastic Web 2.6.7 module. |
+
 ### `files/motd/`
 
 Mensaje de bienvenida de la consola.
@@ -918,7 +946,7 @@ Plantillas del sitio nginx (proxy, TLS, rutas /settings/bricohams/...).
 |---|---|
 | `bricohams-login-log.conf` | Configuración: bricohams login log |
 | `bricohams-sdr-rutas.conf` | nginx · BricoHams SDR · rutas comunes a HTTP y HTTPS (v4.2) |
-| `bricohams-sdr.conf.tmpl` | nginx · BricoHams SDR · N0CALL (v4.2) — lo genera install.sh (paso «web») |
+| `bricohams-sdr.conf.tmpl` | nginx · BricoHams SDR (v4.2) — lo genera install.sh (paso «web») |
 
 ### `files/openwebrx/`
 
@@ -948,6 +976,12 @@ Plantillas de configuración de OpenWebRX+ (settings, marcadores, conf.d).
 | Fichero | Qué hace |
 |---|---|
 | `bricohams_rbimport.py` | owrx/controllers/settings/bricohams_rbimport.py (BricoHams) |
+
+### `files/systemd/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bricohams-mesh-puente.service` | Unidad systemd: bricohams mesh puente |
 
 ### `files/web/`
 
@@ -2163,6 +2197,7 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `meteo_ejemplo.json` | Molina de Segura (Los Valientes) |
 | `run_tests.sh` | Lanza todas las pruebas: shellcheck, sintaxis y tests de Python |
 | `test_actualizar.py` | v4.1 · install.sh --actualizar. |
+| `test_agendas_admin.py` | Paneles privados de satelites y clima: formularios, backup y acciones reales simuladas. |
 | `test_anclajes.py` | v4: anclajes impresos. Cada pieza de tools/anclajes.sh tiene selector en el |
 | `test_anonimato.py` | Rama genérica: ningún fichero puede llevar datos de la estación original. |
 | `test_api.py` | v4: bricohams-api (ficha de indicativos) con HamQTH, RadioID y QRZ simulados. |
@@ -2181,6 +2216,8 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_ctcss_patch.py` | v5.0 · bricohams-owrx-ctcss: subtono CTCSS («Subtono FM») en bookmarks y squelch CTCSS. |
 | `test_env_red.py` | v4.2 · Los dos fallos de la instalación real en la Pi de N0CALL |
 | `test_fan.py` | Curva de los ventiladores de la caja (bricohams-fan). |
+| `test_files_protegidos.py` | Bloqueo servidor Files: sin botones, 403 incluso autenticado, sin borrar. |
+| `test_finalizar_satelites_ctcss.py` | Fichero test finalizar satelites ctcss |
 | `test_ft2.py` | v4 (experimental): FT2 en OpenWebRX+. |
 | `test_fuentes.py` | v5.0 · «¿Quieres una estación como esta?»: enlace a las fuentes del kit (FUENTES_URL) en el |
 | `test_git_sanear.py` | v5.1 · tools/git_sanear.sh y tools/datos_personales.py (manual 38). |
@@ -2190,10 +2227,14 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_live_map.py` | ADS-B reciente, APRS-IS y mensajes de chat sin transmitir por RF. |
 | `test_locator_bookmarks.py` | Locator conversion and geographic bookmark selection from a curated catalog. |
 | `test_locator_es.py` | v4.3 · Marcadores y meteo de zona para CUALQUIER locator de España (manual 32) |
+| `test_login_rate.py` | Las consultas API sin sesion no redirigen ni consumen intentos de password. |
 | `test_mapflights.py` | v5.1: map.flights como destino adicional a RadarBox (conector Beast + MLAT con el UUID). |
 | `test_mapflights_api.py` | Ficha de mapa desde map.flights y selector en General Settings. |
 | `test_mesh_admin.py` | v4.5 · bricohams-mesh-admin: el panel Meshtastic 433/868 solo existe dentro de /settings |
 | `test_mesh_owrx.py` | v4.5 · integración directa con OpenWebRX+ por su MQTT: el publicador MQTT mínimo contra un broker de |
+| `test_mesh_puente.py` | v5.1 · bricohams-mesh-puente: interfaz web de Meshtastic para el LilyGO 433 por USB. |
+| `test_meshweb.py` | Guarded client adapter: pinning, idempotence and preservation of vendor files. |
+| `test_meshweb_favoritos.cjs` | Fichero test meshweb favoritos |
 | `test_meteo.py` | bricohams-meteo con respuestas simuladas de AEMET (una estación con 404) y Open-Meteo. |
 | `test_monitorizacion.py` | v5.0 · paso_monitorizacion de install.sh (Prometheus + node-exporter + Grafana). |
 | `test_owrx_clone.py` | v4.2 · owrx-clone: exportar una estación OpenWebRX+ de mentira (un árbol de ficheros con su |
@@ -2206,7 +2247,9 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_registro_oyentes.py` | Pruebas de registro voluntario, privacidad, límites y endpoint HTTP. |
 | `test_render_settings.py` | Rellena settings.json.tmpl con bricohams.env.example y comprueba receptores, |
 | `test_repeaterbook.py` | v5.0 · bricohams-owrx-repeaterbook: campo «RepeaterBook API key» en /settings/general (solo |
+| `test_satelites_filtros.cjs` | Fichero test satelites filtros |
 | `test_satpass.py` | v4: pases de satélites (bricohams-satpass) comparados con Skyfield cuando está |
+| `test_satpass_fuentes.py` | Catalogo y fallback orbital: nunca asociar TLE de otro NORAD. |
 | `test_satrec.py` | v5.0: bricohams-satrec (grabación automática de pases) con un OpenWebRX+ websocket falso. |
 | `test_ssl_admin.py` | v4.2 · SSL_MODO (decisión de N0CALL: «el certificado SSL es solo para la página de settings»). |
 | `test_systemd_unidades.py` | Unidades systemd que escribe install.sh: sin ciclos de orden. |
@@ -2262,18 +2305,27 @@ Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilació
 | Fichero | Qué hace |
 |---|---|
 | `activar_mapa_local.sh` | Despliega el mapa local sin reinstalar ni reconfigurar RadarBox/MLAT. |
+| `actualizar-satrec.sh` | Fichero actualizar satrec |
 | `anclajes.sh` | Exporta los anclajes impresos (v4): crucetas para unir tubos sin abrazaderas en U, |
 | `antenas.sh` | Exporta las piezas impresas de antenas y soportes, comprueba que caben en |
 | `branding.py` | v4: rehace la imagen superior de OpenWebRX (files/branding/receiver_top_photo.png) |
 | `caja.sh` | Exporta todas las piezas de la caja a STL, comprueba que caben en la |
 | `caja_v3.sh` | Exporta las piezas de la caja v3 (módulos de electrónica, potencia y SAI), |
 | `canales.py` | v4: genera docs/CANALES_Y_FRECUENCIAS.md a partir de data/marcadores_v4.json y de |
+| `cerrar-backend-publico.sh` | Fichero cerrar backend publico |
 | `compilar_rak.sh` | Compila el firmware iGate para todas las placas (PlatformIO) y deja los binarios |
+| `corregir-login-429.sh` | Fichero corregir login 429 |
 | `datos.py` | Genera docs/DATOS.md a partir de los ficheros del repositorio |
 | `datos_personales.py` | tools/datos_personales.py · BricoHams SDR (v5.1, manual 38) |
 | `datos_personales_huellas.txt` | Huellas SHA-256 de datos personales que no deben ir al GitHub público (manual 38). |
+| `desplegar-agenda-telegram.sh` | Fichero desplegar agenda telegram |
+| `desplegar-agendas.sh` | Fichero desplegar agendas |
+| `desplegar-files-amsat.sh` | Fichero desplegar files amsat |
+| `desplegar-mesh-dual.sh` | Despliegue acotado; no ejecuta el instalador completo ni modifica parametros RF. |
 | `esquemas.py` | Genera los esquemas de docs/esquemas/ (SVG, y PNG si hay cairosvg). |
+| `esquemas_modulos.py` | Esquemas 28-30 (v5.4): Meshtastic dual, acceso/administracion y despliegues acotados. |
 | `estructura.py` | Genera docs/ESTRUCTURA_FICHEROS.md (este árbol con descripciones) |
+| `finalizar-satelites-ctcss.sh` | Fichero finalizar satelites ctcss |
 | `generar-guia-visual.cjs` | Fichero generar guia visual |
 | `git_sanear.sh` | tools/git_sanear.sh · BricoHams SDR (v5.1, manual 38) |
 | `instalar_tak.sh` | Instala OpenTAKServer (venv, PostgreSQL, CA, usuarios con clave aleatoria en /etc/bricohams/tak-access.txt) |
