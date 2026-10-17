@@ -4,8 +4,10 @@
 //   MÓDULO DE ELECTRÓNICA  (VARIANTE="electronica")
 //     - Rejilla universal de montaje (insertos M3 cada 20 mm + ranuras de bridas):
 //       cabe cualquier SDR futuro (SDRplay, HydraSDR, otro RTL) sin reimprimir.
+//     - Bandeja intermedia de SDR (bandeja_sdr) con bahías para 3 SDR más:
+//       HackRF One, RTL-SDR V4 y Airspy HF+ Discovery (lista SDR_DECK).
 //     - Bandeja superior para Pi 5 + HAT y los 2 LilyGO.
-//     - 14 pasamuros N hembra (2 filas de 7) + prensaestopas M25 (alimentación
+//     - 18 pasamuros N hembra (filas de 7 + 7 + 4) + prensaestopas M25 (alimentación
 //       desde el módulo de potencia), M20 (LAN) y 4 × PG7 (BME280, RS485 de viento,
 //       pluviómetro y reserva) en la cara inferior.
 //     - Ventilación forzada: entrada de 60 mm abajo a la izquierda y salida de
@@ -14,31 +16,41 @@
 //   MÓDULO DE POTENCIA  (VARIANTE="potencia")
 //     - Base Schuko de superficie + cargador USB de 120 W + gatillo USB-C PD a 12 V,
 //       portafusibles y regleta WAGO. Entrada de 230 V por PG9 y salida M25.
+//   MÓDULO SAI  (VARIANTE="sai", opcional, debajo del de potencia)
+//     - Reaprovecha un SAI line-interactive (placa, transformador y batería de plomo
+//       12 V 7–9 Ah) con filtro EMI de red a la entrada y otro a la salida.
+//     - Batería en cuna con repisa y correa; placa del SAI de canto en dos guías;
+//       transformador en pletina; filtros EMI en escuadras. Lista SAI_LAYOUT.
+//     - Prensaestopas PG9 «RED» y «SALIDA» (al PG9 de 230 V del módulo de potencia)
+//       y PG7 «DATOS» (USB/serie del SAI a la Pi). Rejillas arriba y abajo (hidrógeno).
 //
 //  Coordenadas montada: X ancho, Y alto (0 = abajo), Z fondo (0 = espalda).
 //  Exportar: openscad -D 'VARIANTE="potencia"' -D 'PART="cuerpo"' -o …  (tools/caja_v3.sh)
 // =====================================================================
 
-VARIANTE = "electronica";   // electronica | potencia
+VARIANTE = "electronica";   // electronica | potencia | sai
 PART = "montaje";           // montaje | cuerpo | tapa | tejadillo | placa_rejilla | bandeja | poste_bandeja |
+                            // bandeja_sdr | poste_superior |
                             // capota | rejilla_ventilador | junta_tapa | pletina_pared | soporte_mastil |
                             // soporte_dongle | soporte_hub | soporte_lilygo | soporte_sdrplay | soporte_wago |
-                            // tapon_n | tapon_pg | soporte_schuko | brida_cargador
+                            // tapon_n | tapon_pg | soporte_schuko | brida_cargador |
+                            // soporte_bateria | guia_pcb | pletina_trafo | soporte_filtro
 CAMARA = true;              // ventana de la cámara en la tapa del módulo de electrónica
 $fn = 48;
 E = 0.01;
 FONT = "DejaVu Sans:style=Bold";
 EL = VARIANTE == "electronica";
+SAI = VARIANTE == "sai";
 
 // ------------------------------ medidas ------------------------------
-W = EL ? 228 : 170;
-H = EL ? 240 : 200;
-D = 112;
+W = EL ? 228 : SAI ? 228 : 170;
+H = EL ? 240 : SAI ? 240 : 200;
+D = EL ? 140 : SAI ? 140 : 112;   // electrónica: 140 de fondo para la 3.ª fila de N y la bandeja de SDR
 T = 3.6;                    // pared de 9 líneas de 0,4: más rígida que la v2
 R = 8;
 GAP_LID = 3;  LID_T = 4.4;  RIB_H = 6;  GROOVE_W = 4.6;  GASKET_W = 4.8;  GASKET_H = 4;
 EAR_L = 9;  EAR_Y = 18;  EAR_Z = 10;
-EARS_Y = EL ? [24, 92, 148, 216] : [24, 100, 176];
+EARS_Y = H == 240 ? [24, 92, 148, 216] : [24, 100, 176];
 HOLE_M3 = 3.4;  INS_M3 = 4.0;  INS_M3_L = 6;
 HOLE_M4 = 4.5;  INS_M4 = 5.6;  INS_M4_L = 8.5;
 HOLE_M5 = 5.5;
@@ -51,11 +63,12 @@ PL_BOSS = [[12, 12], [PL[2] - 12, 12], [12, PL[3] - 12], [PL[2] - 12, PL[3] - 12
 
 // conectores inferiores
 N_HOLE = 16.2;              // pasamuros N hembra (rosca 5/8")
-N_ROWS = [[26, ["SAT", "HAM", "VHF", "HF", "ADSB", "868", "GPS"]], [56, ["M433", "IG433", "DISC2", "HF2", "R1", "R2", "R3"]]];
+N_ROWS = [[26, ["SAT", "HAM", "VHF", "HF", "ADSB", "868", "GPS"]], [56, ["M433", "IG433", "DISC2", "HF2", "R1", "R2", "R3"]], [86, ["HRF", "AHF", "V4", "R4"]]];
 N_PITCH = 27;
-GL_Z = 88;
+GL_Z = 116;
 GLANDS_E = [["M25", 25.4, "PWR"], ["M20", 20.4, "LAN"], ["PG7", 12.7, "WX"], ["PG7", 12.7, "VIENTO"], ["PG7", 12.7, "LLUVIA"], ["PG7", 12.7, "RES"]];
 GLANDS_P = [["PG9", 15.5, "230 V"], ["M25", 25.4, "A ELECTRONICA"]];
+GLANDS_S = [["PG9", 15.5, "RED"], ["PG9", 15.5, "SALIDA"], ["PG7", 12.7, "DATOS"]];
 
 // ventiladores de 60 mm (12 V PWM de 4 hilos)
 FAN = 60;  FAN_HOLE = 57;  FAN_SCREW = 50;
@@ -68,7 +81,7 @@ CAM_C = [W / 2, 210];  CAM_WIN = [76, 26];  CAM_PC = [86.5, 36.5];  CAM_FRAME = 
 // tejadillo y fijación
 ROOF_A = 5;  ROOF_GAP = 10;
 ROOF_PILLARS = [[14, 24], [W - 14, 24], [14, D - 20], [W - 14, D - 20]];
-WALL_Y = EL ? [40, 200] : [40, 160];
+WALL_Y = H == 240 ? [40, 200] : [40, 160];
 
 // --------------------------- utilidades ------------------------------
 module rrect(w, h, r) { translate([r, r]) offset(r) square([w - 2 * r, h - 2 * r]); }
@@ -143,6 +156,12 @@ module cuerpo() {
             glands(GLANDS_E);
             fan_hole(-1, FAN_IN[0], FAN_IN[1]);
             fan_hole(1, FAN_OUT[0], FAN_OUT[1]);
+        } else if (SAI) {
+            glands(GLANDS_S);
+            for (x = [20 : 9 : W - 20]) translate([x, -1, 90]) cube([3.5, T + 2, 24]);              // entrada de aire abajo
+            for (x = [30 : 9 : W - 30]) translate([x, H - T - 1, 30]) cube([3.5, T + 2, 60]);       // salida (hidrógeno) bajo el tejadillo
+            translate([W - 0.6, H / 2, D / 2]) rotate([90, 0, 90]) linear_extrude(1) rotate(-90)
+                text("SAI · BATERÍA 12 V", size = 8, font = FONT, halign = "center", valign = "center");
         } else {
             glands(GLANDS_P);
             for (x = [20 : 9 : W - 20]) translate([x, -1, 82]) cube([3.5, T + 2, 18]);              // rejilla de entrada
@@ -199,9 +218,9 @@ module tapa() {
             }
         }
         translate([W / 2, 48, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
-            text(EL ? "BricoHams SDR" : "POTENCIA 230 V", size = EL ? 15 : 11, font = FONT, halign = "center", valign = "center");
+            text(EL ? "BricoHams SDR" : SAI ? "SAI 230 V · Pb" : "POTENCIA 230 V", size = EL ? 15 : 11, font = FONT, halign = "center", valign = "center");
         translate([W / 2, 26, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
-            text(EL ? "BricoHams SDR" : "NO ABRIR CON TENSIÓN", size = 6, font = FONT, halign = "center", valign = "center");
+            text(EL ? "BricoHams SDR" : SAI ? "DESENCHUFAR Y QUITAR BATERÍA" : "NO ABRIR CON TENSIÓN", size = 6, font = FONT, halign = "center", valign = "center");
     }
 }
 
@@ -259,13 +278,14 @@ module placa_rejilla() {
             translate([x, y, -1]) cylinder(d = INS_M3, h = 10);                       // inserto M3 en cada nudo
             translate([x + PITCH / 2 - 1.4, y - 4, -1]) cube([2.8, 8, 10]);          // ranura de brida entre nudos
         }
-        translate([8, 3, PL_T - 0.5]) linear_extrude(1) text(EL ? "REJILLA 20 mm · M3" : "POTENCIA", size = 4, font = FONT);
+        translate([8, 3, PL_T - 0.5]) linear_extrude(1) text(EL ? "REJILLA 20 mm · M3" : SAI ? "SAI · BATERIA" : "POTENCIA", size = 4, font = FONT);
     }
 }
 
 // ----------------------- bandeja de la Pi ----------------------------
-PI5 = [85, 56];  PI5_HOLES = [58, 49];  BAND = [170, 92];  BAND_H = 46;
+PI5 = [85, 56];  PI5_HOLES = [58, 49];  BAND = [170, 92];  BAND_H = 71;
 PI_OFF = [8, 10];  BAND_Y = 118;  DONGLE_Y = 28;
+BAND_POSTS = [[6, 6], [BAND[0] - 6, 6], [6, BAND[1] - 6], [BAND[0] - 6, BAND[1] - 6]];
 module bandeja() {   // bandeja con la Pi 5 + HAT (izquierda) y 2 LilyGO (derecha)
     difference() {
         union() {
@@ -274,14 +294,52 @@ module bandeja() {   // bandeja con la Pi 5 + HAT (izquierda) y 2 LilyGO (derech
             for (k = [0, 1]) translate([108 + k * 31, 12, 0]) difference() { cube([29.4, 67.4, 7]); translate([1.2, 1.2, 5]) cube([27, 65, 5]); translate([4, 6, -1]) cube([21.4, 55.4, 10]); }
         }
         for (i = [0, 1], j = [0, 1]) translate([PI_OFF[0] + 3.5 + i * PI5_HOLES[0], PI_OFF[1] + 3.5 + j * PI5_HOLES[1], -1]) cylinder(d = 2.4, h = 20);
-        for (p = [[6, 6], [BAND[0] - 6, 6], [6, BAND[1] - 6], [BAND[0] - 6, BAND[1] - 6]]) translate([p[0], p[1], -1]) cylinder(d = HOLE_M3, h = 10);
+        for (p = BAND_POSTS) translate([p[0], p[1], -1]) cylinder(d = HOLE_M3, h = 10);
         translate([PI_OFF[0] + 16, PI_OFF[1] + 14, -1]) cube([50, 28, 10]);         // aire bajo la Pi
         for (k = [0, 1], y = [25, 60]) translate([106 + k * 31, y, -1]) cube([2.8, 3, 20]);
         translate([4, BAND[1] - 5, 2.5]) linear_extrude(1) text("Pi 5 + HAT          LilyGO ×2", size = 3.5, font = FONT);
     }
 }
-module poste_bandeja() {   // 4 postes: rejilla (M3 abajo) → bandeja (M3 arriba)
-    difference() { cylinder(d = 10, h = BAND_H); translate([0, 0, -1]) cylinder(d = INS_M3, h = INS_M3_L + 1); translate([0, 0, BAND_H - INS_M3_L]) cylinder(d = INS_M3, h = INS_M3_L + 1); }
+module poste(h) { difference() { cylinder(d = 10, h = h); translate([0, 0, -1]) cylinder(d = INS_M3, h = INS_M3_L + 1); translate([0, 0, h - INS_M3_L]) cylinder(d = INS_M3, h = INS_M3_L + 1); } }
+module poste_bandeja() { poste(DECK_H); }                     // 6: rejilla → bandeja_sdr (4 bajo la Pi + 2 delanteros)
+module poste_superior() { poste(BAND_H - DECK_H - DECK_T); }  // 4: bandeja_sdr → bandeja de la Pi (espárrago M3 × 14)
+
+// -------------- bandeja intermedia de SDR (3 SDR más) ----------------
+// Va sobre la fila de dongles y la bahía SDRplay y bajo la bandeja de la Pi. Coordenadas absolutas
+// del módulo (DECK_O = esquina) y de cada SDR relativas a la bandeja: [nombre, [x, y], [largo x, ancho y, alto]].
+// Los conectores (SMA/USB) quedan en los extremos del lado largo, con ≥ 12 mm libres para el cable.
+DECK_O = [30, 54];  DECK = [167, 170];  DECK_T = 3;  DECK_H = 38;
+SDR_DECK = [["HRF", [20, 82], [124, 79, 20]], ["V4", [12, 20], [85, 26, 13]], ["AHF", [112, 6], [45, 60, 12]]];
+DECK_FRONT = [[PL[0] + 40, PL[1] + 120], [PL[0] + 100, PL[1] + 120]];   // nudos de la rejilla
+function deck_posts() = concat(DECK_FRONT, [for (p = BAND_POSTS) [PL[0] + 20 + p[0], PL[1] + BAND_Y + p[1]]]);
+module bahia_x(l, w) {   // carriles en los lados largos; extremos abiertos para los conectores
+    for (y = [-2, w]) translate([-2, y, 0]) cube([l + 4, 2, 6]);
+    for (x = [-2, l], y = [0, w - 8]) translate([x, y, 0]) cube([2, 8, 6]);
+}
+module bahia(l, w) { if (l >= w) bahia_x(l, w); else translate([l, 0, 0]) rotate(90) bahia_x(w, l); }
+module bandeja_sdr() {
+    difference() {
+        union() {
+            cube([DECK[0], DECK[1], DECK_T]);
+            for (p = deck_posts()) translate([p[0] - DECK_O[0], p[1] - DECK_O[1], 0]) cylinder(d = 12, h = DECK_T);
+            for (x = [0, DECK[0] - 2]) translate([x, 0, 0]) cube([2, DECK[1], DECK_T + 4]);   // nervios de borde
+            for (y = [0, DECK[1] - 2]) translate([0, y, 0]) cube([DECK[0], 2, DECK_T + 4]);
+            for (s = SDR_DECK) translate([s[1][0], s[1][1], DECK_T - E]) bahia(s[2][0], s[2][1]);
+        }
+        for (p = deck_posts()) translate([p[0] - DECK_O[0], p[1] - DECK_O[1], -1]) cylinder(d = HOLE_M3, h = 10);
+        for (s = SDR_DECK) {
+            l = s[2][0]; w = s[2][1]; lx = l >= w;
+            // rejillas de aire bajo cada SDR
+            for (k = [10 : 10 : (lx ? l : w) - 10])
+                translate([s[1][0], s[1][1], -1]) if (lx) translate([k - 2, 6, 0]) cube([4, w - 12, 10]); else translate([6, k - 2, 0]) cube([l - 12, 4, 10]);
+            // ranuras de brida a los dos lados de los carriles
+            for (f = [0.3, 0.7]) translate([s[1][0], s[1][1], -1])
+                if (lx) for (y = [-6.8, w + 2.4]) translate([l * f - 1.5, y, 0]) cube([3, 4.4, 10]);
+                else for (x = [-6.8, l + 2.4]) translate([x, w * f - 1.5, 0]) cube([4.4, 3, 10]);
+            translate([s[1][0] + l / 2, s[1][1] + w / 2, DECK_T - 0.5]) linear_extrude(1)
+                text(s[0], size = 6, font = FONT, halign = "center", valign = "center");
+        }
+    }
 }
 
 // --------------------- soportes para la rejilla ----------------------
@@ -322,6 +380,67 @@ module soporte_schuko() {   // pletina que atornilla la base Schuko a la rejilla
 }
 module brida_cargador() {   // abrazadera en U para sujetar el cargador enchufado (no se cae con vibración)
     difference() { cube([110, 16, 40]); translate([10, -1, 3]) cube([90, 18, 38]); for (x = [5, 105]) translate([x, 8, -1]) cylinder(d = HOLE_M3, h = 6); }
+}
+
+// -------------------- módulo SAI (batería + placa) --------------------
+// Coordenadas sobre la rejilla (0,0 = esquina inferior izquierda de placa_rejilla):
+// [nombre, [x, y], [ancho x, alto y, fondo z]] = hueco reservado (pieza impresa + componente).
+// Medidas por defecto de un SAI de 600 VA: batería 12 V 7–9 Ah (151 × 65 × 94 + bornes),
+// placa ≈ 210 × 70 mm, transformador EI ≈ 80 × 62 × 65 y filtros EMI de chasis 85 × 50 × 30.
+SAI_BAT = [151, 100, 65];          // ancho × alto con bornes × fondo (de pie, bornes arriba)
+SAI_PCB = [210, 70];               // largo × alto de la placa del SAI (medir la tuya)
+SAI_TRAFO = [80, 62, 65];
+FILTRO = [85, 50, 30];             // filtro EMI monofásico de chasis (largo con orejas × ancho × grueso)
+SAI_LAYOUT = [["BAT", [50, 4], [159, 106, 74]], ["PCB", [6, 6], [40, 216, 82]], ["TRAFO", [50, 118], [85, 70, 70]],
+              ["EMI_OUT", [140, 118], [34, 86, 54]], ["EMI_IN", [178, 118], [34, 86, 54]], ["DC", [50, 194], [86, 28, 25]]];
+GUIA_Y = [18, 168];                // guías de la placa del SAI (lejos de los tornillos de la rejilla)
+function sai(n) = [for (s = SAI_LAYOUT) if (s[0] == n) s][0];
+module nudos(o, l, w, m = 6) {     // agujeros en los nudos de la rejilla que caen dentro de la pieza
+    for (x = [PITCH : PITCH : PL[2] - PITCH / 2], y = [PITCH : PITCH : PL[3] - PITCH / 2])
+        if (x - o[0] > m && x - o[0] < l - m && y - o[1] > m && y - o[1] < w - m) translate([x - o[0], y - o[1], 0]) children();
+}
+module alivio(o) { for (b = PL_BOSS) translate([b[0] - o[0], b[1] - o[1], -1]) cylinder(d = 9, h = 3.5); }   // cabezas de la rejilla
+module soporte_bateria() {   // cuna: repisa abajo, laterales con ventanas para correa de 20 mm
+    s = sai("BAT"); o = s[1]; L = s[2][0]; A = s[2][1]; F = s[2][2];
+    difference() {
+        union() {
+            cube([L, A, 3]);
+            cube([L, 4, F]);                                                        // repisa (aguanta el peso)
+            translate([0, 4, F - 3]) cube([L, 10, 3]);                              // labio delantero
+            for (x = [0, L - 3]) cube([3, A, F]);                                   // laterales
+            for (x = [L / 3, 2 * L / 3]) translate([x - 1.5, 0, 0]) cube([3, 4, F]);   // nervios bajo la repisa
+        }
+        for (y = [22, 66]) translate([-1, y, F - 6.5]) cube([L + 2, 22, 3.5]);     // ventanas de la correa
+        nudos(o, L, A) { translate([0, 0, -1]) cylinder(d = HOLE_M3, h = 5); translate([0, 0, 1.2]) cylinder(d = 6.5, h = 3); }
+        alivio(o);
+        for (x = [20 : 20 : L - 20]) translate([x - 4, 20, -1]) cube([8, A - 40, 5]);   // aire y peso
+        translate([L / 2, A / 2, 2.5]) linear_extrude(1) text("BATERÍA 12 V · Pb", size = 6, font = FONT, halign = "center", valign = "center");
+    }
+}
+module guia_pcb() {   // dos por placa: la placa del SAI va de canto (cara de componentes hacia +X)
+    difference() {
+        union() { cube([40, 40, 3]); translate([2, 0, 0]) cube([8, 40, 14]); }
+        translate([6 - 1.1, -1, 6]) cube([2.2, 42, 10]);                           // ranura de la placa (1,6 mm)
+        translate([-1, 20, 10]) rotate([0, 90, 0]) cylinder(d = 2.5, h = 12);      // prisionero M3 lateral
+        for (x = [14, 34]) hull() for (y = [8, 32]) translate([x, y, -1]) cylinder(d = HOLE_M3, h = 5);
+    }
+}
+module pletina_trafo() {   // pletina con repisa; colisos M5 para las patas del transformador
+    s = sai("TRAFO"); o = s[1]; L = s[2][0]; A = s[2][1];
+    difference() {
+        union() { cube([L, A, 5]); cube([L, 5, 40]); for (x = [0, L - 4]) translate([x, 0, 0]) cube([4, 20, 40]); }
+        for (y = [12, 52]) hull() for (x = [12, L - 12]) translate([x, y, -1]) cylinder(d = HOLE_M5, h = 7);
+        nudos(o, L, A) { translate([0, 0, -1]) cylinder(d = HOLE_M3, h = 7); translate([0, 0, 3]) cylinder(d = 6.5, h = 3); }
+        alivio(o);
+    }
+}
+module soporte_filtro() {   // escuadra: el filtro EMI se atornilla por sus orejas a la pared vertical
+    s = sai("EMI_OUT"); L = s[2][0]; A = s[2][1]; F = s[2][2];
+    difference() {
+        union() { cube([L, A, 3]); translate([L - 4, 0, 0]) cube([4, A, F]); translate([L - 14, 0, 0]) cube([10, 4, 20]); translate([L - 14, A - 4, 0]) cube([10, 4, 20]); }
+        for (y = [A / 2 - FILTRO[0] / 2 + 5, A / 2 + FILTRO[0] / 2 - 5]) hull() for (dy = [-4, 4]) translate([L - 5, y + dy, F / 2]) rotate([0, 90, 0]) cylinder(d = HOLE_M4, h = 6);
+        for (y = [22, 42, 62, 82]) hull() for (dx = [14, 26]) translate([dx, y, -1]) cylinder(d = HOLE_M3, h = 5);   // nudos x = 20 (OUT) y 22 (IN)
+    }
 }
 
 // --------------------------- fijaciones ------------------------------
@@ -387,6 +506,14 @@ module componentes() {
         ghost("dimgray") translate([PL[0] + 20, PL[1] + 140, pz]) cube([124, 36, 18]);          // hub Vansuny
         ghost("silver") translate([PL[0] + 150, PL[1] + 140, pz]) cube([26, 50, 20]);           // diplexor HF/VHF
         ghost("orange") translate([PL[0] + 90, PL[1] + 186, pz]) cube([60, 26, 10]);            // WAGO 12 V
+        // bandeja intermedia con HackRF One, RTL-SDR V4 y Airspy HF+ Discovery
+        for (p = deck_posts()) color("lightyellow") translate([p[0], p[1], pz]) cylinder(d = 10, h = DECK_H);
+        translate([DECK_O[0], DECK_O[1], pz + DECK_H]) {
+            color("lightyellow") bandeja_sdr();
+            for (s = SDR_DECK) ghost(s[0] == "HRF" ? "crimson" : s[0] == "V4" ? "steelblue" : "darkorange")
+                translate([s[1][0], s[1][1], DECK_T]) cube(s[2]);
+        }
+        for (p = deck_posts()) if (p[1] > PL[1] + BAND_Y) color("lightyellow") translate([p[0], p[1], pz + DECK_H + DECK_T]) cylinder(d = 10, h = BAND_H - DECK_H - DECK_T);
         // bandeja
         translate([PL[0] + 20, PL[1] + BAND_Y, pz + BAND_H]) {
             color("lightyellow") bandeja();
@@ -396,6 +523,15 @@ module componentes() {
         }
         if (CAMARA) ghost("black") translate([CAM_C[0] - CAM_MOD[0] / 2, CAM_C[1] - CAM_MOD[1] / 2, LID_Z0 - CAM_FRAME_H - CAM_MOD[2]]) cube(CAM_MOD);
         for (f = [[0, FAN_IN], [W - T - 25, FAN_OUT]]) ghost("black") translate([f[0] == 0 ? T : f[0], f[1][0] - 30, f[1][1] - 30]) cube([25, 60, 60]);
+    } else if (SAI) {
+        b = sai("BAT"); translate([PL[0] + b[1][0], PL[1] + b[1][1], pz]) { color("lightyellow") soporte_bateria(); ghost("dimgray") translate([4, 4, 3]) cube(SAI_BAT); }
+        p = sai("PCB");
+        for (gy = GUIA_Y) color("lightyellow") translate([PL[0] + p[1][0], PL[1] + gy, pz]) guia_pcb();
+        ghost("darkgreen") translate([PL[0] + p[1][0] + 5.2, PL[1] + 8, pz + 6]) cube([1.6, SAI_PCB[0], SAI_PCB[1]]);
+        ghost("khaki") translate([PL[0] + p[1][0] + 7, PL[1] + 8, pz + 6]) cube([30, SAI_PCB[0], SAI_PCB[1] - 4]);   // componentes
+        t = sai("TRAFO"); translate([PL[0] + t[1][0], PL[1] + t[1][1], pz]) { color("lightyellow") pletina_trafo(); ghost("sienna") translate([2, 5, 5]) cube(SAI_TRAFO); }
+        for (n = ["EMI_OUT", "EMI_IN"]) { f = sai(n); translate([PL[0] + f[1][0], PL[1] + f[1][1], pz]) { color("lightyellow") soporte_filtro(); ghost("silver") translate([0, 0.5, 3]) cube([FILTRO[2], FILTRO[0], FILTRO[1]]); } }
+        d = sai("DC"); ghost("orange") translate([PL[0] + d[1][0], PL[1] + d[1][1], pz]) cube(d[2]);   // fusible ATO + WAGO
     } else {
         ghost("white") translate([W / 2 - SCHUKO[0] / 2, 30, pz]) cube(SCHUKO);
         ghost("black") translate([W / 2 - 35, 40, pz + SCHUKO[2]]) cube([70, 70, 32]);           // cargador de 120 W
@@ -418,6 +554,24 @@ module montaje(abierta = false) {
     componentes();
 }
 
+// comprobaciones de holgura (fallan al exportar si se cambian medidas y algo deja de caber)
+if (EL) {
+    for (s = SDR_DECK) assert(s[1][0] >= 4 && s[1][1] >= 4 && s[1][0] + s[2][0] <= DECK[0] - 4 && s[1][1] + s[2][1] <= DECK[1] - 4, str("SDR fuera de la bandeja_sdr: ", s[0]));
+    assert(DECK_H + DECK_T + max([for (s = SDR_DECK) s[2][2]]) + 4 <= BAND_H, "los SDR tocan la bandeja de la Pi");
+    assert(T + STANDOFF + PL_T + BAND_H + 41 <= D + GAP_LID - RIB_H, "la Pi + HAT toca la tapa");
+    assert(GL_Z + 25.4 / 2 + 8 <= D, "los prensaestopas no caben en la cara inferior");
+}
+if (SAI) {
+    for (s = SAI_LAYOUT) assert(s[1][0] >= 2 && s[1][1] >= 2 && s[1][0] + s[2][0] <= PL[2] - 2 && s[1][1] + s[2][1] <= PL[3] - 2, str("fuera de la rejilla: ", s[0]));
+    for (i = [0 : len(SAI_LAYOUT) - 2], j = [i + 1 : len(SAI_LAYOUT) - 1]) let(a = SAI_LAYOUT[i], b = SAI_LAYOUT[j])
+        assert(max(b[1][0] - a[1][0] - a[2][0], a[1][0] - b[1][0] - b[2][0], b[1][1] - a[1][1] - a[2][1], a[1][1] - b[1][1] - b[2][1]) >= 4, str("se solapan: ", a[0], " y ", b[0]));
+    assert(T + STANDOFF + PL_T + max([for (s = SAI_LAYOUT) s[2][2]]) <= D + GAP_LID - RIB_H, "el SAI toca la tapa");
+    assert(SAI_BAT[0] + 8 <= sai("BAT")[2][0] && SAI_BAT[1] + 4 <= sai("BAT")[2][1] && SAI_BAT[2] + 3 <= sai("BAT")[2][2] - 6, "la batería no cabe en la cuna");
+    assert(SAI_PCB[0] <= sai("PCB")[2][1] - 4 && SAI_PCB[1] + 6 <= sai("PCB")[2][2], "la placa del SAI no cabe");
+    assert(SAI_TRAFO[0] + 4 <= sai("TRAFO")[2][0] && SAI_TRAFO[1] + 5 <= sai("TRAFO")[2][1] && SAI_TRAFO[2] + 5 <= sai("TRAFO")[2][2], "el transformador no cabe");
+    assert(FILTRO[2] <= sai("EMI_IN")[2][0] - 4 && FILTRO[0] <= sai("EMI_IN")[2][1] && FILTRO[1] + 3 <= sai("EMI_IN")[2][2], "el filtro EMI no cabe");
+}
+
 if (PART == "montaje") rotate([90, 0, 0]) montaje();
 else if (PART == "interior") rotate([90, 0, 0]) montaje(true);
 else if (PART == "cuerpo") cuerpo();
@@ -426,6 +580,9 @@ else if (PART == "tejadillo") rotate([180, 0, 0]) rotate([ROOF_A, 0, 0]) tejadil
 else if (PART == "placa_rejilla") placa_rejilla();
 else if (PART == "bandeja") bandeja();
 else if (PART == "poste_bandeja") poste_bandeja();
+else if (PART == "bandeja_sdr") bandeja_sdr();
+else if (PART == "vista_sdr") { color("lightyellow") bandeja_sdr(); for (s = SDR_DECK) ghost(s[0] == "HRF" ? "crimson" : s[0] == "V4" ? "steelblue" : "darkorange") translate([s[1][0], s[1][1], DECK_T]) cube(s[2]); }
+else if (PART == "poste_superior") poste_superior();
 else if (PART == "capota") capota();
 else if (PART == "rejilla_ventilador") rejilla_ventilador();
 else if (PART == "junta_tapa") junta_tapa();
@@ -440,5 +597,9 @@ else if (PART == "tapon_n") tapon_n();
 else if (PART == "tapon_pg") tapon_pg();
 else if (PART == "soporte_schuko") soporte_schuko();
 else if (PART == "brida_cargador") brida_cargador();
+else if (PART == "soporte_bateria") soporte_bateria();
+else if (PART == "guia_pcb") guia_pcb();
+else if (PART == "pletina_trafo") pletina_trafo();
+else if (PART == "soporte_filtro") soporte_filtro();
 else if (PART == "visera") visera();
 else if (PART == "soporte_camara") soporte_camara();

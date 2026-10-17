@@ -1,5 +1,10 @@
 # BricoHams SDR · N0CALL · tu QTH (Región de Murcia)
 
+**Versión coordinada: v5.4.0 · 2026-10-17.** [VERSION](VERSION) es la fuente
+del número de publicación. Público y privado comparten versión, fecha y etiqueta
+Git `v5.4.0`, pero no hashes ni historial: solo se exporta código anonimizado.
+Toda publicación futura debe actualizar VERSION, el historial y la etiqueta en ambos.
+
 > **Rama `openwebrxplus-generico`: kit anonimizado para cualquier estación OpenWebRX+.**
 > No lleva el indicativo, el QTH, el locator, la red local ni los usuarios de la estación
 > original, y `tests/test_anonimato.py` comprueba que no vuelvan a entrar.
@@ -20,7 +25,7 @@ Documentación / Documentation: [Español](docs/manuales/38_MAPFLIGHTS_PLUGIN.md
 [guía visual de módulos](docs/GUIA_VISUAL_MODULOS.md), con ilustraciones,
 capturas reales anonimizadas y cuadros de comandos por módulo.
 
-Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.0 en desarrollo**):
+Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.0**):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT y, opcionalmente, también para map.flights.
@@ -28,7 +33,7 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
 - Estación meteorológica propia publicada en APRS.
 - Cámara del mástil e imagen BricoHams con Murcia.
 - **Caja de intemperie impresa en 3D** (PETG + TPU) para el mástil Televés, con compartimento de potencia aparte.
-- **v5.0 en desarrollo:**
+- **Funciones de la línea v5, consolidadas en v5.4.0:**
   - **Seguridad desde `/settings`:** bloqueo por IP/red y país, desbaneo de Fail2ban, estado de cortafuegos/nginx, usuarios y avisos de login ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
   - **Ficha de aviones** con foto, modelo, operador y ruta mediante un proxy con caché, y **envío opcional a map.flights** además de RadarBox ([manual 04](docs/manuales/04_ADSB.md)).
   - **Meteo desde el RAK4631** y posición APRS desde su GPS, con respaldo Pico/I2C; corrección del arranque de lgpio y nombre por defecto «BricoHams WX» ([manual 06](docs/manuales/06_SENSOR_WX.md)).
@@ -98,6 +103,13 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
 | 🔒 **v4** · https, portal y API de indicativos | — | nginx + certbot + `bricohams-api` |
 | 👥 **v4** · Visitas y aviso por Telegram | — | mosquitto + `bricohams-visitas` (GeoIP DB-IP Lite) |
 | ⏰ **v4** · Copias, actualización, reinicio y salud | — | `/etc/cron.d/bricohams` + cuenta `bricohams` |
+| 🌦️ **v5.0** · Clima en red, WSPR, grabación de pases y AMSAT | — | `bricohams-wx-red` + `bricohams-wspr` + `bricohams-satrec` → `/bricohams/clima.html` |
+
+## ¿Quieres que otros monten una estación como la tuya?
+
+Pon en `FUENTES_URL` (en `bricohams.env`) la dirección `https://` de tu copia de este repositorio: el portal (`/bricohams/`)
+mostrará la tarjeta «¿Quieres una estación como esta?» y el receptor el botón 🛠️ «Monta la tuya». Vacío (por defecto) = no aparece
+([manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md)).
 
 ## Puesta en marcha rápida
 
@@ -165,6 +177,7 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - v4.5: [35 LoRa APRS (RAK4631) y Meshtastic en OpenWebRX+](docs/manuales/35_LORA_APRS_MESHTASTIC.md)
 - v4.6: [36 TAK y mapa local](docs/manuales/36_TAK_MAPA_LOCAL.md) · [37 Justificación de los cambios v4.6](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)
 - v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
+- v5.0: [42 Clima en red, WSPR, grabación de pases y AMSAT](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).
@@ -203,7 +216,7 @@ docs/
   esquemas/                diagramas SVG/PNG (bloques, GPIO, cableado, RF, red, alimentación y caja)
   manuales/                manuales paso a paso
 hardware/caja/             caja de intemperie v2 (en el mástil): modelo OpenSCAD, STL listos para imprimir y vistas
-hardware/caja_v3/          caja v3 de dos módulos (electrónica + potencia): OpenSCAD, 30 STL, vistas
+hardware/caja_v3/          caja v3 modular (electrónica + potencia + SAI opcional): OpenSCAD, 45 STL, vistas
 hardware/antenas/          antenas: antenas_bricohams.scad + 30 STL, sim/ (modelos NEC2 y resultados)
 hardware/anclajes/         v4: crucetas y soportes impresos (16 STL) y vista de montaje
 data/                      repetidores EA5 (lista EA5KGV), marcadores_v4.json y satelites.json

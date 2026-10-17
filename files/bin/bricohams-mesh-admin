@@ -56,6 +56,11 @@ TAK_POSICIONES = '/settings/bricohams/tak/posiciones'
 MONITOR = '/settings/bricohams/monitorizacion'
 MAPFLIGHTS = '/settings/bricohams/mapflights'
 SEGURIDAD = '/settings/bricohams/seguridad'
+# mensajes Meshtastic: bricohams-mesh-owrx tiene la única conexión a cada nodo; el panel le pide
+# los envíos por su socket Unix (0600) y lee el historial que guarda (chat.json, 0600)
+MESH_CHAT = '/settings/bricohams/meshtastic/chat'
+MESH_RUN = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh')
+REDES_CHAT = (('433', 'mesh433', 'Red 433 MHz · LilyGO T3'), ('868', 'mesh868', 'Red 868 MHz · HAT (meshtasticd)'))
 # backup remoto: mismas rutas que /usr/local/sbin/bricohams-backup-remoto
 BR_CONF = os.environ.get('BACKUP_REMOTO_CONF', '/etc/bricohams/backup-remoto.json')
 BR_SECRETO = os.environ.get('BACKUP_REMOTO_SECRET', '/etc/bricohams/backup-remoto.secret')
@@ -1061,7 +1066,148 @@ def accion(campos):
         return accion_servicios(a)
     if a.startswith('seg-'):
         return accion_seguridad(campos)
+    if a == 'mesh-enviar':
+        return accion_chat(campos)
     raise ValueError('acción desconocida')
+
+
+# ---------------------------------------------------------------- mensajes Meshtastic (433 / 868)
+def enviar_mesh(fuente, canal, texto):
+    """Pide a bricohams-mesh-owrx que mande el texto; ValueError con el motivo si no sale."""
+    import socket
+    ruta = os.path.join(MESH_RUN, 'enviar.sock')
+    try:
+        c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    except (AttributeError, OSError):
+        raise ValueError('este sistema no admite el socket de envío')
+    try:
+        c.settimeout(20)
+        c.connect(ruta)
+        c.sendall(json.dumps({'fuente': fuente, 'canal': canal, 'texto': texto}, ensure_ascii=False).encode('utf-8') + b'\n')
+        r = b''
+        while not r.endswith(b'\n') and len(r) < 4096:
+            t = c.recv(4096)
+            if not t:
+                break
+            r += t
+    except OSError:
+        raise ValueError('el servicio %s no está en marcha (¿mapa LoRa desactivado o leyendo los nodos?)' % SERVICIO_MAPA)
+    finally:
+        c.close()
+    try:
+        d = json.loads(r.decode('utf-8'))
+    except ValueError:
+        raise ValueError('respuesta no válida de %s' % SERVICIO_MAPA)
+    if not d.get('ok'):
+        raise ValueError(d.get('error') or 'no enviado')
+    return True
+
+
+def canal_equivalente(canales, nombre):
+    """Índice del canal con el mismo nombre en la otra red o, si no lo hay, el principal."""
+    for c in canales or []:
+        if c.get('nombre', '').lower() == (nombre or '').lower():
+            return c['indice']
+    for c in canales or []:
+        if c.get('primario'):
+            return c['indice']
+    return 0
+
+
+def accion_chat(campos):
+    redes = {k: (f, t) for k, f, t in REDES_CHAT}
+    red = campos.get('red', '')
+    if red not in redes:
+        raise ValueError('red no válida')
+    texto = re.sub(r'[\x00-\x1f\x7f]', ' ', campos.get('texto', '')).strip()
+    if not texto:
+        raise ValueError('escribe un mensaje')
+    if len(texto.encode('utf-8')) > 200:
+        raise ValueError('mensaje demasiado largo (máximo 200 bytes)')
+    try:
+        canal = int(campos.get('canal', ''))
+    except ValueError:
+        raise ValueError('canal no válido')
+    chat = (leer_json(os.path.join(MESH_RUN, 'chat.json')) or {}).get('redes') or {}
+    nombre_canal = next((c.get('nombre') for c in (chat.get(redes[red][0]) or {}).get('canales', []) if c.get('indice') == canal), '')
+    enviar_mesh(redes[red][0], canal, texto)
+    hecho = 'Mensaje enviado por la red %s (canal %s).' % (red, nombre_canal or canal)
+    if campos.get('ambas') == 'yes':
+        otra = '868' if red == '433' else '433'
+        oc = canal_equivalente((chat.get(redes[otra][0]) or {}).get('canales'), nombre_canal)
+        try:
+            enviar_mesh(redes[otra][0], oc, texto)
+            hecho += ' También por la red %s (canal %s).' % (otra, oc)
+        except ValueError as x:
+            hecho += ' No ha salido por la red %s: %s' % (otra, x)
+    return hecho
+
+
+def pagina_chat(sesion, aviso='', error='', auto=False):
+    """Enviar y recibir mensajes por los canales de los nodos 433 y 868 (sin JavaScript: CSP script-src 'none')."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    chat = (leer_json(os.path.join(MESH_RUN, 'chat.json')) or {}).get('redes') or {}
+    est = ((leer_json(os.path.join(MESH_RUN, 'mesh.json')) or {}).get('fuentes')) or {}
+    cols = []
+    for red, fuente, titulo in REDES_CHAT:
+        r = chat.get(fuente) or {}
+        es = est.get(fuente) or {}
+        canales = r.get('canales') or es.get('canales') or []
+        nombres = {c.get('indice'): c.get('nombre') for c in canales}
+        if es.get('conectado'):
+            estado = '<span class="badge badge-success">conectado</span>'
+        elif es:
+            estado = '<span class="badge badge-danger">sin conexión</span> <small class="text-muted">%s</small>' % e(es.get('error', ''))
+        else:
+            estado = '<span class="badge badge-secondary">servicio parado</span>'
+        if canales:
+            otra = '868' if red == '433' else '433'
+            form = ('<form method="post" action="%s" class="mb-3">%s<input type="hidden" name="red" value="%s">'
+                    '<div class="form-group"><label for="canal%s">Canal</label><select class="form-control" id="canal%s" name="canal">%s</select></div>'
+                    '<div class="form-group"><label for="texto%s">Mensaje (máx. 200 bytes)</label>'
+                    '<textarea class="form-control" id="texto%s" name="texto" rows="2" maxlength="200" required></textarea></div>'
+                    '<div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="ambas%s" name="ambas" value="yes">'
+                    '<label class="form-check-label" for="ambas%s">Enviar también por la red %s (mismo canal por nombre o el principal)</label></div>'
+                    '<button class="btn btn-primary" name="accion" value="mesh-enviar">Enviar por %s</button></form>') % (
+                MESH_CHAT, oculto, red, red, red,
+                ''.join('<option value="%d">%d · %s</option>' % (c['indice'], c['indice'], e(c.get('nombre'))) for c in canales),
+                red, red, red, red, otra, red)
+        else:
+            form = '<p class="text-warning">Sin canales todavía: el nodo %s no está conectado a bricohams-mesh-owrx.</p>' % red
+        filas = ''.join(
+            '<tr%s><td class="text-nowrap small">%s</td><td>%s</td><td>%s%s</td><td style="word-break:break-word">%s</td><td class="small text-nowrap">%s</td></tr>' % (
+                ' class="table-active"' if m.get('dir') == 'tx' else '',
+                e(time.strftime('%d/%m %H:%M', time.localtime(m.get('t') or 0))),
+                e(nombres.get(m.get('canal'), m.get('canal'))),
+                '<b>yo</b> ↑' if m.get('dir') == 'tx' else e(m.get('de')),
+                ' <span class="badge badge-info">directo</span>' if m.get('directo') else '',
+                e(m.get('texto')),
+                '' if m.get('snr') is None else e('%s dB · %s dBm' % (m.get('snr'), m.get('rssi'))))
+            for m in reversed((r.get('mensajes') or [])[-80:]))
+        cols.append(
+            '<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><div class="card-body">%s'
+            '<div style="max-height:32em;overflow:auto"><table class="table table-sm"><tr><th>Hora</th><th>Canal</th><th>De</th><th>Mensaje</th><th>Señal</th></tr>%s</table></div>'
+            '</div></div></div>' % (e(titulo), estado, form, filas or '<tr><td colspan="5" class="text-muted">Sin mensajes todavía.</td></tr>'))
+    refresco = '<meta http-equiv="refresh" content="20;url=%s?auto=1">' % MESH_CHAT if auto else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Mensajes Meshtastic · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container-fluid"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item"><a href="%(base)s">Meshtastic 433 / 868</a></li><li class="breadcrumb-item active">Mensajes</li></ol></nav>
+<h1>Meshtastic · mensajes</h1>
+<p class="text-muted">Envía y recibe por los canales de nuestros nodos: lo que mandes sale por radio a la red Meshtastic
+(y a los nodos conectados a ella). Se guardan los últimos 200 mensajes de cada red mientras el servicio esté en marcha
+(no se escriben en disco); los directos a otros nodos nunca se guardan.
+<a href="%(chat)s">Actualizar</a> · %(auto)s</p>
+%(aviso)s%(error)s</div></div>
+<div class="row">%(cols)s</div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'chat': MESH_CHAT, 'cols': ''.join(cols),
+        'auto': ('<a href="%s">parar la recarga automática</a>' % MESH_CHAT) if auto else (
+            '<a href="%s?auto=1">recargar cada 20 s</a> (pierde lo que estés escribiendo)' % MESH_CHAT),
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else ''}
 
 
 # ---------------------------------------------------------------- web
@@ -1199,9 +1345,10 @@ def pagina(sesion, aviso='', error=''):
 <link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
 <body><div class="container"><div class="row"><div class="col-12">
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
-<li class="breadcrumb-item active">Meshtastic 433 / 868</li><li class="breadcrumb-item"><a href="%(aprs)s">APRS (RAK)</a></li></ol></nav>
+<li class="breadcrumb-item active">Meshtastic 433 / 868</li><li class="breadcrumb-item"><a href="%(chat_url)s">Mensajes</a></li><li class="breadcrumb-item"><a href="%(aprs)s">APRS (RAK)</a></li></ol></nav>
 <h1>Meshtastic · administración</h1>
 <p class="text-muted">Solo para el administrador (sesión de OpenWebRX+). Los cambios se guardan en bricohams.env; las claves nunca se muestran.</p>
+<p><a class="btn btn-primary" href="%(chat_url)s">Mensajes: enviar y recibir por los canales 433 / 868</a></p>
 %(aviso)s%(error)s%(trabajo)s</div></div>
 <div class="row">%(nodos)s</div>
 <div class="row"><div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Mapa de OpenWebRX+</b></div><div class="card-body">
@@ -1214,7 +1361,7 @@ def pagina(sesion, aviso='', error=''):
 <button class="btn btn-secondary mb-2" name="accion" value="reiniciar868">Reiniciar meshtasticd (868)</button>
 <button class="btn btn-secondary mb-2" name="accion" value="reiniciarmapa">Reiniciar el servicio del mapa</button>
 </form></div></div></div></div></div></body></html>''' % {
-        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'oculto': oculto, 'nodos': ''.join(partes), 'trabajo': trabajo,
+        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'chat_url': MESH_CHAT, 'oculto': oculto, 'nodos': ''.join(partes), 'trabajo': trabajo,
         'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
         'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else '',
         'c433': caja('MESH433_OWRX', 'Nodo 433 en el mapa', 'yes'), 'c868': caja('MESH868_OWRX', 'Nodo 868 en el mapa', 'yes'),
@@ -1726,10 +1873,49 @@ def pagina_mapflights(s, aviso='', error=''):
 
 
 PAGINAS = {BASE: pagina, APRS: pagina_aprs, TAK: pagina_tak, MONITOR: pagina_monitor,
-           SEGURIDAD: pagina_seguridad, MAPFLIGHTS: pagina_mapflights}
+           SEGURIDAD: pagina_seguridad, MAPFLIGHTS: pagina_mapflights, MESH_CHAT: pagina_chat}
+
+# Igual que en bricohams-owrx-botones (el test comprueba que coinciden): los paneles
+# salen oscuros y legibles aunque admin.css de OpenWebRX+ aún no esté parcheado.
+TEMA_OSCURO = (
+    'html,body{background-color:#1e1e1e!important;background-image:none!important;color:#f1f1f1}'
+    '.form-control,.custom-select,select,textarea{background-color:#2b2b2b!important;color:#f1f1f1!important;border:1px solid #6c6c6c!important}'
+    '.form-control:focus,.custom-select:focus,select:focus,textarea:focus{background-color:#333!important;color:#fff!important;'
+    'border-color:#f26b21!important;box-shadow:0 0 0 .2rem rgba(242,107,33,.35)!important}'
+    '.form-control::placeholder,textarea::placeholder{color:#a8a8a8!important;opacity:1}'
+    '.form-control:disabled,.form-control[readonly]{background-color:#1a1a1a!important;color:#bdbdbd!important}'
+    'select option,select optgroup{background-color:#2b2b2b;color:#f1f1f1}'
+    '.input-group-text{background-color:#3a3a3a;color:#eee;border-color:#6c6c6c}'
+    '.form-check-input,.custom-control-label::before{background-color:#2b2b2b;border-color:#8a8a8a}'
+    '.card,.list-group-item,.modal-content,.dropdown-menu,.popover,.toast{background-color:#2d2d2d;color:#f1f1f1;border-color:#555}'
+    '.card-header,.card-footer,.modal-header,.modal-footer{background-color:#3a3a3a;color:#fff;border-color:#555}'
+    '.dropdown-item{color:#f1f1f1}.dropdown-item:hover,.dropdown-item:focus{background-color:#f26b21;color:#111}'
+    '.table,.table th,.table td{color:#eee;border-color:#555}'
+    '.table-striped tbody tr:nth-of-type(odd){background-color:rgba(255,255,255,.06)}'
+    '.table-hover tbody tr:hover{background-color:rgba(242,107,33,.15);color:#fff}'
+    '.text-muted,.form-text,.small.text-muted{color:#c8c8c8!important}'
+    'label,.col-form-label,legend,h1,h2,h3,h4,h5,h6{color:#f5f5f5}'
+    'pre,code,kbd{background-color:#161616;color:#e8e8e8}'
+    'pre{padding:.6em;border:1px solid #444;border-radius:.25rem}'
+    '.breadcrumb{background-color:#333}.breadcrumb-item.active,.breadcrumb-item+.breadcrumb-item::before{color:#d0d0d0}'
+    'a:not(.btn){color:#8cc8ff}a:not(.btn):hover{color:#c2e2ff}'
+    '.nav-tabs .nav-link{color:#ddd}.nav-tabs .nav-link.active{background-color:#2d2d2d;color:#fff;border-color:#555 #555 #2d2d2d}'
+    '.tab-body{background-color:#262626}'
+    '.bg-white,.bg-light{background-color:#2d2d2d!important;color:#f1f1f1!important}'
+    '.btn-light,.btn-outline-light{background-color:#444;color:#fff;border-color:#666}'
+)
+
+
+def con_tema(html):
+    """Mete el tema oscuro antes de </head> (una sola vez)."""
+    if 'id="bricohams-tema"' in html:
+        return html
+    return html.replace('</head>', '<style id="bricohams-tema">' + TEMA_OSCURO + '</style></head>', 1)
+
 # acciones que acepta cada página; la de Meshtastic no puede tocar TAK, monitorización ni seguridad
 ACCIONES = {APRS: re.compile(r'^reiniciarrak$'), TAK: re.compile(r'^tak-'), MONITOR: re.compile(r'^mon-'),
-            SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-)')}
+            SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-|mesh-)'),
+            MESH_CHAT: re.compile(r'^mesh-enviar$')}
 
 
 def posiciones_tak():
@@ -1813,10 +1999,15 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         return self._enviar(200, self._pagina(ruta, s).encode('utf-8'))
 
     def _pagina(self, ruta, s, aviso='', error='', mostrar=False):
+        return con_tema(self._pagina_cruda(ruta, s, aviso, error, mostrar))
+
+    def _pagina_cruda(self, ruta, s, aviso='', error='', mostrar=False):
         if ruta == TAK:
             return pagina_tak(s, aviso, error, host=self.headers.get('Host', ''), mostrar=mostrar)
         if ruta == MONITOR:
             return PAGINAS[ruta](s, aviso, error, host=self.headers.get('Host', ''))
+        if ruta == MESH_CHAT:
+            return pagina_chat(s, aviso, error, auto=parse_qs(urlsplit(self.path).query).get('auto') == ['1'])
         return PAGINAS[ruta](s, aviso, error)
 
     do_HEAD = do_GET

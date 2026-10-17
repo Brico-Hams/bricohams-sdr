@@ -9,6 +9,8 @@
 #      mqtt_meshtastic) lo pinta en su mapa igual que si lo hubiera decodificado él.
 #    - Opcional (MESH_OWRX_CHAT=yes): los mensajes de texto de los canales públicos
 #      salen en el chat de la web de OpenWebRX+.
+#    - v5.0 (MESH_TELEGRAM=yes): los mensajes de canal recibidos se avisan por Telegram
+#      (nunca los directos/privados).
 #    - Estado en /run/bricohams-mesh/mesh.json (bricohams-check y banner SSH).
 #  Uso: bricohams-mesh-owrx servicio | estado | prueba
 #  Necesita la librería «meshtastic» (la de /opt/pipx/venvs/meshtastic).
@@ -22,6 +24,10 @@ import time
 
 sys.path[:0] = [os.path.dirname(os.path.realpath(__file__)), '/usr/local/lib/bricohams']
 from bricohams_mqtt import Publicador, simbolo   # noqa: E402
+try:
+    import bricohams_telegram                    # noqa: E402
+except ImportError:                              # sin el módulo: sin avisos a Telegram, lo demás sigue
+    bricohams_telegram = None
 
 _CRED = os.path.join(os.environ.get('CREDENTIALS_DIRECTORY', '/nonexistent'), 'env')
 ENV_FILE = os.environ.get('BRICOHAMS_ENV', _CRED if os.path.exists(_CRED) else '/etc/bricohams/bricohams.env')
@@ -138,13 +144,169 @@ def nombre(nodos, num):
     return u.get('shortName') or u.get('longName') or '!%08x' % num
 
 
+# ------------------------------------------------------------------ mensajes (panel /settings/bricohams/meshtastic/chat)
+CHAT_MAX = 200          # mensajes guardados por red
+TEXTO_MAX = 200         # bytes UTF-8 por mensaje (Meshtastic admite ~228)
+CONTROL = re.compile(r'[\x00-\x08\x0b-\x1f\x7f]')
+
+
+def mensaje(nodos, pkt, mio):
+    """Entrada del historial para un texto recibido (canal público o directo a nosotros) o None."""
+    dec = pkt.get('decoded') or {}
+    if dec.get('portnum') != 'TEXT_MESSAGE_APP' or not isinstance(dec.get('text'), str) or pkt.get('from') is None:
+        return None
+    to = pkt.get('to')
+    if to != BROADCAST and (mio is None or to != mio):
+        return None
+    num = pkt['from']
+    return {'t': int(time.time()), 'dir': 'rx', 'canal': int(pkt.get('channel') or 0), 'de': nombre(nodos, num),
+            'id': '!%08x' % num, 'texto': CONTROL.sub(' ', dec['text'])[:500], 'directo': to != BROADCAST,
+            'snr': pkt.get('rxSnr'), 'rssi': pkt.get('rxRssi')}
+
+
+def canales(iface):
+    """[{indice, nombre, primario}] de los canales activos del nodo (sin claves)."""
+    out = []
+    try:
+        lista = iface.localNode.channels or []
+    except AttributeError:
+        return out
+    for c in lista:
+        rol = getattr(c, 'role', 0)
+        if rol in (0, 'DISABLED'):
+            continue
+        nom = getattr(getattr(c, 'settings', None), 'name', '') or ''
+        out.append({'indice': int(getattr(c, 'index', len(out))), 'nombre': nom or ('principal' if rol in (1, 'PRIMARY') else 'canal %d' % len(out)),
+                    'primario': rol in (1, 'PRIMARY')})
+    return out
+
+
+def validar_envio(d, fuentes):
+    """(Fuente, canal, texto) de una petición del panel; ValueError si no vale."""
+    if not isinstance(d, dict):
+        raise ValueError('petición no válida')
+    f = fuentes.get(d.get('fuente'))
+    if f is None:
+        raise ValueError('red desconocida')
+    if not f.estado['conectado'] or f.iface is None:
+        raise ValueError('el nodo %s no está conectado' % f.nom)
+    try:
+        canal = int(d.get('canal'))
+    except (TypeError, ValueError):
+        raise ValueError('canal no válido')
+    if canal not in [c['indice'] for c in f.estado.get('canales', [])]:
+        raise ValueError('el canal %d no está activo en %s' % (canal, f.nom))
+    texto = d.get('texto')
+    if not isinstance(texto, str):
+        raise ValueError('texto no válido')
+    texto = CONTROL.sub(' ', texto).strip()
+    if not texto:
+        raise ValueError('mensaje vacío')
+    if len(texto.encode('utf-8')) > TEXTO_MAX:
+        raise ValueError('mensaje demasiado largo (máximo %d bytes)' % TEXTO_MAX)
+    return f, canal, texto
+
+
+def aviso_telegram(red, entrada, canales_red):
+    """Texto HTML para Telegram de un mensaje de CANAL recibido; None para directos (privados) o enviados."""
+    if not entrada or entrada.get('dir') != 'rx' or entrada.get('directo'):
+        return None
+    tg = bricohams_telegram
+    nom = next((c['nombre'] for c in canales_red or [] if c.get('indice') == entrada.get('canal')),
+               'canal %s' % entrada.get('canal'))
+    banda = re.sub(r'\D', '', red) or red
+    senal = ' · SNR %s dB' % entrada['snr'] if entrada.get('snr') is not None else ''
+    return '📻 <b>Meshtastic %s</b> · #%s\n<b>%s</b> <code>%s</code>: %s%s' % (
+        tg.esc(banda), tg.esc(nom), tg.esc(entrada.get('de')), tg.esc(entrada.get('id')),
+        tg.esc(tg.limpio(entrada.get('texto'), 400)), tg.esc(senal))
+
+
+class Chat:
+    """Historial de mensajes por red en RUN_DIR/chat.json (0600: solo el servicio y root)."""
+
+    def __init__(self, ruta):
+        self.ruta, self.lock, self.redes = ruta, threading.Lock(), {}
+
+    def anotar(self, red, entrada, canales_red=None):
+        with self.lock:
+            r = self.redes.setdefault(red, {'canales': [], 'mensajes': []})
+            if canales_red is not None:
+                r['canales'] = canales_red
+            if entrada:
+                r['mensajes'] = (r['mensajes'] + [entrada])[-CHAT_MAX:]
+            self._guardar()
+
+    def _guardar(self):
+        try:
+            os.makedirs(os.path.dirname(self.ruta), exist_ok=True)
+            tmp = self.ruta + '.tmp'
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+                json.dump({'actualizado': int(time.time()), 'redes': self.redes}, fh, ensure_ascii=False)
+            os.replace(tmp, self.ruta)
+        except OSError as x:
+            print('chat: no puedo guardar %s: %s' % (self.ruta, x), file=sys.stderr, flush=True)
+
+
+def servidor_envio(ruta, fuentes, chat):
+    """Socket Unix (0600) para que el panel de administración (root) mande mensajes por los nodos.
+    Una línea JSON {"fuente":"mesh868","canal":0,"texto":"..."} -> {"ok":true} o {"ok":false,"error":"..."}."""
+    import socket
+    try:
+        os.unlink(ruta)
+    except OSError:
+        pass
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    viejo = os.umask(0o177)
+    try:
+        s.bind(ruta)
+    finally:
+        os.umask(viejo)
+    os.chmod(ruta, 0o600)
+    s.listen(4)
+
+    def atender(c):
+        with c:
+            c.settimeout(10)
+            datos = b''
+            try:
+                while b'\n' not in datos and len(datos) < 4096:
+                    trozo = c.recv(4096)
+                    if not trozo:
+                        break
+                    datos += trozo
+                f, canal, texto = validar_envio(json.loads(datos.decode('utf-8')), fuentes)
+                f.iface.sendText(texto, channelIndex=canal)
+                chat.anotar(f.nom, {'t': int(time.time()), 'dir': 'tx', 'canal': canal, 'de': 'yo', 'id': '',
+                                    'texto': texto, 'directo': False, 'snr': None, 'rssi': None})
+                r = {'ok': True}
+            except (ValueError, UnicodeDecodeError) as x:
+                r = {'ok': False, 'error': str(x)[:200]}
+            except Exception as x:               # noqa: BLE001 — la librería de Meshtastic lanza de todo
+                r = {'ok': False, 'error': 'el nodo no ha aceptado el mensaje: %s' % str(x)[:150]}
+            try:
+                c.sendall(json.dumps(r, ensure_ascii=False).encode('utf-8') + b'\n')
+            except OSError:
+                pass
+
+    def bucle():
+        while True:
+            c, _ = s.accept()
+            threading.Thread(target=atender, args=(c,), daemon=True).start()
+
+    threading.Thread(target=bucle, daemon=True).start()
+    return s
+
+
 # ------------------------------------------------------------------ servicio
 class Fuente:
-    def __init__(self, nom, tipo, destino, freq, mqtt, decimales, chat):
+    def __init__(self, nom, tipo, destino, freq, mqtt, decimales, chat, historial=None, telegram=None):
         self.nom, self.tipo, self.destino, self.freq = nom, tipo, destino, freq
-        self.mqtt, self.decimales, self.chat = mqtt, decimales, chat
+        self.mqtt, self.decimales, self.chat, self.historial = mqtt, decimales, chat, historial
+        self.telegram = telegram
         self.iface, self.mio, self.nodos = None, None, {}
-        self.estado = {'conectado': False, 'nodos': 0, 'en_mapa': 0, 'mensajes': 0, 'ultimo': None, 'error': ''}
+        self.estado = {'conectado': False, 'nodos': 0, 'en_mapa': 0, 'mensajes': 0, 'ultimo': None, 'error': '',
+                       'canales': []}
         self.lock = threading.Lock()
 
     def publicar_nodo(self, num, extra=None):
@@ -166,6 +328,13 @@ class Fuente:
                 return
             self.estado['ultimo'] = time.strftime('%H:%M:%S') + ' ' + nombre(self.nodos, num)
             self.publicar_nodo(num, extra)
+            m = mensaje(self.nodos, pkt, self.mio)
+            if m and self.historial:
+                self.historial.anotar(self.nom, m)
+            if m and self.telegram:
+                aviso = aviso_telegram(self.nom, m, self.estado.get('canales'))
+                if aviso:
+                    self.telegram.avisar(aviso)
             if texto:
                 self.estado['mensajes'] += 1
                 if self.chat:
@@ -186,7 +355,9 @@ class Fuente:
             for n in (self.iface.nodes or {}).values():
                 if 'num' in n:
                     self.nodos[n['num']] = dict(n)
-            self.estado.update({'conectado': True, 'nodos': len(self.nodos), 'error': ''})
+            self.estado.update({'conectado': True, 'nodos': len(self.nodos), 'error': '', 'canales': canales(self.iface)})
+        if self.historial:
+            self.historial.anotar(self.nom, None, self.estado['canales'])
         self.volcar()
 
 
@@ -196,7 +367,20 @@ def servicio():
     h, _, pt = env('BRICOHAMS_MQTT', '127.0.0.1:1883').partition(':')
     mqtt = Publicador(h, int(pt or 1883), 'bricohams-mesh-owrx')
     dec = int(env('OWRX_GPS_DECIMALES', '2')) if env('OWRX_GPS_DECIMALES', '2').isdigit() else None
-    fs = [Fuente(n, t, d, f, mqtt, dec, si('MESH_OWRX_CHAT', 'no')) for n, t, d, f in fuentes()]
+    os.makedirs(RUN_DIR, exist_ok=True)
+    historial = Chat(os.path.join(RUN_DIR, 'chat.json'))
+    tg = None
+    if bricohams_telegram and si('MESH_TELEGRAM', 'yes'):
+        tg = bricohams_telegram.Avisador(nombre='mesh-owrx')
+        print('telegram: %s' % ('mensajes de canal -> Telegram' if tg.configurado else 'sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID'),
+              flush=True)
+        tg = tg if tg.configurado else None
+    fs = [Fuente(n, t, d, f, mqtt, dec, si('MESH_OWRX_CHAT', 'no'), historial, tg) for n, t, d, f in fuentes()]
+    if si('MESH_CHAT', 'yes'):
+        try:
+            servidor_envio(os.path.join(RUN_DIR, 'enviar.sock'), {f.nom: f for f in fs}, historial)
+        except (OSError, AttributeError) as x:
+            print('chat: sin socket de envío: %s' % x, file=sys.stderr, flush=True)
     por_iface = {}
 
     def al_recibir(packet, interface):
@@ -260,7 +444,7 @@ def main(a):
             print('%s: %s %s · %.3f MHz · %s' % (n, t, d, f / 1e6,
                   'existe' if t == 'tcp' or os.path.exists(d) else 'NO está conectado'))
         return 0
-    for l in open(__file__, encoding='utf-8').read().splitlines()[2:16]:
+    for l in open(__file__, encoding='utf-8').read().splitlines()[2:18]:
         print(l.lstrip('# '))
     return 1
 

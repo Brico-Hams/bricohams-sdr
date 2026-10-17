@@ -87,6 +87,7 @@ DESCRIPCIONES = {
     'owrx-clone/LICENSE': 'Licencia de owrx-clone',
     'files/openwebrx/settings.json.tmpl': 'Plantilla de settings.json de OpenWebRX+ (receptor, perfiles, ubicación) rellenada desde bricohams.env',
     'files/web/index.html.tmpl': 'Plantilla de la portada web de la estación rellenada desde bricohams.env',
+    'files/web/clima.html': 'v5.0 · Clima en red: estaciones WX por APRS, balizas WSPR, pases grabados e informe AMSAT',
     'firmware/rak4631-lora-aprs/bin/bricohams-rak4631-lora-aprs.hex': 'Firmware iGate precompilado (Intel HEX, para nrfutil/SWD)',
     'firmware/rak4631-lora-aprs/bin/bricohams-rak4631-lora-aprs.uf2': 'Firmware iGate precompilado (UF2, arrastrar a la unidad del bootloader)',
     'firmware/rak4631-lora-aprs/bin/bricohams-rak4631-lora-aprs.zip': 'Paquete DFU del firmware iGate (adafruit-nrfutil por USB serie, el que usa el instalador)',

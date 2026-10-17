@@ -274,6 +274,64 @@ try:
     assert len(lanzados) == n, 'nada fuera de la lista blanca llega a systemctl'
     assert pide('POST', M.TAK, urlencode({'accion': 'tak-parar', 'csrf': '0' * 40}), ORIGEN)[0] == 403
 
+    # --- mensajes Meshtastic 433 / 868: historial de bricohams-mesh-owrx y envío por su socket
+    M.MESH_RUN = os.path.join(tmp, 'mesh-run')
+    os.makedirs(M.MESH_RUN)
+    st, _, pag = pide('GET', M.MESH_CHAT, cab=COOKIE)
+    assert st == 200 and 'servicio parado' in pag and 'Sin canales todavía' in pag, 'sin servicio: lo dice, sin formulario'
+    canales = [{'indice': 0, 'nombre': 'principal', 'primario': True}, {'indice': 1, 'nombre': 'Murcia', 'primario': False}]
+    json.dump({'redes': {'mesh433': {'canales': canales, 'mensajes': [
+        {'t': 1700000000, 'dir': 'rx', 'canal': 1, 'de': 'CT01', 'texto': '<b>hola</b>', 'directo': False, 'snr': 5, 'rssi': -90},
+        {'t': 1700000060, 'dir': 'rx', 'canal': 0, 'de': 'MU02', 'texto': 'privado', 'directo': True, 'snr': 1, 'rssi': -99},
+        {'t': 1700000100, 'dir': 'tx', 'canal': 1, 'de': 'yo', 'texto': 'respuesta', 'directo': False}]},
+        'mesh868': {'canales': [{'indice': 0, 'nombre': 'SFNarrow', 'primario': True}, {'indice': 3, 'nombre': 'murcia', 'primario': False}],
+                    'mensajes': []}}}, open(os.path.join(M.MESH_RUN, 'chat.json'), 'w', encoding='utf-8'))
+    json.dump({'fuentes': {'mesh433': {'conectado': True}, 'mesh868': {'conectado': False, 'error': 'sin HAT'}}},
+              open(os.path.join(M.MESH_RUN, 'mesh.json'), 'w', encoding='utf-8'))
+    st, h, pag = pide('GET', M.MESH_CHAT, cab=COOKIE)
+    assert st == 200 and '&lt;b&gt;hola&lt;/b&gt;' in pag and '<b>hola</b>' not in pag, 'el texto recibido se escapa'
+    assert 'badge-info">directo' in pag and 'table-active' in pag and 'conectado' in pag and 'sin HAT' in pag
+    assert pag.count('value="mesh-enviar"') == 2 and '<option value="1">1 · Murcia</option>' in pag
+    assert 'id="bricohams-tema"' in pag and "script-src 'none'" in h['Content-Security-Policy']
+    assert 'http-equiv="refresh"' not in pag and 'http-equiv="refresh"' in pide('GET', M.MESH_CHAT + '?auto=1', cab=COOKIE)[2]
+    assert M.canal_equivalente(json.load(open(os.path.join(M.MESH_RUN, 'chat.json')))['redes']['mesh868']['canales'], 'Murcia') == 3
+    assert M.canal_equivalente([{'indice': 2, 'nombre': 'x', 'primario': True}], 'nada') == 2
+    tkc = re.search(r'name="csrf" value="([0-9a-f]+)"', pag).group(1)
+    pedidos = []
+    if os.name == 'posix':
+        import socket
+        sv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sv.bind(os.path.join(M.MESH_RUN, 'enviar.sock'))
+        sv.listen(4)
+
+        def falso_mesh():
+            while True:
+                c, _ = sv.accept()
+                d = json.loads(c.makefile().readline())
+                pedidos.append(d)
+                c.sendall((json.dumps({'ok': True} if d['fuente'] == 'mesh433' else {'ok': False, 'error': 'el nodo mesh868 no está conectado'}) + '\n').encode())
+                c.close()
+        threading.Thread(target=falso_mesh, daemon=True).start()
+    st, _, pag = pide('POST', M.MESH_CHAT, urlencode({'accion': 'mesh-enviar', 'red': '433', 'canal': '1', 'texto': 'QSO\r\nmañana',
+                                                      'ambas': 'yes', 'csrf': tkc}), ORIGEN)
+    if os.name == 'posix':
+        assert st == 200 and 'Mensaje enviado por la red 433 (canal Murcia)' in pag and 'No ha salido por la red 868' in pag, pag[-800:]
+        assert pedidos[0] == {'fuente': 'mesh433', 'canal': 1, 'texto': 'QSO  mañana'}
+        assert pedidos[1] == {'fuente': 'mesh868', 'canal': 3, 'texto': 'QSO  mañana'}, 'mismo canal por nombre en la otra red'
+    else:
+        assert st == 200 and 'alert-danger' in pag
+    n = len(pedidos)
+    for malos in ({'red': '999', 'canal': '0', 'texto': 'a'}, {'red': '433', 'canal': 'x', 'texto': 'a'},
+                  {'red': '433', 'canal': '0', 'texto': '   '}, {'red': '433', 'canal': '0', 'texto': 'ñ' * 101}):
+        st, _, pag = pide('POST', M.MESH_CHAT, urlencode(dict(malos, accion='mesh-enviar', csrf=tkc)), ORIGEN)
+        assert st == 200 and 'alert-danger' in pag, malos
+    st, _, pag = pide('POST', BASE, urlencode({'accion': 'mesh-enviar', 'red': '433', 'canal': '0', 'texto': 'a', 'csrf': tkc}), ORIGEN)
+    assert 'alert-danger' in pag, 'el envío solo desde la página de mensajes'
+    assert pide('POST', M.MESH_CHAT, urlencode({'accion': 'mesh-enviar', 'red': '433', 'canal': '0', 'texto': 'a', 'csrf': '0' * 40}), ORIGEN)[0] == 403
+    assert pide('GET', M.MESH_CHAT)[0] == 302, 'sin sesión: al login'
+    assert len(pedidos) == n, 'nada no válido llega al nodo'
+    assert 'href="%s"' % M.MESH_CHAT in pide('GET', BASE, cab=COOKIE)[2], 'enlace desde el panel Meshtastic'
+
     # --- credenciales TAK: ocultas por defecto, visibles solo en la respuesta al POST «Mostrar»
     st, _, pag = pide('GET', M.TAK, cab=COOKIE)
     assert 'No hay credenciales' in pag, 'sin tak-access.txt: lo dice'
@@ -487,6 +545,38 @@ try:
     open(plant, 'w', encoding='utf-8').write('<html><body>\n</body>')
     B.main(['-q'])
     assert 'settings/bricohams/aprs' in open(plant, encoding='utf-8').read(), 'plantilla rara: antes de </body>'
+    # tema oscuro: el mismo CSS en admin.css de OpenWebRX+ y en línea en los paneles
+    assert B.TEMA_OSCURO == M.TEMA_OSCURO, 'el tema de botones y el de mesh-admin deben coincidir'
+    assert 'select,textarea{background-color:#2b2b2b' in M.TEMA_OSCURO and 'select option' in M.TEMA_OSCURO
+    h = M.con_tema('<html><head><title>x</title></head><body></body></html>')
+    assert h.count('id="bricohams-tema"') == 1 and h.index('bricohams-tema') < h.index('</head>')
+    assert M.con_tema(h) == h, 'idempotente'
+    os.makedirs(os.path.join(tmp, 'css'), exist_ok=True)
+    acss = os.path.join(tmp, 'css', 'admin.css')
+    css_orig = '@import url("openwebrx-header.css");\nbody { margin-bottom: 5rem; }\n'
+    open(acss, 'w', encoding='utf-8').write(css_orig)
+    hojas = {'login.css': B.LOGIN_OSCURO, 'openwebrx-header.css': B.CABECERA}
+    for nombre in hojas:
+        open(os.path.join(tmp, 'css', nombre), 'w', encoding='utf-8').write(css_orig)
+    open(plant, 'w', encoding='utf-8').write(orig)
+    assert B.main(['-q']) == 0 and B.main(['-q']) == 0
+    c = open(acss, encoding='utf-8').read()
+    assert c.startswith(css_orig) and c.count(B.CSS_INI) == 1 and c.count(B.CSS_FIN) == 1 and B.TEMA_OSCURO in c
+    for nombre, esperado in hojas.items():
+        hoja = open(os.path.join(tmp, 'css', nombre), encoding='utf-8').read()
+        assert hoja.startswith(css_orig) and hoja.count(B.CSS_INI) == 1 and esperado in hoja
+    assert 'html,body{background-color:#1e1e1e!important' in B.LOGIN_OSCURO
+    assert '.login{background-color:#2d2d2d!important' in B.LOGIN_OSCURO
+    assert 'width:calc(100% - 32px)' in B.LOGIN_OSCURO
+    assert '.webrx-top-bar{background:#242424!important}' in B.CABECERA
+    assert 'background-image:none' not in B.CABECERA, 'se conserva la foto del banner expandido'
+    assert B.main(['-q', '--quitar']) == 0 and open(acss, encoding='utf-8').read() == css_orig
+    for nombre in hojas:
+        assert open(os.path.join(tmp, 'css', nombre), encoding='utf-8').read() == css_orig
+    assert open(plant, encoding='utf-8').read() == orig
+    os.remove(acss)
+    assert B.main(['-q']) == 0, 'sin admin.css no falla'
+    B.main(['-q', '--quitar'])
     T = open(os.path.join(RAIZ, 'files', 'nginx', 'bricohams-sdr.conf.tmpl'), encoding='utf-8').read()
     assert T.index('#@ADMIN@') < T.index('#@HTTP@    include'), 'la regex de /settings→HTTPS va antes de las rutas'
     W = open(os.path.join(RAIZ, 'files', 'web', 'index.html.tmpl'), encoding='utf-8').read()

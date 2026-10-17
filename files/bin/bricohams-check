@@ -36,6 +36,21 @@ servicio() {
         mal "servicio $1 NO activo (journalctl -u $1 -n 50)"
     fi
 }
+# Hardware declarado «en camino» en HARDWARE_PENDIENTE (p. ej. "BME280, cámara, Pico"): sus fallos son avisos
+pendiente() {
+    local p k n
+    IFS=',' read -ra p <<<"${HARDWARE_PENDIENTE:-}"
+    for k in "${p[@]}"; do
+        k=$(printf '%s' "$k" | sed 's/^ *//;s/ *$//'); [ -n "$k" ] || continue
+        for n in "$@"; do [[ "${n,,}" == *"${k,,}"* ]] && return 0; done
+    done
+    return 1
+}
+mal_hw() { local q=$1; shift; if pendiente "$q"; then aviso "$* · en camino (HARDWARE_PENDIENTE)"; else mal "$*"; fi; }
+servicio_hw() {
+    if ! systemctl is-active --quiet "$2" && pendiente "$1"; then aviso "servicio $2 parado · en camino (HARDWARE_PENDIENTE)"
+    else servicio "$2"; fi
+}
 edad() { local f=$1; [ -e "$f" ] || { echo 999999; return; }; echo $(( $(date +%s) - $(stat -c %Y "$f") )); }
 
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
@@ -121,10 +136,11 @@ fi
 systemctl list-unit-files 2>/dev/null | grep -q '^sdrplay' && servicio sdrplay
 
 titulo "HAT HackerGadgets"
-if i2cdetect -y 1 2>/dev/null | grep -Eq ' (51|UU) '; then bien "RTC PCF85063A en I2C 0x51"; else mal "no veo el RTC en I2C-1 0x51"; fi
+if i2cdetect -y 1 2>/dev/null | grep -Eq ' (51|UU) ' || grep -qs pcf85063 /sys/class/rtc/rtc0/name; then bien "RTC PCF85063A en I2C 0x51"; else mal "no veo el RTC en I2C-1 0x51"; fi
+# Trixie no trae hwclock (paquete util-linux-extra): sin él la hora se lee de /sys
 if hw=$(hwclock -r 2>/dev/null); then bien "hora del RTC: $hw"
-elif [ "$(id -u)" != 0 ] && [ -r /sys/class/rtc/rtc0/time ]; then bien "hora del RTC: $(cat /sys/class/rtc/rtc0/date /sys/class/rtc/rtc0/time | tr '\n' ' ')UTC (sin root: leída de /sys)"
-else mal "hwclock no puede leer el RTC"; fi
+elif [ -r /sys/class/rtc/rtc0/time ]; then bien "hora del RTC: $(cat /sys/class/rtc/rtc0/date /sys/class/rtc/rtc0/time | tr '\n' ' ')UTC (leída de /sys)"
+else mal "no puedo leer el RTC (ni hwclock ni /sys/class/rtc/rtc0)"; fi
 servicio gpsd
 if gp=$(timeout 12 gpspipe -w -n 12 2>/dev/null); then
     if printf '%s' "$gp" | grep -q '"mode":3'; then bien "GPS con posición 3D"
@@ -154,7 +170,7 @@ if [ "${ADSB_ENABLE:-yes}" = yes ]; then
     [ -d /usr/local/share/tar1090 ] && bien "mapa tar1090 en http://$(hostname -I | awk '{print $1}')/tar1090/"
     if [ "${MAPFLIGHTS_FEED:-no}" = yes ]; then
         if grep -q 'net-connector=feed.map.flights' /etc/default/readsb 2>/dev/null; then
-            ss -tn 2>/dev/null | grep -q ':30004 ' && bien "map.flights: readsb conectado a feed.map.flights:30004" \
+            ss -Htn state established '( dport = :30004 )' 2>/dev/null | grep -q . && bien "map.flights: readsb conectado a feed.map.flights:30004" \
                 || mal "map.flights: readsb no está conectado a feed.map.flights:30004 (journalctl -u readsb)"
         else mal "map.flights: falta el conector en /etc/default/readsb (MAPFLIGHTS_UUID y sudo bash install.sh --solo adsb)"; fi
         if [ "${MAPFLIGHTS_MLAT:-yes}" = yes ]; then
@@ -183,18 +199,22 @@ if [ "${TAK:-no}" = yes ] || [ -e /etc/systemd/system/bricohams-tak.service ]; t
 fi
 if [ "${MONITORIZACION:-no}" = yes ]; then
     titulo "Monitorización (Prometheus + Grafana)"
-    for u in prometheus-node-exporter prometheus grafana-server; do servicio "$u"; done
+    # node_exporter instalado a mano (binario oficial) en vez del paquete de Debian: install.sh lo adopta
+    nu=prometheus-node-exporter; systemctl cat node_exporter >/dev/null 2>&1 && nu=node_exporter
+    for u in "$nu" prometheus grafana-server; do servicio "$u"; done
+    curl -fsS --max-time 4 http://127.0.0.1:9100/metrics 2>/dev/null | grep -q '^node_' && bien "node-exporter da métricas (127.0.0.1:9100)" || mal "node-exporter no responde en 127.0.0.1:9100"
     curl -fsS --max-time 4 http://127.0.0.1:9090/-/ready >/dev/null 2>&1 && bien "Prometheus listo (127.0.0.1:9090)" || mal "Prometheus no responde en 127.0.0.1:9090"
     curl -fsS --max-time 4 http://127.0.0.1:3000/api/health 2>/dev/null | grep -q '"ok"' && bien "Grafana sano · panel en /settings/bricohams/monitorizacion" || mal "Grafana no responde en 127.0.0.1:3000"
 fi
 
 titulo "Cámara del mástil"
+CAM="cámara camara CSI"
 if command -v rpicam-hello >/dev/null && rpicam-hello --list-cameras 2>&1 | grep -q '^[0-9] :'; then bien "cámara CSI detectada"; else aviso "no veo la cámara CSI (rpicam-hello --list-cameras); si MediaMTX la está usando es normal"; fi
 servicio mediamtx
-if curl -fsS --max-time 4 http://127.0.0.1:9997/v3/paths/get/mastil 2>/dev/null | grep -q '"ready":true'; then bien "vídeo 'mastil' en marcha (RTSP 8554 · WebRTC 8889 · HLS 8888)"; else mal "el vídeo 'mastil' no está listo en MediaMTX"; fi
+if curl -fsS --max-time 4 http://127.0.0.1:9997/v3/paths/get/mastil 2>/dev/null | grep -q '"ready":true'; then bien "vídeo 'mastil' en marcha (RTSP 8554 · WebRTC 8889 · HLS 8888)"; else mal_hw "$CAM" "el vídeo 'mastil' no está listo en MediaMTX"; fi
 servicio bricohams-camsnap
 e=$(edad "$HTDOCS/plugins/receiver/camara/snap/mastil.jpg")
-[ "$e" -lt $(( ${CAM_SNAPSHOT_SECONDS:-60} * 3 )) ] && bien "foto de la cámara al día (hace ${e}s)" || mal "foto de la cámara vieja o ausente"
+[ "$e" -lt $(( ${CAM_SNAPSHOT_SECONDS:-60} * 3 )) ] && bien "foto de la cámara al día (hace ${e}s)" || mal_hw "$CAM" "foto de la cámara vieja o ausente"
 
 titulo "LilyGO 433 (USB) · Meshtastic"
 [ -e /dev/lilygo-mesh ] && bien "/dev/lilygo-mesh conectado (Meshtastic 433)" || aviso "/dev/lilygo-mesh no aparece (sudo bricohams-dispositivos identificar)"
@@ -252,10 +272,10 @@ fi
 
 titulo "Sensor BME280/BMP280, viento y lluvia"
 if [ "${WX_ENABLE:-yes}" = yes ]; then
-    servicio bricohams-wx
+    servicio_hw "BME280 BMP280 sensor" bricohams-wx
     sj=$HTDOCS/plugins/receiver/meteo/sensor.json
     e=$(edad "$sj")
-    [ "$e" -lt 300 ] && bien "sensor: $(python3 -c "import json;d=json.load(open('$sj'));print(d['chip'],d.get('addr'),d['ta'],'°C',d.get('hr'),'%',d.get('pres_nmar') or '—','hPa','pos:',(d.get('pos') or {}).get('fuente','fija'))")" || mal "sensor.json viejo o ausente (journalctl -u bricohams-wx)"
+    [ "$e" -lt 300 ] && bien "sensor: $(python3 -c "import json;d=json.load(open('$sj'));print(d['chip'],d.get('addr'),d['ta'],'°C',d.get('hr'),'%',d.get('pres_nmar') or '—','hPa','pos:',(d.get('pos') or {}).get('fuente','fija'))")" || mal_hw "BME280 BMP280 sensor" "sensor.json viejo o ausente (journalctl -u bricohams-wx)"
     [ "${WX_APRS:-no}" = yes ] && bien "WX APRS como ${WX_APRS_CALLSIGN:-N0CALL-13}: https://aprs.fi/#!call=${WX_APRS_CALLSIGN:-N0CALL-13}"
 fi
 
@@ -272,7 +292,7 @@ if systemctl is-enabled --quiet bricohams-fan 2>/dev/null; then
     if [ -s /run/bricohams/caja.json ]; then
         est=$(python3 -c 'import json;d=json.load(open("/run/bricohams/caja.json"));print("CPU %s °C · caja %s °C · ciclo %s %% · rpm %s · %s" % (d.get("t_cpu"), d.get("t_caja"), d.get("ciclo"), d.get("rpm"), d.get("modo")))')
         bien "$est"
-        grep -q '"alarma": null' /run/bricohams/caja.json || mal "ventilador parado: $(python3 -c 'import json;print(json.load(open("/run/bricohams/caja.json"))["alarma"])') (revisa conector y tacómetro)"
+        grep -q '"alarma": null' /run/bricohams/caja.json || mal_hw "Pico ventilador" "ventilador parado: $(python3 -c 'import json;print(json.load(open("/run/bricohams/caja.json"))["alarma"])') (revisa conector y tacómetro)"
     else
         aviso "bricohams-fan sin estado todavía"
     fi
@@ -288,13 +308,13 @@ fi
 
 titulo "Pico bricohams-io (sensores y ventiladores por USB)"
 if systemctl is-enabled --quiet bricohams-io 2>/dev/null; then
-    servicio bricohams-io
-    [ -e /dev/bricohams-io ] && bien "/dev/bricohams-io presente" || mal "no veo la Pico (/dev/bricohams-io): ¿cable USB? ¿MicroPython grabado? (manual 20)"
+    servicio_hw Pico bricohams-io
+    [ -e /dev/bricohams-io ] && bien "/dev/bricohams-io presente" || mal_hw Pico "no veo la Pico (/dev/bricohams-io): ¿cable USB? ¿MicroPython grabado? (manual 20)"
     e=$(edad /run/bricohams/io.json)
     if [ "$e" -lt 30 ]; then
         bien "datos de la Pico al día: $(python3 -c 'import json;d=json.load(open("/run/bricohams/io.json"));b=d.get("bme") or {};f=d.get("fan") or {};print("BME %s °C %s hPa · lluvia %s vuelcos · rpm %s%s" % (b.get("t"), round(b["p"]/100,1) if b.get("p") else "?", d.get("rain"), f.get("rpm"), " · ¡ventiladores en modo seguridad!" if f.get("auto") else ""))')"
     else
-        mal "la Pico no manda datos (hace ${e}s): sudo bricohams-io ping"
+        mal_hw Pico "la Pico no manda datos (hace ${e}s): sudo bricohams-io ping"
     fi
 else
     aviso "bricohams-io no instalado (IO_MODE=gpio)"
@@ -326,6 +346,28 @@ servicio bricohams-visitas
 [ -s /var/lib/bricohams/dbip-city-lite.mmdb ] && bien "base GeoIP local presente" || aviso "sin base GeoIP: sudo -u openwebrx bricohams-visitas --geoip"
 [ -s /etc/bricohams/telegram.env ] && grep -q 'TELEGRAM_TOKEN=.\+' /etc/bricohams/telegram.env && bien "Telegram configurado" || aviso "Telegram sin configurar (TELEGRAM_TOKEN)"
 systemctl is-active --quiet bricohams-satpass.timer && bien "pases de satélites cada 15 min" || aviso "bricohams-satpass.timer parado"
+# v5.0 · grabación automática de pases, «Clima en red» (APRS-IS) y resumen WSPR
+if [ -e /etc/systemd/system/bricohams-satrec.service ]; then
+    if systemctl is-enabled --quiet bricohams-satrec 2>/dev/null; then
+        servicio bricohams-satrec
+        gj=$HTDOCS/plugins/receiver/satelites/grabaciones.json
+        [ "$(edad "$gj")" -lt 1800 ] && bien "plan de grabación al día: $(python3 -c "import json;d=json.load(open('$gj'));print(len(d['plan']),'pases planificados,',len(d['capturas']),'capturas')" 2>/dev/null)" \
+            || mal "grabaciones.json viejo o ausente: journalctl -u bricohams-satrec -n 30"
+        command -v lame >/dev/null && bien "lame instalado (MP3 de los pases)" || aviso "sin lame: los pases se quedan en WAV y no salen en Files (sudo apt install lame)"
+    else aviso "grabación de pases desactivada (SATREC_ENABLE)"; fi
+fi
+if [ -e /etc/systemd/system/bricohams-wx-red.service ]; then
+    if systemctl is-enabled --quiet bricohams-wx-red 2>/dev/null; then
+        servicio bricohams-wx-red
+        wj=$HTDOCS/plugins/receiver/meteo/wx-red.json
+        [ "$(edad "$wj")" -lt 600 ] && bien "Clima en red: $(python3 -c "import json;d=json.load(open('$wj'));print(len(d['estaciones']),'estaciones WX ·','conectado' if d['conectado'] else 'SIN conexión','a APRS-IS')" 2>/dev/null)" \
+            || mal "wx-red.json viejo o ausente: journalctl -u bricohams-wx-red -n 30"
+    else aviso "Clima en red desactivado (WXRED_ENABLE)"; fi
+fi
+if [ -e /etc/systemd/system/bricohams-wspr.timer ]; then
+    systemctl is-active --quiet bricohams-wspr.timer && bien "resumen WSPR cada 15 min" || aviso "bricohams-wspr.timer parado"
+    systemctl is-failed --quiet bricohams-wspr.service && aviso "resumen WSPR falló (¿sin indicativo WSPRnet?): journalctl -u bricohams-wspr -n 10"
+fi
 if command -v satdump >/dev/null; then
     if [ -d /usr/lib/satdump/plugins ] && [ ! -e /usr/local/lib/satdump ] && strings "$(ldd "$(command -v satdump)" | awk '/satdump_core/{print $3}')" 2>/dev/null | grep -qx /usr/local/lib/satdump/; then
         mal "SatDump no encuentra sus plugins (METEOR LRPT se salta): sudo ln -s /usr/lib/satdump /usr/local/lib/satdump"

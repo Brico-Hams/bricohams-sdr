@@ -560,19 +560,22 @@ sudo bash install.sh --solo satelites,ft2
 Variables referenciadas por estos pasos y sus ayudantes indicados (inventario estático, sin
 valores privados; las herramientas llamadas pueden leer otras variables):
 
-`STATION_LAT`, `STATION_LON`, `STATION_ASL`, `OWRX_BACKEND`, `SATDUMP_ENABLE`, `FT2_ENABLE`.
+`STATION_LAT`, `STATION_LON`, `STATION_ASL`, `OWRX_BACKEND`, `SATDUMP_ENABLE`, `FT2_ENABLE`, `CALLSIGN`,
+`SATREC_ENABLE`, `SATREC_MIN_EL`, `SATREC_EXCLUIR`, `SATREC_METEOR`, `SATREC_DIAS`, `SATREC_MAX_MB`, `AMSAT_REPORT`.
 
-**Scripts y código.** [Instalador](../install.sh); [bricohams-ft2](../files/bin/bricohams-ft2), [bricohams-ft2-decode](../files/bin/bricohams-ft2-decode), [bricohams-ft2-patch.py](../files/bin/bricohams-ft2-patch.py), [bricohams-satpass.py](../files/bin/bricohams-satpass.py).
+**Scripts y código.** [Instalador](../install.sh); [bricohams-ft2](../files/bin/bricohams-ft2), [bricohams-ft2-decode](../files/bin/bricohams-ft2-decode), [bricohams-ft2-patch.py](../files/bin/bricohams-ft2-patch.py), [bricohams-satpass.py](../files/bin/bricohams-satpass.py), [bricohams-satrec.py](../files/bin/bricohams-satrec.py) (v5.0, grabación de pases), [clima.html](../files/web/clima.html).
 
 **Comprobar (solo los servicios/opciones habilitados).**
 
 ```bash
 systemctl status bricohams-satpass.timer --no-pager
 journalctl -u bricohams-satpass.service -n 30 --no-pager
+systemctl status bricohams-satrec --no-pager
+sudo -u openwebrx bricohams-satrec --plan
 sudo bricohams-ft2 estado
 ```
 
-**Resultado esperado.** Lista de pases coherente y selección de escucha cuando hay receptor disponible. Las efemérides requieren actualización; que no haya pase visible puede ser normal.
+**Resultado esperado.** Lista de pases coherente y selección de escucha cuando hay receptor disponible. Las efemérides requieren actualización; que no haya pase visible puede ser normal. Tras un pase de más de 20° aparece su MP3 en **Files** y en `/bricohams/clima.html`.
 
 **Si no funciona.** Pases incorrectos: revisa hora, ubicación y datos orbitales. No recibir un satélite fuera del horizonte no es fallo de instalación.
 
@@ -581,7 +584,7 @@ del módulo. Un estado `inactive` en un periférico desactivado es esperable;
 `failed` exige revisar el journal. No borres configuraciones para hacer que pase
 una prueba. Para cambios de hardware vuelve a intervenir sin tensión.
 
-**Procedimiento detallado:** [26_SATELITES](manuales/26_SATELITES.md) · [28_FT2](manuales/28_FT2.md).
+**Procedimiento detallado:** [26_SATELITES](manuales/26_SATELITES.md) · [28_FT2](manuales/28_FT2.md) · [42_CLIMA_RED_SATELITES_GRABACION](manuales/42_CLIMA_RED_SATELITES_GRABACION.md).
 
 <a id="web"></a>
 
@@ -645,7 +648,7 @@ sudo bash install.sh --solo visitas,tareas
 Variables referenciadas por estos pasos y sus ayudantes indicados (inventario estático, sin
 valores privados; las herramientas llamadas pueden leer otras variables):
 
-`DUCKDNS_DOMAIN`, `DUCKDNS_TOKEN`, `VISITAS_ENABLE`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `VISITAS_DIAS`, `VISITAS_CHAT`, `VISITAS_AVISAR_LAN`, `VISITAS_AVISAR_DESCONEXION`, `CRON_COPIA`, `CRON_ACTUALIZAR`, `CRON_REINICIO`, `CRON_SALUD`, `CRON_RESUMEN`, `CRON_GEOIP`.
+`DUCKDNS_DOMAIN`, `DUCKDNS_TOKEN`, `VISITAS_ENABLE`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `VISITAS_DIAS`, `VISITAS_CHAT`, `VISITAS_AVISAR_LAN`, `VISITAS_AVISAR_DESCONEXION`, `OYENTES_TELEGRAM`, `MESH_TELEGRAM`, `APRS_TELEGRAM`, `CRON_COPIA`, `CRON_ACTUALIZAR`, `CRON_REINICIO`, `CRON_SALUD`, `CRON_RESUMEN`, `CRON_GEOIP`.
 
 **Scripts y código.** [Instalador](../install.sh); [bricohams-tarea](../files/bin/bricohams-tarea), [bricohams-telegram](../files/bin/bricohams-telegram), [bricohams-visitas.py](../files/bin/bricohams-visitas.py).
 
@@ -918,6 +921,7 @@ El manual 37 explica cambios históricos, no añade un paso de instalación.
 | [24_VISITAS_TELEGRAM](manuales/24_VISITAS_TELEGRAM.md) | [Oyentes, Telegram y avisos](#visitas) |
 | [25_TAREAS_AUTOMATICAS](manuales/25_TAREAS_AUTOMATICAS.md) | [Tareas, backups, limpieza, actualización y clonado](#mantenimiento) |
 | [26_SATELITES](manuales/26_SATELITES.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
+| [42_CLIMA_RED_SATELITES_GRABACION](manuales/42_CLIMA_RED_SATELITES_GRABACION.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
 | [27_PLUGINS_WEB_V4](manuales/27_PLUGINS_WEB_V4.md) | [Plugins, registro de oyentes, CTCSS y RepeaterBook](#plugins) |
 | [28_FT2](manuales/28_FT2.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
 | [29_ACTUALIZAR](manuales/29_ACTUALIZAR.md) | [Tareas, backups, limpieza, actualización y clonado](#mantenimiento) |

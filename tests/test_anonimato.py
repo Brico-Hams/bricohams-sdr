@@ -6,6 +6,7 @@ Los patrones se construyen troceados para que este test no se detecte a sí mism
 import os
 import re
 import sys
+import stat
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -32,7 +33,12 @@ def ficheros():
         for n in nombres:
             if n in EXCLUIR_NOMBRES or os.path.splitext(n)[1].lower() in EXCLUIR_EXT:
                 continue
-            yield os.path.join(base, n)
+            ruta = os.path.join(base, n)
+            try:
+                if stat.S_ISREG(os.lstat(ruta).st_mode):
+                    yield ruta
+            except OSError:
+                continue
 
 
 def main():

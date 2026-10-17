@@ -34,6 +34,8 @@ python3 tests/test_registro_oyentes.py
 python3 tests/test_chat_registro.py
 python3 tests/test_plugins_ea5hkx.py
 python3 tests/test_politicas_mapa_local.py
+python3 tests/test_fuentes.py
+python3 tests/test_systemd_unidades.py
 python3 tests/test_live_map.py
 python3 tests/test_ft2.py
 python3 tests/test_anclajes.py
@@ -47,6 +49,10 @@ python3 tests/test_owrx_clone.py
 python3 tests/test_owrx_clone_docker.py
 python3 tests/test_instalador_perfil.py
 python3 tests/test_rak_aprs.py
+python3 tests/test_wx_red.py
+python3 tests/test_wspr.py
+python3 tests/test_satrec.py
+python3 tests/test_clima_web.py
 python3 tests/test_v45_dispositivos.py
 python3 tests/test_mesh_owrx.py
 python3 tests/test_mesh_admin.py
@@ -61,6 +67,7 @@ python3 tests/test_chat_moderador.py
 python3 tests/test_wx_rak.py
 python3 tests/test_avion.py
 python3 tests/test_mapflights_api.py
+python3 tests/test_telegram_avisos.py
 python3 tests/test_mapflights.py
 python3 tests/test_anonimato.py
 python3 tools/marcadores.py --comprobar

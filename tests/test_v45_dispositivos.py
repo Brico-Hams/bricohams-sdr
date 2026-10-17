@@ -96,7 +96,25 @@ assert 'meshtastic_cli --seturl "$MESH433_CHANNEL_URL"' in L and 'no de EU_433' 
 # v5.0 · SatDump encuentra sus plugins y el RTC se comprueba también sin root
 assert 'ln -s /usr/lib/satdump /usr/local/lib/satdump' in S, 'enlace de plugins de SatDump'
 CHK = open(os.path.join(BIN, 'bricohams-check'), encoding='utf-8').read()
-assert '/sys/class/rtc/rtc0/time' in CHK and 'sin root' in CHK, 'RTC sin root leído de /sys'
+assert '/sys/class/rtc/rtc0/time' in CHK and 'leída de /sys' in CHK, 'RTC leído de /sys si no hay hwclock (Trixie)'
+assert 'grep -qs pcf85063 /sys/class/rtc/rtc0/name' in CHK, 'RTC detectado sin i2cdetect'
+assert 'systemctl cat node_exporter' in CHK and '127.0.0.1:9100/metrics' in CHK, 'node_exporter manual adoptado'
+for q, txt in (('"$CAM"', "el vídeo 'mastil' no está listo"), ('"$CAM"', 'foto de la cámara vieja'),
+               ('"BME280 BMP280 sensor"', 'sensor.json viejo'), ('"Pico ventilador"', 'ventilador parado')):
+    assert 'mal_hw %s "%s' % (q, txt) in CHK, txt
+assert 'servicio_hw "BME280 BMP280 sensor" bricohams-wx' in CHK
+# pendiente(): comportamiento real con bash (si lo hay)
+import re as _re
+import shutil as _sh
+import subprocess as _sp
+_bash = _sh.which('bash')
+if _bash:
+    _fn = _re.search(r'^pendiente\(\) \{.*?^\}\n', CHK, _re.S | _re.M).group(0)
+    for env, nombre, esperado in (('BME280, Cámara, Pico', 'cámara camara CSI', 0), ('bme280', 'BME280 BMP280 sensor', 0),
+                                  ('HAT, Mini', 'Pico ventilador', 1), ('', 'cámara camara CSI', 1),
+                                  ('camara', 'cámara camara CSI', 0)):
+        r = _sp.run([_bash, '-c', _fn + 'HARDWARE_PENDIENTE="%s"; pendiente "%s"' % (env, nombre)])
+        assert r.returncode == esperado, (env, nombre, r.returncode)
 assert 'sudo ln -s /usr/lib/satdump /usr/local/lib/satdump' in CHK, 'el check avisa del enlace de SatDump'
 
 # ------------------------------------------------------------------ 3. banner SSH

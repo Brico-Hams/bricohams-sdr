@@ -11,6 +11,7 @@
 #    - le manda al RAK su configuración desde bricohams.env (orden KISS 0x06);
 #    - pasa los mensajes de APRS-IS a RF para las estaciones oídas (como messagesToRF del original);
 #    - pinta en el MAPA de OpenWebRX+ lo oído (MQTT local «lora433/APRS», v4.5, ADR-50);
+#    - v5.0 · avisa por Telegram los mensajes APRS dirigidos a la estación (APRS_TELEGRAM);
 #    - deja el estado en /run/bricohams-rak/rak-aprs.json (lo leen bricohams-check,
 #      el control de ventiladores y el banner SSH).
 #
@@ -34,6 +35,10 @@ try:
     from bricohams_mqtt import Publicador, simbolo
 except ImportError:                                    # sin el módulo: no hay mapa de OpenWebRX+, el iGate sigue
     Publicador = None
+try:
+    import bricohams_telegram
+except ImportError:                                    # sin el módulo: sin avisos a Telegram
+    bricohams_telegram = None
 
 # con systemd (LoadCredential=env:…) el env llega como credencial: el servicio no corre como root
 _CRED = os.path.join(os.environ.get('CREDENTIALS_DIRECTORY', '/nonexistent'), 'env')
@@ -88,9 +93,54 @@ def indicativo():
     return env('RAK_CALLSIGN', env('IGATE_CALLSIGN', 'N0CALL-10')).upper()
 
 
-def config_deseada():
-    """Configuración del RAK a partir de bricohams.env (no lleva claves)."""
+def digi_modo():
+    """RAK_DIGI: 0-3 fijo, o «auto» (WIDE1-1 solo mientras el otro digi de la zona está callado)."""
+    v = env('RAK_DIGI', '0').strip().lower()
+    if v == 'auto':
+        return 'auto'
+    try:
+        return max(0, min(3, int(v)))
+    except ValueError:
+        return 0
+
+
+def digi_vigilado():
+    """Digi/iGate que ya cubre la zona (por defecto IGATE_CALLSIGN si no es el propio RAK)."""
+    v = env('RAK_DIGI_VIGILA', env('IGATE_CALLSIGN', '')).strip().upper()
+    return '' if v in ('', indicativo(), 'N0CALL-10') else v
+
+
+class DigiAuto:
+    """Con RAK_DIGI=auto el RAK hace de digi WIDE1-1 solo si «vigila» no se oye desde hace
+    RAK_DIGI_AUTO_MIN minutos (ni como origen ni repitiendo, «VIGILA*» en la ruta): así no hay
+    dos digis en el mismo sitio repitiendo lo mismo (duplicados) y la zona no se queda sin digi."""
+
+    def __init__(self, vigila, minutos, ahora):
+        self.vigila = vigila.upper()
+        self.espera = max(5, minutos) * 60
+        self.ultimo = ahora          # al arrancar se da por vivo: primero se escucha
+        self.visto = None
+
+    def oir(self, tnc2, ahora):
+        cab = tnc2.split(':', 1)[0]
+        de, _, ruta = cab.partition('>')
+        if de.upper() == self.vigila or any(p.endswith('*') and p.rstrip('*').upper() == self.vigila
+                                            for p in ruta.split(',')[1:]):
+            self.ultimo = self.visto = ahora
+            return True
+        return False
+
+    def decidir(self, ahora):
+        return 1 if ahora - self.ultimo > self.espera else 0
+
+
+def config_deseada(digi=None):
+    """Configuración del RAK a partir de bricohams.env (no lleva claves). «digi» manda sobre RAK_DIGI (modo auto)."""
     sim = env('RAK_SYMBOL', 'L&')
+    if digi is None:
+        digi = digi_modo()
+        if digi == 'auto':
+            digi = 0 if digi_vigilado() else 1
     return {
         'callsign': indicativo(),
         'comment': env('RAK_COMMENT', 'SDR BricoHams LoRa APRS')[:43],
@@ -103,7 +153,7 @@ def config_deseada():
         'freq': int(num('RAK_FREQ', 433775000, int)), 'sf': int(num('RAK_SF', 12, int)),
         'bw': int(num('RAK_BW', 125000, int)), 'cr': int(num('RAK_CR', 5, int)),
         'power': int(num('RAK_POWER', 20, int)), 'tx': si('RAK_TX', 'no'), 'cad': True,
-        'digi': int(num('RAK_DIGI', 0, int)),
+        'digi': digi,
         'beaconMin': int(num('RAK_BEACON_MIN', 15, int)), 'beaconRF': si('RAK_BEACON_RF', 'no'),
         'telemetryMin': int(num('RAK_TELEMETRY_MIN', 10, int)), 'telemetryRF': si('RAK_TELEMETRY_RF', 'no'),
         'tempInComment': True, 'tempOffset': num('RAK_TEMP_OFFSET', 0.0),
@@ -347,6 +397,32 @@ class ChatAPRS:
         return True
 
 
+def indicativos_propios():
+    """Indicativos base (sin SSID) de la estación: CALLSIGN, IGATE_CALLSIGN y RAK_CALLSIGN."""
+    out = set()
+    for k in ('CALLSIGN', 'IGATE_CALLSIGN', 'RAK_CALLSIGN'):
+        b = env(k).upper().split('-')[0].strip()
+        if b and b != 'N0CALL':
+            out.add(b)
+    return out
+
+
+def aviso_aprs(tnc2, propios, modo='propios', via='RF'):
+    """Texto HTML para Telegram de un mensaje APRS recibido, o None.
+    modo «propios»: solo los dirigidos a la estación; «todos»: cualquier mensaje oído."""
+    m = mensaje_chat(tnc2)
+    if not m or modo not in ('propios', 'todos'):
+        return None
+    src, _, dest = m['name'].partition(' -> ')
+    if src.split('-')[0] in propios:
+        return None
+    if modo == 'propios' and dest.split('-')[0] not in propios:
+        return None
+    tg = bricohams_telegram
+    return '📡 <b>APRS</b> (%s) <b>%s</b> → <b>%s</b>: %s' % (tg.esc(via), tg.esc(src), tg.esc(dest),
+                                                           tg.esc(tg.limpio(m['message'])))
+
+
 def mensaje_a_rf(linea, igate, oidas, ahora, recordar=1800, ruta='WIDE1-1'):
     """Mensaje de APRS-IS para una estación oída por RF hace menos de «recordar» s → paquete de terceros
     para transmitir (como aprs_is.messagesToRF del iGate original). None si no toca."""
@@ -504,8 +580,8 @@ def esperar_hw(ser, lector, prefijo, segundos=5):
     return None
 
 
-def sincronizar_config(ser, lector):
-    deseada = config_deseada()
+def sincronizar_config(ser, lector, digi=None):
+    deseada = config_deseada(digi)
     orden(ser, 'BH:CONF?')
     actual = esperar_hw(ser, lector, 'BH:CONF')
     try:
@@ -540,10 +616,22 @@ def servicio():
         h, _, pt = env('BRICOHAMS_MQTT', '127.0.0.1:1883').partition(':')
         mqtt = Publicador(h, int(pt or 1883), 'bricohams-rak-aprs')
     chat = ChatAPRS(mqtt) if mqtt and chat_activo else None
+    tg, modo_tg, propios = None, env('APRS_TELEGRAM', 'propios').strip().lower(), indicativos_propios()
+    if bricohams_telegram and modo_tg in ('propios', 'todos'):
+        tg = bricohams_telegram.Avisador(nombre='rak-aprs')
+        print('telegram: %s' % ('mensajes APRS (%s) -> Telegram' % modo_tg if tg.configurado
+                                else 'sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID'), flush=True)
+        tg = tg if tg.configurado else None
     oidas, enviados_rf, t_estado, t_latido = {}, {}, 0.0, time.time()
     if not aprsis.activo():
         print('aviso: sin APRS_PASSCODE (o RAK_APRSIS=no): solo escucha, no sube nada a APRS-IS', flush=True)
     vistos, oidos, estado_rak, meta = {}, [], {}, {}
+    vigila = digi_vigilado() if digi_modo() == 'auto' else ''
+    auto = DigiAuto(vigila, int(num('RAK_DIGI_AUTO_MIN', 30, int)), time.time()) if vigila else None
+    if auto:
+        print('digi auto: WIDE1-1 solo si %s calla más de %d min%s' % (
+            vigila, auto.espera // 60, '' if si('RAK_TX', 'no') else ' (sin efecto: RAK_TX=no)'), flush=True)
+    digi_actual, t_digi = None, 0.0
     while True:
         try:
             ser = abrir(puerto())
@@ -552,7 +640,8 @@ def servicio():
             time.sleep(20)
             continue
         lector = LectorKISS()
-        print('rak: abierto %s · configuración %s' % (ser.port, sincronizar_config(ser, lector)), flush=True)
+        digi_actual = auto.decidir(time.time()) if auto else None
+        print('rak: abierto %s · configuración %s' % (ser.port, sincronizar_config(ser, lector, digi_actual)), flush=True)
         orden(ser, 'BH:GET')
         ultimo_dato = time.time()
         try:
@@ -561,6 +650,8 @@ def servicio():
                 for l in aprsis.lineas():
                     if chat:
                         chat.recibir(l, ahora)
+                    if tg:
+                        tg.avisar(aviso_aprs(l, propios, modo_tg, 'APRS-IS'))
                     if mqtt and mapa_activo:
                         m = aprs_mapa(l, origen='APRS-IS')
                         if m and not mqtt.publicar('aprsis/APRS', m):
@@ -597,11 +688,15 @@ def servicio():
                     except ValueError:
                         continue
                     propio = tnc2.split('>', 1)[0] == igate
+                    if auto:
+                        auto.oir(tnc2, time.time())
                     linea = para_aprsis(tnc2, propio, igate)
                     clave = tnc2.split('>', 1)[0] + tnc2.split(':', 1)[1]
                     ahora = time.time()
                     if chat:
                         chat.recibir(tnc2, ahora)
+                    if tg and not propio:
+                        tg.avisar(aviso_aprs(tnc2, propios, modo_tg, 'RF 433'))
                     vistos = {k: v for k, v in vistos.items() if ahora - v < 30}
                     subido = False
                     if linea and clave not in vistos:
@@ -623,6 +718,15 @@ def servicio():
                 if mqtt and time.time() - t_latido > 30:
                     mqtt.latido()
                     t_latido = time.time()
+                if auto and time.time() - t_digi > 60:
+                    t_digi = time.time()
+                    d = auto.decidir(t_digi)
+                    if d != digi_actual:
+                        orden(ser, 'BH:CFG ' + json.dumps(config_deseada(d), separators=(',', ':')))
+                        print('digi auto: %s' % ('%s no se oye desde hace %d min → digi WIDE1-1 ACTIVADO' % (
+                            vigila, (t_digi - auto.ultimo) // 60) if d else '%s vuelve a oírse → digi desactivado' % vigila),
+                            flush=True)
+                        digi_actual = d
                 if (estado_rak or oidos) and time.time() - t_estado > 5:
                     t_estado = time.time()
                     guardar_estado({'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S'), 'puerto': ser.port,
@@ -632,6 +736,9 @@ def servicio():
                                                'activo': aprsis.activo(), 'mensajes_a_rf': a_rf},
                                     'mapa_owrx': {'activo': mqtt is not None,
                                                   'publicados': mqtt.enviados if mqtt else 0},
+                                    'digi_auto': {'vigila': vigila, 'minutos': auto.espera // 60, 'activo': bool(digi_actual),
+                                                  'oido': time.strftime('%H:%M:%S', time.localtime(auto.visto)) if auto.visto else None}
+                                    if auto else None,
                                     'oidos': oidos})
                 if time.time() - ultimo_dato > 180:
                     raise OSError('el RAK no habla desde hace 3 min')
@@ -758,7 +865,7 @@ def main(argv):
         return 0
     if o == 'grabar':
         return grabar(argv[2] if len(argv) > 2 else None)
-    for linea in open(__file__, encoding='utf-8').read().splitlines()[2:21]:
+    for linea in open(__file__, encoding='utf-8').read().splitlines()[2:22]:
         print(linea.lstrip('# '))
     return 1
 

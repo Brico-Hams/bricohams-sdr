@@ -29,6 +29,12 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path[:0] = [os.path.dirname(os.path.realpath(globals().get('__file__', '.'))), '/usr/local/lib/bricohams']
+try:
+    import bricohams_telegram
+except ImportError:                                    # sin el módulo: el registro funciona, sin aviso
+    bricohams_telegram = None
+
 ESTADO = os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams')
 UA = {'User-Agent': 'BricoHams-SDR N0CALL (+https://t.me/bricohams)'}
 CALL_RE = re.compile(r'^[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](/[A-Z0-9]{1,4})?$|^[A-Z0-9]{1,4}/[A-Z0-9]{3,7}$')
@@ -115,6 +121,34 @@ def barcos_locales(url=AIS_JSON_URL):
 def _https(u):
     u = str(u or '')
     return u if u.startswith('https://') and len(u) < 500 and not any(c in u for c in '"<> \'') else ''
+
+
+FUENTES_FOTO = {'wikimedia': 'Wikimedia Commons', 'planespotters': 'Planespotters.net',
+                'jetphotos': 'JetPhotos', 'airport-data': 'airport-data.com'}
+
+
+def _url_mapflights(u):
+    """map.flights da las fotos con ruta relativa (/photos/...): se completan con su dominio."""
+    u = str(u or '')
+    return 'https://map.flights' + u if u.startswith('/') and not u.startswith('//') else u
+
+
+def _credito_mapflights(foto):
+    """«© autor · origen · licencia» de una foto de map.flights (la licencia exige citar al autor)."""
+    partes = []
+    autor = str(foto.get('photographer') or '').strip()[:80]
+    if autor:
+        partes.append('© ' + autor)
+    fuente = str(foto.get('source') or '').strip().lower()
+    if not fuente:
+        dominio = urllib.parse.urlparse(str(foto.get('link') or foto.get('url') or '')).hostname or ''
+        fuente = 'planespotters' if 'plnspttrs' in dominio or 'planespotters' in dominio else ''
+    if fuente:
+        partes.append(FUENTES_FOTO.get(fuente, fuente[:40]))
+    licencia = str(foto.get('license') or '').strip()[:40]
+    if licencia:
+        partes.append(licencia)
+    return ' · '.join(partes)
 
 
 def _numero(v, lo, hi):
@@ -232,13 +266,11 @@ def ficha_avion(hexid, cs='', pedir=None, usar_mapflights=True, clave_mapflights
                     ficha['aerolinea'] = str(aerolinea)[:20]
             foto = mf.get('photo')
             if isinstance(foto, dict):
-                foto_url = _https(foto.get('url') or foto.get('thumbnail'))
+                foto_url = _https(_url_mapflights(foto.get('thumbnail') or foto.get('url')))
                 if foto_url:
                     ficha['foto'] = foto_url
-                    ficha['enlace'] = _https(foto.get('link'))
-                    credito = str(foto.get('photographer') or '').strip()
-                    ficha['credito'] = ('© %s · Planespotters.net' % credito
-                                        if credito else 'Planespotters.net')
+                    ficha['enlace'] = _https(foto.get('link')) or _https(_url_mapflights(foto.get('url')))
+                    ficha['credito'] = _credito_mapflights(foto)
             if ficha:
                 ficha['fuente'] = 'MAP.FLIGHTS'
 
@@ -515,7 +547,8 @@ def validar_registro_oyente(datos):
 
 
 class RegistroOyentes:
-    def __init__(self, ruta, reloj=time.time):
+    def __init__(self, ruta, reloj=time.time, aviso=None):
+        self.aviso = aviso
         os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
         mascara = os.umask(0o077)
         try:
@@ -560,6 +593,11 @@ class RegistroOyentes:
                 'INSERT INTO registro_oyentes (identificador, tipo, creado, consentimiento) VALUES (?, ?, ?, ?)',
                 (valor, tipo, ahora, 'v1'))
             self._limpiar()
+        if self.aviso:
+            try:
+                self.aviso(valor, tipo)
+            except Exception as e:                 # noqa: BLE001 — el aviso nunca debe romper el registro
+                print('api oyentes: aviso: %s' % e, file=sys.stderr, flush=True)
         return True
 
     def listar(self, limite=1000):
@@ -655,15 +693,35 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
     return H
 
 
+def aviso_oyente_telegram(valor, tipo):
+    """Texto HTML del aviso de un oyente registrado (indicativo o nombre ya validados)."""
+    tg = bricohams_telegram
+    if tipo == 'indicativo':
+        return '📝 <b>Oyente registrado</b>: indicativo <b>%s</b> · <a href="https://www.qrz.com/db/%s">QRZ</a>' % (
+            tg.esc(valor), urllib.parse.quote(valor))
+    return '📝 <b>Oyente registrado</b>: %s' % tg.esc(valor)
+
+
+def avisador_oyentes():
+    """Función (valor, tipo) que avisa por Telegram, o None si no hay Telegram u OYENTES_TELEGRAM=no."""
+    if not bricohams_telegram or not bricohams_telegram.activo(os.environ.get('OYENTES_TELEGRAM'), 'yes'):
+        return None
+    tg = bricohams_telegram.Avisador(nombre='api oyentes')
+    if not tg.configurado:
+        return None
+    return lambda valor, tipo: tg.avisar(aviso_oyente_telegram(valor, tipo))
+
+
 def servidor(host='127.0.0.1', puerto=8075):
     cache = Cache(os.path.join(ESTADO, 'indicativos.sqlite'))
-    oyentes = RegistroOyentes(os.path.join(ESTADO, 'oyentes.sqlite'))
+    aviso = avisador_oyentes()
+    oyentes = RegistroOyentes(os.path.join(ESTADO, 'oyentes.sqlite'), aviso=aviso)
     hamqth = HamQTH(os.environ.get('HAMQTH_USER', ''), os.environ.get('HAMQTH_PASS', ''))
     qrz = Qrz(os.environ.get('QRZ_USER', ''), os.environ.get('QRZ_PASS', ''))
     fichas = CacheFichas()
     httpd = ThreadingHTTPServer((host, puerto), crear_manejador(cache, hamqth, qrz, fichas, oyentes))
-    print('api: http://%s:%d/bricohams/api/ (HamQTH %s, QRZ %s)' %
-          (host, puerto, 'sí' if hamqth.u else 'no', 'sí' if qrz.u else 'no'), flush=True)
+    print('api: http://%s:%d/bricohams/api/ (HamQTH %s, QRZ %s, registro->Telegram %s)' %
+          (host, puerto, 'sí' if hamqth.u else 'no', 'sí' if qrz.u else 'no', 'sí' if aviso else 'no'), flush=True)
     httpd.serve_forever()
 
 

@@ -55,3 +55,6 @@ command -v satdump && satdump --help | head -3
 ls -l /usr/local/lib/satdump                 # enlace a /usr/lib/satdump
 ```
 - **En la web:** pulsa **PASES** y después ▶ en un pase en curso. La frecuencia del receptor debe moverse sola unos pocos kHz durante el pase.
+
+## 5. Grabación automática, calendario e informe AMSAT (v5.0)
+Los pases de más de 20° se graban solos en MP3 y salen en **Files** y en la página «Clima en red» (`/bricohams/clima.html`), con su calendario `.ics` y el borrador del informe para AMSAT: [manual 42](42_CLIMA_RED_SATELITES_GRABACION.md).

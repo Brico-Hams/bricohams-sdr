@@ -66,7 +66,9 @@ assert 'python3 tests/test_politicas_mapa_local.py' in pruebas
 # --- init.js: configuración y orden de carga -----------------------------------------
 assert "politicas: BH_WEB + '/bricohams/politicas.html'" in init_js
 # v5.1 · por el :8073 directo las páginas /bricohams/ irían a OpenWebRX+ (404): van a https://<host>/
-assert "const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' : 'https://') + location.hostname : '';" in init_js
+assert "const BH_DOM = /^[a-z0-9.-]+$/i.test('__SSL_DOMAIN__') ? '__SSL_DOMAIN__' : '';" in init_js
+assert "const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' + location.hostname : 'https://' + (BH_DOM || location.hostname)) : '';" in init_js
+assert '-e "s#__SSL_DOMAIN__#${SSL_DOMAIN:-}#g"' in instalador, 'por IP el certificado no vale: enlazar al dominio'
 assert init_js.index('const BH_WEB') < init_js.index('/bricohams/privacidad.html')
 assert not re.search(r"(?<!BH_WEB \+ )'/bricohams/(privacidad|politicas)\.html'", init_js), 'enlace sin BH_WEB'
 assert "url: BH_WEB + '/bricohams/'" in init_js
@@ -84,6 +86,7 @@ assert 'Plugins.consentimiento.listo' in ident_js, 'la bienvenida espera al avis
 assert 'fotos de aviones' in consent_js and 'recepción local' in consent_js
 assert "'bh_idioma'" in idioma_js and "'Settings': 'Ajustes'" in idioma_js
 assert "static/plugins/receiver/marca/bricohams-logo.png" in marca_js and '.webrx-top-logo' in marca_js
+assert '#openwebrx-bookmarks-container .bookmark' in marca_js and 'color:#111 !important' in marca_js, 'etiquetas legibles'
 with open(os.path.join(PLUG, 'marca/bricohams-logo.png'), 'rb') as f:
     assert f.read(8) == b'\x89PNG\r\n\x1a\n'
 

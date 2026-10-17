@@ -1,11 +1,75 @@
 # Historial
 
-## v5.0 · en desarrollo
+## v5.4.0 · 2026-10-17
+
+Publicación coordinada del público y privado, posterior a la v5.3 pública.
+Integra Telegram, chat Meshtastic 433/868, clima en red, WSPR, grabación de pases
+y las correcciones de login y cabecera del receptor y de los mapas.
+La etiqueta `v5.4.0` identifica esta entrega en ambos repositorios; los historiales
+permanecen separados para no publicar datos de la estación.
+
+### Cambios consolidados del ciclo v5.0
+- Se conservan los recursos exclusivos del historial público, incluidos los firmwares.
+  Se retira de la distribución el informe de una estación concreta y se anonimizan
+  los nombres de usuario de los registros de compilación. El historial no se reescribe.
+- Login oscuro y adaptable a móviles: se parchea también `login.css`, no solo `admin.css`.
+  La barra superior compartida es opaca para que la foto del banner no tape Help/Map/Files/Settings;
+  se conserva la imagen al desplegar los detalles. Parche idempotente, reversible y reaplicado tras apt.
+  nginx fuerza revalidar las tres hojas de estilo. Regresión: `test_mesh_admin.py`.
+**Clima en red, balizas WSPR, grabación automática de pases e informe AMSAT** ([manual 42](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md))
+- Página nueva `/bricohams/clima.html` (tarjeta en el portal y enlace en la ventana METEO), en oscuro: nuestro sensor, estaciones WX cercanas, paquetes APRS por satélite, balizas WSPR, pases planificados y grabaciones.
+- `bricohams-wx-red`: conexión de solo lectura a APRS-IS (sin passcode) con filtro de radio (`WXRED_RADIO_KM`, 100 km) y digis espaciales; decodifica las tramas WX (texto, comprimidas, con hora y objetos) y marca la vía: **rf** (la oyó un igate nuestro), **satélite** (ISS/ARISS/PSAT) o **internet**.
+- `bricohams-wspr` (cada 15 min): resumen de wspr.live de las balizas que OpenWebRX+ ya oye y reporta a WSPRnet (bandas, la más lejana, últimas 40). De `settings.json` solo lee el indicativo y si reporta.
+- `bricohams-satrec`: graba solo los pases de más de `SATREC_MIN_EL` (20°) desde el websocket local de OpenWebRX+, con Doppler SGP4 cada 2 s; MP3 (`lame`) en `/var/lib/bricohams/satelites` y las 10 últimas en **Files**. En los METEOR pone el perfil para que SatDump saque la imagen. Calendario `satelites/pases.ics` con aviso 5 min antes.
+- AMSAT: borrador del formulario de amsat.org/status por pase (SO-50, AO-91, RS-44, TO-108), con «Heard» propuesto por un detector de FM y botón para enviarlo; `AMSAT_REPORT="auto"` solo envía los «Heard».
+- `bricohams-check` y `bricohams-servicios` vigilan los tres servicios. Pruebas: `test_wx_red.py`, `test_wspr.py`, `test_satrec.py`, `test_clima_web.py`.
+**Meshtastic: mensajes 433 / 868 desde el panel** ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md#mensajes-433--868-desde-el-panel-v50))
+- Nueva página `/settings/bricohams/meshtastic/chat` (botón **Mensajes**): una columna por red, con estado del nodo, envío por cualquier canal real del nodo (≤ 200 bytes) y los últimos 80 mensajes, incluidos los directos a nosotros. La opción «también por la otra red» reenvía por el canal del mismo nombre o, si no lo hay, por el principal.
+- `bricohams-mesh-owrx` guarda el historial en RAM (`/run/bricohams-mesh/chat.json`, 0600, 200 por red) y atiende el envío en el socket `enviar.sock` (0600), así sigue siendo el único cliente de cada nodo. Sin JavaScript (CSP); sesión, origen y CSRF obligatorios. `MESH_CHAT` (por defecto `yes`). Pruebas: `test_mesh_owrx.py`, `test_mesh_admin.py`.
+
+**APRS: digipeater automático y el tiempo vuelve a APRS-IS** ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md))
+- `RAK_DIGI="auto"`: el RAK hace de digi WIDE1-1 solo cuando el digi que ya cubre la zona (`RAK_DIGI_VIGILA`, por defecto `IGATE_CALLSIGN`) lleva `RAK_DIGI_AUTO_MIN` minutos (30) sin oírse; al volver a oírlo deja de repetir. Así no hay duplicados con el iGate LilyGO y la red no se queda sin digi si se apaga. Estado en `rak-aprs.json` → `digi_auto`.
+- Corregido: `bricohams-wx` no arrancaba nunca (y el tiempo — temperatura, humedad y presión — no salía a APRS-IS) porque `bricohams-io` y `bricohams-fan` llevaban `After=multi-user.target` siendo `WantedBy=multi-user.target`: systemd rompía el ciclo quitando `bricohams-wx`. Ahora `bricohams-io` va tras `systemd-udevd` y `bricohams-fan` tras `bricohams-io`. Nueva prueba `tests/test_systemd_unidades.py` que busca ciclos en todas las unidades del instalador.
+
+**«¿Quieres una estación como esta?»** ([manual 23](docs/manuales/23_WEB_SSL_SERVICIOS.md))
+- Tarjeta en el portal y botón 🛠️ «Monta la tuya» en el receptor con el enlace a tus fuentes: `FUENTES_URL` (solo `https://`; vacío = no se muestra, por defecto). Prueba `tests/test_fuentes.py`.
+
+**Paneles de administración en oscuro y con contraste**
+- `bricohams-owrx-botones` añade a `htdocs/css/admin.css` de OpenWebRX+ un tema oscuro (formularios, desplegables, tarjetas, tablas y textos secundarios legibles); se vuelve a aplicar tras cada actualización de OpenWebRX+ (gancho apt) y `--quitar` lo deja como estaba. Los paneles BricoHams llevan el mismo bloque. Prueba: `test_mesh_admin.py`.
+- Corregido: algunos navegadores seguían viendo el fondo blanco. El fondo de `html,body` va ahora con `!important`, y nginx sirve `admin.css` con `Cache-Control: no-cache` para que el cambio llegue sin esperar a la caché de una hora de OpenWebRX+.
+
+**Avisos por Telegram de registros y mensajes de radio** ([manual 24 §8](docs/manuales/24_VISITAS_TELEGRAM.md))
+- Módulo común `bricohams_telegram.py`: cola con hilo propio, 20 avisos/min como máximo, sin repetidos en 5 min, HTML escapado y token oculto en los errores.
+- `bricohams-api`: aviso del indicativo (con enlace QRZ) o nombre de cada oyente que se registra (`OYENTES_TELEGRAM`); el texto del consentimiento y las políticas lo indican.
+- `bricohams-mesh-owrx`: mensajes de **canal** Meshtastic 433/868 recibidos, con canal, remitente y SNR (`MESH_TELEGRAM`). Los directos nunca salen.
+- `bricohams-rak-aprs` (LoRa 433 y APRS-IS) y `bricohams-visitas` (APRS de 2 m que decodifica OpenWebRX+, tema MQTT `openwebrx/APRS`): mensajes APRS dirigidos a la estación (`APRS_TELEGRAM="propios"`, o `todos`/`no`). Prueba: `test_telegram_avisos.py`.
+
+**Corregido: crédito de la foto en el globo de map.flights** ([manual 38](docs/manuales/38_MAPFLIGHTS_PLUGIN.md))
+- Las fotos de map.flights llegan con ruta relativa y se descartaban, así que salía la de Planespotters con su fotógrafo. Ahora se usa la foto de map.flights con su crédito y licencia («© autor · Wikimedia Commons · CC BY 2.0»).
+
+**Caja v3: módulo SAI con filtros EMI** ([manual 17 §1.2](docs/manuales/17_CAJA_V3.md))
+- Nuevo `VARIANTE="sai"` en `caja_v3.scad` (228 × 240 × 140, debajo del módulo de potencia): cuna de batería de 12 V 7–9 Ah con repisa y correa, 2 guías para la placa del SAI de canto, pletina del transformador y 2 escuadras para filtros EMI de chasis. Huecos en `SAI_LAYOUT` con comprobaciones (`assert`).
+- Filtro EMI de 6 A a la entrada (ruido de la red) y a la salida (inversor del SAI), ferritas de mezcla 31 y filtro π de 12 V; fusible ATO de 15 A en BAT+. Rejillas abajo y bajo el tejadillo para el hidrógeno.
+- `tools/sai_calculo.py`: autonomía con Peukert (SAI completo ≈ 1,1 h; batería al bus de 12 V ≈ 1,9 h con 7 Ah usada y 25 W), fusibles, sección, caída de tensión, flotación compensada y corte del filtro LC. Pruebas en `test_v3_hardware.py` (13 STL más).
+
+**Corregido: avisos falsos de `bricohams-check`, tar1090 por HTTPS y etiquetas ilegibles**
+- RTC: Trixie no trae `hwclock` (paquete `util-linux-extra`); el check lee la hora de `/sys/class/rtc/rtc0` también con root y detecta el PCF85063 sin `i2cdetect`.
+- Monitorización: un `node_exporter` instalado a mano (binario oficial, unidad `node_exporter`) ya no da «prometheus-node-exporter NO activo»; además se comprueba que da métricas en 127.0.0.1:9100.
+- Hardware «en camino»: lo declarado en `HARDWARE_PENDIENTE` (p. ej. `"BME280, cámara, Pico"`) sale como aviso y no como fallo en la cámara (vídeo y foto), el sensor (`bricohams-wx` y `sensor.json`) y el ventilador («sin Pico»). Así el informe horario de Telegram solo trae fallos reales.
+- `/tar1090/` daba 502 si `lighttpd` no estaba instalado: lo sirve nginx con la configuración oficial de tar1090 (`bricohams-tar1090.conf`), ya en la v5.0; hay que publicarlo en estaciones antiguas.
+- Etiquetas de frecuencia del receptor (marcadores amarillo, cian y verde): con el tema Rig Skin el texto salía claro y no se leía; el plugin `marca` las pone en texto oscuro y sin sombra. Pruebas: `test_v45_dispositivos.py`, `test_politicas_mapa_local.py`.
+
+**Caja v3: sitio para 3 SDR más (HackRF One, Airspy HF+ y RTL-SDR V4)** ([manual 17](docs/manuales/17_CAJA_V3.md))
+- El módulo de electrónica pasa a **228 × 240 × 140** (fondo 112 → 140; el de potencia no cambia).
+- Nueva pieza `bandeja_sdr`: bandeja intermedia sobre la fila de dongles y la bahía SDRplay, con bahías de carriles, rejillas de aire y ranuras de brida para un **HackRF One** (124 × 79), un **RTL-SDR V4** y un **Airspy HF+ Discovery**. Va en 6 `poste_bandeja` de 38 mm; la bandeja de la Pi sube 25 mm sobre 4 `poste_superior` (espárrago M3 × 14).
+- **3.ª fila de 4 pasamuros N** (HRF, AHF, V4, R4): 18 en total. Los prensaestopas bajan a 116 mm.
+- La lista `SDR_DECK` del `.scad` define posición y tamaño de cada SDR. El `.scad` (asserts) y `test_v3_hardware.py` comprueban que no pisan postes, ventiladores, el SDRplay, la bandeja de la Pi ni la tapa. 32 STL.
+
 **Rama `openwebrxplus-generico`: kit anonimizado para otras estaciones**
 - Contenido del kit genérico en la raíz y sin datos de la estación original: QTH de ejemplo en la Catedral de Murcia (`IM97kx`), LAN `192.168.1.x`, balizas APRS de prueba recalculadas y esquema 22 regenerado. El manual 32 enlaza ahora el SVG; el PNG se rehace con `tools/esquemas.py` si está instalado cairosvg. La guía visual (`tools/generar-guia-visual.cjs`) trabaja con un solo kit. Prueba nueva: `test_anonimato.py`.
 
 **Corregido: el aviso de privacidad daba 404 entrando por el :8073**
-- Las páginas `/bricohams/` (privacidad, políticas y portal) las sirve nginx en el 443, no OpenWebRX+. `init.js` define `BH_WEB`: si la web se abre por un puerto propio (p. ej. `http://<ip>:8073`) los enlaces van a `https://<host>/bricohams/…` (a `http://` solo con `SSL_MODO=no`); por el 443 siguen relativos. `install.sh` sustituye `__SSL_MODO__`. Con `publicar.sh` (modo `todo`) el 8073 queda solo en la Pi y todo entra por HTTPS. Prueba: `test_politicas_mapa_local.py`.
+- Las páginas `/bricohams/` (privacidad, políticas y portal) las sirve nginx en el 443, no OpenWebRX+. `init.js` define `BH_WEB`: si la web se abre por un puerto propio (p. ej. `http://<ip>:8073`) los enlaces van a `https://SSL_DOMAIN/bricohams/…`, porque el certificado solo vale para el dominio y por IP el navegador lo rechaza (a `https://<host>/` si no hay dominio; a `http://` solo con `SSL_MODO=no`); por el 443 siguen relativos. `install.sh` sustituye `__SSL_MODO__` y `__SSL_DOMAIN__`. Con `publicar.sh` (modo `todo`) el 8073 queda solo en la Pi y todo entra por HTTPS. Prueba: `test_politicas_mapa_local.py`.
 
 **Plugins de EA5HKX: callsign_gate y tone_detector** ([manual 41](docs/manuales/41_PLUGINS_EA5HKX.md))
 - `install.sh` (paso `plugins`) descarga de gitlab.com/openwebrx-plugins `callsign_gate` (identificación obligatoria al entrar) y `tone_detector` (panel CTCSS en el navegador) en un commit fijo y solo los instala si coincide el sha256: no publican licencia, así que su código no va dentro del kit. Variables `PLUGIN_CALLSIGN_GATE`, `PLUGIN_TONE_DETECTOR` y `CALLSIGN_GATE_ANUNCIO` (por defecto `no`).

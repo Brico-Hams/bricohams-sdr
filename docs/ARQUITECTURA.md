@@ -295,8 +295,9 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 
 ## ADR-21 · Caja v3 en dos módulos al pie del mástil (≈ 5 m)
 - **Decisión:**
-  - **Módulo de electrónica** (228 × 240 × 112) con rejilla universal de M3 cada 20 mm, 14 pasamuros N, bahía de expansión y ventilación forzada.
+  - **Módulo de electrónica** (228 × 240 × 140) con rejilla universal de M3 cada 20 mm, 18 pasamuros N, bahía de expansión, bandeja de SDR (HackRF One, Airspy HF+, RTL-SDR V4) y ventilación forzada.
   - **Módulo de potencia** (170 × 200 × 112) aparte.
+  - **Módulo SAI** opcional (228 × 240 × 140) debajo del de potencia: reaprovecha la placa, el transformador y la batería de plomo de un SAI de 600 VA, con filtro EMI de red a la entrada y a la salida (manual 17 §1.2, `tools/sai_calculo.py`). Se elige el SAI completo a 230 V (≈ 1,1 h con 7 Ah usada) frente a llevar su batería al bus de 12 V (≈ 1,9 h) para no tocar el resto de la alimentación.
   - Los dos, a ~5 m del mástil, en pared o poste.
 - **Por qué:**
   - Decisión del usuario («A 5 m, al pie»). No suma peso ni carga de viento al mástil (ADR-20).
@@ -703,7 +704,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de N0CALL) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
 3. **WPI408**: comprobar si el filtro IR es fijo o se puede quitar, para elegir `CAM_TUNING`.
 4. **SDRplay**: modelo (RSP1A/1B/dx) para `SDRPLAY_ANTENNA`.
-5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8).
+5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8; 11 con la bandeja de SDR, o un segundo hub USB 3.0 alimentado).
 6. **Conectores de antena del HAT y de los LilyGO** (SMA o u.FL): según cuáles sean, los latiguillos a los SMA pasamuros cambian.
 7. **Diámetro del mástil Televés**: el modelo trae `MAST_D = 40`.
 8. **Pines del HAT AIO frente a GPIO 4, 5, 12, 13, 17 y 22** (ADR-23 y 25): confirmarlos cuando se publique el esquema del HAT. Se han evitado 7, 16, 23 y 27, que la guía AIO puede usar.
@@ -764,7 +765,7 @@ Indicativo N0CALL-15: «N0CALL-SDR» no es válido en AX.25 ni en APRS-IS. Desti
 - **Antes de autenticarse:** solo logo y aviso legal. Cualquiera lo ve, así que no se dice sistema, versión, IP ni dominio.
 - **Después:** el estado útil, generado en cada entrada sin red (lee `/run` y `/proc`) para no retrasar el login.
 
-Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO CH9102 1a86:55d4). `HARDWARE_PENDIENTE` separa «no aparece» de «en camino».
+Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO CH9102 1a86:55d4). `HARDWARE_PENDIENTE` separa «no aparece» de «en camino». `bricohams-check` lo aplica también al BME280, la cámara del mástil y la Pico de los ventiladores: si están declarados, sus fallos son avisos y no llegan al informe de Telegram.
 
 ## ADR-53 · Configuración de Meshtastic solo dentro de /settings (v4.5, despliegue N0CALL)
 **Contexto:** N0CALL exige que la configuración de Meshtastic no sea accesible desde la web pública de OpenWebRX+. Solo se puede tocar en Ajustes, que pide contraseña.

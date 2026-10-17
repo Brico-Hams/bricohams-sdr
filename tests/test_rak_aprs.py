@@ -88,6 +88,29 @@ for clave in c:                                            # mismas claves que e
     assert '"%s"' % clave in open(os.path.join(FW, 'configuration.cpp'), encoding='utf-8').read(), clave
 assert 'APZBH1' in cab and 'txActive        = false' in cab, 'por defecto el RAK solo escucha'
 
+# digipeater automático: el RAK solo repite (WIDE1-1) si el otro digi de la zona se calla
+os.environ['RAK_DIGI'] = 'auto'
+assert rak.digi_modo() == 'auto' and rak.digi_vigilado() == '' and rak.config_deseada()['digi'] == 1, 'sin otro digi: digi siempre'
+os.environ['RAK_CALLSIGN'] = 'N0CALL-15'
+assert rak.digi_vigilado() == '', 'N0CALL-10 es la plantilla sin configurar: no se vigila'
+os.environ['IGATE_CALLSIGN'] = 'EA1YYY-10'
+assert rak.digi_vigilado() == 'EA1YYY-10' and rak.config_deseada()['digi'] == 0, 'con otro digi: empieza escuchando'
+assert rak.config_deseada(1)['digi'] == 1 and rak.config_deseada(1)['callsign'] == 'N0CALL-15'
+os.environ['RAK_DIGI_VIGILA'] = 'ea1zzz-10'
+assert rak.digi_vigilado() == 'EA1ZZZ-10'
+for v, esperado in (('2', 2), ('9', 3), ('-1', 0), ('x', 0), (' AUTO ', 'auto')):
+    os.environ['RAK_DIGI'] = v
+    assert rak.digi_modo() == esperado, (v, rak.digi_modo())
+da = rak.DigiAuto('N0CALL-10', 30, 1000.0)
+assert da.decidir(1000 + 1799) == 0 and da.decidir(1000 + 1801) == 1, 'al arrancar se da por vivo 30 min'
+assert da.oir('EA5GJ-10>APLRG1,N0CALL-10*:=x', 5000) and da.decidir(5000 + 60) == 0, 'repitiendo cuenta como vivo'
+assert not da.oir('EA5GJ-10>APLRG1,N0CALL-10,WIDE2-1:=x', 9000), 'en la ruta sin * aún no lo ha repetido'
+assert not da.oir('N0CALL-1>APRS:>N0CALL-10*', 9000) and da.oir('n0call-10>APLRG1,WIDE1-1:=x', 9000) and da.visto == 9000
+assert rak.DigiAuto('X', 1, 0).espera == 300, 'mínimo 5 min sin oírlo'
+os.environ['RAK_DIGI'] = '1'
+del os.environ['RAK_CALLSIGN'], os.environ['RAK_DIGI_VIGILA']
+os.environ['IGATE_CALLSIGN'] = 'n0call-10'
+
 # ------------------------------------------------------------------ 4. servicio con un RAK y un APRS-IS de mentira
 srv = socket.socket()
 srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

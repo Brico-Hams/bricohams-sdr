@@ -20,15 +20,17 @@ window.rig_skin_config = {
 };
 
 // v5.1 · las páginas /bricohams/ (privacidad, políticas, portal) las sirve nginx en el 443, no
-// OpenWebRX+: si se entra directo por un puerto propio (p. ej. :8073) los enlaces van a https://<host>/
-// (http:// solo con SSL_MODO=no). Por el 443 quedan relativos.
-const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' : 'https://') + location.hostname : '';
+// OpenWebRX+: si se entra directo por un puerto propio (p. ej. :8073) los enlaces van a
+// https://SSL_DOMAIN/ (el certificado solo vale para el dominio; por IP el navegador lo rechaza),
+// o a https://<host>/ si no hay dominio (http:// solo con SSL_MODO=no). Por el 443 quedan relativos.
+const BH_DOM = /^[a-z0-9.-]+$/i.test('__SSL_DOMAIN__') ? '__SSL_DOMAIN__' : '';
+const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' + location.hostname : 'https://' + (BH_DOM || location.hostname)) : '';
 
 // Botones propios de la barra superior: DX (rig_skin) · SOL · 21,3° (METEO) · CAM
 window.solar_config     = { lat: __LAT__, lon: __LON__ };                   // QTH para día/noche
 window.meteo_config     = { url: 'static/plugins/receiver/meteo/meteo.json' };
 window.camara_config    = { live: 'auto', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · __QTH__' };
-window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
+window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true, fuentes: '__FUENTES__' };   // fuentes: «¿Quieres una estación como esta?» (FUENTES_URL)
 // v4
 window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
 window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: BH_WEB + '/bricohams/privacidad.html' };

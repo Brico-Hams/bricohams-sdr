@@ -193,8 +193,8 @@ Plugins.identificacion.init = function () {
                 ? 'Además, acepto que se guarde en el registro de oyentes del receptor durante un máximo de 180 días (opcional, sin IP).'
                 : 'I also agree to be stored in the receiver listener log for up to 180 days (optional, no IP address).')
             : (spanish
-                ? 'Acepto guardar el identificador y la fecha de esta visita durante un máximo de 180 días. No se guardará mi IP.'
-                : 'I agree to store my identifier and visit date for up to 180 days. My IP address will not be stored.');
+                ? 'Acepto guardar el identificador y la fecha de esta visita durante un máximo de 180 días y que se avise de ello a los operadores de la estación. No se guardará mi IP.'
+                : 'I agree to store my identifier and visit date for up to 180 days and to notify the station operators. My IP address will not be stored.');
         if (chat && !registroDisponible) checkbox.parentNode.style.display = 'none';
         submit.textContent = chat ? (spanish ? 'Entrar al chat' : 'Join the chat') : (spanish ? 'Acceder / Enter' : 'Enter');
         submit.disabled = true;

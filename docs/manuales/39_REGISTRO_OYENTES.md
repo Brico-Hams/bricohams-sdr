@@ -72,6 +72,12 @@ En una instalación ya hecha se puede cambiar a mano en
   en esta base de datos.
 - El identificador se conserva hasta 180 días. La API purga vencidos al iniciar
   y al recibir nuevas entradas; además limita el archivo a 100.000 registros.
+- **v5.0 · Aviso por Telegram.** Cada registro se avisa al grupo privado de los
+  operadores («📝 Oyente registrado: indicativo EA… · QRZ» o el nombre), con las
+  mismas credenciales `TELEGRAM_TOKEN`/`TELEGRAM_CHAT_ID` (en `api.env`, 0640).
+  Máximo 20 avisos por minuto y sin repetidos en 5 minutos. Se desactiva con
+  `OYENTES_TELEGRAM="no"` y `sudo bash install.sh --solo web`. El texto del
+  consentimiento lo indica.
 - No existe endpoint público para leer la lista. El acceso se hace localmente
   desde la Pi. Para solicitar acceso o supresión de entradas previas, usa el
   contacto publicado en el [aviso de privacidad](/bricohams/privacidad.html).

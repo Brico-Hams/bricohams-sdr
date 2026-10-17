@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BricoHams SDR · Clima en red y satélites</title>
+<style>:root{--bg:#141518;--fg:#e8e8e8;--card:#1f2125;--lin:#2e3238;--acc:#F26B21;--cr:#ff6b6b;--ok:#4caf50;--sat:#b388ff;--net:#64b5f6;--rf:#81c784;--dim:#9aa4ae}
+body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:20px 12px}
+main{max-width:1100px;margin:auto}h1{margin:.1em 0;color:var(--acc)}h2{margin:26px 0 8px;font-size:1.15em;color:var(--acc)}
+p.s,.dim{color:var(--dim)}a{color:#ffb380}nav a{margin-right:14px}
+.card{background:var(--card);border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.35);overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.93em}th,td{padding:5px 7px;border-bottom:1px solid var(--lin);text-align:left;white-space:nowrap}
+th{color:var(--dim);font-weight:600}tr.propia td{background:rgba(242,107,33,.12)}
+.b{display:inline-block;border-radius:9px;padding:1px 8px;font-size:.82em;font-weight:600;color:#111}
+.b.rf{background:var(--rf)}.b.satelite{background:var(--sat)}.b.internet{background:var(--net)}.b.ok{background:var(--ok)}.b.no{background:#78909c}.b.err{background:var(--cr)}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.kv div{background:#26292e;border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:1.35em}.nota{font-size:.88em;color:#ffcc80;margin-top:8px}
+button,select{background:#2b2f35;color:var(--fg);border:1px solid #444;border-radius:6px;padding:3px 8px;font:inherit;font-size:.9em}
+button{cursor:pointer;border-color:var(--acc)}form{margin:0;display:flex;gap:6px;align-items:center}
+footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><main>
+<h1>🌦️ Clima en red y satélites</h1>
+<p class="s">Estación __OPERADOR__ · tiempo de nuestro sensor, estaciones WX cercanas por APRS (radio, satélite e internet), balizas WSPR oídas y pases de satélite grabados</p>
+<nav><a href="/bricohams/">← Portal</a><a href="/">Receptor</a><a href="/files">Ficheros (Files)</a><a id="ics" href="/static/plugins/receiver/satelites/pases.ics" download>📅 Pases en tu calendario (.ics)</a></nav>
+
+<h2>🏠 Nuestro sensor</h2><div class="card" id="sensor"><span class="dim">Cargando…</span></div>
+
+<h2>📡 Estaciones WX cercanas (APRS)</h2>
+<div class="card"><div class="dim" id="wxestado"></div><table><thead><tr><th>Estación</th><th>Vía</th><th>Dist.</th><th>Temp.</th><th>Hum.</th><th>Presión</th><th>Viento</th><th>Lluvia</th><th>Hace</th></tr></thead><tbody id="wx"></tbody></table>
+<div class="nota"><span class="b rf">rf</span> la oyó un igate nuestro · <span class="b satelite">satélite</span> llegó por un digipetidor espacial (ISS, PSAT…) · <span class="b internet">internet</span> de APRS-IS</div></div>
+
+<h2>🛰️ Paquetes APRS recibidos por satélite</h2><div class="card"><table><thead><tr><th>Hora</th><th>Estación</th><th>Digi</th><th>Paquete</th></tr></thead><tbody id="aprssat"></tbody></table></div>
+
+<h2>📶 Balizas WSPR (24 h)</h2><div class="card" id="wspr"><span class="dim">Cargando…</span></div>
+
+<h2>🗓️ Próximos pases que se grabarán</h2>
+<div class="card"><div class="dim" id="planestado"></div><table><thead><tr><th>AOS (hora local)</th><th>Satélite</th><th>Elev. máx.</th><th>Duración</th><th>Frecuencia</th><th>Acción</th></tr></thead><tbody id="plan"></tbody></table></div>
+
+<h2>🎙️ Grabaciones e informe AMSAT</h2>
+<div class="card"><table><thead><tr><th>Pase</th><th>Satélite</th><th>Elev.</th><th>Resultado</th><th>Audio</th><th>AMSAT</th></tr></thead><tbody id="capturas"></tbody></table>
+<div class="nota">El botón abre el formulario oficial de <a href="https://www.amsat.org/status/" target="_blank" rel="noopener">amsat.org/status</a> ya relleno: revisa el resultado y confirma tú. «Heard» lo propone el detector de señal FM; en SSB elige tú.</div></div>
+
+<footer>Datos públicos de APRS-IS (solo lectura), <a href="https://wspr.live" target="_blank" rel="noopener">wspr.live</a> y de nuestros receptores · se actualiza cada minuto · <a href="__FUENTES__" target="_blank" rel="noopener">¿Quieres una estación como esta?</a></footer>
+</main>
+<script>
+(function () {
+    var B = '/static/plugins/receiver/';
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+    function num(v, d) { return typeof v === 'number' ? v.toFixed(d === undefined ? 1 : d) : '—'; }
+    function rosa(g) { return typeof g === 'number' ? ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'][Math.round(g / 45) % 8] : ''; }
+    function hace(t) {
+        var s = Math.max(0, Date.now() / 1000 - t);
+        return s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h';
+    }
+    function hora(t) { return new Date(t * 1000).toLocaleString('es-ES', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    function json(f) {
+        return fetch(B + f + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    }
+    function vacio(tb, n, txt) { $(tb).innerHTML = '<tr><td colspan="' + n + '" class="dim">' + txt + '</td></tr>'; }
+
+    function sensor() {
+        json('meteo/sensor.json').then(function (s) {
+            var viejo = !s.updated || Date.now() - Date.parse(s.updated) > 15 * 60 * 1000;
+            $('sensor').innerHTML = '<div class="kv">' +
+                '<div><span class="dim">Temperatura</span><b>' + num(s.ta) + ' °C</b></div>' +
+                (typeof s.hr === 'number' ? '<div><span class="dim">Humedad</span><b>' + num(s.hr, 0) + ' %</b></div>' : '') +
+                '<div><span class="dim">Presión (mar)</span><b>' + num(s.pres_nmar) + ' hPa</b></div>' +
+                (s.viento ? '<div><span class="dim">Viento</span><b>' + num(s.viento.vel_ms * 3.6, 0) + ' km/h ' + rosa(s.viento.dir) + '</b></div>' : '') +
+                (s.lluvia ? '<div><span class="dim">Lluvia hoy</span><b>' + num(s.lluvia.hoy) + ' mm</b></div>' : '') +
+                '</div><div class="nota">' + esc(s.name || '') + (s.chip ? ' · ' + esc(s.chip) : '') + (s.aprs ? ' · en APRS como ' + esc(s.aprs) : '') +
+                (viejo ? ' · <b style="color:#ff5252">sin datos recientes</b>' : ' · ' + new Date(s.updated).toLocaleTimeString('es-ES')) +
+                '<br>Si el sensor está dentro de la caja del equipo, la temperatura es la de la caja (más alta que la del aire); la presión y la humedad sí valen.</div>';
+        }).catch(function () { $('sensor').innerHTML = '<span class="dim">Sin sensor propio o sin datos (bricohams-wx).</span>'; });
+    }
+
+    function wx() {
+        json('meteo/wx-red.json').then(function (d) {
+            $('wxestado').textContent = (d.conectado ? '🟢 conectado a ' : '🔴 sin conexión con ') + d.servidor + ' · radio ' + d.radio_km + ' km · últimas ' + d.horas + ' h · ' + new Date(d.actualizado).toLocaleTimeString('es-ES');
+            if (!d.estaciones.length) vacio('wx', 9, 'Aún no ha llegado ninguna estación WX (suelen emitir cada 5–15 min).');
+            else $('wx').innerHTML = d.estaciones.map(function (e) {
+                var w = e.wx || {};
+                return '<tr' + (e.propia ? ' class="propia"' : '') + '><td><a href="https://aprs.fi/#!call=' + encodeURIComponent(e.call) + '" target="_blank" rel="noopener">' + esc(e.call) + '</a>' + (e.propia ? ' 🏠' : '') + '</td>' +
+                    '<td><span class="b ' + esc(e.via) + '" title="' + esc(e.igate || '') + '">' + esc(e.via) + '</span></td>' +
+                    '<td>' + num(e.dist_km, 0) + ' km ' + rosa(e.rumbo) + '</td><td>' + num(w.temp_c) + ' °C</td><td>' + num(w.hum, 0) + ' %</td>' +
+                    '<td>' + num(w.pres_hpa) + ' hPa</td><td>' + (typeof w.viento_kmh === 'number' ? num(w.viento_kmh, 0) + ' km/h ' + rosa(w.dir) + (w.racha_kmh ? ' (' + num(w.racha_kmh, 0) + ')' : '') : '—') + '</td>' +
+                    '<td>' + (typeof w.lluvia_24h_mm === 'number' ? num(w.lluvia_24h_mm) + ' mm/24h' : typeof w.lluvia_1h_mm === 'number' ? num(w.lluvia_1h_mm) + ' mm/h' : '—') + '</td>' +
+                    '<td>' + hace(e.t) + '</td></tr>';
+            }).join('');
+            if (!d.satelite.length) vacio('aprssat', 4, 'Nada todavía: llegan cuando la ISS u otro digi espacial está activo y pasa por encima.');
+            else $('aprssat').innerHTML = d.satelite.map(function (s) {
+                return '<tr><td>' + hora(s.t) + '</td><td>' + esc(s.call) + '</td><td><span class="b satelite">' + esc(s.digi) + '</span></td><td style="white-space:normal"><code>' + esc(s.texto) + '</code></td></tr>';
+            }).join('');
+        }).catch(function () {
+            $('wxestado').textContent = 'Servicio no disponible (systemctl status bricohams-wx-red).';
+            vacio('wx', 9, '—'); vacio('aprssat', 4, '—');
+        });
+    }
+
+    function wspr() {
+        json('meteo/wspr.json').then(function (d) {
+            var bandas = Object.keys(d.bandas || {}).map(function (b) { return b + ': ' + d.bandas[b]; }).join(' · ') || '—';
+            var lej = d.mas_lejano;
+            $('wspr').innerHTML = '<div class="kv"><div><span class="dim">Balizas oídas</span><b>' + d.spots_24h + '</b></div>' +
+                '<div><span class="dim">Estaciones</span><b>' + d.estaciones + '</b></div>' +
+                '<div><span class="dim">Más lejana</span><b>' + (lej ? esc(lej.call) + ' · ' + lej.km + ' km' : '—') + '</b></div></div>' +
+                '<p>Bandas: ' + esc(bandas) + ' · ' + (d.reporta ? '<span class="b ok">reportando a WSPRnet como ' + esc(d.indicativo) + '</span>' : '<span class="b no">sin reportar a WSPRnet</span>') +
+                ' · <a href="' + esc(d.enlace) + '" target="_blank" rel="noopener">ver en wspr.rocks</a></p>' +
+                (d.ultimos && d.ultimos.length ? '<table><thead><tr><th>UTC</th><th>Banda</th><th>Baliza</th><th>Locator</th><th>Dist.</th><th>SNR</th><th>Potencia</th></tr></thead><tbody>' +
+                    d.ultimos.slice(0, 20).map(function (s) {
+                        return '<tr><td>' + esc(s.t.replace('T', ' ').slice(0, 16)) + '</td><td>' + esc(s.banda) + '</td><td>' + esc(s.call) + '</td><td>' + esc(s.loc) + '</td><td>' + esc(s.km) + ' km</td><td>' + esc(s.snr) + ' dB</td><td>' + esc(s.dbm) + ' dBm</td></tr>';
+                    }).join('') + '</tbody></table>' : '<p class="dim">Ninguna baliza en las últimas 24 h: pon un perfil WSPR en el receptor de HF para que OpenWebRX+ las decodifique y reporte.</p>');
+        }).catch(function () { $('wspr').innerHTML = '<span class="dim">Sin resumen WSPR (systemctl status bricohams-wspr.timer).</span>'; });
+    }
+
+    function campo(n, v) { return '<input type="hidden" name="' + n + '" value="' + esc(v) + '">'; }
+    function amsat(f) {
+        if (!f) return '<span class="dim">—</span>';
+        var h = '<form method="post" action="https://www.amsat.org/status/submit.php" target="_blank" rel="noopener">';
+        ['SatName', 'SatYear', 'SatMonth', 'SatDay', 'SatHour', 'SatPeriod', 'SatCall', 'SatGridSquare'].forEach(function (k) { h += campo(k, f[k]); });
+        h += '<select name="SatReport">' + ['Heard', 'Telemetry Only', 'Not Heard'].map(function (o) {
+            return '<option' + (o === f.SatReport ? ' selected' : '') + '>' + o + '</option>';
+        }).join('') + '</select>' + campo('SatSubmit', 'Submit Data') + '<button type="submit" title="' + esc(f.SatName) + '">Enviar a AMSAT</button></form>';
+        return h;
+    }
+    function sat() {
+        json('satelites/grabaciones.json').then(function (d) {
+            $('planestado').textContent = (d.activo ? '🟢 grabación automática activa' : '⏸️ grabación desactivada (SATREC_ENABLE)') + ' · pases con elevación ≥ ' + d.min_el + '° · AMSAT: ' + (d.amsat_modo === 'auto' ? 'envío automático de los «Heard»' : 'borrador para enviar tú');
+            if (!d.plan.length) vacio('plan', 6, 'No hay pases por encima del mínimo en las próximas horas.');
+            else $('plan').innerHTML = d.plan.map(function (p) {
+                return '<tr><td>' + hora(p.aos) + '</td><td>' + esc(p.nombre) + '</td><td>' + num(p.max_el, 0) + '°</td><td>' + Math.round(p.duracion_s / 60) + ' min</td>' +
+                    '<td>' + (p.hz / 1e6).toFixed(3) + ' MHz ' + esc((p.modo || '').toUpperCase()) + '</td><td>' + (p.accion === 'meteor' ? '🖼️ imagen METEOR (SatDump)' : '🎙️ grabar audio') + '</td></tr>';
+            }).join('');
+            if (!d.capturas.length) vacio('capturas', 6, 'Todavía no se ha grabado ningún pase.');
+            else $('capturas').innerHTML = d.capturas.map(function (c) {
+                var est = String(c.estado || ''), cls = est.indexOf('error') === 0 ? 'err' : est.indexOf('grabado') === 0 ? 'ok' : 'no';
+                var oido = c.oido === true ? ' · señal ' + c.segundos_oidos + ' s' : c.oido === false ? ' · sin señal clara' : '';
+                return '<tr><td>' + hora(c.aos) + '</td><td>' + esc(c.nombre) + '</td><td>' + num(c.max_el, 0) + '°</td>' +
+                    '<td style="white-space:normal"><span class="b ' + cls + '">' + esc(est.split(':')[0]) + '</span>' + esc(oido) + (cls === 'err' ? '<br><small class="dim">' + esc(est) + '</small>' : '') + '</td>' +
+                    '<td>' + (c.fichero && c.en_files ? '<a href="/files/' + encodeURIComponent(c.fichero) + '" download>⬇ MP3</a> <audio preload="none" controls src="/files/' + encodeURIComponent(c.fichero) + '" style="height:28px;vertical-align:middle"></audio>' : c.fichero ? '<span class="dim" title="' + esc(c.fichero) + '">archivada en la estación</span>' : '—') + '</td>' +
+                    '<td>' + (c.amsat_enviado ? '<span class="b ok">enviado</span>' : amsat(c.amsat_form)) + '</td></tr>';
+            }).join('');
+        }).catch(function () {
+            $('planestado').textContent = 'Grabador no disponible (systemctl status bricohams-satrec).';
+            vacio('plan', 6, '—'); vacio('capturas', 6, '—');
+        });
+    }
+
+    function todo() { sensor(); wx(); wspr(); sat(); }
+    todo();
+    setInterval(todo, 60000);
+})();
+</script>
+</body></html>

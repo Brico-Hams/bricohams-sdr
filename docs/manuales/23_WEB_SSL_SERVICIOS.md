@@ -68,6 +68,8 @@
 | RTSP de la cámara | no expuesto | `rtsp://IP:8554/mastil` |
 | Admin de OpenWebRX+ | **`https://DOMINIO/settings`** (si entras por http, te lleva a https) | igual |
 
+**«¿Quieres una estación como esta?» (v5.0):** con `FUENTES_URL` en `bricohams.env` (la dirección `https://` de tu repositorio) el portal muestra una tarjeta y el receptor un botón 🛠️ «Monta la tuya» (encima del de Telegram). Solo se admiten direcciones `https://`; vacío (por defecto) = no aparecen. Para cambiarlo: `sudo bash install.sh --solo plugins,web`.
+
 Con `SSL_MODO="todo"` todo lo de arriba va por `https://`. El HTTPS también sirve el receptor: quien prefiera `https://DOMINIO/` puede usarlo.
 
 **Para ver todo de un vistazo:**

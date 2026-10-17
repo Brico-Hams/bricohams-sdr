@@ -72,4 +72,6 @@ La posición del objeto WX y de la baliza del RAK sale del GPS cuando tiene fix 
 
 Como el RAK va dentro de la caja, su temperatura es la de la caja: ajusta `WX_TEMP_OFFSET` comparando con un termómetro exterior.
 
+**Clima en red (v5.0).** La página `/bricohams/clima.html` muestra este sensor junto a las estaciones WX cercanas que llegan por APRS (radio, satélite e internet) y las balizas WSPR: [manual 42](42_CLIMA_RED_SATELITES_GRABACION.md).
+
 **`bricohams-wx` no arranca y el journal muestra un error de lgpio** (`can not open … .lgd-nfy`). lgpio crea ficheros de notificación en el directorio de trabajo. La unidad lleva `WorkingDirectory=/var/lib/bricohams` y el programa cambia a ese directorio antes de importar lgpio. Si editaste la unidad a mano, reinstala con `sudo bash install.sh --solo sensor`.

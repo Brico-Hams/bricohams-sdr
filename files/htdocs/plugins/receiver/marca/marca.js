@@ -19,7 +19,11 @@ Plugins.marca.init = function () {
 
     var st = document.createElement('style');
     st.textContent = 'img.bh-marca-logo{height:52px;width:auto;max-width:190px;object-fit:contain;padding:0;border-radius:6px;vertical-align:middle}' +
-        '@media (max-width:600px){img.bh-marca-logo{height:36px}}';
+        '@media (max-width:600px){img.bh-marca-logo{height:36px}}' +
+        // Etiquetas de frecuencia: fondo amarillo/cian/verde de OpenWebRX+ con el texto claro de los
+        // temas (Rig Skin) no se leían; texto oscuro y sin sombra en todas.
+        '#openwebrx-bookmarks-container .bookmark,#openwebrx-bookmarks-container .bookmark .bookmark-content' +
+        '{color:#111 !important;text-shadow:none !important;font-weight:600}';
     document.head.appendChild(st);
 
     function cambiar(intentos) {
