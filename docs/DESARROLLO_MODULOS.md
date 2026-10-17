@@ -536,6 +536,87 @@ systemctl list-timers 'bricohams-backup*' --no-pager
 - **Documentación:** [10](manuales/10_CAJA_3D.md)–[17](manuales/17_CAJA_V3.md),
   [21](manuales/21_ANCLAJES.md), [GUIA_VISUAL_MODULOS.md](GUIA_VISUAL_MODULOS.md).
 
+## Plugins de OpenWebRX+, uno a uno
+
+Cada plugin vive en **su propia carpeta**, que es el formato que exige
+OpenWebRX+ (`plugins/receiver/<nombre>/<nombre>.js` o
+`plugins/map/<nombre>/<nombre>.js`). No se deben mover ni agrupar: el cargador
+los busca por esa ruta. El orden de carga y la activación se controlan en
+`files/htdocs/plugins/receiver/init.js` y `files/htdocs/plugins/map/init.js`,
+que el paso `plugins` copia a `/usr/lib/python3/dist-packages/htdocs/plugins/`.
+
+```bash
+# Reinstalar solo los plugins y recargar la web con Ctrl+F5
+sudo bash install.sh --solo plugins
+# Ver qué plugins hay instalados
+ls /usr/lib/python3/dist-packages/htdocs/plugins/receiver/
+```
+
+Para **desactivar** uno, quita su nombre de la lista correspondiente de
+`init.js` y repite `--solo plugins`; para **volver atrás**, restaura `init.js`
+desde la copia diaria.
+
+### Plugins propios de BricoHams (receptor)
+
+| Plugin | Carpeta | Qué hace | Desarrollo y dependencias |
+|---|---|---|---|
+| `idioma` | [receiver/idioma/](../files/htdocs/plugins/receiver/idioma/) | Botón ES/EN de la interfaz | Primero en cargarse para traducir el resto |
+| `marca` | [receiver/marca/](../files/htdocs/plugins/receiver/marca/) | Logo de la estación en la cabecera | Imagen local, sin peticiones externas |
+| `consentimiento` | [receiver/consentimiento/](../files/htdocs/plugins/receiver/consentimiento/) | Aviso de cookies y de contenido de terceros | Cookie `bh_consent`; sin consentimiento las fotos externas quedan como enlace |
+| `solar` | [receiver/solar/](../files/htdocs/plugins/receiver/solar/) | Radiación solar y propagación HF | Sustituye al SunPlugin integrado |
+| `meteo` | [receiver/meteo/](../files/htdocs/plugins/receiver/meteo/) | Tiempo de estaciones cercanas | Datos calculados en el servidor (ADR-10) |
+| `camara` | [receiver/camara/](../files/htdocs/plugins/receiver/camara/) | Cámara del mástil | Foto por el puerto de OpenWebRX+ (ADR-09) |
+| `bricohams` | [receiver/bricohams/](../files/htdocs/plugins/receiver/bricohams/) | Imagen y elementos visuales de la estación | ADR-11 |
+| `banderas` | [receiver/banderas/](../files/htdocs/plugins/receiver/banderas/) | Bandera del país en FT8/FT4/FT2/WSPR | Lo reutiliza el panel de oyentes |
+| `dvficha` | [receiver/dvficha/](../files/htdocs/plugins/receiver/dvficha/) | Ficha del operador en DMR/YSF/NXDN/D-Star | Solo lectura de metadatos decodificados |
+| `satelites` | [receiver/satelites/](../files/htdocs/plugins/receiver/satelites/) | Aviso de próximos pases y «▶ Escuchar» | Pases de `bricohams-satpass`; Doppler con `doppler` (ADR-31) |
+| `visitas` | [receiver/visitas/](../files/htdocs/plugins/receiver/visitas/) | Oyentes conectados y contador de visitas | Datos de `bricohams-visitas` (ADR-33) |
+| `identificacion` | [receiver/identificacion/](../files/htdocs/plugins/receiver/identificacion/) | Registro voluntario del oyente; obligatorio para escribir en el chat | Guarda en el navegador; servidor solo con consentimiento |
+| `ea5hkx_puente` | [receiver/ea5hkx_puente/](../files/htdocs/plugins/receiver/ea5hkx_puente/) | Adapta `callsign_gate` y `tone_detector` de EA5HKX | Debe cargar antes de `callsign_gate` |
+| `audio_cadena` | [receiver/audio_cadena/](../files/htdocs/plugins/receiver/audio_cadena/) | Base común de la cadena de audio | Debe cargar antes de `filtro_audio` y `dsp_audio` (ADR-41) |
+| `filtro_audio` | [receiver/filtro_audio/](../files/htdocs/plugins/receiver/filtro_audio/) | Botón FILTRO: filtros en el navegador | Necesita `audio_cadena` |
+| `dsp_audio` | [receiver/dsp_audio/](../files/htdocs/plugins/receiver/dsp_audio/) | Botón DSP: reducción de ruido y procesado | Necesita `audio_cadena` |
+
+### Plugins del mapa
+
+| Plugin | Carpeta | Qué hace | Origen |
+|---|---|---|---|
+| `bricohams_live` | [map/bricohams_live/](../files/htdocs/plugins/map/bricohams_live/) | Aviones ADS-B, trazas APRS, capa TAK y ficha del avión | BricoHams (ADR-55, ADR-56, ADR-69) |
+| `layer_qth_maidenhead` | [map/layer_qth_maidenhead/](../files/htdocs/plugins/map/layer_qth_maidenhead/) | Cuadrícula Maidenhead | Comunidad OpenWebRX+ |
+| `reduce_map_legend_sections` | [map/reduce_map_legend_sections/](../files/htdocs/plugins/map/reduce_map_legend_sections/) | Leyenda compacta | Comunidad OpenWebRX+ |
+
+### Plugins de terceros que se cargan
+
+| Plugin | Origen | Qué hace |
+|---|---|---|
+| `utils`, `notify` | 0xAF | Base común y notificaciones para otros plugins |
+| `colorful_spectrum` | 0xAF | Espectro en color |
+| `compact_analog_modes` | 0xAF | Botones de modo compactos |
+| `screenshot` | 0xAF | Captura de la cascada |
+| `toggle_scannable` | 0xAF | Clic derecho en un marcador para incluirlo o no en el escáner |
+| `search_bookmarks` | 0xAF | Buscador de marcadores |
+| `doppler` | 0xAF | Seguimiento Doppler de satélites |
+| `rig_skin` | aganet | Tema de frontal de radio, DX cluster, pantallas PROP y SAT |
+| `callsign_gate`, `tone_detector` | EA5HKX | Ventana de bienvenida con indicativo y detector de tonos |
+| `listeners`, `plugin_loader` | 0xAF | Solo si están configurados en `init.js` |
+| `MapPlugin`, `KeyPlugin` | integrados en OpenWebRX+ | Mapa flotante y campo *magic key* |
+
+Las demás carpetas de `receiver/` (por ejemplo `example*`, `minimap`, `smeter`,
+`uikit` y `ui_*`) son copias locales de plugins de la comunidad disponibles para
+activarlos, pero `init.js` no las carga por defecto.
+
+### Extensiones de servidor dentro de `/settings`
+
+No son plugins JavaScript, sino parches o páginas del panel privado:
+
+| Extensión | Ficheros | Ruta o efecto | Módulo |
+|---|---|---|---|
+| Botones BricoHams en Ajustes | `files/bin/bricohams-owrx-botones` | Accesos a Meshtastic, TAK, Monitorización, Seguridad y map.flights | 8, 12, 17, 18, 19 |
+| Importar/exportar bookmarks | `files/bin/bricohams-owrx-bookmarks-io` | `/settings/bookmarks` | 5 |
+| Subtono CTCSS | `files/bin/bricohams-owrx-ctcss`, `files/share/bricohams-ctcss/` | Formulario de bookmarks y silenciador | 5 |
+| RepeaterBook | `files/bin/bricohams-owrx-repeaterbook`, `files/bin/bricohams-owrx-rbimport` | Ajustes generales e importador | 6 |
+| Panel map.flights | `files/bin/bricohams-mesh-admin` | `/settings/bricohams/mapflights` | 12 |
+
 ## Cómo documentar un módulo nuevo
 
 Copia esta plantilla al final de este documento y complétala antes de desplegar:

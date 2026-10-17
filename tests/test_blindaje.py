@@ -44,15 +44,18 @@ def nft(raiz, extra=''):
 
 T = tempfile.mkdtemp()
 r = nft(T)
-assert 'policy drop' in r and 'tcp dport { 80, 443, 8073 } ct state new accept' in r, r
+assert 'policy drop' in r and 'tcp dport { 80, 443 } ct state new accept' in r, r
+assert '8073' not in r, r
 assert 'ip saddr @lan4 tcp dport { 22, 4403, 8443, 8554 }' in r and 'elements = { 192.168.1.0/24 }' in r
 assert 'ct state established,related accept' in r and 'iif "lo" accept' in r and 'ipv6-icmp' in r
 r2 = nft(T, 'BLINDAJE_8073="lan"\nBLINDAJE_SSH="todos"\nBLINDAJE_PUERTOS_LAN=""\n')
 assert 'tcp dport { 80, 443, 22 } ct state new accept' in r2 and 'ip saddr @lan4 tcp dport { 8073 }' in r2, r2
 r3 = nft(T, 'BLINDAJE_LAN="192.168.1.0/24, 10.8.0.0/24"\n')
 assert 'elements = { 192.168.1.0/24, 10.8.0.0/24 }' in r3
+r4 = nft(T, 'BLINDAJE_8073="publico"\n')
+assert 'tcp dport { 80, 443, 8073 } ct state new accept' in r4, r4
 if shutil.which('nft') and os.geteuid() == 0:
-    for x in (r, r2, r3):
+    for x in (r, r2, r3, r4):
         f = os.path.join(T, 'x.nft'); open(f, 'w').write(x)
         c = subprocess.run(['nft', '-c', '-f', f], capture_output=True, text=True)
         assert c.returncode == 0 or 'Operation not permitted' in c.stderr, c.stderr
@@ -163,5 +166,5 @@ shutil.rmtree(A)
 
 S = open(os.path.join(RAIZ_KIT, 'install.sh'), encoding='utf-8').read()
 assert 'install -m 755 "$FILES/bin/bricohams-blindaje" /usr/local/sbin/bricohams-blindaje' in S
-print('OK test_blindaje: cortafuegos (público 80/443/8073, SSH y resto solo LAN, nft -c), auditoría sin enseñar claves '
+print('OK test_blindaje: cortafuegos (publico 80/443, backend cerrado salvo opcion explicita, SSH y resto LAN, nft -c), auditoría sin enseñar claves '
       '(fugas, permisos, env en git, sudo, posición exacta), aplicar/confirmar/deshacer y SSH solo-clave solo si hay claves')

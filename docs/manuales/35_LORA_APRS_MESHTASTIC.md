@@ -8,6 +8,23 @@
 
 ![LoRa APRS y Meshtastic en OpenWebRX+](../esquemas/25_lora_owrx.png)
 
+### Acceso administrativo y error 429
+
+Si caduca la sesion, las consultas API de los clientes 8443/8444 deben
+recibir **401**, no redirigir al login en cada sondeo. Solo la navegacion
+al cliente redirige al acceso. El limite de login se mantiene en 12 POST
+por minuto e IP; abrir el formulario mediante GET no consume ese limite.
+No desactivar la autenticacion ni ampliar el limite para ocultar el problema.
+
+Para actualizar instalaciones anteriores: con backup verificado, ejecutar
+`sudo bash tools/corregir-login-429.sh /ruta/kit-instalado`.
+El script verifica y registra la copia y su restauracion, valida `nginx -t`
+y recarga nginx sin reiniciar OpenWebRX ni cortar la grabacion.
+Usa una zona nueva `bh_login_post` para no reutilizar la memoria compartida
+con una clave distinta durante la recarga. Comprueba las APIs en ambos puertos:
+`nginx -t` y el exito de `systemctl reload` por si solos no prueban la activacion.
+Si la sesion caduco, entrar otra vez en Settings y reconectar el cliente.
+
 | Aparato | Qué hace | Cómo se conecta | Nombre fijo |
 |---|---|---|---|
 | **RAK4631 WisBlock (L, 433 MHz)** en base RAK19007, con GPS (slot A) y sensor de temperatura | iGate y digipeater **LoRa APRS 433,775 MHz** · **N0CALL-15** · mide la temperatura de la caja | USB a la Pi (KISS) | `/dev/rak-aprs` |
@@ -15,6 +32,54 @@
 | **HAT SX1262 868** (en camino) | nodo **Meshtastic 868** de la red (URL 868) · *SDR BricoHams 868* (SB86) | SPI (meshtasticd) | 127.0.0.1:4403 |
 
 **Integración directa con OpenWebRX+:** todo lo que oyen los tres aparece en el **mapa** de OpenWebRX+ (`/map`) igual que lo que decodifica él mismo. Además, OpenWebRX+ decodifica LoRa APRS y Meshtastic con sus SDR (marcadores 433,775 y 433,875; manual 2.4).
+
+### Cliente oficial para ambos nodos
+
+**Favoritos BricoHams:** la cabecera del cliente muestra siempre **Nodo 868 MHz**
+y **Nodo 433 MHz**. Al pulsarlos, conecta o selecciona la radio en el propio
+cliente, sin crear duplicados. Ambas APIs pasan por el mismo origen autenticado
+(`/bricohams/nodos/868/api/` y `/bricohams/nodos/433/api/`): no requieren CORS ni
+guardar claves en el navegador. El 433 muestra un error si el puente o el USB
+no están disponibles; un favorito no implica que el dispositivo esté conectado.
+
+La integración usa el ámbito del módulo oficial y sus tiendas/transportes,
+por lo que está limitada al SHA-256 de **Web 2.6.7 ACFA7D2**. `bricohams-meshweb`
+comprueba el original y crea un módulo nuevo; nunca reemplaza el bundle original.
+Una versión desconocida detiene la activación en lugar de parchear nombres internos
+a ciegas. Guarda y verifica el índice anterior, imprime su restauración y cambia
+la referencia del índice a un nombre con hash nuevo para evitar caché antigua.
+Al actualizar Meshtastic Web, hay que adaptar y volver a probar esta integración.
+Pruebas: `test_meshweb.py`, `test_meshweb_favoritos.cjs` y navegador con el cliente real.
+
+El cliente oficial guarda sus conexiones en cada navegador y origen; no hereda
+las conexiones del mapa. Inicia sesión en `/settings` **en el mismo host** que
+usarás para Meshtastic (no mezcles IP y dominio).
+
+- **868:** `https://<host>:8443/`, API de meshtasticd.
+- **433:** `https://<host>:8444/`, requiere `MESH_WEB="yes"` y
+  `MESH433_WEB="yes"` en la configuración real del kit y de `/etc/bricohams`.
+  Sin `MESH433_WEB`, las instalaciones anteriores conservan la serie directa.
+- En cada página: **New Connection → HTTP → Connect**, dejando el host y puerto
+  propuestos y HTTPS activo. Los canales se descargan del nodo, no se inventan
+  ni se cambian sus claves. Escribe y envía solo al canal seleccionado.
+- Alternativa unificada: `/settings/bricohams/meshtastic/chat`, con una columna
+  por radio y sus canales reales.
+
+El instalador configura `bricohams-mesh-puente` como único dueño del USB 433.
+Ofrece TCP `127.0.0.1:4404` al mapa/panel y HTTP `127.0.0.1:4480` al proxy
+autenticado de nginx. No abras 8443/8444 en el router ni expongas 4480/4404.
+Usa una sesión del cliente oficial por radio: su cola HTTP es compartida.
+El historial del cliente oficial y el del panel BricoHams son independientes.
+
+Antes de actualizar, crea y verifica una copia de los ejecutables afectados,
+configuraciones reales, unidades systemd y sitio nginx; conserva un procedimiento
+de restauración y los estados activo/habilitado de los servicios.
+Tras instalar, comprueba `systemctl status bricohams-mesh-puente`,
+`bricohams-mesh-puente estado` y `bricohams-mesh-owrx estado`: ambas fuentes
+deben indicar conexión. `nginx -t` debe pasar antes de recargarlo.
+La validación del desarrollo usa radio simulada y la biblioteca real;
+no necesita enviar mensajes RF. No se da por desplegado hasta comprobar los
+dos nodos reales y sus canales en el navegador.
 
 ## 1. Firmware del RAK4631: «BricoHams RAK APRS»
 Es un **port de [LoRa_APRS_iGate](https://github.com/richonguzman/LoRa_APRS_iGate) de CA2RXU** (revisión `9314bf1`, 07/10/2026; licencia GPL-3.0) al nRF52840 del RAK4631. El original solo existe para ESP32 y hace la parte de Internet por WiFi; el RAK no tiene WiFi. Por eso (ADR-49):
@@ -148,7 +213,7 @@ La configuración de Meshtastic **no está en la web pública**. Para verla:
 1. Entra en `https://DOMINIO/settings` con la contraseña de administrador de OpenWebRX+.
 2. Pulsa el botón **«Meshtastic 433 / 868»**, que lleva a `/settings/bricohams/meshtastic`, o **«APRS (RAK)»**, que lleva a `/settings/bricohams/aprs`.
 
-Los botones los añade `bricohams-owrx-botones` a la plantilla `settings.html` de OpenWebRX+, así que salen también si entras directo por `http://IP:8073/settings`. En ese caso el enlace te manda a `https://IP/settings/bricohams/…`, porque el panel solo lo sirve nginx; acepta el aviso del certificado si entras por IP. Tras un `apt upgrade` de openwebrx, el gancho `/etc/apt/apt.conf.d/99bricohams-owrx-botones` los vuelve a poner. Para quitarlos: `sudo bricohams-owrx-botones --quitar`.
+Los botones los añade `bricohams-owrx-botones` a la plantilla `settings.html` de OpenWebRX+. Entra por `https://DOMINIO/settings`: tanto el receptor como los paneles pasan por nginx; el backend no se publica directamente. Tras un `apt upgrade` de openwebrx, el gancho `/etc/apt/apt.conf.d/99bricohams-owrx-botones` los vuelve a poner. Para quitarlos: `sudo bricohams-owrx-botones --quitar`.
 
 **APRS (RAK)** enseña, en solo lectura:
 - el estado del RAK4631: firmware, indicativo, radio y frecuencia, contadores, sensor, batería, GPS, APRS-IS y mapa;

@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Add favorites to a verified official client without changing its original bundle."""
+import argparse
+import hashlib
+from pathlib import Path
+import re
+import shlex
+
+ORIGINAL = 'index-C9olJJTU.js'
+SHA256 = '2ee24297810c48a01465dac47cf4027cc84f718d9721ff6f060ec03b30ade9c6'
+
+
+def preparar(root, adapter, comprobar=False):
+    original = root / ORIGINAL
+    contenido = original.read_bytes()
+    if hashlib.sha256(contenido).hexdigest() != SHA256:
+        raise ValueError('Cliente no compatible: se requiere Meshtastic Web 2.6.7 ACFA7D2; no se modifica')
+    plugin = adapter.read_bytes()
+    resultado = contenido + b'\n' + plugin + b'\n'
+    nombre = 'index-bricohams-' + hashlib.sha256(resultado).hexdigest()[:16] + '.js'
+    indice = root / 'index.html'
+    if indice.is_symlink():
+        raise ValueError('index.html es un enlace; revisa su destino antes de modificarlo')
+    html = indice.read_text(encoding='utf-8')
+    patron = r'(?<=src="/)(?:index-C9olJJTU|index-bricohams-[a-f0-9]{16})\.js(?=")'
+    nuevo, cuantos = re.subn(patron, nombre, html)
+    if cuantos != 1:
+        raise ValueError('No se identifica un unico modulo oficial en index.html; no se modifica')
+    if comprobar:
+        return nombre
+    previo = indice.read_bytes()
+    copia = root / ('index.html.bricohams-backup-' + hashlib.sha256(previo).hexdigest()[:16])
+    if copia.exists() and copia.read_bytes() != previo:
+        raise OSError('La copia existente no coincide; no se modifica el cliente')
+    copia.write_bytes(previo)
+    if copia.read_bytes() != previo:
+        raise OSError('No se pudo verificar la copia de index.html')
+    print('BACKUP_VERIFICADO=%s' % copia)
+    print('Restauracion: cp -- %s %s' % (shlex.quote(str(copia)), shlex.quote(str(indice))))
+    destino = root / nombre
+    destino.write_bytes(resultado)
+    destino.chmod(0o644)
+    if destino.read_bytes() != resultado:
+        raise OSError('No se pudo verificar el modulo generado; index.html sigue intacto')
+    temporal = indice.with_suffix('.html.bricohams-tmp')
+    temporal.write_text(nuevo, encoding='utf-8')
+    temporal.chmod(indice.stat().st_mode & 0o777)
+    temporal.replace(indice)
+    return nombre
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--root', type=Path, default=Path('/usr/share/meshtasticd/web'))
+    p.add_argument('--adapter', type=Path, default=Path('/usr/local/share/bricohams/meshweb/favoritos.js'))
+    p.add_argument('--check', action='store_true')
+    a = p.parse_args()
+    try:
+        print(preparar(a.root, a.adapter, a.check))
+    except (OSError, ValueError) as e:
+        p.exit(1, 'bricohams-meshweb: %s\n' % e)
+
+
+if __name__ == '__main__':
+    main()

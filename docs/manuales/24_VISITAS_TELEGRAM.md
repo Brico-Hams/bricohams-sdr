@@ -44,6 +44,23 @@
    sudo bash install.sh --solo visitas,tareas
    bricohams-telegram "prueba desde la estación"
    ```
+### Si los mensajes dejan de llegar (HTTP 400)
+Si `journalctl -u bricohams-visitas` muestra `Telegram: HTTP Error 400: Bad Request`,
+comprueba el motivo sin mostrar el token:
+
+```bash
+sudo bricohams-telegram "prueba"; journalctl -u bricohams-visitas -n 20 --no-pager
+```
+
+El caso más habitual es **«group chat was upgraded to a supergroup chat»**:
+Telegram convierte el grupo en supergrupo (al hacerlo público, añadir
+administradores o activar el historial) y le asigna un **chat id nuevo** que
+empieza por `-100`. El antiguo deja de funcionar.
+
+1. Haz una copia de `/etc/bricohams/*.env` (`sudo tar czf /var/backups/bricohams/pre-telegram.tar.gz /etc/bricohams/*.env`).
+2. Obtén el id nuevo con `getUpdates` (punto 3) o en el campo `migrate_to_chat_id` del error.
+3. Sustituye `TELEGRAM_CHAT_ID` en `bricohams.env` y aplica con `sudo bash install.sh --solo visitas,tareas`.
+4. Prueba con `bricohams-telegram "prueba"`.
 
 ## 3. Privacidad
 - **Por qué hay que avisar:** registrar IPs, aunque sea truncadas, y la localización es tratar datos personales. Por eso la web tiene un **aviso de privacidad** (`/bricohams/privacidad.html`, enlazado en la descripción del receptor y en el contador) que explica qué se guarda, para qué, cuánto tiempo y cómo ejercer los derechos.

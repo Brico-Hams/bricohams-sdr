@@ -14,7 +14,7 @@
 #  sudo bricohams-blindaje deshacer [COPIA]      vuelve a como estaba antes del último «aplicar»
 #
 #  Ajustes en /etc/bricohams/bricohams.env (manual 34):
-#    BLINDAJE_8073="publico"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
+#    BLINDAJE_8073="cerrado"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
 #                                · cerrado = nadie desde fuera de la Pi (v5.0: todo por el 443 de nginx)
 #    BLINDAJE_SSH="lan"          lan = SSH solo desde la red de casa · todos
 #    BLINDAJE_LAN=""             redes de casa (vacío = la de la interfaz, p. ej. 192.168.1.0/24)
@@ -252,12 +252,12 @@ auditar() {
     fi
 
     titulo "5. OpenWebRX+ (lo que ve el público)"
-    if [ "$(env_de BLINDAJE_8073 publico)" = publico ]; then
+    if [ "$(env_de BLINDAJE_8073 cerrado)" = publico ]; then
         if [ "$(env_de SSL_MODO admin)" != no ]; then
             hallazgo ALTO "el router abre el 8073 a Internet: por ahí /login y /settings van SIN cifrar y sin pasar por nginx ni el bloqueo web de Fail2ban (la contraseña de admin viaja en claro)" \
                 "cierra el 8073 en el router (el receptor ya va por el 80/443 de nginx) y pon BLINDAJE_8073=\"lan\"; o entra a /settings solo por https://"
         fi
-    elif [ "$(env_de BLINDAJE_8073 publico)" = cerrado ]; then
+    elif [ "$(env_de BLINDAJE_8073 cerrado)" = cerrado ]; then
         if [ -z "$RAIZ" ] && existe ss && ss -Hltn "sport = :8073" 2>/dev/null | awk '{print $4}' | grep -qvE '^(127\.|\[::1\])'; then
             hallazgo MEDIO "BLINDAJE_8073=cerrado pero OpenWebRX+ escucha en toda la red (el cortafuegos lo tapa)" "OWRX_SOLO_LOCAL=\"yes\" y sudo bash install.sh --solo configuracion"
         else bien "8073 cerrado: OpenWebRX+ solo se ve a través de nginx (443)"; fi
@@ -595,7 +595,7 @@ EOF
     if [ "$sin_fw" = 0 ]; then
         local redes; redes=$(redes_lan)
         guardar "$NFT" "$UNIDAD"; install -d "$(dirname "$NFT")"
-        genera_nft "$(env_de BLINDAJE_8073 publico)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$redes" >"$NFT.nuevo"
+        genera_nft "$(env_de BLINDAJE_8073 cerrado)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$redes" >"$NFT.nuevo"
         chmod 644 "$NFT.nuevo"
         if [ -z "$RAIZ" ]; then
             nft -c -f "$NFT.nuevo" || { rm -f "$NFT.nuevo"; fallo "nft no acepta las reglas (arriba): no he tocado el cortafuegos"; }
@@ -625,7 +625,7 @@ EOF
             systemd-run --unit=bricohams-cortafuegos-vuelta --on-active="${VUELTA_SEG}s" /usr/local/sbin/bricohams-blindaje quitar-cortafuegos-pendiente >/dev/null 2>&1 \
                 || echo "  ! no pude programar la vuelta atrás automática: confirma o deshaz tú"
         fi
-        echo "  ✔ cortafuegos cargado · público: 80, 443$([ "$(env_de BLINDAJE_8073 publico)" = publico ] && echo ', 8073') · LAN ($(echo "$redes" | tr '\n' ' ')): SSH$([ "$(env_de BLINDAJE_8073 publico)" = lan ] && echo ', 8073') y $(puertos_lan)"
+        echo "  ✔ cortafuegos cargado · público: 80, 443$([ "$(env_de BLINDAJE_8073 cerrado)" = publico ] && echo ', 8073') · LAN ($(echo "$redes" | tr '\n' ' ')): SSH$([ "$(env_de BLINDAJE_8073 cerrado)" = lan ] && echo ', 8073') y $(puertos_lan)"
         echo
         echo "  ⚠ Comprueba AHORA, desde OTRA ventana, que sigues entrando (ssh y la web). Si todo va:"
         echo "      sudo bricohams-blindaje confirmar"
@@ -689,7 +689,7 @@ ayuda() { sed -n '3,24p' "$0" | sed 's/^#  \{0,1\}//'; }
 orden=${1:-auditar}; shift 2>/dev/null || true
 case "$orden" in
     -h|--help|ayuda) ayuda; exit 0 ;;
-    genera-nft) leer_env; genera_nft "$(env_de BLINDAJE_8073 publico)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$(redes_lan)"; exit 0 ;;
+    genera-nft) leer_env; genera_nft "$(env_de BLINDAJE_8073 cerrado)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$(redes_lan)"; exit 0 ;;
 esac
 [ "$(id -u)" -eq 0 ] || [ -n "$RAIZ" ] || fallo "Ejecútalo con sudo: sudo bricohams-blindaje $orden"
 case "$orden" in
