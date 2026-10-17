@@ -183,11 +183,24 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - v4.6: [36 TAK y mapa local](docs/manuales/36_TAK_MAPA_LOCAL.md) · [37 Justificación de los cambios v4.6](docs/manuales/37_JUSTIFICACION_CAMBIOS_V4_6.md)
 - v4.3: [32 Zona por locator](docs/manuales/32_ZONA_LOCATOR.md) · [33 OpenWebRX+ en Docker](docs/manuales/33_OPENWEBRX_DOCKER.md) · [catálogo de zona](data/locator/LEEME.md)
 - v5.0: [42 Clima en red, WSPR, grabación de pases y AMSAT](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md)
+- v5.4: Meshtastic dual 433/868 y puente USB ([35](docs/manuales/35_LORA_APRS_MESHTASTIC.md)), acceso y administración ([24](docs/manuales/24_VISITAS_TELEGRAM.md), [34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)), agendas de satélites y grabador ([26](docs/manuales/26_SATELITES.md), [42](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md)) y despliegues acotados con copia de seguridad.
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).
 
 ![Caja del mástil](hardware/caja/render/montaje.png)
+
+### Esquemas de la v5.4
+
+Todos llevan la cabecera y la franja de marca BricoHams SDR.
+
+![Meshtastic dual 433/868 y puente USB](docs/esquemas/28_meshtastic_dual.png)
+
+![Acceso, administración y Files protegidos](docs/esquemas/29_acceso_administracion.png)
+
+![Despliegues acotados con copia de seguridad](docs/esquemas/30_despliegues_acotados.png)
+
+Herramientas de despliegue ([manual 35](docs/manuales/35_LORA_APRS_MESHTASTIC.md), [24](docs/manuales/24_VISITAS_TELEGRAM.md) y [26](docs/manuales/26_SATELITES.md)): `tools/desplegar-mesh-dual.sh`, `tools/desplegar-agenda-telegram.sh` y `tools/finalizar-satelites-ctcss.sh`. Todas exigen `sudo`, hacen copia verificada antes de tocar nada y no admiten contraseñas en la orden. La unidad `files/systemd/bricohams-mesh-puente.service` arranca el puente del nodo 433 sin root.
 
 ## Estructura
 
@@ -226,7 +239,8 @@ hardware/antenas/          antenas: antenas_bricohams.scad + 30 STL, sim/ (model
 hardware/anclajes/         v4: crucetas y soportes impresos (16 STL) y vista de montaje
 data/                      repetidores EA5 (lista EA5KGV), marcadores_v4.json y satelites.json
 tests/                     pruebas (run_tests.sh)
-tools/                     esquemas.py, datos.py, caja.sh, caja_v3.sh, antenas.sh, mastil.py,
+tools/                     esquemas.py, esquemas_modulos.py, desplegar-*.sh, finalizar-satelites-ctcss.sh,
+                           datos.py, caja.sh, caja_v3.sh, antenas.sh, mastil.py,
                            planos_antenas.py, marcadores.py, stl_util.py,
                            anclajes.sh, branding.py, canales.py (v4)
 CHANGELOG.md               historial de versiones
@@ -237,6 +251,14 @@ CHANGELOG.md               historial de versiones
 ```bash
 bash tests/run_tests.sh        # shellcheck, sintaxis, BME280, settings, meteo, viento/lluvia, ventiladores, STL
 python3 tools/esquemas.py      # regenera los esquemas
+python3 tools/esquemas_modulos.py  # esquemas 28-30 (v5.4) y PNG de 26-27
+python3 tests/test_mesh_puente.py  # puente Meshtastic
+python3 tests/test_login_rate.py   # limitación de intentos de login
+python3 tests/test_files_protegidos.py  # Files bloqueado
+python3 tests/test_agendas_admin.py     # paneles privados de satélites y clima
+python3 tests/test_satpass_fuentes.py   # catálogo y TLE por NORAD
+python3 tests/test_finalizar_satelites_ctcss.py  # script de CTCSS externo
+node tests/test_satelites_filtros.cjs   # filtros del panel de satélites
 python3 tools/datos.py         # regenera docs/DATOS.md
 tools/caja.sh                  # regenera los STL de la caja y sus vistas (OpenSCAD)
 tools/caja_v3.sh               # caja v3

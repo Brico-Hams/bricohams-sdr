@@ -1838,6 +1838,7 @@ paso_herramientas() {
     install -m 755 "$FILES/bin/bricohams-lilygo" /usr/local/bin/bricohams-lilygo
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/bin/bricohams_telegram.py
     # v4.2 · owrx-clone: exportar/importar perfiles de OpenWebRX+ (también lo usa la copia diaria)
     install -m 755 "$KIT/owrx-clone/owrx-clone" /usr/local/bin/owrx-clone
     install -D -m 644 "$KIT/owrx-clone/owrx-clone.1" /usr/local/share/man/man1/owrx-clone.1
@@ -2660,6 +2661,7 @@ EOF
     systemctl enable mosquitto && systemctl restart mosquitto
     install -m 755 "$FILES/bin/bricohams-visitas.py" /usr/local/bin/bricohams-visitas
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/bin/bricohams_telegram.py
     install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/visitas"
     {
         envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
@@ -2752,6 +2754,7 @@ paso_tareas() {
     apt_i cron at
     install -m 755 "$FILES/bin/bricohams-tarea" /usr/local/sbin/bricohams-tarea
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
+    install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/bin/bricohams_telegram.py
     id bricohams >/dev/null 2>&1 || useradd --system --home-dir /var/lib/bricohams-svc --create-home --shell /usr/sbin/nologin \
         --comment "BricoHams cuenta de servicio" bricohams
     usermod -aG adm bricohams 2>/dev/null || true
@@ -2771,6 +2774,7 @@ ${CRON_COPIA:-30 4 * * *}       bricohams  sudo -n $T copia
 ${CRON_ACTUALIZAR:-30 3 * * 1}       bricohams  sudo -n $T actualizar
 ${CRON_REINICIO:-0 5 * * 1}        bricohams  sudo -n $T reinicio
 ${CRON_SALUD:-*/30 * * * *}      bricohams  sudo -n $T salud
+${CRON_ESTADO:-0 */6 * * *}      bricohams  sudo -n $T estado
 ${CRON_RESUMEN:-0 21 * * *}        bricohams  sudo -n $T resumen
 ${CRON_GEOIP:-15 3 2 * *}        bricohams  sudo -n $T geoip
 EOF

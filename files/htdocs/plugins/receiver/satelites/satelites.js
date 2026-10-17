@@ -15,7 +15,7 @@
  */
 
 Plugins.satelites._version = '1.0.0';
-Plugins.satelites._author='BricoHams';
+Plugins.satelites._author = 'BricoHams';
 Plugins.satelites.no_css = true;
 
 Plugins.satelites.init = function () {
@@ -39,6 +39,28 @@ Plugins.satelites.init = function () {
     var $franja = $('<div id="bh-sat-franja"></div>').appendTo('body');
     var $lista = $('<div id="bh-sat-lista"></div>').appendTo('body');
     var cerrada = false;
+    var filtro = { banda: '', desde: '', hasta: '' };
+    function filtrar(p) {
+        var limites = { '': [0, 1e11], '2m': [144e6, 148e6], '70cm': [430e6, 440e6],
+            '137': [137e6, 138e6], '400': [400e6, 401e6] }[filtro.banda];
+        var desde = filtro.desde ? Number(filtro.desde.replace(',', '.')) * 1e6 : 0;
+        var hasta = filtro.hasta ? Number(filtro.hasta.replace(',', '.')) * 1e6 : 1e11;
+        return p.hz >= Math.max(limites[0], desde) && p.hz <= Math.min(limites[1], hasta);
+    }
+    $lista.on('submit', 'form', function (evento) {
+        evento.preventDefault();
+        var desde = $(this).find('[name=desde]').val().trim();
+        var hasta = $(this).find('[name=hasta]').val().trim();
+        if ([desde, hasta].some(function (v) {
+            return v && (!/^[0-9]+([.,][0-9]{1,6})?$/.test(v) || Number(v.replace(',', '.')) <= 0 ||
+                Number(v.replace(',', '.')) > 100000);
+        }) || (desde && hasta && Number(desde.replace(',', '.')) > Number(hasta.replace(',', '.')))) {
+            $lista.find('[role=alert]').text('Frecuencias no válidas: MHz positivos, desde menor o igual que hasta.');
+            return;
+        }
+        filtro = { banda: $(this).find('[name=banda]').val(), desde: desde, hasta: hasta };
+        pintarLista();
+    });
 
     function mhz(hz) { return (hz / 1e6).toFixed(3).replace('.', ','); }
     function hora(t) { var d = new Date(t * 1000); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
@@ -94,9 +116,9 @@ Plugins.satelites.init = function () {
     }
     S._cerrar = function () { cerrada = true; setTimeout(function () { cerrada = false; }, 30 * 60 * 1000); };
 
-    S.lista = function () {
+    function pintarLista() {
         var ahora = Date.now() / 1000;
-        var filas = pases.filter(function (p) { return p.los > ahora; }).slice(0, 15).map(function (p) {
+        var filas = pases.filter(function (p) { return p.los > ahora && filtrar(p); }).slice(0, 100).map(function (p) {
             var i = pases.indexOf(p);
             return '<tr class="' + (p.aos <= ahora ? 'vivo' : '') + '"><td>' + hora(p.aos) + '</td><td>' + esc(p.nombre) + '</td><td>' + p.max_el +
                 '°</td><td>' + Math.round(p.duracion_s / 60) + ' min</td><td>' + mhz(p.hz) + ' ' + p.modo.toUpperCase() + '</td><td>' +
@@ -104,9 +126,20 @@ Plugins.satelites.init = function () {
                 '</td><td><button onclick="Plugins.satelites.escuchar(' + i + ')">▶</button></td></tr>';
         }).join('');
         $lista.html('<b>🛰️ Próximos pases (24 h)</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-sat-lista\').hide()">✕</span>' +
+            '<form><label>Banda <select name="banda">' +
+            [['', 'Todas'], ['2m', '2 m'], ['70cm', '70 cm'], ['137', '137 MHz'], ['400', '400 MHz']].map(function (v) {
+                return '<option value="' + v[0] + '"' + (filtro.banda === v[0] ? ' selected' : '') + '>' + v[1] + '</option>';
+            }).join('') + '</select></label> <label>Desde MHz <input name="desde" size="9" inputmode="decimal" value="' +
+            esc(filtro.desde) + '"></label> <label>Hasta MHz <input name="hasta" size="9" inputmode="decimal" value="' +
+            esc(filtro.hasta) + '"></label> <button>Filtrar</button></form><div role="alert"></div>' +
+            '<div>Solo filtra esta lista, no las capturas ni los avisos. Para frecuencia exacta: desde = hasta.</div>' +
             '<table><tr><th>Hora</th><th>Satélite</th><th>Máx</th><th>Dura</th><th>Bajada</th><th>Az</th><th></th></tr>' +
-            (filas || '<tr><td colspan="7">Sin datos todavía (bricohams-satpass)</td></tr>') + '</table>' +
-            '<div style="opacity:.7;margin-top:4px">▶ cambia de perfil, sintoniza y activa el Doppler. Imágenes METEOR: menú «Files».</div>').toggle();
+            (filas || '<tr><td colspan="7">Sin pases con estos filtros o sin datos (bricohams-satpass)</td></tr>') + '</table>' +
+            '<div style="opacity:.7;margin-top:4px">▶ cambia de perfil, sintoniza y activa el Doppler. Imágenes METEOR: menú «Files».</div>');
+    }
+    S.lista = function () {
+        pintarLista();
+        $lista.toggle();
     };
 
     function cargar() {

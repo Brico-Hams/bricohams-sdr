@@ -30,6 +30,13 @@
   3. escribe `plugins/receiver/satelites/pases.json`.
 - **Precisión:** la prueba `tests/test_satpass.py` compara con Skyfield: entrada en horizonte a ±10 s y elevación máxima a ±1°.
 - **Lista de satélites:** `data/satelites.json`.
+- **Filtros de consulta:** Settings → Satélites y el botón PASES permiten elegir
+  2 m, 70 cm, 137 MHz o 400 MHz y un intervalo inclusivo de frecuencias en MHz.
+  Aceptan coma decimal; para una frecuencia exacta, usa el mismo valor en ambos
+  extremos. No cambian las grabaciones, las exclusiones ni los avisos.
+- **Respaldo orbital:** si falla CelesTrak, se consultan las TLE de SatNOGS y se
+  convierten a OMM con SGP4, comprobando el NORAD de ambas líneas. Si fallan ambas
+  fuentes se conserva la copia y se registra el error; sin elementos no se inventan pases.
 
   | Satélite | NORAD | Bajada | Modo | Perfil |
   |---|---|---|---|---|
@@ -37,12 +44,27 @@
   | SO-50 | 27607 | 436,795 | NFM | sat70 |
   | AO-91 | 43017 | 145,960 | NFM | sat2m |
   | RS-44 | 44909 | 435,640 | USB | sat70 |
+  | FO-29 (JAS-2) | 24278 | 435,850 | USB | sat70 |
+  | Replicator-2 | 69927 | 400,500 | NFM (audio de GFSK) | sat400 |
+  | SAKHACUBE-CHOLBON (RS18S) | 67290 | 437,350 | NFM (telemetría/SSTV en eventos) | sat70 |
   | TO-108 | 44881 | 145,925 | USB | sat2m |
   | IO-117 GreenCube | 53106 | 435,310 | USB | sat70 |
   | METEOR-M2-3 | 57166 | 137,900 | NFM / LRPT | meteor |
   | METEOR-M2-4 | 59051 | 137,900 | NFM / LRPT | meteor |
 
   Para añadir uno, pon una línea con su número NORAD, la bajada, el modo y el perfil, y lanza `sudo systemctl start bricohams-satpass`.
+
+  Replicator-2 no es un repetidor de voz: transmite GFSK 9600. SatNOGS lo
+  identifica provisionalmente como 98267, pero sus TLE siguen el NORAD 69927;
+  `satnogs_id` conserva esa correspondencia sin confundir las órbitas.
+  El perfil `sat400` evita intentar recibir 400,500 MHz dentro de la ventana de 70 cm.
+  Grabar audio FM no equivale a decodificar GFSK/GMSK. FO-29 depende del horario
+  del operador; que exista un pase no garantiza actividad. No se asignan códigos
+  AMSAT no verificados a las nuevas entradas.
+
+  Fuentes: [FO-29](https://db.satnogs.org/satellite/XTKP-9404-9174-4088-2406/),
+  [Replicator-2](https://db.satnogs.org/satellite/VCDK-6912-2495-5415-3885/) y
+  [SAKHACUBE-CHOLBON](https://www.yksa.space/projects/missions/sakhacube-cholbon).
 
 ## 3. Duplex y transmisión
 La estación **solo recibe**. «Autoconfigurar el duplex» aquí significa sintonizar la **bajada** con su Doppler. La subida y el tono de cada satélite van en la nota del marcador y en la tabla del manual 27, para quien vaya a transmitir con su equipo.
@@ -58,3 +80,9 @@ ls -l /usr/local/lib/satdump                 # enlace a /usr/lib/satdump
 
 ## 5. Grabación automática, calendario e informe AMSAT (v5.0)
 Los pases de más de 20° se graban solos en MP3 y salen en **Files** y en la página «Clima en red» (`/bricohams/clima.html`), con su calendario `.ics` y el borrador del informe para AMSAT: [manual 42](42_CLIMA_RED_SATELITES_GRABACION.md).
+
+## v5.4: filtros, CTCSS externo y despliegue
+
+![Despliegues acotados con copia de seguridad](../esquemas/30_despliegues_acotados.png)
+
+sudo tools/finalizar-satelites-ctcss.sh <kit-instalado> desactiva el panel CTCSS externo y deja intacto el subtono FM integrado; hace copia verificada y reinicia solo ricohams-satrec. Pruebas: 	ests/test_finalizar_satelites_ctcss.py, 	ests/test_satelites_filtros.cjs y 	ests/test_satpass_fuentes.py (nunca se asocia un TLE de otro NORAD).

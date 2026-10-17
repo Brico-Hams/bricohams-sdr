@@ -28,6 +28,7 @@ python3 tests/test_instalador_os.py
 python3 tests/test_instalador_docker.py
 python3 tests/test_pico_io.py
 python3 tests/test_satpass.py
+python3 tests/test_satpass_fuentes.py
 python3 tests/test_visitas.py
 python3 tests/test_api.py
 python3 tests/test_registro_oyentes.py
@@ -60,6 +61,7 @@ python3 tests/test_mesh_admin.py
 python3 tests/test_mesh_puente.py
 python3 tests/test_meshweb.py
 node tests/test_meshweb_favoritos.cjs
+node tests/test_satelites_filtros.cjs
 python3 tests/test_agendas_admin.py
 python3 tests/test_files_protegidos.py
 python3 tests/test_finalizar_satelites_ctcss.py

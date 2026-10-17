@@ -938,6 +938,16 @@ El manual 37 explica cambios históricos, no añade un paso de instalación.
 | [40_HTTPS_MAPA_LOCAL_POLITICAS](manuales/40_HTTPS_MAPA_LOCAL_POLITICAS.md) | [Portal, HTTPS, API y paneles administrativos](#web) |
 | [41_PLUGINS_EA5HKX](manuales/41_PLUGINS_EA5HKX.md) | [Caja, antenas, filtros, alimentación y anclajes](#hardware) |
 
+### Esquemas de la v5.4
+
+![Meshtastic dual 433/868 y puente USB](esquemas/28_meshtastic_dual.png)
+
+![Acceso, administración y Files protegidos](esquemas/29_acceso_administracion.png)
+
+![Despliegues acotados con copia de seguridad](esquemas/30_despliegues_acotados.png)
+
+También están disponibles en PNG los esquemas [26](esquemas/26_procedimiento_seguro.png) y [27](esquemas/27_adsb_destinos.png).
+
 ## 6. Mantener la guía y publicar capturas
 
 Generada con `node tools/generar-guia-visual.cjs` desde la raíz del repositorio.

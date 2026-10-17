@@ -62,9 +62,15 @@ class Avisador:
     @staticmethod
     def _telegram(texto):
         try:
-            subprocess.run([TELEGRAM, texto], capture_output=True, timeout=40)
-        except (OSError, subprocess.SubprocessError):
-            pass
+            r = subprocess.run([TELEGRAM, texto], capture_output=True, timeout=40, text=True)
+        except (OSError, subprocess.SubprocessError) as ex:
+            print('login-aviso: Telegram no enviado (%s).' % type(ex).__name__, file=sys.stderr, flush=True)
+            return False
+        if r.returncode:
+            print('login-aviso: Telegram no enviado; revisa destino y permisos del bot.',
+                  file=sys.stderr, flush=True)
+            return False
+        return True
 
     def linea(self, linea):
         r = analizar(linea)
@@ -74,10 +80,11 @@ class Avisador:
         ahora = self.reloj()
         if ahora - self.ultimo.get(ip, -PAUSA - 1) < PAUSA:
             return False
+        if self.enviar(texto_aviso(ip, hora)) is False:
+            return False
         self.ultimo[ip] = ahora
         if len(self.ultimo) > 1000:
             self.ultimo = {k: v for k, v in self.ultimo.items() if ahora - v < PAUSA}
-        self.enviar(texto_aviso(ip, hora))
         return True
 
 

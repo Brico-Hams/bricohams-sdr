@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 try:
     from sgp4.api import Satrec, jday
     from sgp4 import omm as sgp4_omm
+    from sgp4.exporter import export_omm
 except ImportError:
     Satrec = None
 
@@ -31,6 +32,7 @@ LISTA = os.environ.get('SAT_LIST', os.path.join(KIT, 'data', 'satelites.json'))
 SALIDA = os.environ.get('SAT_OUT', '/usr/lib/python3/dist-packages/htdocs/plugins/receiver/satelites/pases.json')
 CACHE = os.path.join(os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams'), 'tle.json')
 CELESTRAK = 'https://celestrak.org/NORAD/elements/gp.php?CATNR={}&FORMAT=JSON'
+SATNOGS = 'https://db.satnogs.org/api/tle/?norad_cat_id={}&format=json'
 
 A_WGS = 6378.137
 F_WGS = 1 / 298.257223563
@@ -121,7 +123,7 @@ def pases(sat, lat, lon, alt_m, desde, horas=24, paso=30, min_el=10):
     return out
 
 
-def descargar_omm(noradas, cache=CACHE, max_edad=12 * 3600):
+def descargar_omm(noradas, cache=CACHE, max_edad=12 * 3600, satnogs_ids=None):
     try:
         datos = json.load(open(cache))
     except (OSError, ValueError):
@@ -134,10 +136,30 @@ def descargar_omm(noradas, cache=CACHE, max_edad=12 * 3600):
         try:
             req = urllib.request.Request(CELESTRAK.format(n), headers={'User-Agent': 'BricoHams-SDR N0CALL'})
             j = json.load(urllib.request.urlopen(req, timeout=20))
-            if j:
-                datos[str(n)] = {'t': ahora, 'omm': j[0]}
-        except Exception as ex:
-            print('satpass: CelesTrak %s: %s (uso la copia)' % (n, ex), file=sys.stderr)
+            if not j or int(j[0]['NORAD_CAT_ID']) != n:
+                raise ValueError('Elementos ausentes o NORAD incorrecto')
+            datos[str(n)] = {'t': ahora, 'omm': j[0], 'fuente': 'CelesTrak'}
+            continue
+        except (OSError, ValueError, KeyError, TypeError) as ex:
+            print('satpass: CelesTrak %s: %s; intento SatNOGS' % (n, ex), file=sys.stderr)
+        try:
+            identificador = (satnogs_ids or {}).get(n, n)
+            req = urllib.request.Request(SATNOGS.format(identificador), headers={'User-Agent': 'BricoHams-SDR'})
+            with urllib.request.urlopen(req, timeout=20) as respuesta:
+                entradas = json.load(respuesta)
+            entrada = next((x for x in entradas if int(x['norad_cat_id']) == identificador), None)
+            if entrada is None:
+                raise ValueError('Sin TLE para este satélite')
+            sat = Satrec.twoline2rv(entrada['tle1'], entrada['tle2'])
+            if sat.satnum != n or int(entrada['tle2'][2:7]) != n:
+                raise ValueError('NORAD de las TLE no coincide con el catálogo')
+            datos[str(n)] = {'t': ahora, 'omm': export_omm(sat, entrada['tle0'].removeprefix('0 ')),
+                             'fuente': 'SatNOGS'}
+            print('satpass: %s actualizado desde SatNOGS' % n, flush=True)
+        except (OSError, ValueError, KeyError, TypeError) as ex:
+            print('satpass: SatNOGS %s: %s (%s)' % (
+                n, ex, 'uso la copia' if str(n) in datos else 'sin elementos: no se calculan pases'),
+                file=sys.stderr)
     try:
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         json.dump(datos, open(cache, 'w'))
@@ -186,7 +208,8 @@ def main():
     lon = float(os.environ.get('STATION_LON', '0'))
     alt = float(os.environ.get('STATION_ASL', '200'))
     lista = json.load(open(LISTA, encoding='utf-8'))['satelites']
-    omms = descargar_omm([s['norad'] for s in lista])
+    omms = descargar_omm([s['norad'] for s in lista],
+                         satnogs_ids={s['norad']: s['satnogs_id'] for s in lista if 'satnogs_id' in s})
     p = calcular(lista, omms, lat, lon, alt)
     if '--ver' in sys.argv:
         for x in p:
@@ -196,7 +219,7 @@ def main():
         return 0
     write_atomic(SALIDA, {'actualizado': datetime.now(timezone.utc).isoformat(timespec='seconds'),
                           'qth': {'lat': round(lat, 2), 'lon': round(lon, 2), 'asl': alt},   # v4.4: público, ~1 km
-                          'pases': p[:40]})
+                          'pases': p})
     print('satpass: %d pases en las próximas 24 h' % len(p))
     return 0
 

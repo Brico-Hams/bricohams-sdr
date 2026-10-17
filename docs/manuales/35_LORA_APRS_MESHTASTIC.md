@@ -295,3 +295,9 @@ OpenWebRX+ 1.2.122 y posteriores escuchan en su broker MQTT los temas `+/APRS`, 
 | El nodo sale con un nombre viejo (p. ej. «mi-qth») | el nombre se guarda en el propio nodo, no basta con cambiar `bricohams.env`. Ajusta `MESH_LONG_NAME`/`MESH_SHORT_NAME` (868) y `MESH433_LONG_NAME`/`MESH433_SHORT_NAME` (433) y pulsa *Aplicar* en Ajustes → Meshtastic (`bricohams-mesh-admin`, que llama a `meshtastic --set-owner`). El nodo 433 también se renombra con `sudo bricohams-lilygo`. Los vecinos tardan unos minutos en ver el nombre nuevo |
 
 Decisiones: ADR-49 a ADR-52 en [ARQUITECTURA](../ARQUITECTURA.md). Pruebas: `tests/test_rak_aprs.py` (firmware compilado en el PC + pasarela + RAK y APRS-IS de mentira), `tests/test_mesh_owrx.py` y `tests/test_v45_dispositivos.py`.
+
+## v5.4: Meshtastic dual y despliegue acotado
+
+![Meshtastic dual 433/868 y puente USB](../esquemas/28_meshtastic_dual.png)
+
+El 433 (LilyGO por USB) lo reparte `bricohams-mesh-puente` (unidad `files/systemd/bricohams-mesh-puente.service`, sin root) y el 868 lo sirve `meshtasticd`. Ambos clientes oficiales salen por nginx (`:8444` y `:8443`) y solo con la sesión de administrador. `sudo tools/desplegar-mesh-dual.sh <ruta-del-bricohams.env>` lo instala sin ejecutar el instalador completo ni cambiar parámetros RF: valida, hace copia, aplica y comprueba `nginx -t`. Prueba: `tests/test_mesh_puente.py`.

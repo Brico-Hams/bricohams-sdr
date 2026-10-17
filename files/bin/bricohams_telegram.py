@@ -10,6 +10,7 @@ Credenciales: TELEGRAM_TOKEN y TELEGRAM_CHAT_ID del entorno del servicio.
 """
 import collections
 import html
+import json
 import os
 import queue
 import re
@@ -17,10 +18,37 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 
 MAX_MIN = 20
 REPETIDO_S = 300
+
+
+def enviar_mensaje(token, chat, texto, formato_html=True):
+    if not token or not chat:
+        raise ValueError('Telegram sin configurar (token o destino ausente).')
+    campos = {'chat_id': chat, 'text': texto, 'disable_web_page_preview': 'true'}
+    if formato_html:
+        campos['parse_mode'] = 'HTML'
+    datos = urllib.parse.urlencode(campos).encode()
+    try:
+        with urllib.request.urlopen('https://api.telegram.org/bot%s/sendMessage' % token,
+                                    datos, timeout=20) as respuesta:
+            resultado = json.load(respuesta)
+    except urllib.error.HTTPError as ex:
+        try:
+            resultado = json.load(ex)
+        except (ValueError, OSError) as lectura:
+            raise RuntimeError('Telegram HTTP %s; respuesta no válida.' % ex.code) from lectura
+    except OSError as ex:
+        raise RuntimeError('Telegram: fallo de conexión (%s).' % type(ex).__name__) from None
+    if not resultado.get('ok'):
+        detalle = str(resultado.get('description', 'Respuesta sin confirmación')).replace(token, '***')[:250]
+        if resultado.get('parameters', {}).get('migrate_to_chat_id'):
+            detalle += ' El grupo ha migrado: sincroniza TELEGRAM_CHAT_ID en todos los servicios.'
+        raise RuntimeError('Telegram %s: %s' % (resultado.get('error_code', ''), detalle))
+    return resultado['result']
 
 
 def esc(texto):
@@ -88,9 +116,7 @@ class Avisador:
             time.sleep(1)
 
     def _http(self, texto):
-        datos = urllib.parse.urlencode({'chat_id': self.chat, 'text': texto, 'parse_mode': 'HTML',
-                                        'disable_web_page_preview': 'true'}).encode()
-        urllib.request.urlopen('https://api.telegram.org/bot%s/sendMessage' % self.token, datos, timeout=15).read()
+        return enviar_mensaje(self.token, self.chat, texto)
 
 
 def limpio(texto, n=300):

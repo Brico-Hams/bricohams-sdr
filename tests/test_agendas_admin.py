@@ -36,6 +36,24 @@ with tempfile.TemporaryDirectory() as tmp:
         assert not mod.ACCIONES[mod.BASE].match('sat-guardar')
         assert not mod.ACCIONES[mod.BASE].match('wx-guardar')
     assert 'SAT&lt;test&gt;' in mod.pagina_satelites('sesion')
+    ps = [dict(p, nombre='FO-29', norad=24278, hz=435850000),
+          dict(p, nombre='Replicator-2', norad=69927, hz=400500000),
+          dict(p, nombre='ISS', norad=25544, hz=145800000)]
+    Path(pases).write_text(json.dumps({'pases': ps}), encoding='utf-8')
+    for filtros, visible, ocultos in (
+        ({'banda': '70cm'}, 'FO-29', ('Replicator-2', 'ISS')),
+        ({'banda': '400'}, 'Replicator-2', ('FO-29', 'ISS')),
+        ({'desde_mhz': '145,800', 'hasta_mhz': '145.800'}, 'ISS', ('FO-29', 'Replicator-2')),
+    ):
+        html = mod.pagina_satelites('sesion', filtros=filtros)
+        assert '<td>%s</td>' % visible in html
+        assert all('<td>%s</td>' % x not in html for x in ocultos)
+        assert 'no cambian las capturas programadas' in html
+        assert 'name="sat_1"' in html, 'filtrar no oculta ni desmarca las agendas'
+    for filtros in ({'banda': 'inventada'}, {'desde_mhz': 'nan'}, {'hasta_mhz': '-1'},
+                    {'desde_mhz': '436', 'hasta_mhz': '400'}, {'desde_mhz': '<script>'}):
+        assert 'alert-danger' in mod.pagina_satelites('sesion', filtros=filtros)
+    Path(pases).write_text(json.dumps({'pases': [p]}), encoding='utf-8')
     informes = mod.informes_capturas(
         [{'norad': 44881, 'nombre': 'TO-108', 'aos': 1792232748, 'estado': 'grabado', 'amsat': ''},
          {'norad': 25544, 'nombre': 'ISS', 'aos': 1792232748, 'estado': 'error: perfil'},
