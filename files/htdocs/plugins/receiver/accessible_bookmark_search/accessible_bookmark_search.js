@@ -26,7 +26,7 @@
  *
  * License: MIT
  * Copyright (c) 2026
- * Autored by René Jaun, assisted by Claude AI
+ * Authored by René Jaun
   *
  * Changes:
  * 0.1:
