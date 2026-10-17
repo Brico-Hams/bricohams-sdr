@@ -30,6 +30,16 @@ Documentación / Documentation: [Español](docs/manuales/38_MAPFLIGHTS_PLUGIN.md
 [guía visual de módulos](docs/GUIA_VISUAL_MODULOS.md), con ilustraciones,
 capturas reales anonimizadas y cuadros de comandos por módulo.
 
+**Laboratorio RF:** [hojas rellenables y trazabilidad](docs/laboratorio-rf/README.md),
+[procedimientos de cualificación](docs/manuales/44_LABORATORIO_RF.md) y
+[NanoVNA: calibración y medidas paso a paso](docs/manuales/45_NANOVNA.md),
+con ilustraciones BricoHams y capturas de referencia identificadas.
+
+**Impresión 3D de las cajas:** [guía BricoHams para ASA en la Kobra S1 Combo](docs/manuales/43_KOBRA_S1_ASA.md):
+calibración, perfiles personalizados, capturas oficiales, pruebas de aceptación
+y mantenimiento preventivo. Las tapas grandes caben sin brim, pero **no con
+un brim exterior de 5 mm**; revisar la huella final antes de imprimir.
+
 Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.1**):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).

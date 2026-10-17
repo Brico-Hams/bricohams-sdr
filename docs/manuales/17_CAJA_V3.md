@@ -32,6 +32,14 @@
 > La **caja v2** (`hardware/caja`, manual 10) sigue siendo válida si se quiere todo en el mástil y solo con los SDR actuales. La v3 es la recomendada.
 
 ## 1. Piezas (`hardware/caja_v3/stl`, todas ≤ 250 mm, Kobra S1)
+
+> **Antes de imprimir ASA:** seguir la [guía Kobra S1 Combo de BricoHams](43_KOBRA_S1_ASA.md),
+> con calibración, pruebas y mantenimiento. Las tapas llegan a 247 × 244,6 mm:
+> caben nominalmente, pero **no con brim exterior de 5 mm**. Comprobar huella
+> tras compensar contracción, purga y soportes; no escalar los STL para hacer sitio.
+> Los tiempos y pesos siguientes son estimaciones previas, no un laminado
+> validado del nuevo diseño de 190 mm ni del perfil ASA de tu máquina.
+
 | Módulo | Pieza | Material | Relleno |
 |---|---|---|---|
 | ambos | `cuerpo`, `tapa`, `tejadillo` | **ASA** (o PETG blanco) | 30 % giroide, 6 perímetros |

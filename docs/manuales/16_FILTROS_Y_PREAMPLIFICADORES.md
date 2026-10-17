@@ -8,6 +8,11 @@
 
 ![Cadena de RF](../esquemas/12_cadena_rf.png)
 
+**Medidas de banco:** [laboratorio RF y cualificación](44_LABORATORIO_RF.md),
+[manual NanoVNA](45_NANOVNA.md) y [hojas rellenables](../laboratorio-rf/README.md).
+El NanoVNA permite caracterizar adaptación y paso RF, no potencia admisible ni
+figura de ruido. No conectar bias-tee alimentados ni salida TX a sus puertos.
+
 ## 1. Dónde va cada uno
 | Elemento | Posición | Por qué |
 |---|---|---|

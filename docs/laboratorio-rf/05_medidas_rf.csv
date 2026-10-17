@@ -1,0 +1,2 @@
+ensayo_id;punto_id;componente_id;revision;requisito_id;calibracion_id;fecha_hora_zona;operador;sentido;montaje_archivo;puerto_tercero_carga_id;frecuencia_Hz;magnitud;unidad;lectura;resultado_tipo;repeticion;suelo_montaje_dB;temperatura_C;evidencia_archivo;captura_archivo;sha256_evidencia;limitaciones;observaciones
+;;;;;;;;;;;;;;;;;;;;;;;

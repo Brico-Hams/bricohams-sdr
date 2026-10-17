@@ -3,7 +3,7 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **1070 ficheros** en **209 carpetas**.
+El repositorio tiene **1091 ficheros** en **213 carpetas**.
 
 ## Árbol de carpetas
 
@@ -18,7 +18,11 @@ El repositorio tiene **1070 ficheros** en **209 carpetas**.
     demo-sdr/                         3
     en/                               2
     esquemas/                        56  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
-    manuales/                        43  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
+    imagenes/                         0
+      kobra-s1/                       6
+      laboratorio-rf/                 3
+    laboratorio-rf/                   9
+    manuales/                        46  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
   files/                              0  Todo lo que install.sh copia al sistema
     bin/                             54  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
     branding/                         4  Imagen BricoHams (cabecera, avatar, favicon) que se aplica a OpenWebRX+
@@ -375,6 +379,39 @@ Diagramas generados por tools/esquemas.py (SVG fuente + PNG).
 | `30_despliegues_acotados.png` | Imagen / vista renderizada: 30 despliegues acotados |
 | `30_despliegues_acotados.svg` | Diagrama vectorial: 30 despliegues acotados |
 
+### `docs/imagenes/kobra-s1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `01_secuencia.svg` | Diagrama vectorial: 01 secuencia |
+| `02_primera_capa.svg` | Diagrama vectorial: 02 primera capa |
+| `03_pantalla_calibracion.png` | Imagen / vista renderizada: 03 pantalla calibracion |
+| `04_material_flujo_pa.png` | Imagen / vista renderizada: 04 material flujo pa |
+| `05_huella_cama.svg` | Diagrama vectorial: 05 huella cama |
+| `06_movimiento_z.png` | Imagen / vista renderizada: 06 movimiento z |
+
+### `docs/imagenes/laboratorio-rf/`
+
+| Fichero | Qué hace |
+|---|---|
+| `01_instrumentos.svg` | Diagrama vectorial: 01 instrumentos |
+| `02_planos.svg` | Diagrama vectorial: 02 planos |
+| `03_seguridad.svg` | Diagrama vectorial: 03 seguridad |
+
+### `docs/laboratorio-rf/`
+
+| Fichero | Qué hace |
+|---|---|
+| `01_componentes.csv` | Tabla de datos: 01 componentes |
+| `02_instrumentos.csv` | Tabla de datos: 02 instrumentos |
+| `03_requisitos.csv` | Tabla de datos: 03 requisitos |
+| `04_calibraciones.csv` | Tabla de datos: 04 calibraciones |
+| `05_medidas_rf.csv` | Tabla de datos: 05 medidas rf |
+| `06_medidas_sdr_aux.csv` | Tabla de datos: 06 medidas sdr aux |
+| `07_incertidumbre.csv` | Tabla de datos: 07 incertidumbre |
+| `08_decisiones.csv` | Tabla de datos: 08 decisiones |
+| `README.md` | BricoHams SDR · Paquete de laboratorio RF rellenable |
+
 ### `docs/manuales/`
 
 Manuales paso a paso numerados (instalación, cada servicio y cada panel).
@@ -424,6 +461,9 @@ Manuales paso a paso numerados (instalación, cada servicio y cada panel).
 | `40_HTTPS_MAPA_LOCAL_POLITICAS.md` | 40 · Solo HTTPS, mapa local (ADS-B/AIS), políticas, cookies, idioma y logo |
 | `41_PLUGINS_EA5HKX.md` | 41 · Plugins de EA5HKX: callsign_gate y tone_detector |
 | `42_CLIMA_RED_SATELITES_GRABACION.md` | 42 · Clima en red, balizas WSPR, grabación automática de pases e informe AMSAT (v5.0) |
+| `43_KOBRA_S1_ASA.md` | 43 · BricoHams SDR · Kobra S1 Combo: ASA, calibración y mantenimiento |
+| `44_LABORATORIO_RF.md` | 44 · BricoHams SDR · Laboratorio RF y cualificación de componentes |
+| `45_NANOVNA.md` | 45 · BricoHams SDR · NanoVNA: puesta en marcha, calibración y medidas |
 
 ### `files/bin/`
 
