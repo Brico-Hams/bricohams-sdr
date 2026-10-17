@@ -126,7 +126,7 @@ En el repositorio público **sí** pueden ir:
 `tools/datos_personales.py --historial` sobre GitHub (12/10/2026):
 
 - **No hay** contraseñas, passcodes, tokens ni PSK de Meshtastic en ningún commit ni en ningún `.zip` publicado.
-- **Sí hay**, en commits viejos y en los `Claude outputs/*.zip` de versiones 4.0–4.3:
+- **Sí hay**, en commits viejos y en los archivos `.zip` de versiones 4.0–4.3:
   - los SSID de las WiFi;
   - la red de casa;
   - el usuario del sistema de la Pi;
@@ -140,9 +140,10 @@ La v5.1 lo quita del árbol actual, pero el historial sigue público. Hay dos ca
    ```bash
    git clone --mirror https://github.com/<cuenta>/bricohams-sdr.git limpio.git
    cd limpio.git
-   git filter-repo --path "Claude outputs" --invert-paths --replace-text ../reemplazos.txt
+   git filter-repo --path "<directorio-historico>" --invert-paths --replace-text ../reemplazos.txt
    git push --force --mirror
    ```
+   - Sustituye `<directorio-historico>` por la ruta exacta del directorio que contiene los archivos antiguos, comprobada en el historial. No ejecutes el ejemplo con el marcador literal.
    - `reemplazos.txt` tiene una línea por dato, `dato==>texto`. Escríbelo tú y no lo subas.
    - **Cambia todos los hashes**: cualquier otra copia (la Pi, otros PCs) tiene que volver a clonar.
    - GitHub puede tardar en olvidar las vistas en caché; para eso está su formulario de soporte.

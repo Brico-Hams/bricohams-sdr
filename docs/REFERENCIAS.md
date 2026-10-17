@@ -35,7 +35,7 @@
 - NetworkManager, `nmcli connection add` (prioridad de autoconexión): https://networkmanager.dev/docs/api/latest/nmcli.html
 
 ## v3.0 · Antenas, caja v3, ventilación, viento y lluvia
-- **NEC2 (`nec2c`)**, motor de simulación de los modelos de `hardware/antenas/sim/`: paquete `nec2c` de Debian. Las reglas de la cúbica parten de `claude/cubica_cx1ddr.md`, y el diplexor de `claude/diplexor_2m70cm_v1.md`, ambos del proyecto.
+- **NEC2 (`nec2c`)**, motor de simulación de los modelos de `hardware/antenas/sim/`: paquete `nec2c` de Debian. Los documentos de diseño originales de la cúbica y del diplexor no se incluyen en esta distribución pública.
 - **SDRplay RSPdx-R2:**
   - datasheet: https://sdrplay.com/wp-content/uploads/2026/06/RSPdxR2_Datasheet.pdf
   - ficha y precio: https://www.passion-radio.com/sdr-receivers/rsp-dx-935.html
@@ -58,7 +58,7 @@
   - https://devices.esphome.io/devices/renke-rs-fxjt-n01-wind-direction/
 - **Formato APRS WX** (`_CCC/SSSgGGGtTTTrRRRpPPPPPPPhHHbBBBBB`): APRS Protocol Reference 1.0.1, cap. 12.
 - **Wifon FM** (97,5 MHz, Murcia): https://wifonfm.es/
-- **Repetidores EA5:** lista EA5KGV del proyecto (`claude/canales_repetidores_EA.md`) → `data/repetidores_EA5KGV_zonaEA5.csv`.
+- **Repetidores EA5:** lista EA5KGV del proyecto, distribuida en `data/repetidores_EA5KGV_zonaEA5.csv`.
 
 ## v3.1 · Trixie
 - **Repositorio de OpenWebRX+ por versión:** `bookworm/` y `trixie/`, Release firmado. Página: https://luarvique.github.io/ppa/ · Repositorio: https://github.com/luarvique/ppa
