@@ -1,4 +1,4 @@
-# 17 · Caja v3: dos módulos al pie del mástil
+﻿# 17 · Caja v3: dos módulos al pie del mástil
 
 <!-- guia-visual:inicio -->
 > **Ruta visual:** [Caja, antenas, filtros, alimentación y anclajes](../GUIA_VISUAL_MODULOS.md#hardware).
@@ -14,6 +14,7 @@
 ![Interior](../../hardware/caja_v3/render/electronica_interior.png)
 ![Cara inferior](../../hardware/caja_v3/render/electronica_inferior.png)
 ![Bandeja de SDR](../../hardware/caja_v3/render/electronica_bandeja_sdr.png)
+![Bandeja 2 de SDR (Hermes-Lite 2 y plazas futuras)](../../hardware/caja_v3/render/electronica_bandeja_sdr2.png)
 ![Potencia](../../hardware/caja_v3/render/potencia_interior.png)
 ![Alimentación](../esquemas/15_alimentacion_v3.png)
 
@@ -24,7 +25,7 @@
 
 | Módulo | Medidas (an × al × fondo) | Lleva |
 |---|---|---|
-| **Electrónica** | 228 × 240 × 140 mm | Pi 5 + HAT, 3 SDR + FlightStick, **bandeja de SDR con HackRF One, RTL-SDR V4 y Airspy HF+**, 2 LilyGO, regleta Vansuny, filtro 433, bias-tee, inyector MLA-30, diplexores, RS485, DS18B20, **2 ventiladores de 60 mm**, cámara (opcional) |
+| **Electrónica** | 228 × 240 × 190 mm | Pi 5 + HAT, 3 SDR + FlightStick, **bandeja de SDR con HackRF Pro/One, RTL-SDR V4 y Airspy HF+**, **2.ª bandeja con Hermes-Lite 2 y 5 plazas más**, bahía del suelo para RSPdx, LilyGO + **RAK4631 (RAK19007)**, regleta Vansuny, filtro 433, bias-tee, inyector MLA-30, diplexores, RS485, DS18B20, **2 ventiladores de 60 mm**, cámara (opcional) |
 | **Potencia** | 170 × 200 × 112 mm | base Schuko de superficie, cargador de 120 W, gatillo USB-C PD a 12 V, portafusibles, WAGO 221 |
 | **SAI** (opcional, debajo del de potencia) | 228 × 240 × 140 mm | placa, transformador y batería de plomo 12 V 7–9 Ah de un SAI reaprovechado, **2 filtros EMI** de red, fusible de batería ([§1.2](#12-módulo-sai-reaprovechar-un-sai-con-filtros-emi)) |
 
@@ -37,10 +38,11 @@
 | ambos | `placa_rejilla` | PETG | 40 % |
 | ambos | `junta_tapa` | **TPU 95A** | 100 % |
 | ambos | `pletina_pared`, `soporte_mastil` | PETG/ASA | 60 % |
-| electrónica | `bandeja`, `poste_bandeja` ×6, `poste_superior` ×4 | PETG | 40 % |
+| electrónica | `bandeja`, `poste_bandeja` ×6, `poste_medio` ×6, `poste_superior` ×4 | PETG | 40 % |
+| electrónica | `bandeja_sdr2` (Hermes-Lite 2 y plazas futuras) | PETG | 40 %, 4 perímetros |
 | electrónica | `bandeja_sdr` (HackRF One, RTL-SDR V4, Airspy HF+) | PETG | 40 %, 4 perímetros |
 | electrónica | `capota` ×2, `rejilla_ventilador` ×2 | ASA | 30 % |
-| electrónica | `soporte_dongle` ×4, `soporte_hub`, `soporte_lilygo` ×2, `soporte_sdrplay`, `soporte_wago` | PETG | 40 % |
+| electrónica | `soporte_dongle` ×4, `soporte_hub`, `soporte_lilygo`, `soporte_rak`, `soporte_sdrplay`, `soporte_wago` | PETG | 40 % |
 | electrónica | `tapon_n` (para los N sin usar), `tapon_pg` | TPU | 100 % |
 | electrónica | `visera`, `soporte_camara` | ASA | 30 % |
 | potencia | `soporte_schuko`, `brida_cargador` | PETG | 40 % |
@@ -52,7 +54,7 @@
 - **Para regenerar:** `tools/caja_v3.sh`.
 
 ### 1.1 Bandeja de SDR: 3 receptores más
-La `bandeja_sdr` va entre la fila de dongles (y la bahía SDRplay) y la bandeja de la Pi, a 38 mm de la rejilla. Por eso el módulo de electrónica tiene 140 mm de fondo en vez de 112.
+La `bandeja_sdr` va entre la fila de dongles (y la bahía SDRplay) y la bandeja de la Pi, a 38 mm de la rejilla. Por eso el módulo de electrónica tiene 190 mm de fondo en vez de 112 (con la 2.ª bandeja de §1.3).
 
 | Bahía | SDR | Hueco (largo × ancho × alto) | Dónde |
 |---|---|---|---|
@@ -69,6 +71,22 @@ La `bandeja_sdr` va entre la fila de dongles (y la bahía SDRplay) y la bandeja 
   - Los 3 SDR consumen ~4,5 W a 5 V (HackRF ~0,35 A, V4 ~0,3 A, Airspy ~0,2 A): la regleta pasa de 7–9 W a 12–14 W, dentro de su fusible de 2 A a 12 V.
 - **Calor:** ~4,5 W más. Los ventiladores PWM (manual 18) suben de vueltas solos; la bandeja tiene rejillas para que el aire de la diagonal pase por debajo de los SDR.
 
+### 1.3 Diseño v5.5, bandeja 2 de SDR, RAK4631 y potencia reservada
+- **Diseño:** cuerpo con faldón perimetral chaflanado a 45° que enrasa con la tapa, tapa con marco y aspa en X hundidos (sin voladizos al imprimir) y cierres laterales más anchos.
+- **Bandeja de la Pi:** el 2.º LilyGO se sustituye por la cuna `soporte_rak` del **RAK19007 + RAK4631** (30 × 60 mm, con el GPS en el slot A).
+- **Bandeja 2 (`bandeja_sdr2`)** a 82 mm de la rejilla, con 42 mm libres hasta la bandeja de la Pi:
+
+| Bahía | Equipo previsto | Hueco (largo × ancho × alto) |
+|---|---|---|
+| `HL2` | **Hermes-Lite 2** (12 V + Ethernet; medida a verificar con tu unidad) | 125 × 62 × 36 mm |
+| `S1`, `S2` | dongles RTL/FlightStick | 85 × 26 × 13 mm |
+| `S3`, `S4` | Airspy Mini, RSP1B de canto o similar | 52 × 30 × 15 y 52 × 24 × 15 mm |
+| `S5` | dongle en vertical | 26 × 60 × 13 mm |
+
+- **Reparto de los SDR de las imágenes:** HackRF Pro en `HRF` (120 × 75 × 20, bandeja 1), Airspy HF+ Discovery en `AHF`, **RSPdx** en la bahía de expansión del suelo (`soporte_sdrplay`, 100 × 90 × 32) y Hermes-Lite 2 en `HL2`. Todas las cotas son nominales: mide tu unidad y edita `SDR_DECK` / `SDR_DECK2`; los `assert` y `test_v3_hardware.py` avisan si algo choca.
+- **Potencia reservada:** hueco en el suelo (x 20, y 186, 60 × 26 × 22 mm) para fusibles ATO por carril y **dos reductores 12→5 V de 5 A**, uno solo para la Pi y otro para el hub de los SDR USB. El Hermes-Lite 2 va a 12 V con su fusible de 3 A.
+- **Presupuesto (`python3 tools/presupuesto_potencia.py`, consumos nominales):** con todos los equipos futuros la estación toma ~52 W (44 % del cargador de 120 W); el reductor más cargado, 3,6 A de 5 A; el carril de 12 V, 1,1 A. Es una estimación: revisa los consumos con las hojas de datos.
+- **Servidor:** `bricohams.env.example` declara `HACKRF_PRO_SERIAL`, `AIRSPY_HF_SERIAL` y `HERMES_LITE2_IP`, todos vacíos, y permite poner esos equipos en `HARDWARE_PENDIENTE` para que `bricohams-check` no los dé por fallo.
 ### 1.2 Módulo SAI: reaprovechar un SAI con filtros EMI
 Tercer módulo, **debajo del de potencia**, para un SAI *line-interactive* pequeño (600 VA, placa tipo 16-500014, batería de plomo 12 V 7–9 Ah). Los cuerpos, la tapa, la junta y el tejadillo salen de `caja_v3.scad` con `VARIANTE="sai"` y miden lo mismo que el de electrónica (228 × 240 × 140 mm, cabe en la Kobra S1).
 

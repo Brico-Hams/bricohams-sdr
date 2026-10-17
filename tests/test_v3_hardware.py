@@ -82,6 +82,31 @@ assert d_o[1] >= 50, 'la bandeja de SDR invade la zona de latiguillos de los N (
 assert deck_h > 3 + 32 + 2, 'la bandeja de SDR toca el SDRplay de la bahía de expansión'
 assert deck_h + deck_t + max(s[5] for s in sdr) + 4 <= band_h, 'los SDR tocan la bandeja de la Pi'
 assert pz + band_h + 41 <= Dc + num('GAP_LID') - num('RIB_H'), 'la Pi + HAT toca la tapa'
+
+# segunda bandeja de SDR: Hermes-Lite 2 y plazas futuras; sin pisar postes ni solaparse; alturas encadenadas
+deck2_h = num('DECK2_H')
+sdr2 = [(n, float(x), float(y), float(l), float(w), float(h)) for n, x, y, l, w, h in re.findall(
+    r'\["(\w+)", \[(\d+), (\d+)\], \[(\d+), (\d+), (\d+)\]\]', re.search(r'SDR_DECK2 = (.+?);', SRC, re.S).group(1))]
+assert sdr2[0][0] == 'HL2' and len(sdr2) >= 6, sdr2
+assert deck_h + deck_t + max(s[5] for s in sdr) + 4 <= deck2_h, 'la bandeja 1 toca la 2'
+assert deck2_h + deck_t + max(s[5] for s in sdr2) + 4 <= band_h, 'la bandeja 2 toca la de la Pi'
+for n, x, y, l, w, h in sdr2:
+    assert 4 <= x and 4 <= y and x + l <= deck[0] - 4 and y + w <= deck[1] - 4, ('SDR2 fuera de la bandeja', n)
+    for px, py in postes:
+        qx, qy = px - d_o[0], py - d_o[1]
+        assert not (x - 2 < qx + 6 and qx - 6 < x + l + 2 and y - 2 < qy + 6 and qy - 6 < y + w + 2), ('poste bajo el SDR2', n)
+for i, a in enumerate(sdr2):
+    for b in sdr2[i + 1:]:
+        sep = max(b[1] - (a[1] + a[3]), a[1] - (b[1] + b[3]), b[2] - (a[2] + a[4]), a[2] - (b[2] + b[4]))
+        assert sep >= 2, ('SDR2 demasiado juntos', a[0], b[0], sep)
+assert 'RAK_O' in SRC and 'soporte_rak' in se and 'bandeja_sdr2' in se and 'poste_medio' in se
+
+# presupuesto de potencia con los SDR futuros (HackRF Pro, Airspy HF+, RSPdx, Hermes-Lite 2)
+import presupuesto_potencia as pp  # noqa: E402
+_r = pp.calcular()
+assert _r['carga'] <= pp.MARGEN_MAX, ('el cargador va justo', _r['carga'])
+assert _r['a5_reductor'] <= pp.REDUCTOR_5V_A * pp.MARGEN_5V, ('un reductor de 5 V va justo', _r['a5_reductor'])
+assert all(_r['A'][c] <= pp.FUSIBLES[c] * 0.8 for c in pp.FUSIBLES), _r['A']
 filas = [(int(z), [e.strip(' "') for e in s.split(',')]) for z, s in re.findall(r'\[(\d+), \[([^\]]*)\]\]', re.search(r'N_ROWS = (.+);', SRC).group(1))]
 assert len(filas) == 3 and sum(len(f[1]) for f in filas) == 18 and filas[2][1][:3] == ['HRF', 'AHF', 'V4'], filas
 assert all(b[0] - a[0] >= 27 for a, b in zip(filas, filas[1:])), filas
@@ -91,7 +116,7 @@ assert Dc <= 250 - 10
 
 # 2c. módulo SAI: todo cabe en la rejilla sin solaparse y las cuentas del manual 17 §1.2 cuadran
 import sai_calculo  # noqa: E402
-assert re.search(r'W = EL \? 228 : SAI \? 228 : 170;', SRC) and re.search(r'D = EL \? 140 : SAI \? 140 : 112;', SRC)
+assert re.search(r'W = EL \? 228 : SAI \? 228 : 170;', SRC) and re.search(r'D = EL \? 190 : SAI \? 140 : 112;', SRC)
 pl_w, pl_h = Wc - 2 * Tc - 6, Hc - 2 * Tc - 6
 lay = [(n, float(x), float(y), float(a), float(b), float(c)) for n, x, y, a, b, c in re.findall(
     r'\["(\w+)", \[(\d+), (\d+)\], \[(\d+), (\d+), (\d+)\]\]', re.search(r'SAI_LAYOUT = (.+?);', SRC, re.S).group(1))]

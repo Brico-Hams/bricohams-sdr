@@ -3,7 +3,7 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **1065 ficheros** en **209 carpetas**.
+El repositorio tiene **1070 ficheros** en **209 carpetas**.
 
 ## Árbol de carpetas
 
@@ -205,8 +205,8 @@ El repositorio tiene **1065 ficheros** en **209 carpetas**.
       render/                        15
       stl/                           16
     caja_v3/                          1  Caja v3 en dos módulos (electrónica + potencia)
-      render/                         8
-      stl/                           45
+      render/                         9
+      stl/                           48
     gcode/                            1
   owrx-clone/                         6  Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+
   tests/                             70  Pruebas automáticas (bash tests/run_tests.sh)
@@ -216,7 +216,7 @@ El repositorio tiene **1065 ficheros** en **209 carpetas**.
           lib/                        2
         owrx/                         2
       owrx-1.2.126/                   5
-  tools/                             32  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
+  tools/                             33  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
 ```
 
 ## Qué hace cada fichero
@@ -397,7 +397,7 @@ Manuales paso a paso numerados (instalación, cada servicio y cada panel).
 | `14_ADSB_LNA.md` | 14 · Antena ADS-B 1090 MHz con el LNA en la base |
 | `15_LAZO_MLA30.md` | 15 · Lazo MLA-30 para HF: protección de intemperie y montaje |
 | `16_FILTROS_Y_PREAMPLIFICADORES.md` | 16 · Filtros, preamplificadores y bias-tee |
-| `17_CAJA_V3.md` | 17 · Caja v3: dos módulos al pie del mástil |
+| `17_CAJA_V3.md` | 1. Piezas (`hardware/caja_v3/stl`, todas ≤ 250 mm, Kobra S1) |
 | `18_VENTILACION.md` | 18 · Ventilación de la caja: conexión y control |
 | `19_VIENTO_Y_LLUVIA.md` | 19 · Viento y lluvia para el WX APRS |
 | `20_PICO_IO.md` | 20 · Pico «bricohams-io»: sensores y ventiladores por USB |
@@ -2104,13 +2104,14 @@ Caja v3 en dos módulos (electrónica + potencia).
 
 | Fichero | Qué hace |
 |---|---|
-| `caja_v3.scad` | Caja v3 BricoHams SDR · N0CALL — DOS MÓDULOS al pie del mástil (~5 m) |
+| `caja_v3.scad` | Modelo paramétrico OpenSCAD: caja v3 |
 
 ### `hardware/caja_v3/render/`
 
 | Fichero | Qué hace |
 |---|---|
 | `electronica_bandeja_sdr.png` | Imagen / vista renderizada: electronica bandeja sdr |
+| `electronica_bandeja_sdr2.png` | Imagen / vista renderizada: electronica bandeja sdr2 |
 | `electronica_inferior.png` | Imagen / vista renderizada: electronica inferior |
 | `electronica_interior.png` | Imagen / vista renderizada: electronica interior |
 | `electronica_montaje.png` | Imagen / vista renderizada: electronica montaje |
@@ -2125,12 +2126,14 @@ Caja v3 en dos módulos (electrónica + potencia).
 |---|---|
 | `electronica_bandeja.stl` | Pieza 3D lista para imprimir: electronica bandeja |
 | `electronica_bandeja_sdr.stl` | Pieza 3D lista para imprimir: electronica bandeja sdr |
+| `electronica_bandeja_sdr2.stl` | Pieza 3D lista para imprimir: electronica bandeja sdr2 |
 | `electronica_capota.stl` | Pieza 3D lista para imprimir: electronica capota |
 | `electronica_cuerpo.stl` | Pieza 3D lista para imprimir: electronica cuerpo |
 | `electronica_junta_tapa.stl` | Pieza 3D lista para imprimir: electronica junta tapa |
 | `electronica_placa_rejilla.stl` | Pieza 3D lista para imprimir: electronica placa rejilla |
 | `electronica_pletina_pared.stl` | Pieza 3D lista para imprimir: electronica pletina pared |
 | `electronica_poste_bandeja.stl` | Pieza 3D lista para imprimir: electronica poste bandeja |
+| `electronica_poste_medio.stl` | Pieza 3D lista para imprimir: electronica poste medio |
 | `electronica_poste_superior.stl` | Pieza 3D lista para imprimir: electronica poste superior |
 | `electronica_rejilla_ventilador.stl` | Pieza 3D lista para imprimir: electronica rejilla ventilador |
 | `electronica_soporte_camara.stl` | Pieza 3D lista para imprimir: electronica soporte camara |
@@ -2138,6 +2141,7 @@ Caja v3 en dos módulos (electrónica + potencia).
 | `electronica_soporte_hub.stl` | Pieza 3D lista para imprimir: electronica soporte hub |
 | `electronica_soporte_lilygo.stl` | Pieza 3D lista para imprimir: electronica soporte lilygo |
 | `electronica_soporte_mastil.stl` | Pieza 3D lista para imprimir: electronica soporte mastil |
+| `electronica_soporte_rak.stl` | Pieza 3D lista para imprimir: electronica soporte rak |
 | `electronica_soporte_sdrplay.stl` | Pieza 3D lista para imprimir: electronica soporte sdrplay |
 | `electronica_soporte_wago.stl` | Pieza 3D lista para imprimir: electronica soporte wago |
 | `electronica_tapa.stl` | Pieza 3D lista para imprimir: electronica tapa |
@@ -2333,6 +2337,7 @@ Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilació
 | `marcadores.py` | Genera y fusiona marcadores de OpenWebRX |
 | `mastil.py` | Plan del mástil BricoHams: posición de cada antena, separaciones entre las |
 | `planos_antenas.py` | Planos acotados de las antenas a partir de los resultados NEC2 |
+| `presupuesto_potencia.py` | Fichero presupuesto potencia |
 | `sai_calculo.py` | Cálculos del módulo SAI (manual 17 §1.2): autonomía con la batería de plomo del SAI, |
 | `stl_util.py` | Utilidades STL sin dependencias. |
 | `tak-requirements.txt` | Versiones fijadas de Python para OpenTAKServer |
