@@ -37,6 +37,14 @@ El mapa muestra **Powered by MAP.FLIGHTS**, el icono oficial y un enlace a
 `https://map.flights`. Se conserva además el crédito de la foto cuando la
 respuesta identifica a su fotógrafo.
 
+**Fotos (v5.0).** map.flights devuelve sus propias fotos con ruta relativa
+(`/photos/ext_…_640.webp`), con autor, origen (`source`, p. ej. `wikimedia`) y
+licencia. La API las completa a `https://map.flights/photos/…` y compone el
+crédito «© autor · Wikimedia Commons · CC BY 2.0»; antes se descartaban por no
+empezar por `https://` y la ficha caía a la foto de Planespotters, que salía con
+su crédito aunque los datos fueran de map.flights. Si la foto no indica el
+origen, se deduce del dominio (Planespotters). Prueba: `test_mapflights_api.py`.
+
 ## Flujo
 
 ![Un receptor, RadarBox y map.flights simultáneos](../esquemas/27_adsb_destinos.svg)

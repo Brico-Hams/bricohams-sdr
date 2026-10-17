@@ -3,20 +3,23 @@
 > Documento **generado** por `python3 tools/estructura.py`. No lo edites a mano:
 > cambia la cabecera del fichero o `DESCRIPCIONES` en el generador y vuelve a ejecutarlo.
 
-El repositorio tiene **535 ficheros** en **102 carpetas**.
+El repositorio tiene **1031 ficheros** en **206 carpetas**.
 
 ## Árbol de carpetas
 
 ```
-.                                     6  Raíz del repositorio
+.                                     8  Raíz del repositorio
+  .vscode/                            1
   data/                               3  Datos de entrada: repetidores, marcadores, satélites y catálogo de localizadores
     locator/                          2  Catálogo de localidades → locator Maidenhead y repetidores por zona (bricohams-locator)
       fuentes/                        5
-  docs/                              10  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
-    esquemas/                        46  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
-    manuales/                        37  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
+  docs/                              12  Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructura
+    capturas/                         2
+    en/                               1
+    esquemas/                        48  Diagramas generados por tools/esquemas.py (SVG fuente + PNG)
+    manuales/                        43  Manuales paso a paso numerados (instalación, cada servicio y cada panel)
   files/                              0  Todo lo que install.sh copia al sistema
-    bin/                             43  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
+    bin/                             52  Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ y utilidades
     branding/                         4  Imagen BricoHams (cabecera, avatar, favicon) que se aplica a OpenWebRX+
     grafana/                          1  Paneles de Grafana aprovisionados por install.sh
     htdocs/                           0  Recursos web servidos por OpenWebRX+ (plugins del cliente)
@@ -35,18 +38,23 @@ El repositorio tiene **535 ficheros** en **102 carpetas**.
           colorful_spectrum/          3
           compact_analog_modes/       3
           connect_notify/             3
+          consentimiento/             1
           doppler/                    6
           dsp_audio/                  1
           dvficha/                    1
+          ea5hkx_puente/              1
           example/                    2
           example_theme/              3
           example_uikit/              2
           filtro_audio/               1
           freq_scanner/               4
           frequency_far_jump/         2
+          identificacion/             1
+          idioma/                     1
           keyboard_shortcuts/         4
           magic_key/                  3
           map/                        1
+          marca/                      2
           meteo/                      1
           minimap/                    2
           mouse_freq/                 3
@@ -79,13 +87,108 @@ El repositorio tiene **535 ficheros** en **102 carpetas**.
     share/                            0  Módulos compartidos que los parcheadores insertan en OpenWebRX+
       bricohams-ctcss/                2
       bricohams-rbimport/             1
-    web/                              2  Portal estático /bricohams/ y página de privacidad
+    web/                              4  Portal estático /bricohams/ y página de privacidad
   firmware/                           0  Firmware para los microcontroladores de la estación
     pico-io/                          1  MicroPython de la Raspberry Pi Pico (sensores y ventiladores)
     rak4631-lora-aprs/               18  Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO)
-      bin/                            4
+      bin/                            5
       test/                           1
         shim/                         1
+  firmware-compilado/                 1
+    igate/                            2
+      ESP32C3_DIY_1W_LoRa_915_E22_900M30S/    4
+      ESP32C3_DIY_1W_LoRa_E22_400M30S/    4
+      ESP32C3_OctopusLab_LoRa/        4
+      ESP32C3_SuperMini_DIY_LoRa_SX1278/    4
+      ESP32_9M2IBR_1W_LoRa_GPS_E22_400M30S/    4
+      ESP32_DIY_1W_LoRa_915_E22_900M30S/    4
+      ESP32_DIY_1W_LoRa_E220_400M30S/    4
+      ESP32_DIY_1W_LoRa_E22_400M30S/    4
+      ESP32_DIY_1W_LoRa_E32_400M30S/    4
+      ESP32_DIY_1W_LoRa_Mesh_V1_2_E22_400M30S/    4
+      ESP32_DIY_LoRa_915_SX1276/      4
+      ESP32_DIY_LoRa_A7670_915_SX1276/    4
+      ESP32_DIY_LoRa_A7670_SX1278/    4
+      ESP32_DIY_LoRa_SX1278/          4
+      LoRaHAM_V2/                     4
+      OE5HWN_MeshCom/                 4
+      QRPLabs_LightGateway_1_0/       4
+      QRPLabs_LightGateway_Plus_1_0/    4
+      RAK3112/                        4
+      RAK3312/                        4
+      RPC_LORA_DIGIGATE_1W/           4
+      TROY_LoRa_APRS/                 4
+      WEMOS_D1_R32_DIY_LoRa_SX1278/    4
+      WEMOS_LOLIN32_OLED_DIY_LoRa_SX1278/    4
+      WEMOS_S2_MINI_DIY_LoRa_SX1278/    4
+      XIAO_ESP32S3_WIO_SX1262/        4
+      _logs/                         55
+      heltec-lora32-v2/               4
+      heltec-lora32-v2_915/           4
+      heltec_ht-ct62/                 4
+      heltec_vision_master_e290/      4
+      heltec_wifi_lora_32_V3/         4
+      heltec_wifi_lora_32_V3_2/       4
+      heltec_wifi_lora_32_V4/         4
+      heltec_wireless_bridge/         4
+      heltec_wireless_paper_v1/       4
+      heltec_wireless_paper_v1_2/     4
+      heltec_wireless_stick/          4
+      heltec_wireless_stick_lite_v3/    4
+      heltec_wireless_stick_lite_v3_display/    4
+      heltec_wireless_tracker/        4
+      ttgo-lora32-v21/                4
+      ttgo-lora32-v21_915/            4
+      ttgo-lora32-v21_915_GPS/        4
+      ttgo-lora32-v21_GPS/            4
+      ttgo-t-beam-v1/                 4
+      ttgo-t-beam-v1_2/               4
+      ttgo-t-beam-v1_2_915/           4
+      ttgo-t-beam-v1_2_SX1262/        4
+      ttgo-t-beam-v1_915/             4
+      ttgo-t-beam-v1_SX1262/          4
+      ttgo-t-beam-v1_SX1268/          4
+      ttgo_lora32_t3s3_v1_2/          4
+      ttgo_t_beam_s3_SUPREME_v3/      4
+      ttgo_t_deck_GPS/                4
+      ttgo_t_deck_plus/               4
+    meshtastic/                       2
+      _logs/                         35
+      heltec-mesh-node-t096/          3
+      heltec-mesh-node-t1/            3
+      heltec-mesh-node-t114/          3
+      heltec-mesh-pocket-10000/       3
+      heltec-mesh-pocket-10000-inkhud/    3
+      heltec-mesh-pocket-5000/        3
+      heltec-mesh-pocket-5000-inkhud/    3
+      heltec-mesh-solar/              3
+      heltec-mesh-solar-eink/         3
+      heltec-mesh-solar-inkhud/       3
+      heltec-mesh-solar-oled/         3
+      heltec-mesh-solar-tft/          3
+      heltec-v1/                      3
+      heltec-v2_0/                    3
+      heltec-v2_1/                    3
+      seeed_solar_node/               3
+      seeed_wio_tracker_L1/           3
+      seeed_wio_tracker_L1_eink/      3
+      seeed_wio_tracker_L1_eink-inkhud/    3
+      seeed_xiao_nrf52840_btb/        3
+      seeed_xiao_nrf52840_kit/        3
+      seeed_xiao_nrf52840_kit_i2c/    3
+      t-echo/                         3
+      t-echo-inkhud/                  3
+      t-echo-lite/                    3
+      t-echo-plus/                    3
+      t-impulse-plus/                 3
+      tbeam/                          3
+      tbeam0_7/                       3
+      tlora-v1/                       3
+      tlora-v2/                       3
+      tlora_v1_3/                     3
+      xiao_ble/                       3
+      xiao_ble_30db/                  3
+      xiao_ble_33db/                  3
   hardware/                           0  Diseño mecánico y de RF (OpenSCAD, STL, NEC2)
     anclajes/                         1  Crucetas y soportes impresos del mástil
       render/                         1
@@ -99,17 +202,18 @@ El repositorio tiene **535 ficheros** en **102 carpetas**.
       render/                        15
       stl/                           16
     caja_v3/                          1  Caja v3 en dos módulos (electrónica + potencia)
-      render/                         5
-      stl/                           30
+      render/                         8
+      stl/                           45
+    gcode/                            1
   owrx-clone/                         6  Herramienta independiente (MIT) para clonar una instalación de OpenWebRX+
-  tests/                             43  Pruebas automáticas (bash tests/run_tests.sh)
+  tests/                             61  Pruebas automáticas (bash tests/run_tests.sh)
     datos/                            2  Datos de prueba (fixtures) usados por los tests
       owrx/                           0
         htdocs/                       0
           lib/                        2
         owrx/                         2
       owrx-1.2.126/                   5
-  tools/                             18  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
+  tools/                             23  Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilación RAK)
 ```
 
 ## Qué hace cada fichero
@@ -120,12 +224,20 @@ Raíz del repositorio.
 
 | Fichero | Qué hace |
 |---|---|
+| `.git` | Fichero .git |
 | `.gitattributes` | Fuerza finales de línea LF (los scripts se ejecutan en Linux) |
 | `.gitignore` | Excluye claves (bricohams.env), cachés y artefactos de compilación |
 | `bricohams.env.example` | Plantilla pública de configuración de la estación, sin credenciales (copiar a bricohams.env) |
 | `CHANGELOG.md` | Historial de versiones y de cada cambio |
 | `install.sh` | Instalador por pasos, idempotente: dependencias, servicios, parches de OpenWebRX+, nginx, Meshtastic, APRS, TAK, Grafana/Prometheus y copias (--lista, --solo, --backup, --actualizar) |
 | `README.md` | Presentación del proyecto, puesta en marcha rápida, estructura resumida y reglas |
+| `VERSION` | Fichero VERSION |
+
+### `.vscode/`
+
+| Fichero | Qué hace |
+|---|---|
+| `settings.json` | Datos JSON: settings |
 
 ### `data/`
 
@@ -163,15 +275,30 @@ Documentación: arquitectura (ADR), componentes, datos, hardware y esta estructu
 | Fichero | Qué hace |
 |---|---|
 | `ARQUITECTURA.md` | Decisiones de arquitectura (ADR-01 en adelante): contexto, decisión y consecuencias |
-| `AYUDA_RAPIDA.md` | Ayuda rápida · BricoHams SDR (v4.2) |
+| `AYUDA_RAPIDA.md` | Ayuda rápida · BricoHams SDR (v5.0 en desarrollo) |
 | `CANALES_Y_FRECUENCIAS.md` | Canales y frecuencias de todos los grupos de marcadores (generado por tools/canales.py) |
 | `COMPONENTES.md` | Ficha de cada componente: función, ficheros, servicio, puertos, configuración y pruebas |
 | `DATOS.md` | Conjuntos de datos: SDR, perfiles, marcadores, puertos, servicios, I2C (generado por tools/datos.py) |
+| `DESARROLLO_MODULOS.md` | Módulos creados y su desarrollo |
 | `ESTRUCTURA_FICHEROS.md` | Este documento (generado por tools/estructura.py) |
 | `EVALUACION_MODULOS.md` | Evaluación de módulos |
+| `GUIA_VISUAL_MODULOS.md` | Guía visual de instalación y módulos |
 | `HARDWARE_Y_GPIO.md` | Hardware, GPIO, buses y alimentación |
 | `MEMORIA_TECNICA.md` | Memoria técnica · Estación BricoHams SDR · N0CALL · tu QTH (v3.0) |
 | `REFERENCIAS.md` | Referencias |
+
+### `docs/capturas/`
+
+| Fichero | Qué hace |
+|---|---|
+| `mapa-capas.png` | Imagen / vista renderizada: mapa capas |
+| `mapa-herramientas.png` | Imagen / vista renderizada: mapa herramientas |
+
+### `docs/en/`
+
+| Fichero | Qué hace |
+|---|---|
+| `MAPFLIGHTS_PLUGIN.md` | map.flights module for OpenWebRX+ |
 
 ### `docs/esquemas/`
 
@@ -217,6 +344,7 @@ Diagramas generados por tools/esquemas.py (SVG fuente + PNG).
 | `20_audio_navegador.svg` | Diagrama vectorial: 20 audio navegador |
 | `21_clonar_openwebrx.png` | Imagen / vista renderizada: 21 clonar openwebrx |
 | `21_clonar_openwebrx.svg` | Diagrama vectorial: 21 clonar openwebrx |
+| `22_zona_locator.png` | Imagen / vista renderizada: 22 zona locator |
 | `22_zona_locator.svg` | Diagrama vectorial: 22 zona locator |
 | `23_openwebrx_docker.png` | Imagen / vista renderizada: 23 openwebrx docker |
 | `23_openwebrx_docker.svg` | Diagrama vectorial: 23 openwebrx docker |
@@ -224,6 +352,8 @@ Diagramas generados por tools/esquemas.py (SVG fuente + PNG).
 | `24_blindaje.svg` | Diagrama vectorial: 24 blindaje |
 | `25_lora_owrx.png` | Imagen / vista renderizada: 25 lora owrx |
 | `25_lora_owrx.svg` | Diagrama vectorial: 25 lora owrx |
+| `26_procedimiento_seguro.svg` | Diagrama vectorial: 26 procedimiento seguro |
+| `27_adsb_destinos.svg` | Diagrama vectorial: 27 adsb destinos |
 
 ### `docs/manuales/`
 
@@ -268,6 +398,12 @@ Manuales paso a paso numerados (instalación, cada servicio y cada panel).
 | `35_LORA_APRS_MESHTASTIC.md` | 35 · iGate LoRa APRS en un RAK4631 y Meshtastic 433/868, dentro de OpenWebRX+ (v4.5) |
 | `36_TAK_MAPA_LOCAL.md` | TAK local, mapa ADS-B/APRS y CHAT |
 | `37_JUSTIFICACION_CAMBIOS_V4_6.md` | 37 · Justificación de los cambios de la v4.6 |
+| `38_GITHUB_SINCRONIZACION_PRIVACIDAD.md` | 38 · GitHub: sincronización y repositorio sin datos personales |
+| `38_MAPFLIGHTS_PLUGIN.md` | 38 · Módulo map.flights para OpenWebRX+ |
+| `39_REGISTRO_OYENTES.md` | 39 · Registro voluntario de oyentes y registro obligatorio del chat |
+| `40_HTTPS_MAPA_LOCAL_POLITICAS.md` | 40 · Solo HTTPS, mapa local (ADS-B/AIS), políticas, cookies, idioma y logo |
+| `41_PLUGINS_EA5HKX.md` | 41 · Plugins de EA5HKX: callsign_gate y tone_detector |
+| `42_CLIMA_RED_SATELITES_GRABACION.md` | 42 · Clima en red, balizas WSPR, grabación automática de pases e informe AMSAT (v5.0) |
 
 ### `files/bin/`
 
@@ -276,6 +412,7 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 | Fichero | Qué hace |
 |---|---|
 | `bricohams-api.py` | bricohams-api · BricoHams (v4) |
+| `bricohams-backup-limpieza` | Fichero bricohams backup limpieza |
 | `bricohams-backup-remoto` | bricohams-backup-remoto · copia de la configuración fuera de la estación |
 | `bricohams-banner` | bricohams-banner · BricoHams (v4.5) |
 | `bricohams-blindaje` | bricohams-blindaje · auditoría y blindaje de seguridad de la estación (v4.4) |
@@ -293,31 +430,39 @@ Ejecutables instalados en /usr/local/bin: servicios, parcheadores de OpenWebRX+ 
 | `bricohams-lilygo` | bricohams-lilygo · BricoHams |
 | `bricohams-locator` | Zona de la estación según su locator: coordenadas, AEMET y FM cercanas, marcadores [AUTO-LOCATOR] y METEO_STATIONS (manual 32) |
 | `bricohams-login-aviso` | bricohams-login-aviso · avisa por Telegram de cada inicio de sesión correcto en /settings. |
+| `bricohams-mapflights.py` | BricoHams: alimenta map.flights desde readsb (además de RadarBox). |
 | `bricohams-merge-bookmarks.py` | Une marcadores de OpenWebRX (clave: frecuencia + modo). |
 | `bricohams-mesh-admin` | Panel de administración (solo /settings, con sesión): Meshtastic 433/868, iGate RAK, APRS, TAK (credenciales) y Monitorización |
 | `bricohams-mesh-owrx` | Integra Meshtastic en la web de OpenWebRX+ (solo información de nodos y registro APRS, sin configuración) |
+| `bricohams-mesh-puente` | bricohams-mesh-puente · BricoHams SDR (v5.1, manual 35 §9, ADR-66) |
 | `bricohams-mesh-url` | Genera/lee las URL de canales Meshtastic compartidas entre los nodos 433 y 868 |
 | `bricohams-meteo.py` | bricohams-meteo · BricoHams |
 | `bricohams-mqtt-settings.py` | v4.2 · Tras importar un perfil (install.sh --importar), activa en settings.json el informe |
 | `bricohams-owrx-bookmarks-io` | Parche de OpenWebRX+: importar/exportar bookmarks en /settings/bookmarks |
 | `bricohams-owrx-botones` | Parche de OpenWebRX+: botones TAK y Monitorización en /settings (nunca en la página pública) |
 | `bricohams-owrx-ctcss` | Parche de OpenWebRX+: subtono CTCSS (FM) en bookmarks y silenciador por tono |
+| `bricohams-owrx-mapflights` | Fichero bricohams owrx mapflights |
 | `bricohams-owrx-rbimport` | Parche de OpenWebRX+: importar repetidores de RepeaterBook por región a bookmarks (con subtono) |
 | `bricohams-owrx-repeaterbook` | Parche de OpenWebRX+: campo de clave API de RepeaterBook en /settings/general |
+| `bricohams-oyentes` | Fichero bricohams oyentes |
 | `bricohams-rak-aprs` | Puente del iGate RAK4631 (USB serie) hacia APRS-IS y el registro mostrado en la web |
 | `bricohams-rbfeeder-ini.py` | BricoHams: deja /etc/rbfeeder.ini leyendo la salida Beast de readsb |
 | `bricohams-render-settings.py` | bricohams-render-settings · BricoHams |
 | `bricohams-satpass.py` | bricohams-satpass · BricoHams (v4) |
+| `bricohams-satrec.py` | bricohams-satrec · BricoHams (v5.0) |
 | `bricohams-sdr-serials` | bricohams-sdr-serials · BricoHams |
 | `bricohams-servicios` | Lista y controla los servicios BricoHams (estado, arranque, logs) |
 | `bricohams-tarea` | bricohams-tarea · BricoHams (v4) |
 | `bricohams-telegram` | bricohams-telegram "texto" · manda un aviso al grupo/canal de Telegram de la estación. |
 | `bricohams-visitas.py` | bricohams-visitas · BricoHams (v4) |
+| `bricohams-wspr.py` | bricohams-wspr · BricoHams (v5.0) |
+| `bricohams-wx-red.py` | bricohams-wx-red · BricoHams (v5.0) |
 | `bricohams-wx.py` | bricohams-wx · BricoHams |
 | `bricohams_locator.py` | Locator Maidenhead ⇄ coordenadas (v4.3). |
 | `bricohams_locator_bookmarks.py` | Select nearby radio sites from a curated JSON catalog for an OpenWebRX+ QTH. |
 | `bricohams_locator_online.py` | v4.3 · Datos de zona que se bajan EN LA PI al instalar (cambian a menudo, no van en el kit) |
 | `bricohams_mqtt.py` | BricoHams v4.5 · publicador MQTT 3.1.1 mínimo (QoS 0, sin dependencias) para el broker local. |
+| `bricohams_telegram.py` | bricohams_telegram · BricoHams (v5.0) |
 
 ### `files/branding/`
 
@@ -441,6 +586,12 @@ Paneles de Grafana aprovisionados por install.sh.
 | `connect_notify.png` | Imagen / vista renderizada: connect notify |
 | `README.md` | Preview |
 
+### `files/htdocs/plugins/receiver/consentimiento/`
+
+| Fichero | Qué hace |
+|---|---|
+| `consentimiento.js` | consentimiento: aviso de cookies y de contenido de terceros para OpenWebRX+ (BricoHams) |
+
 ### `files/htdocs/plugins/receiver/doppler/`
 
 | Fichero | Qué hace |
@@ -463,6 +614,12 @@ Paneles de Grafana aprovisionados por install.sh.
 | Fichero | Qué hace |
 |---|---|
 | `dvficha.js` | dvficha: ficha del operador en voz digital (DMR, YSF, NXDN, D-Star) para OpenWebRX+ |
+
+### `files/htdocs/plugins/receiver/ea5hkx_puente/`
+
+| Fichero | Qué hace |
+|---|---|
+| `ea5hkx_puente.js` | Puente entre BricoHams y los plugins de EA5HKX (gitlab.com/openwebrx-plugins). |
 
 ### `files/htdocs/plugins/receiver/example/`
 
@@ -508,6 +665,18 @@ Paneles de Grafana aprovisionados por install.sh.
 | `frequency_far_jump.js` | Plugin: Jump to a frequency outside the boundaries of the selected profile by typing it in the receiver's frequency dial. |
 | `README.md` | Load |
 
+### `files/htdocs/plugins/receiver/identificacion/`
+
+| Fichero | Qué hace |
+|---|---|
+| `identificacion.js` | Registro voluntario de oyentes: guarda indicativo/nombre solo tras consentimiento. |
+
+### `files/htdocs/plugins/receiver/idioma/`
+
+| Fichero | Qué hace |
+|---|---|
+| `idioma.js` | idioma: botón ES/EN para la interfaz de OpenWebRX+ (BricoHams) |
+
 ### `files/htdocs/plugins/receiver/keyboard_shortcuts/`
 
 | Fichero | Qué hace |
@@ -530,6 +699,13 @@ Paneles de Grafana aprovisionados por install.sh.
 | Fichero | Qué hace |
 |---|---|
 | `README.md` | Enable |
+
+### `files/htdocs/plugins/receiver/marca/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bricohams-logo.png` | Imagen / vista renderizada: bricohams logo |
+| `marca.js` | marca: logo de BricoHams en la cabecera de OpenWebRX+ |
 
 ### `files/htdocs/plugins/receiver/meteo/`
 
@@ -779,7 +955,9 @@ Portal estático /bricohams/ y página de privacidad.
 
 | Fichero | Qué hace |
 |---|---|
+| `clima.html` | v5.0 · Clima en red: estaciones WX por APRS, balizas WSPR, pases grabados e informe AMSAT |
 | `index.html.tmpl` | Plantilla de la portada web de la estación rellenada desde bricohams.env |
+| `politicas.html` | Página HTML: politicas |
 | `privacidad.html` | Página HTML: privacidad |
 
 ### `firmware/pico-io/`
@@ -823,6 +1001,7 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 | `bricohams-rak4631-lora-aprs.uf2` | Firmware iGate precompilado (UF2, arrastrar a la unidad del bootloader) |
 | `bricohams-rak4631-lora-aprs.zip` | Paquete DFU del firmware iGate (adafruit-nrfutil por USB serie, el que usa el instalador) |
 | `SHA256SUMS` | Sumas SHA-256 de los binarios del firmware iGate |
+| `VERSION.json` | Datos JSON: VERSION |
 
 ### `firmware/rak4631-lora-aprs/test/`
 
@@ -835,6 +1014,901 @@ Firmware iGate LoRa APRS (solo RX) para RAK4631 y placas compatibles (PlatformIO
 | Fichero | Qué hace |
 |---|---|
 | `Arduino.h` | Arduino.h mínimo para compilar en el PC la lógica del firmware (KISS, digipeater, APRS) |
+
+### `firmware-compilado/`
+
+| Fichero | Qué hace |
+|---|---|
+| `build_all.py` | Compila en lote firmware LoRa APRS iGate (CA2RXU) y Meshtastic con PlatformIO. |
+
+### `firmware-compilado/igate/`
+
+| Fichero | Qué hace |
+|---|---|
+| `build_report.json` | Datos JSON: build report |
+| `SHA256SUMS` | Fichero SHA256SUMS |
+
+### `firmware-compilado/igate/ESP32C3_DIY_1W_LoRa_915_E22_900M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32C3_DIY_1W_LoRa_915_E22_900M30S.factory.bin` | Fichero ESP32C3 DIY 1W LoRa 915 E22 900M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32C3_DIY_1W_LoRa_E22_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32C3_DIY_1W_LoRa_E22_400M30S.factory.bin` | Fichero ESP32C3 DIY 1W LoRa E22 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32C3_OctopusLab_LoRa/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32C3_OctopusLab_LoRa.factory.bin` | Fichero ESP32C3 OctopusLab LoRa.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32C3_SuperMini_DIY_LoRa_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32C3_SuperMini_DIY_LoRa_SX1278.factory.bin` | Fichero ESP32C3 SuperMini DIY LoRa SX1278.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_9M2IBR_1W_LoRa_GPS_E22_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_9M2IBR_1W_LoRa_GPS_E22_400M30S.factory.bin` | Fichero ESP32 9M2IBR 1W LoRa GPS E22 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_1W_LoRa_915_E22_900M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_1W_LoRa_915_E22_900M30S.factory.bin` | Fichero ESP32 DIY 1W LoRa 915 E22 900M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_1W_LoRa_E220_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_1W_LoRa_E220_400M30S.factory.bin` | Fichero ESP32 DIY 1W LoRa E220 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_1W_LoRa_E22_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_1W_LoRa_E22_400M30S.factory.bin` | Fichero ESP32 DIY 1W LoRa E22 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_1W_LoRa_E32_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_1W_LoRa_E32_400M30S.factory.bin` | Fichero ESP32 DIY 1W LoRa E32 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_1W_LoRa_Mesh_V1_2_E22_400M30S/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_1W_LoRa_Mesh_V1_2_E22_400M30S.factory.bin` | Fichero ESP32 DIY 1W LoRa Mesh V1 2 E22 400M30S.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_LoRa_915_SX1276/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_LoRa_915_SX1276.factory.bin` | Fichero ESP32 DIY LoRa 915 SX1276.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_LoRa_A7670_915_SX1276/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_LoRa_A7670_915_SX1276.factory.bin` | Fichero ESP32 DIY LoRa A7670 915 SX1276.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_LoRa_A7670_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_LoRa_A7670_SX1278.factory.bin` | Fichero ESP32 DIY LoRa A7670 SX1278.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ESP32_DIY_LoRa_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `ESP32_DIY_LoRa_SX1278.factory.bin` | Fichero ESP32 DIY LoRa SX1278.factory |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/LoRaHAM_V2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `LoRaHAM_V2.factory.bin` | Fichero LoRaHAM V2.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/OE5HWN_MeshCom/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `OE5HWN_MeshCom.factory.bin` | Fichero OE5HWN MeshCom.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/QRPLabs_LightGateway_1_0/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `QRPLabs_LightGateway_1_0.factory.bin` | Fichero QRPLabs LightGateway 1 0.factory |
+
+### `firmware-compilado/igate/QRPLabs_LightGateway_Plus_1_0/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `QRPLabs_LightGateway_Plus_1_0.factory.bin` | Fichero QRPLabs LightGateway Plus 1 0.factory |
+
+### `firmware-compilado/igate/RAK3112/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `RAK3112.factory.bin` | Fichero RAK3112.factory |
+
+### `firmware-compilado/igate/RAK3312/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `RAK3312.factory.bin` | Fichero RAK3312.factory |
+
+### `firmware-compilado/igate/RPC_LORA_DIGIGATE_1W/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `RPC_LORA_DIGIGATE_1W.factory.bin` | Fichero RPC LORA DIGIGATE 1W.factory |
+
+### `firmware-compilado/igate/TROY_LoRa_APRS/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `TROY_LoRa_APRS.factory.bin` | Fichero TROY LoRa APRS.factory |
+
+### `firmware-compilado/igate/WEMOS_D1_R32_DIY_LoRa_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `WEMOS_D1_R32_DIY_LoRa_SX1278.factory.bin` | Fichero WEMOS D1 R32 DIY LoRa SX1278.factory |
+
+### `firmware-compilado/igate/WEMOS_LOLIN32_OLED_DIY_LoRa_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `WEMOS_LOLIN32_OLED_DIY_LoRa_SX1278.factory.bin` | Fichero WEMOS LOLIN32 OLED DIY LoRa SX1278.factory |
+
+### `firmware-compilado/igate/WEMOS_S2_MINI_DIY_LoRa_SX1278/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `WEMOS_S2_MINI_DIY_LoRa_SX1278.factory.bin` | Fichero WEMOS S2 MINI DIY LoRa SX1278.factory |
+
+### `firmware-compilado/igate/XIAO_ESP32S3_WIO_SX1262/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `XIAO_ESP32S3_WIO_SX1262.factory.bin` | Fichero XIAO ESP32S3 WIO SX1262.factory |
+
+### `firmware-compilado/igate/_logs/`
+
+| Fichero | Qué hace |
+|---|---|
+| `ESP32_9M2IBR_1W_LoRa_GPS_E22_400M30S.log` | Fichero ESP32 9M2IBR 1W LoRa GPS E22 400M30S |
+| `ESP32_DIY_1W_LoRa_915_E22_900M30S.log` | Fichero ESP32 DIY 1W LoRa 915 E22 900M30S |
+| `ESP32_DIY_1W_LoRa_E220_400M30S.log` | Fichero ESP32 DIY 1W LoRa E220 400M30S |
+| `ESP32_DIY_1W_LoRa_E22_400M30S.log` | Fichero ESP32 DIY 1W LoRa E22 400M30S |
+| `ESP32_DIY_1W_LoRa_E32_400M30S.log` | Fichero ESP32 DIY 1W LoRa E32 400M30S |
+| `ESP32_DIY_1W_LoRa_Mesh_V1_2_E22_400M30S.log` | Fichero ESP32 DIY 1W LoRa Mesh V1 2 E22 400M30S |
+| `ESP32_DIY_LoRa_915_SX1276.log` | Fichero ESP32 DIY LoRa 915 SX1276 |
+| `ESP32_DIY_LoRa_A7670_915_SX1276.log` | Fichero ESP32 DIY LoRa A7670 915 SX1276 |
+| `ESP32_DIY_LoRa_A7670_SX1278.log` | Fichero ESP32 DIY LoRa A7670 SX1278 |
+| `ESP32_DIY_LoRa_SX1278.log` | Fichero ESP32 DIY LoRa SX1278 |
+| `ESP32C3_DIY_1W_LoRa_915_E22_900M30S.log` | Fichero ESP32C3 DIY 1W LoRa 915 E22 900M30S |
+| `ESP32C3_DIY_1W_LoRa_E22_400M30S.log` | Fichero ESP32C3 DIY 1W LoRa E22 400M30S |
+| `ESP32C3_OctopusLab_LoRa.log` | Fichero ESP32C3 OctopusLab LoRa |
+| `ESP32C3_SuperMini_DIY_LoRa_SX1278.log` | Fichero ESP32C3 SuperMini DIY LoRa SX1278 |
+| `heltec-lora32-v2.log` | Fichero heltec lora32 v2 |
+| `heltec-lora32-v2_915.log` | Fichero heltec lora32 v2 915 |
+| `heltec_ht-ct62.log` | Fichero heltec ht ct62 |
+| `heltec_vision_master_e290.log` | Fichero heltec vision master e290 |
+| `heltec_wifi_lora_32_V3.log` | Fichero heltec wifi lora 32 V3 |
+| `heltec_wifi_lora_32_V3_2.log` | Fichero heltec wifi lora 32 V3 2 |
+| `heltec_wifi_lora_32_V4.log` | Fichero heltec wifi lora 32 V4 |
+| `heltec_wireless_bridge.log` | Fichero heltec wireless bridge |
+| `heltec_wireless_paper_v1.log` | Fichero heltec wireless paper v1 |
+| `heltec_wireless_paper_v1_2.log` | Fichero heltec wireless paper v1 2 |
+| `heltec_wireless_stick.log` | Fichero heltec wireless stick |
+| `heltec_wireless_stick_lite_v3.log` | Fichero heltec wireless stick lite v3 |
+| `heltec_wireless_stick_lite_v3_display.log` | Fichero heltec wireless stick lite v3 display |
+| `heltec_wireless_tracker.log` | Fichero heltec wireless tracker |
+| `LoRaHAM_V2.log` | Fichero LoRaHAM V2 |
+| `OE5HWN_MeshCom.log` | Fichero OE5HWN MeshCom |
+| `QRPLabs_LightGateway_1_0.log` | Fichero QRPLabs LightGateway 1 0 |
+| `QRPLabs_LightGateway_Plus_1_0.log` | Fichero QRPLabs LightGateway Plus 1 0 |
+| `RAK3112.log` | Fichero RAK3112 |
+| `RAK3312.log` | Fichero RAK3312 |
+| `RPC_LORA_DIGIGATE_1W.log` | Fichero RPC LORA DIGIGATE 1W |
+| `TROY_LoRa_APRS.log` | Fichero TROY LoRa APRS |
+| `ttgo-lora32-v21.log` | Fichero ttgo lora32 v21 |
+| `ttgo-lora32-v21_915.log` | Fichero ttgo lora32 v21 915 |
+| `ttgo-lora32-v21_915_GPS.log` | Fichero ttgo lora32 v21 915 GPS |
+| `ttgo-lora32-v21_GPS.log` | Fichero ttgo lora32 v21 GPS |
+| `ttgo-t-beam-v1.log` | Fichero ttgo t beam v1 |
+| `ttgo-t-beam-v1_2.log` | Fichero ttgo t beam v1 2 |
+| `ttgo-t-beam-v1_2_915.log` | Fichero ttgo t beam v1 2 915 |
+| `ttgo-t-beam-v1_2_SX1262.log` | Fichero ttgo t beam v1 2 SX1262 |
+| `ttgo-t-beam-v1_915.log` | Fichero ttgo t beam v1 915 |
+| `ttgo-t-beam-v1_SX1262.log` | Fichero ttgo t beam v1 SX1262 |
+| `ttgo-t-beam-v1_SX1268.log` | Fichero ttgo t beam v1 SX1268 |
+| `ttgo_lora32_t3s3_v1_2.log` | Fichero ttgo lora32 t3s3 v1 2 |
+| `ttgo_t_beam_s3_SUPREME_v3.log` | Fichero ttgo t beam s3 SUPREME v3 |
+| `ttgo_t_deck_GPS.log` | Fichero ttgo t deck GPS |
+| `ttgo_t_deck_plus.log` | Fichero ttgo t deck plus |
+| `WEMOS_D1_R32_DIY_LoRa_SX1278.log` | Fichero WEMOS D1 R32 DIY LoRa SX1278 |
+| `WEMOS_LOLIN32_OLED_DIY_LoRa_SX1278.log` | Fichero WEMOS LOLIN32 OLED DIY LoRa SX1278 |
+| `WEMOS_S2_MINI_DIY_LoRa_SX1278.log` | Fichero WEMOS S2 MINI DIY LoRa SX1278 |
+| `XIAO_ESP32S3_WIO_SX1262.log` | Fichero XIAO ESP32S3 WIO SX1262 |
+
+### `firmware-compilado/igate/heltec-lora32-v2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec-lora32-v2.factory.bin` | Fichero heltec lora32 v2.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec-lora32-v2_915/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec-lora32-v2_915.factory.bin` | Fichero heltec lora32 v2 915.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_ht-ct62/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_ht-ct62.factory.bin` | Fichero heltec ht ct62.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_vision_master_e290/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_vision_master_e290.factory.bin` | Fichero heltec vision master e290.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wifi_lora_32_V3/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wifi_lora_32_V3.factory.bin` | Fichero heltec wifi lora 32 V3.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wifi_lora_32_V3_2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wifi_lora_32_V3_2.factory.bin` | Fichero heltec wifi lora 32 V3 2.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wifi_lora_32_V4/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wifi_lora_32_V4.factory.bin` | Fichero heltec wifi lora 32 V4.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_bridge/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_bridge.factory.bin` | Fichero heltec wireless bridge.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_paper_v1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_paper_v1.factory.bin` | Fichero heltec wireless paper v1.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_paper_v1_2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_paper_v1_2.factory.bin` | Fichero heltec wireless paper v1 2.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_stick/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_stick.factory.bin` | Fichero heltec wireless stick.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_stick_lite_v3/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_stick_lite_v3.factory.bin` | Fichero heltec wireless stick lite v3.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_stick_lite_v3_display/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_stick_lite_v3_display.factory.bin` | Fichero heltec wireless stick lite v3 display.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/heltec_wireless_tracker/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `heltec_wireless_tracker.factory.bin` | Fichero heltec wireless tracker.factory |
+| `partitions.bin` | Fichero partitions |
+
+### `firmware-compilado/igate/ttgo-lora32-v21/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-lora32-v21.factory.bin` | Fichero ttgo lora32 v21.factory |
+
+### `firmware-compilado/igate/ttgo-lora32-v21_915/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-lora32-v21_915.factory.bin` | Fichero ttgo lora32 v21 915.factory |
+
+### `firmware-compilado/igate/ttgo-lora32-v21_915_GPS/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-lora32-v21_915_GPS.factory.bin` | Fichero ttgo lora32 v21 915 GPS.factory |
+
+### `firmware-compilado/igate/ttgo-lora32-v21_GPS/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-lora32-v21_GPS.factory.bin` | Fichero ttgo lora32 v21 GPS.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1.factory.bin` | Fichero ttgo t beam v1.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_2.factory.bin` | Fichero ttgo t beam v1 2.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_2_915/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_2_915.factory.bin` | Fichero ttgo t beam v1 2 915.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_2_SX1262/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_2_SX1262.factory.bin` | Fichero ttgo t beam v1 2 SX1262.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_915/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_915.factory.bin` | Fichero ttgo t beam v1 915.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_SX1262/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_SX1262.factory.bin` | Fichero ttgo t beam v1 SX1262.factory |
+
+### `firmware-compilado/igate/ttgo-t-beam-v1_SX1268/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo-t-beam-v1_SX1268.factory.bin` | Fichero ttgo t beam v1 SX1268.factory |
+
+### `firmware-compilado/igate/ttgo_lora32_t3s3_v1_2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo_lora32_t3s3_v1_2.factory.bin` | Fichero ttgo lora32 t3s3 v1 2.factory |
+
+### `firmware-compilado/igate/ttgo_t_beam_s3_SUPREME_v3/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo_t_beam_s3_SUPREME_v3.factory.bin` | Fichero ttgo t beam s3 SUPREME v3.factory |
+
+### `firmware-compilado/igate/ttgo_t_deck_GPS/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo_t_deck_GPS.factory.bin` | Fichero ttgo t deck GPS.factory |
+
+### `firmware-compilado/igate/ttgo_t_deck_plus/`
+
+| Fichero | Qué hace |
+|---|---|
+| `bootloader.bin` | Fichero bootloader |
+| `firmware.bin` | Fichero firmware |
+| `partitions.bin` | Fichero partitions |
+| `ttgo_t_deck_plus.factory.bin` | Fichero ttgo t deck plus.factory |
+
+### `firmware-compilado/meshtastic/`
+
+| Fichero | Qué hace |
+|---|---|
+| `build_report.json` | Datos JSON: build report |
+| `SHA256SUMS` | Fichero SHA256SUMS |
+
+### `firmware-compilado/meshtastic/_logs/`
+
+| Fichero | Qué hace |
+|---|---|
+| `heltec-mesh-node-t096.log` | Fichero heltec mesh node t096 |
+| `heltec-mesh-node-t1.log` | Fichero heltec mesh node t1 |
+| `heltec-mesh-node-t114.log` | Fichero heltec mesh node t114 |
+| `heltec-mesh-pocket-10000-inkhud.log` | Fichero heltec mesh pocket 10000 inkhud |
+| `heltec-mesh-pocket-10000.log` | Fichero heltec mesh pocket 10000 |
+| `heltec-mesh-pocket-5000-inkhud.log` | Fichero heltec mesh pocket 5000 inkhud |
+| `heltec-mesh-pocket-5000.log` | Fichero heltec mesh pocket 5000 |
+| `heltec-mesh-solar-eink.log` | Fichero heltec mesh solar eink |
+| `heltec-mesh-solar-inkhud.log` | Fichero heltec mesh solar inkhud |
+| `heltec-mesh-solar-oled.log` | Fichero heltec mesh solar oled |
+| `heltec-mesh-solar-tft.log` | Fichero heltec mesh solar tft |
+| `heltec-mesh-solar.log` | Fichero heltec mesh solar |
+| `heltec-v1.log` | Fichero heltec v1 |
+| `heltec-v2_0.log` | Fichero heltec v2 0 |
+| `heltec-v2_1.log` | Fichero heltec v2 1 |
+| `seeed_solar_node.log` | Fichero seeed solar node |
+| `seeed_wio_tracker_L1.log` | Fichero seeed wio tracker L1 |
+| `seeed_wio_tracker_L1_eink-inkhud.log` | Fichero seeed wio tracker L1 eink inkhud |
+| `seeed_wio_tracker_L1_eink.log` | Fichero seeed wio tracker L1 eink |
+| `seeed_xiao_nrf52840_btb.log` | Fichero seeed xiao nrf52840 btb |
+| `seeed_xiao_nrf52840_kit.log` | Fichero seeed xiao nrf52840 kit |
+| `seeed_xiao_nrf52840_kit_i2c.log` | Fichero seeed xiao nrf52840 kit i2c |
+| `t-echo-inkhud.log` | Fichero t echo inkhud |
+| `t-echo-lite.log` | Fichero t echo lite |
+| `t-echo-plus.log` | Fichero t echo plus |
+| `t-echo.log` | Fichero t echo |
+| `t-impulse-plus.log` | Fichero t impulse plus |
+| `tbeam.log` | Fichero tbeam |
+| `tbeam0_7.log` | Fichero tbeam0 7 |
+| `tlora-v1.log` | Fichero tlora v1 |
+| `tlora-v2.log` | Fichero tlora v2 |
+| `tlora_v1_3.log` | Fichero tlora v1 3 |
+| `xiao_ble.log` | Fichero xiao ble |
+| `xiao_ble_30db.log` | Fichero xiao ble 30db |
+| `xiao_ble_33db.log` | Fichero xiao ble 33db |
+
+### `firmware-compilado/meshtastic/heltec-mesh-node-t096/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-node-t096-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh node t096 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t096-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh node t096 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t096-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh node t096 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-node-t1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-node-t1-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh node t1 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t1-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh node t1 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t1-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh node t1 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-node-t114/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-node-t114-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh node t114 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t114-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh node t114 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-node-t114-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh node t114 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-pocket-10000/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-pocket-10000-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh pocket 10000 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-10000-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh pocket 10000 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-10000-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh pocket 10000 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-pocket-10000-inkhud/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-pocket-10000-inkhud-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh pocket 10000 inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-10000-inkhud-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh pocket 10000 inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-10000-inkhud-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh pocket 10000 inkhud 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-pocket-5000/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-pocket-5000-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh pocket 5000 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-5000-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh pocket 5000 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-5000-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh pocket 5000 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-pocket-5000-inkhud/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-pocket-5000-inkhud-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh pocket 5000 inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-5000-inkhud-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh pocket 5000 inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-pocket-5000-inkhud-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh pocket 5000 inkhud 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-solar/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-solar-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh solar 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh solar 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh solar 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-solar-eink/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-solar-eink-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh solar eink 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-eink-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh solar eink 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-eink-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh solar eink 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-solar-inkhud/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-solar-inkhud-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh solar inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-inkhud-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh solar inkhud 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-inkhud-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh solar inkhud 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-solar-oled/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-solar-oled-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh solar oled 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-oled-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh solar oled 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-oled-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh solar oled 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-mesh-solar-tft/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-mesh-solar-tft-2.7.26.54e0d8d.hex` | Fichero firmware heltec mesh solar tft 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-tft-2.7.26.54e0d8d.uf2` | Fichero firmware heltec mesh solar tft 2.7.26.54e0d8d |
+| `firmware-heltec-mesh-solar-tft-2.7.26.54e0d8d.zip` | Fichero firmware heltec mesh solar tft 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-v1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-v1-2.7.26.54e0d8d.bin` | Fichero firmware heltec v1 2.7.26.54e0d8d |
+| `firmware-heltec-v1-2.7.26.54e0d8d.factory.bin` | Fichero firmware heltec v1 2.7.26.54e0d8d.factory |
+| `littlefs-heltec-v1-2.7.26.54e0d8d.bin` | Fichero littlefs heltec v1 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-v2_0/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-v2_0-2.7.26.54e0d8d.bin` | Fichero firmware heltec v2 0 2.7.26.54e0d8d |
+| `firmware-heltec-v2_0-2.7.26.54e0d8d.factory.bin` | Fichero firmware heltec v2 0 2.7.26.54e0d8d.factory |
+| `littlefs-heltec-v2_0-2.7.26.54e0d8d.bin` | Fichero littlefs heltec v2 0 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/heltec-v2_1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-heltec-v2_1-2.7.26.54e0d8d.bin` | Fichero firmware heltec v2 1 2.7.26.54e0d8d |
+| `firmware-heltec-v2_1-2.7.26.54e0d8d.factory.bin` | Fichero firmware heltec v2 1 2.7.26.54e0d8d.factory |
+| `littlefs-heltec-v2_1-2.7.26.54e0d8d.bin` | Fichero littlefs heltec v2 1 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_solar_node/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_solar_node-2.7.26.54e0d8d.hex` | Fichero firmware seeed solar node 2.7.26.54e0d8d |
+| `firmware-seeed_solar_node-2.7.26.54e0d8d.uf2` | Fichero firmware seeed solar node 2.7.26.54e0d8d |
+| `firmware-seeed_solar_node-2.7.26.54e0d8d.zip` | Fichero firmware seeed solar node 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_wio_tracker_L1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_wio_tracker_L1-2.7.26.54e0d8d.hex` | Fichero firmware seeed wio tracker L1 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1-2.7.26.54e0d8d.uf2` | Fichero firmware seeed wio tracker L1 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1-2.7.26.54e0d8d.zip` | Fichero firmware seeed wio tracker L1 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_wio_tracker_L1_eink/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_wio_tracker_L1_eink-2.7.26.54e0d8d.hex` | Fichero firmware seeed wio tracker L1 eink 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1_eink-2.7.26.54e0d8d.uf2` | Fichero firmware seeed wio tracker L1 eink 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1_eink-2.7.26.54e0d8d.zip` | Fichero firmware seeed wio tracker L1 eink 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_wio_tracker_L1_eink-inkhud/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_wio_tracker_L1_eink-inkhud-2.7.26.54e0d8d.hex` | Fichero firmware seeed wio tracker L1 eink inkhud 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1_eink-inkhud-2.7.26.54e0d8d.uf2` | Fichero firmware seeed wio tracker L1 eink inkhud 2.7.26.54e0d8d |
+| `firmware-seeed_wio_tracker_L1_eink-inkhud-2.7.26.54e0d8d.zip` | Fichero firmware seeed wio tracker L1 eink inkhud 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_xiao_nrf52840_btb/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_xiao_nrf52840_btb-2.7.26.54e0d8d.hex` | Fichero firmware seeed xiao nrf52840 btb 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_btb-2.7.26.54e0d8d.uf2` | Fichero firmware seeed xiao nrf52840 btb 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_btb-2.7.26.54e0d8d.zip` | Fichero firmware seeed xiao nrf52840 btb 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_xiao_nrf52840_kit/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_xiao_nrf52840_kit-2.7.26.54e0d8d.hex` | Fichero firmware seeed xiao nrf52840 kit 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_kit-2.7.26.54e0d8d.uf2` | Fichero firmware seeed xiao nrf52840 kit 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_kit-2.7.26.54e0d8d.zip` | Fichero firmware seeed xiao nrf52840 kit 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/seeed_xiao_nrf52840_kit_i2c/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-seeed_xiao_nrf52840_kit_i2c-2.7.26.54e0d8d.hex` | Fichero firmware seeed xiao nrf52840 kit i2c 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_kit_i2c-2.7.26.54e0d8d.uf2` | Fichero firmware seeed xiao nrf52840 kit i2c 2.7.26.54e0d8d |
+| `firmware-seeed_xiao_nrf52840_kit_i2c-2.7.26.54e0d8d.zip` | Fichero firmware seeed xiao nrf52840 kit i2c 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/t-echo/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-t-echo-2.7.26.54e0d8d.hex` | Fichero firmware t echo 2.7.26.54e0d8d |
+| `firmware-t-echo-2.7.26.54e0d8d.uf2` | Fichero firmware t echo 2.7.26.54e0d8d |
+| `firmware-t-echo-2.7.26.54e0d8d.zip` | Fichero firmware t echo 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/t-echo-inkhud/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-t-echo-inkhud-2.7.26.54e0d8d.hex` | Fichero firmware t echo inkhud 2.7.26.54e0d8d |
+| `firmware-t-echo-inkhud-2.7.26.54e0d8d.uf2` | Fichero firmware t echo inkhud 2.7.26.54e0d8d |
+| `firmware-t-echo-inkhud-2.7.26.54e0d8d.zip` | Fichero firmware t echo inkhud 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/t-echo-lite/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-t-echo-lite-2.7.26.54e0d8d.hex` | Fichero firmware t echo lite 2.7.26.54e0d8d |
+| `firmware-t-echo-lite-2.7.26.54e0d8d.uf2` | Fichero firmware t echo lite 2.7.26.54e0d8d |
+| `firmware-t-echo-lite-2.7.26.54e0d8d.zip` | Fichero firmware t echo lite 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/t-echo-plus/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-t-echo-plus-2.7.26.54e0d8d.hex` | Fichero firmware t echo plus 2.7.26.54e0d8d |
+| `firmware-t-echo-plus-2.7.26.54e0d8d.uf2` | Fichero firmware t echo plus 2.7.26.54e0d8d |
+| `firmware-t-echo-plus-2.7.26.54e0d8d.zip` | Fichero firmware t echo plus 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/t-impulse-plus/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-t-impulse-plus-2.7.26.54e0d8d.hex` | Fichero firmware t impulse plus 2.7.26.54e0d8d |
+| `firmware-t-impulse-plus-2.7.26.54e0d8d.uf2` | Fichero firmware t impulse plus 2.7.26.54e0d8d |
+| `firmware-t-impulse-plus-2.7.26.54e0d8d.zip` | Fichero firmware t impulse plus 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/tbeam/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-tbeam-2.7.26.54e0d8d.bin` | Fichero firmware tbeam 2.7.26.54e0d8d |
+| `firmware-tbeam-2.7.26.54e0d8d.factory.bin` | Fichero firmware tbeam 2.7.26.54e0d8d.factory |
+| `littlefs-tbeam-2.7.26.54e0d8d.bin` | Fichero littlefs tbeam 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/tbeam0_7/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-tbeam0_7-2.7.26.54e0d8d.bin` | Fichero firmware tbeam0 7 2.7.26.54e0d8d |
+| `firmware-tbeam0_7-2.7.26.54e0d8d.factory.bin` | Fichero firmware tbeam0 7 2.7.26.54e0d8d.factory |
+| `littlefs-tbeam0_7-2.7.26.54e0d8d.bin` | Fichero littlefs tbeam0 7 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/tlora-v1/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-tlora-v1-2.7.26.54e0d8d.bin` | Fichero firmware tlora v1 2.7.26.54e0d8d |
+| `firmware-tlora-v1-2.7.26.54e0d8d.factory.bin` | Fichero firmware tlora v1 2.7.26.54e0d8d.factory |
+| `littlefs-tlora-v1-2.7.26.54e0d8d.bin` | Fichero littlefs tlora v1 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/tlora-v2/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-tlora-v2-2.7.26.54e0d8d.bin` | Fichero firmware tlora v2 2.7.26.54e0d8d |
+| `firmware-tlora-v2-2.7.26.54e0d8d.factory.bin` | Fichero firmware tlora v2 2.7.26.54e0d8d.factory |
+| `littlefs-tlora-v2-2.7.26.54e0d8d.bin` | Fichero littlefs tlora v2 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/tlora_v1_3/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-tlora_v1_3-2.7.26.54e0d8d.bin` | Fichero firmware tlora v1 3 2.7.26.54e0d8d |
+| `firmware-tlora_v1_3-2.7.26.54e0d8d.factory.bin` | Fichero firmware tlora v1 3 2.7.26.54e0d8d.factory |
+| `littlefs-tlora_v1_3-2.7.26.54e0d8d.bin` | Fichero littlefs tlora v1 3 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/xiao_ble/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-xiao_ble-2.7.26.54e0d8d.hex` | Fichero firmware xiao ble 2.7.26.54e0d8d |
+| `firmware-xiao_ble-2.7.26.54e0d8d.uf2` | Fichero firmware xiao ble 2.7.26.54e0d8d |
+| `firmware-xiao_ble-2.7.26.54e0d8d.zip` | Fichero firmware xiao ble 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/xiao_ble_30db/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-xiao_ble_30db-2.7.26.54e0d8d.hex` | Fichero firmware xiao ble 30db 2.7.26.54e0d8d |
+| `firmware-xiao_ble_30db-2.7.26.54e0d8d.uf2` | Fichero firmware xiao ble 30db 2.7.26.54e0d8d |
+| `firmware-xiao_ble_30db-2.7.26.54e0d8d.zip` | Fichero firmware xiao ble 30db 2.7.26.54e0d8d |
+
+### `firmware-compilado/meshtastic/xiao_ble_33db/`
+
+| Fichero | Qué hace |
+|---|---|
+| `firmware-xiao_ble_33db-2.7.26.54e0d8d.hex` | Fichero firmware xiao ble 33db 2.7.26.54e0d8d |
+| `firmware-xiao_ble_33db-2.7.26.54e0d8d.uf2` | Fichero firmware xiao ble 33db 2.7.26.54e0d8d |
+| `firmware-xiao_ble_33db-2.7.26.54e0d8d.zip` | Fichero firmware xiao ble 33db 2.7.26.54e0d8d |
 
 ### `hardware/anclajes/`
 
@@ -1002,23 +2076,28 @@ Caja v3 en dos módulos (electrónica + potencia).
 
 | Fichero | Qué hace |
 |---|---|
+| `electronica_bandeja_sdr.png` | Imagen / vista renderizada: electronica bandeja sdr |
 | `electronica_inferior.png` | Imagen / vista renderizada: electronica inferior |
 | `electronica_interior.png` | Imagen / vista renderizada: electronica interior |
 | `electronica_montaje.png` | Imagen / vista renderizada: electronica montaje |
 | `potencia_interior.png` | Imagen / vista renderizada: potencia interior |
 | `potencia_montaje.png` | Imagen / vista renderizada: potencia montaje |
+| `sai_interior.png` | Imagen / vista renderizada: sai interior |
+| `sai_montaje.png` | Imagen / vista renderizada: sai montaje |
 
 ### `hardware/caja_v3/stl/`
 
 | Fichero | Qué hace |
 |---|---|
 | `electronica_bandeja.stl` | Pieza 3D lista para imprimir: electronica bandeja |
+| `electronica_bandeja_sdr.stl` | Pieza 3D lista para imprimir: electronica bandeja sdr |
 | `electronica_capota.stl` | Pieza 3D lista para imprimir: electronica capota |
 | `electronica_cuerpo.stl` | Pieza 3D lista para imprimir: electronica cuerpo |
 | `electronica_junta_tapa.stl` | Pieza 3D lista para imprimir: electronica junta tapa |
 | `electronica_placa_rejilla.stl` | Pieza 3D lista para imprimir: electronica placa rejilla |
 | `electronica_pletina_pared.stl` | Pieza 3D lista para imprimir: electronica pletina pared |
 | `electronica_poste_bandeja.stl` | Pieza 3D lista para imprimir: electronica poste bandeja |
+| `electronica_poste_superior.stl` | Pieza 3D lista para imprimir: electronica poste superior |
 | `electronica_rejilla_ventilador.stl` | Pieza 3D lista para imprimir: electronica rejilla ventilador |
 | `electronica_soporte_camara.stl` | Pieza 3D lista para imprimir: electronica soporte camara |
 | `electronica_soporte_dongle.stl` | Pieza 3D lista para imprimir: electronica soporte dongle |
@@ -1042,6 +2121,25 @@ Caja v3 en dos módulos (electrónica + potencia).
 | `potencia_tapa.stl` | Pieza 3D lista para imprimir: potencia tapa |
 | `potencia_tapon_pg.stl` | Pieza 3D lista para imprimir: potencia tapon pg |
 | `potencia_tejadillo.stl` | Pieza 3D lista para imprimir: potencia tejadillo |
+| `sai_cuerpo.stl` | Pieza 3D lista para imprimir: sai cuerpo |
+| `sai_guia_pcb.stl` | Pieza 3D lista para imprimir: sai guia pcb |
+| `sai_junta_tapa.stl` | Pieza 3D lista para imprimir: sai junta tapa |
+| `sai_placa_rejilla.stl` | Pieza 3D lista para imprimir: sai placa rejilla |
+| `sai_pletina_pared.stl` | Pieza 3D lista para imprimir: sai pletina pared |
+| `sai_pletina_trafo.stl` | Pieza 3D lista para imprimir: sai pletina trafo |
+| `sai_soporte_bateria.stl` | Pieza 3D lista para imprimir: sai soporte bateria |
+| `sai_soporte_filtro.stl` | Pieza 3D lista para imprimir: sai soporte filtro |
+| `sai_soporte_mastil.stl` | Pieza 3D lista para imprimir: sai soporte mastil |
+| `sai_soporte_wago.stl` | Pieza 3D lista para imprimir: sai soporte wago |
+| `sai_tapa.stl` | Pieza 3D lista para imprimir: sai tapa |
+| `sai_tapon_pg.stl` | Pieza 3D lista para imprimir: sai tapon pg |
+| `sai_tejadillo.stl` | Pieza 3D lista para imprimir: sai tejadillo |
+
+### `hardware/gcode/`
+
+| Fichero | Qué hace |
+|---|---|
+| `1004-1742-electronica_tapa_plate(01)_PETG_0.16_8h42m34s.gcode` | HEADER_BLOCK_START |
 
 ### `owrx-clone/`
 
@@ -1066,26 +2164,34 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `run_tests.sh` | Lanza todas las pruebas: shellcheck, sintaxis y tests de Python |
 | `test_actualizar.py` | v4.1 · install.sh --actualizar. |
 | `test_anclajes.py` | v4: anclajes impresos. Cada pieza de tools/anclajes.sh tiene selector en el |
+| `test_anonimato.py` | Rama genérica: ningún fichero puede llevar datos de la estación original. |
 | `test_api.py` | v4: bricohams-api (ficha de indicativos) con HamQTH, RadioID y QRZ simulados. |
 | `test_audio_navegador.py` | v4.2 · Plugins de audio en un navegador DE VERDAD (Chromium sin pantalla, Playwright). |
 | `test_audio_plugins.py` | v4.2 · Plugins de audio (audio_cadena, filtro_audio, dsp_audio) con node |
 | `test_avion.py` | v5.1: ficha de avión (/bricohams/api/avion) con adsbdb y planespotters simulados. |
+| `test_backup_limpieza.sh` | Fichero test backup limpieza |
 | `test_blindaje.py` | v4.4 · bricohams-blindaje sobre un sistema de mentira (BH_RAIZ): el cortafuegos que genera |
 | `test_bloqueo_helper.py` | v5.1 · bricohams-bloqueo (root) y bricohams-login-aviso (Telegram). |
 | `test_bloqueo_web.py` | v5.1 · Ajustes > Seguridad: bloqueo por IP/país, panel del cortafuegos y alta/baja de usuarios. |
 | `test_bookmarks_io.py` | v5.0 · bricohams-owrx-bookmarks-io: botones Importar/Exportar en /settings/bookmarks (solo |
 | `test_caja.py` | Comprueba la caja: que están todas las piezas, que caben en la Kobra S1 |
 | `test_chat_moderador.py` | v5.1: moderador del chat de bricohams-visitas. Reglas (inyección, enlaces, |
+| `test_chat_registro.py` | v5.0 · Registro obligatorio para el chat (plugin «identificacion»). |
+| `test_clima_web.py` | v5.0 · «Clima en red»: instalador, unidades systemd, página del portal y formulario AMSAT encajan entre sí. |
 | `test_ctcss_patch.py` | v5.0 · bricohams-owrx-ctcss: subtono CTCSS («Subtono FM») en bookmarks y squelch CTCSS. |
 | `test_env_red.py` | v4.2 · Los dos fallos de la instalación real en la Pi de N0CALL |
 | `test_fan.py` | Curva de los ventiladores de la caja (bricohams-fan). |
 | `test_ft2.py` | v4 (experimental): FT2 en OpenWebRX+. |
+| `test_fuentes.py` | v5.0 · «¿Quieres una estación como esta?»: enlace a las fuentes del kit (FUENTES_URL) en el |
+| `test_git_sanear.py` | v5.1 · tools/git_sanear.sh y tools/datos_personales.py (manual 38). |
 | `test_instalador_docker.py` | Verifica backend Docker de OpenWebRX+ sin requerir un daemon Docker. |
 | `test_instalador_os.py` | v3.1: el instalador vale para Trixie (Debian 13) y Bookworm (Debian 12). |
 | `test_instalador_perfil.py` | v4.2 · owrx-clone dentro del instalador BricoHams |
 | `test_live_map.py` | ADS-B reciente, APRS-IS y mensajes de chat sin transmitir por RF. |
 | `test_locator_bookmarks.py` | Locator conversion and geographic bookmark selection from a curated catalog. |
 | `test_locator_es.py` | v4.3 · Marcadores y meteo de zona para CUALQUIER locator de España (manual 32) |
+| `test_mapflights.py` | v5.1: map.flights como destino adicional a RadarBox (conector Beast + MLAT con el UUID). |
+| `test_mapflights_api.py` | Ficha de mapa desde map.flights y selector en General Settings. |
 | `test_mesh_admin.py` | v4.5 · bricohams-mesh-admin: el panel Meshtastic 433/868 solo existe dentro de /settings |
 | `test_mesh_owrx.py` | v4.5 · integración directa con OpenWebRX+ por su MQTT: el publicador MQTT mínimo contra un broker de |
 | `test_meteo.py` | bricohams-meteo con respuestas simuladas de AEMET (una estación con 404) y Open-Meteo. |
@@ -1093,18 +2199,28 @@ Pruebas automáticas (bash tests/run_tests.sh).
 | `test_owrx_clone.py` | v4.2 · owrx-clone: exportar una estación OpenWebRX+ de mentira (un árbol de ficheros con su |
 | `test_owrx_clone_docker.py` | v4.3 · owrx-clone 1.1 con OpenWebRX+ en Docker, sin Docker de verdad: una orden «docker» de |
 | `test_pico_io.py` | v4: puente USB con la Pico «bricohams-io». |
+| `test_plugins_ea5hkx.py` | v5.1 · Plugins de EA5HKX (gitlab.com/openwebrx-plugins): callsign_gate y tone_detector. |
+| `test_politicas_mapa_local.py` | v5.0 · Políticas y cookies, idioma ES/EN, logo BricoHams en todas las páginas y mapa con |
 | `test_rak_aprs.py` | v4.5 · RAK4631 LoRa APRS: la lógica del firmware compilada en el PC (KISS, digipeater, baliza, |
 | `test_rbimport.py` | v5.0 · bricohams-owrx-rbimport: importador de repetidores de RepeaterBook. |
+| `test_registro_oyentes.py` | Pruebas de registro voluntario, privacidad, límites y endpoint HTTP. |
 | `test_render_settings.py` | Rellena settings.json.tmpl con bricohams.env.example y comprueba receptores, |
 | `test_repeaterbook.py` | v5.0 · bricohams-owrx-repeaterbook: campo «RepeaterBook API key» en /settings/general (solo |
 | `test_satpass.py` | v4: pases de satélites (bricohams-satpass) comparados con Skyfield cuando está |
+| `test_satrec.py` | v5.0: bricohams-satrec (grabación automática de pases) con un OpenWebRX+ websocket falso. |
 | `test_ssl_admin.py` | v4.2 · SSL_MODO (decisión de N0CALL: «el certificado SSL es solo para la página de settings»). |
+| `test_systemd_unidades.py` | Unidades systemd que escribe install.sh: sin ciclos de orden. |
+| `test_telegram_avisos.py` | v5.0 · avisos a Telegram: módulo común (ritmo, repetidos, HTML escapado, token oculto), |
 | `test_v3_hardware.py` | v3: comprueba las piezas de antenas y de la caja v3 (selector en el .scad, |
 | `test_v45_dispositivos.py` | v4.5 · inventario de dispositivos con un /sys de mentira (SDR por su serie, RAK4631, LilyGO, lo que falta |
+| `test_v51_aprs_web.py` | v5.1 · Interfaz web del APRS: la pasarela del RAK (bricohams-rak-aprs) con su API local |
+| `test_v51_mesh_puente.py` | v5.1 · bricohams-mesh-puente: interfaz web de Meshtastic para el LilyGO 433 por USB. |
 | `test_viento_lluvia.py` | Viento RS485 (Modbus RTU), pluviómetro y paquete APRS WX completo. |
 | `test_visitas.py` | v4: bricohams-visitas. IP parcial, GeoIP (simulada), avisos de Telegram con |
+| `test_wspr.py` | v5.0: bricohams-wspr (escuchas WSPR reportadas, vía wspr.live) con un servidor HTTP falso. |
 | `test_wx_bme280.py` | Compensación BME280/BMP280 contra el ejemplo de la hoja de datos de Bosch |
 | `test_wx_rak.py` | v5: la estación meteo toma T/HR/P y la posición del RAK4631 (rak-aprs.json). |
+| `test_wx_red.py` | v5.0: bricohams-wx-red (tiempo de otras estaciones por APRS-IS) con un servidor APRS-IS falso. |
 
 ### `tests/datos/`
 
@@ -1150,16 +2266,21 @@ Generadores y herramientas de desarrollo (esquemas, datos, STL, TAK, compilació
 | `antenas.sh` | Exporta las piezas impresas de antenas y soportes, comprueba que caben en |
 | `branding.py` | v4: rehace la imagen superior de OpenWebRX (files/branding/receiver_top_photo.png) |
 | `caja.sh` | Exporta todas las piezas de la caja a STL, comprueba que caben en la |
-| `caja_v3.sh` | Exporta las piezas de la caja v3 (módulos de electrónica y de potencia), |
+| `caja_v3.sh` | Exporta las piezas de la caja v3 (módulos de electrónica, potencia y SAI), |
 | `canales.py` | v4: genera docs/CANALES_Y_FRECUENCIAS.md a partir de data/marcadores_v4.json y de |
 | `compilar_rak.sh` | Compila el firmware iGate para todas las placas (PlatformIO) y deja los binarios |
 | `datos.py` | Genera docs/DATOS.md a partir de los ficheros del repositorio |
+| `datos_personales.py` | tools/datos_personales.py · BricoHams SDR (v5.1, manual 38) |
+| `datos_personales_huellas.txt` | Huellas SHA-256 de datos personales que no deben ir al GitHub público (manual 38). |
 | `esquemas.py` | Genera los esquemas de docs/esquemas/ (SVG, y PNG si hay cairosvg). |
 | `estructura.py` | Genera docs/ESTRUCTURA_FICHEROS.md (este árbol con descripciones) |
+| `generar-guia-visual.cjs` | Fichero generar guia visual |
+| `git_sanear.sh` | tools/git_sanear.sh · BricoHams SDR (v5.1, manual 38) |
 | `instalar_tak.sh` | Instala OpenTAKServer (venv, PostgreSQL, CA, usuarios con clave aleatoria en /etc/bricohams/tak-access.txt) |
 | `locator_catalogo.py` | v4.3 · Construye data/locator/catalogo_es.json, el catálogo nacional que usa el instalador |
 | `marcadores.py` | Genera y fusiona marcadores de OpenWebRX |
 | `mastil.py` | Plan del mástil BricoHams: posición de cada antena, separaciones entre las |
 | `planos_antenas.py` | Planos acotados de las antenas a partir de los resultados NEC2 |
+| `sai_calculo.py` | Cálculos del módulo SAI (manual 17 §1.2): autonomía con la batería de plomo del SAI, |
 | `stl_util.py` | Utilidades STL sin dependencias. |
 | `tak-requirements.txt` | Versiones fijadas de Python para OpenTAKServer |

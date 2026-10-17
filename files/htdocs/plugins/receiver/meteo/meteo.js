@@ -299,7 +299,8 @@ Plugins.meteo.init = function () {
             h += '</div>';
         }
         h += '<div class="mt-note">' + (sensor ? 'Sensor propio ' + esc(sensor.chip || '') + ' en el mástil. ' : '') + 'Observación: <a href="https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?k=mur" target="_blank" rel="noopener">AEMET OpenData</a>. ' +
-            'Modelo y previsión: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>. Se actualiza cada 10 min.</div>';
+            'Modelo y previsión: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>. Se actualiza cada 10 min.</div>' +
+            '<div class="mt-note">🌦️ <a href="/bricohams/clima.html" target="_blank" rel="noopener">Clima en red</a>: estaciones WX cercanas por APRS, balizas WSPR y pases de satélite grabados.</div>';
         if (data.errors && data.errors.length) h += '<div class="mt-note">Avisos: ' + esc(data.errors.join(' · ')) + '</div>';
         $lcd.html(h);
         $lcd.find('canvas').each(function () {

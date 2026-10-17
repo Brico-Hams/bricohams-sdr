@@ -81,3 +81,23 @@ En `https://DOMINIO/clients` (OpenWebRX+, con el usuario admin), el admin ve las
 
 ## 7. Aviso de inicio de sesión
 `bricohams-login-aviso` manda por Telegram cada inicio de sesión correcto en `/settings`, con la IP y la hora. No incluye el usuario, porque el registro de nginx no lo lleva. Una misma IP no repite aviso en 10 min. Se activa con `TG_AVISO_LOGIN=yes` en `bricohams.env`. Los intentos fallidos los gestiona fail2ban (ver [manual 34](34_BLINDAJE_SEGURIDAD.md)).
+
+## 8. Registros de oyentes y mensajes de radio (v5.0)
+Además de las visitas y el chat, el grupo de Telegram recibe:
+
+| Aviso | Servicio | Clave en `bricohams.env` | Por defecto |
+|---|---|---|---|
+| 📝 Oyente registrado: indicativo (con enlace QRZ) o nombre | `bricohams-api` ([manual 39](39_REGISTRO_OYENTES.md)) | `OYENTES_TELEGRAM` | `yes` |
+| 📻 Mensaje de **canal** Meshtastic 433/868 (canal, remitente, texto, SNR). Los mensajes **directos** nunca se reenvían | `bricohams-mesh-owrx` ([manual 35](35_LORA_APRS_MESHTASTIC.md)) | `MESH_TELEGRAM` | `yes` |
+| 📡 Mensaje APRS recibido por LoRa 433 (RAK) o APRS-IS | `bricohams-rak-aprs` | `APRS_TELEGRAM` | `propios` |
+| 📡 Mensaje APRS que decodifica OpenWebRX+ (2 m, tema MQTT `openwebrx/APRS`) | `bricohams-visitas` | `APRS_TELEGRAM` | `propios` |
+
+`APRS_TELEGRAM`: `propios` = solo los dirigidos a la estación (`CALLSIGN`, `IGATE_CALLSIGN`, `RAK_CALLSIGN`, con cualquier SSID); `todos` = cualquier mensaje APRS oído (sin acuses ni telemetría); `no` = ninguno. Los mensajes enviados por nuestros propios indicativos no se avisan.
+
+Todos usan el módulo común `bricohams_telegram.py` (`/usr/local/lib/bricohams`): cola con hilo propio, como mucho 20 avisos por minuto y servicio, sin repetidos en 5 minutos, HTML escapado y el token oculto en los errores. Para aplicar cambios:
+
+```bash
+sudo nano /etc/bricohams/bricohams.env         # OYENTES_TELEGRAM, MESH_TELEGRAM, APRS_TELEGRAM
+sudo bash install.sh --solo web,visitas,lilygo,rak
+journalctl -u bricohams-mesh-owrx -u bricohams-rak-aprs | grep telegram
+```

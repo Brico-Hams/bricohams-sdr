@@ -1,4 +1,17 @@
-# 38 · GitHub: sincronización y repositorio sin datos personales (v5.1)
+# 38 · GitHub: sincronización y repositorio sin datos personales
+
+## Publicaciones coordinadas desde v5.4.0 · 2026-10-17
+
+[VERSION](../../VERSION) define la versión vigente. Público y privado comparten
+versión, fecha y etiqueta Git `v5.4.0`; cada `main` conserva su propio historial.
+Nunca se fusiona el historial privado en el público ni se usa force-push para alinearlos.
+El público recibe archivos del kit anonimizado, preservando sus recursos exclusivos.
+Antes de publicar: pruebas, `tests/test_anonimato.py` y `tools/datos_personales.py`.
+La nueva entrega debe incrementar VERSION y el historial y crear la misma etiqueta
+en los dos repositorios. Los commits tendrán hashes diferentes.
+
+Las secciones siguientes documentan la incidencia histórica de v5.1; no son
+instrucciones para sustituir el procedimiento coordinado de publicación actual.
 
 Este manual explica:
 
@@ -19,7 +32,8 @@ La carpeta `Documentos\GitHub\bricohams-sdr` del PC tenía cuatro problemas a la
 | GitHub va 1 commit por delante: «Delete .gitignore» | Alguien borró `.gitignore` desde la web de GitHub. Si se trae tal cual, **`bricohams.env` (con las claves) quedaría sin proteger** y un `git add .` lo subiría. | La v5.1 vuelve a poner `.gitignore`, ampliado. Al traer el commit de la web, el de la v5.1 lo recupera. |
 | `firmware-compilado/` sin seguimiento, 322 MB | Binarios compilados en lote (iGate y Meshtastic de muchas placas). Un commit así hace los `push` lentísimos y casi choca con el límite de GitHub. | Van en `.gitignore`, salvo `build_all.py`. Los binarios se publican como **Release** de GitHub, no en el git. |
 
-Además, `git push` no puede funcionar desde el entorno de Claude: ni la máquina de la nube ni la Linux del ordenador tienen las credenciales de GitHub. Las credenciales están en Windows (Git Credential Manager). **El `push` lo haces tú** (§4).
+El `push` requiere una sesión autenticada de GitHub. Usa Git Credential Manager
+o una clave SSH autorizada; nunca guardes tokens en los comandos ni en el repositorio.
 
 ## 2. Diagnóstico y reparación automática
 

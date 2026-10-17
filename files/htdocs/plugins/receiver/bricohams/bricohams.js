@@ -11,10 +11,11 @@
  *    cada visitante) y foto superior más baja para que se vea la web.
  *
  * Ajustes opcionales en init.js:
- *   window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true };
+ *   window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true, fuentes: 'https://…' };
+ *  - v5.0: botón «Monta la tuya» → fuentes del kit (solo si `fuentes` es https).
  */
 
-Plugins.bricohams._version = '1.1.0';
+Plugins.bricohams._version = '1.2.0';
 Plugins.bricohams._author='BricoHams';
 Plugins.bricohams.no_css = true;
 
@@ -49,7 +50,11 @@ Plugins.bricohams.init = function () {
             'padding:6px 12px;border-radius:999px;background:' + OR + ';color:#fff;font:600 13px/1 sans-serif;' +
             'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
         '#bricohams-tg:hover{opacity:1;background:#229ED9}' +
-        '@media (max-width:600px){#bricohams-tg span{display:none}}';
+        '#bricohams-gh{position:fixed;right:12px;bottom:48px;z-index:9999;display:flex;gap:6px;align-items:center;' +
+            'padding:6px 12px;border-radius:999px;background:#24292f;color:#fff;font:600 13px/1 sans-serif;' +
+            'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
+        '#bricohams-gh:hover{opacity:1;background:#2da44e}' +
+        '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
     // v4: la foto de cabecera abierta no tapa media pantalla
     css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';
     var st = document.createElement('style');
@@ -75,6 +80,21 @@ Plugins.bricohams.init = function () {
             'd="M9.8 15.6l-.4 5.4c.6 0 .8-.2 1.1-.5l2.6-2.5 5.4 4c1 .6 1.7.3 2-.9l3.6-17c.3-1.5-.6-2.1-1.6-1.7L1.3 ' +
             '9.6C-.2 10.2-.1 11 1 11.4l5.4 1.7L18.8 5.3c.6-.4 1.1-.2.7.2z"/></svg><span>BricoHams</span>';
         document.body.appendChild(a);
+    }
+    // v5.0 · «¿Quieres una estación como esta?» → fuentes del kit
+    var FU = typeof cfg.fuentes === 'string' ? cfg.fuentes : '';
+    if (/^https:\/\/[^\s'"<>]+$/.test(FU) && !document.getElementById('bricohams-gh')) {
+        var g = document.createElement('a');
+        g.id = 'bricohams-gh';
+        g.href = FU;
+        g.target = '_blank';
+        g.rel = 'noopener';
+        g.title = '¿Quieres una estación como esta? Instalador, caja 3D, manuales y código';
+        g.textContent = '🛠️';
+        var gs = document.createElement('span');
+        gs.textContent = 'Monta la tuya';
+        g.appendChild(gs);
+        document.body.appendChild(g);
     }
     // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
     try {

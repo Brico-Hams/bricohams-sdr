@@ -15,6 +15,10 @@
 #  Un «apt upgrade» de openwebrx reescribe la plantilla: el gancho
 #  /etc/apt/apt.conf.d/99bricohams-owrx-botones lo vuelve a aplicar.
 #
+#  También añade al final de htdocs/css/admin.css un tema oscuro de alto
+#  contraste (entre /* bricohams-tema-oscuro */) para todas las páginas de
+#  administración: cajas, desplegables, tarjetas y tablas legibles.
+#
 #  Uso: bricohams-owrx-botones [-q]      añade los botones (idempotente)
 #       bricohams-owrx-botones --quitar  deja la plantilla original
 # =====================================================================
@@ -63,6 +67,86 @@ def bloque(web=True, tak=False, mon=False):
 
 
 BLOQUE = bloque()
+
+# Tema oscuro de alto contraste para todas las páginas de administración
+# (OpenWebRX+ y paneles BricoHams cargan admin.css). Las cajas de texto,
+# desplegables, tarjetas y tablas de Bootstrap salen blancas o con texto gris
+# poco legible; aquí van oscuras con texto claro y foco naranja BricoHams.
+CSS_INI = '/* bricohams-tema-oscuro */'
+CSS_FIN = '/* /bricohams-tema-oscuro */'
+TEMA_OSCURO = (
+    'html,body{background-color:#1e1e1e!important;background-image:none!important;color:#f1f1f1}'
+    '.form-control,.custom-select,select,textarea{background-color:#2b2b2b!important;color:#f1f1f1!important;border:1px solid #6c6c6c!important}'
+    '.form-control:focus,.custom-select:focus,select:focus,textarea:focus{background-color:#333!important;color:#fff!important;'
+    'border-color:#f26b21!important;box-shadow:0 0 0 .2rem rgba(242,107,33,.35)!important}'
+    '.form-control::placeholder,textarea::placeholder{color:#a8a8a8!important;opacity:1}'
+    '.form-control:disabled,.form-control[readonly]{background-color:#1a1a1a!important;color:#bdbdbd!important}'
+    'select option,select optgroup{background-color:#2b2b2b;color:#f1f1f1}'
+    '.input-group-text{background-color:#3a3a3a;color:#eee;border-color:#6c6c6c}'
+    '.form-check-input,.custom-control-label::before{background-color:#2b2b2b;border-color:#8a8a8a}'
+    '.card,.list-group-item,.modal-content,.dropdown-menu,.popover,.toast{background-color:#2d2d2d;color:#f1f1f1;border-color:#555}'
+    '.card-header,.card-footer,.modal-header,.modal-footer{background-color:#3a3a3a;color:#fff;border-color:#555}'
+    '.dropdown-item{color:#f1f1f1}.dropdown-item:hover,.dropdown-item:focus{background-color:#f26b21;color:#111}'
+    '.table,.table th,.table td{color:#eee;border-color:#555}'
+    '.table-striped tbody tr:nth-of-type(odd){background-color:rgba(255,255,255,.06)}'
+    '.table-hover tbody tr:hover{background-color:rgba(242,107,33,.15);color:#fff}'
+    '.text-muted,.form-text,.small.text-muted{color:#c8c8c8!important}'
+    'label,.col-form-label,legend,h1,h2,h3,h4,h5,h6{color:#f5f5f5}'
+    'pre,code,kbd{background-color:#161616;color:#e8e8e8}'
+    'pre{padding:.6em;border:1px solid #444;border-radius:.25rem}'
+    '.breadcrumb{background-color:#333}.breadcrumb-item.active,.breadcrumb-item+.breadcrumb-item::before{color:#d0d0d0}'
+    'a:not(.btn){color:#8cc8ff}a:not(.btn):hover{color:#c2e2ff}'
+    '.nav-tabs .nav-link{color:#ddd}.nav-tabs .nav-link.active{background-color:#2d2d2d;color:#fff;border-color:#555 #555 #2d2d2d}'
+    '.tab-body{background-color:#262626}'
+    '.bg-white,.bg-light{background-color:#2d2d2d!important;color:#f1f1f1!important}'
+    '.btn-light,.btn-outline-light{background-color:#444;color:#fff;border-color:#666}'
+)
+
+
+def bloque_css():
+    return '\n' + CSS_INI + '\n' + TEMA_OSCURO + '\n' + CSS_FIN + '\n'
+
+LOGIN_OSCURO = (
+    TEMA_OSCURO +
+    '.login{background-color:#2d2d2d!important;color:#f1f1f1;'
+    'width:calc(100% - 32px);max-width:500px;box-sizing:border-box}'
+    '.login .btn-login{background-color:#444;color:#fff;border-color:#777}'
+)
+CABECERA = (
+    '.webrx-top-bar{background:#242424!important}'
+    '.webrx-top-bar .webrx-rx-texts div,.webrx-top-bar .webrx-rx-texts h1{color:#ddd}'
+    '.webrx-top-bar .openwebrx-main-buttons{background:#242424;flex-shrink:0}'
+)
+
+
+def admin_css(settings_html):
+    ruta = os.environ.get('OWRX_ADMIN_CSS')
+    if ruta:
+        return ruta
+    return os.path.join(os.path.dirname(settings_html), 'css', 'admin.css')
+
+
+def quitar_css(texto):
+    return re.sub(r'\n?' + re.escape(CSS_INI) + r'.*?' + re.escape(CSS_FIN) + r'\n?', '', texto, flags=re.S)
+
+
+def tema(ruta, quitar_tema=False, css=TEMA_OSCURO):
+    """Añade (o quita) el tema oscuro al final de admin.css; None si no existe."""
+    try:
+        original = open(ruta, encoding='utf-8').read()
+    except OSError:
+        return None
+    limpio = quitar_css(original)
+    nuevo = limpio if quitar_tema else limpio.rstrip('\n') + '\n\n' + CSS_INI + '\n' + css + '\n' + CSS_FIN + '\n'
+    if nuevo != original:
+        tmp = ruta + '.bricohams-tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            f.write(nuevo)
+        os.chmod(tmp, os.stat(ruta).st_mode & 0o777)
+        os.replace(tmp, ruta)
+    return True
+
+
 ANCLA = re.compile(r'([ \t]*<div class="col-4">\s*<a class="btn btn-secondary" href="features">)')
 
 
@@ -140,6 +224,13 @@ def main(a):
         os.replace(tmp, ruta)
     if not callado:
         print('%s: botones %s' % (ruta, 'quitados' if '--quitar' in a else 'puestos'))
+    css = admin_css(ruta)
+    if tema(css, '--quitar' in a) and not callado:
+        print('%s: tema oscuro %s' % (css, 'quitado' if '--quitar' in a else 'puesto'))
+    for nombre, contenido in (('login.css', LOGIN_OSCURO), ('openwebrx-header.css', CABECERA)):
+        hoja = os.path.join(os.path.dirname(css), nombre)
+        if tema(hoja, '--quitar' in a, contenido) and not callado:
+            print('%s: estilos %s' % (hoja, 'quitados' if '--quitar' in a else 'puestos'))
     return 0
 
 

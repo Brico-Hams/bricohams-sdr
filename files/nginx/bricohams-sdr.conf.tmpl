@@ -12,6 +12,7 @@
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 map $uri $bh_admin_cache {
     default "";
+    ~^/static/css/(admin|login|openwebrx-header)\.css$ "no-cache";   # tema y cabecera actualizados
     ~^/(login|logout|pwchange|settings|imageupload|clients|services|ban|unban|broadcast|files/delete)(/|$) "no-store";
 }
 # v4.4 · como mucho 12 intentos de /login por minuto y IP (fuerza bruta de la contraseña de admin)

@@ -48,9 +48,29 @@ assert ficha['operador'] == 'Wizz Air' and ficha['aerolinea'] == 'WMT', ficha
 assert ficha['origen'] == 'Otopeni (OTP), RO' and ficha['destino'] == 'Santander (SDR), ES', ficha
 assert ficha['pOrigen'] == [44.571792, 26.103285]
 assert ficha['pDestino'] == [43.427101, -3.82001]
-assert ficha['foto'] == 'https://t.plnspttrs.net/plane.jpg'
+assert ficha['foto'] == 'https://t.plnspttrs.net/plane_t.jpg'
+assert ficha['enlace'] == 'https://www.planespotters.net/photo/1'
 assert ficha['fuente'] == 'MAP.FLIGHTS'
 assert ficha['credito'] == '© Aviador · Planespotters.net', ficha
+
+
+# map.flights entrega sus propias fotos con ruta relativa y licencia: no debe caer a Planespotters
+def foto_relativa(url):
+    if 'map.flights' in url:
+        return {'typeName': 'BOEING 737-800', 'registration': 'EC-ABC',
+                'photo': {'url': '/photos/ext_4ca703_640.webp', 'thumbnail': '/photos/ext_4ca703_320.webp',
+                          'photographer': 'Autora', 'source': 'wikimedia', 'license': 'CC BY 2.0',
+                          'licenseUrl': 'https://creativecommons.org/licenses/by/2.0'}}
+    raise AssertionError('no debe consultar otras fuentes de foto: ' + url)
+
+
+rel = api.ficha_avion('4ca703', pedir=lambda u: foto_relativa(u) if 'map.flights' in u else {})
+assert rel['foto'] == 'https://map.flights/photos/ext_4ca703_320.webp', rel
+assert rel['enlace'] == 'https://map.flights/photos/ext_4ca703_640.webp', rel
+assert rel['credito'] == '© Autora · Wikimedia Commons · CC BY 2.0', rel
+assert 'Planespotters' not in rel['credito']
+assert api._url_mapflights('//evil.example/x.jpg') == '//evil.example/x.jpg'
+assert api._https(api._url_mapflights('//evil.example/x.jpg')) == ''
 
 
 def respuesta_parcial(url):

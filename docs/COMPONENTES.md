@@ -90,7 +90,7 @@ qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero es
 ### 6. Meshtastic 868 (HAT) y 433 (LilyGO)
 - **Función:** nodo `meshtasticd` en el HAT de 868 MHz, nodo LilyGO por USB en 433 MHz, mensajes y nodos pintados en el mapa de OpenWebRX+.
 - **Paso:** `meshtastic`, `lilygo`.
-- **Ficheros:** `files/bin/bricohams-mesh-admin` (panel), `files/bin/bricohams-mesh-owrx`, `files/bin/bricohams-mesh-url`, `files/bin/bricohams-lilygo`, `files/bin/bricohams_mqtt.py`, `files/bin/bricohams-mqtt-settings.py`.
+- **Ficheros:** `files/bin/bricohams-mesh-admin` (panel), `files/bin/bricohams-mesh-owrx`, `files/bin/bricohams-mesh-url`, `files/bin/bricohams-lilygo`, `files/bin/bricohams_mqtt.py`, `files/bin/bricohams_telegram.py`, `files/bin/bricohams-mqtt-settings.py`.
 - **Servicios:** `meshtasticd.service`, `bricohams-mesh-admin.service`, `bricohams-mesh-owrx.service`, `bricohams-meshweb-fw.service`, `mosquitto.service`.
 - **Gestión:** `/settings/bricohams/` (solo admin); cliente web oficial por `https://<estación>:8443/` con la misma sesión.
 - **Pruebas:** `test_mesh_admin.py`, `test_mesh_owrx.py`.

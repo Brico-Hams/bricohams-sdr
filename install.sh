@@ -409,6 +409,12 @@ rtlsdr_debian() {
 }
 
 si() { case "${1,,}" in 1|y|yes|s|si|sí|true|on) return 0 ;; *) return 1 ;; esac; }
+# v5.0 · «¿Quieres una estación como esta?»: enlace a las fuentes del kit (FUENTES_URL="" = no se muestra)
+fuentes_url() {
+    local u="${FUENTES_URL-}"
+    case "$u" in https://*) ;; *) u= ;; esac
+    u=${u//[\'\"<> ]/}; u=${u//&/\\&}; printf '%s' "${u//#/%23}"
+}
 # texto seguro como reemplazo de sed con delimitador #
 sed_esc() { printf '%s' "$1" | sed -e 's/[\\#&]/\\&/g'; }
 
@@ -1030,6 +1036,7 @@ paso_plugins() {
         aviso "Perfil importado: conservo su plugins/receiver/init.js (los plugins de BricoHams quedan copiados, pero sin cargar)"
     fi
     rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
+        --exclude 'meteo/wx-red.json' --exclude 'meteo/wspr.json' --exclude 'satelites/grabaciones.json' --exclude 'satelites/pases.ics' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     local callsign_gate=no tone_detector=no callsign_anuncio=no p
     local -A pedido=([callsign_gate]="${PLUGIN_CALLSIGN_GATE:-yes}" [tone_detector]="${PLUGIN_TONE_DETECTOR:-yes}")
@@ -1051,8 +1058,9 @@ paso_plugins() {
         -e "s#__LISTENERS_COUNTRY__#${listeners_country}#" \
         -e "s#__VISITAS_ENABLE__#${visitas_enable}#" -e "s#__CHAT_REGISTRO__#${chat_registro}#" \
         -e "s#__CALLSIGN_GATE__#${callsign_gate}#" -e "s#__TONE_DETECTOR__#${tone_detector}#" \
-        -e "s#__CALLSIGN_ANUNCIO__#${callsign_anuncio}#" -e "s#__SSL_MODO__#${SSL_MODO:-todo}#" \
-        -e "s#__OPERADOR__#$(sed_esc "${CALLSIGN:-N0CALL}")#g" -e "s#__QTH__#$(sed_esc "${STATION_QTH:-}")#g" "$R/init.js"
+        -e "s#__CALLSIGN_ANUNCIO__#${callsign_anuncio}#" -e "s#__SSL_MODO__#${SSL_MODO:-todo}#" -e "s#__SSL_DOMAIN__#${SSL_DOMAIN:-}#g" \
+        -e "s#__OPERADOR__#$(sed_esc "${CALLSIGN:-N0CALL}")#g" -e "s#__QTH__#$(sed_esc "${STATION_QTH:-}")#g" \
+        -e "s#__FUENTES__#$(fuentes_url)#g" "$R/init.js"
     if [ "${OWRX_BACKEND:-native}" = docker ]; then
         mkdir -p "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
         owrx_owner
@@ -1123,6 +1131,62 @@ EOF
     systemctl enable --now bricohams-meteo.timer
     systemctl start bricohams-meteo.service || aviso "La primera lectura de meteo falló (mira: journalctl -u bricohams-meteo)"
     if grep -q "^AEMET_API_KEY='..*'$" "$ETC_BH/meteo.env"; then bien "meteo AEMET ($METEO_STATIONS) + Open-Meteo"; else aviso "Sin AEMET_API_KEY: solo modelo Open-Meteo. Pide la clave gratis, ponla en bricohams.env y vuelve a lanzar: sudo bash install.sh --solo meteo"; fi
+    # v5.0 · «Clima en red»: estaciones WX de APRS-IS (solo lectura, sin passcode) y resumen WSPR
+    install -m 755 "$FILES/bin/bricohams-wx-red.py" /usr/local/bin/bricohams-wx-red
+    install -m 755 "$FILES/bin/bricohams-wspr.py" /usr/local/bin/bricohams-wspr
+    local wxcall="${WX_APRS_CALLSIGN:-}"; si "${WX_APRS:-no}" || wxcall=""
+    cat >/etc/systemd/system/bricohams-wx-red.service <<EOF
+[Unit]
+Description=BricoHams: estaciones WX cercanas de APRS-IS (Clima en red)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=openwebrx
+Environment="STATION_LAT=${STATION_LAT:-0}" "STATION_LON=${STATION_LON:-0}" "CALLSIGN=${CALLSIGN:-N0CALL}"
+Environment="IGATE_CALLSIGN=${IGATE_CALLSIGN:-}" "RAK_CALLSIGN=${RAK_CALLSIGN:-}" "WX_APRS_CALLSIGN=${wxcall}"
+Environment="WXRED_RADIO_KM=${WXRED_RADIO_KM:-100}" "WXRED_OUT=${HTDOCS}/plugins/receiver/meteo/wx-red.json"
+ExecStart=/usr/local/bin/bricohams-wx-red
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    cat >/etc/systemd/system/bricohams-wspr.service <<EOF
+[Unit]
+Description=BricoHams: resumen de las balizas WSPR oídas y reportadas (wspr.live)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=openwebrx
+Environment="OWRX_SETTINGS_FILE=${OWRX_DATA}/settings.json" "CALLSIGN=${CALLSIGN:-N0CALL}" "WSPR_CALLSIGN=${WSPR_CALLSIGN:-}"
+Environment="WSPR_OUT=${HTDOCS}/plugins/receiver/meteo/wspr.json"
+ExecStart=/usr/local/bin/bricohams-wspr
+EOF
+    cat >/etc/systemd/system/bricohams-wspr.timer <<'EOF'
+[Unit]
+Description=BricoHams: resumen WSPR cada 15 minutos
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60s
+
+[Install]
+WantedBy=timers.target
+EOF
+    systemctl daemon-reload
+    if si "${WXRED_ENABLE:-yes}"; then
+        systemctl enable bricohams-wx-red >/dev/null 2>&1; systemctl restart bricohams-wx-red
+        bien "Clima en red: estaciones WX a ${WXRED_RADIO_KM:-100} km por APRS-IS (/bricohams/clima.html)"
+    else
+        systemctl disable --now bricohams-wx-red >/dev/null 2>&1 || true
+    fi
+    systemctl enable --now bricohams-wspr.timer >/dev/null 2>&1
+    systemctl start bricohams-wspr.service 2>/dev/null || aviso "WSPR: sin indicativo de WSPRnet todavía (manual 19)"
 }
 
 paso_camara() {
@@ -1322,7 +1386,8 @@ EOF
     cat >/etc/systemd/system/bricohams-fan.service <<'EOF'
 [Unit]
 Description=BricoHams: ventiladores de la caja (PWM + tacómetro)
-After=multi-user.target bricohams-io.service
+# nunca After=multi-user.target: va en WantedBy=multi-user.target y sería un ciclo (systemd borra trabajos al arrancar)
+After=bricohams-io.service
 
 [Service]
 EnvironmentFile=/etc/bricohams/fan.env
@@ -1521,6 +1586,7 @@ mqtt_local() {
     fi
     install -d /usr/local/lib/bricohams
     install -m 644 "$FILES/bin/bricohams_mqtt.py" /usr/local/lib/bricohams/bricohams_mqtt.py
+    install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/lib/bricohams/bricohams_telegram.py
 }
 
 paso_lilygo() {
@@ -1993,7 +2059,8 @@ EOF
     cat >/etc/systemd/system/bricohams-io.service <<'EOF'
 [Unit]
 Description=BricoHams: puente USB con la Pico (BME280, DS18B20, pluviómetro y ventiladores)
-After=multi-user.target
+# sin After=multi-user.target: con WantedBy=multi-user.target hacía un ciclo y systemd quitaba bricohams-wx al arrancar
+After=systemd-udevd.service
 
 [Service]
 User=openwebrx
@@ -2058,6 +2125,39 @@ WantedBy=timers.target
 EOF
     systemctl daemon-reload
     systemctl enable --now bricohams-satpass.timer
+    # v5.0 · grabación automática de los pases (MP3 en «Files»), calendario ICS y borradores AMSAT
+    apt_i lame
+    local owrx_p=8073
+    [ "${OWRX_DOCKER_RED:-host}" = bridge ] && owrx_p=${OWRX_DOCKER_PORT:-8073}
+    install -m 755 "$FILES/bin/bricohams-satrec.py" /usr/local/bin/bricohams-satrec
+    cat >/etc/systemd/system/bricohams-satrec.service <<EOF
+[Unit]
+Description=BricoHams: graba los pases de satélites desde OpenWebRX+ (Files + AMSAT)
+After=network-online.target openwebrx.service
+Wants=network-online.target
+
+[Service]
+User=openwebrx
+StateDirectory=bricohams/satelites
+Environment="STATION_LAT=${STATION_LAT}" "STATION_LON=${STATION_LON}" "STATION_ASL=${STATION_ASL}" "CALLSIGN=${CALLSIGN:-N0CALL}"
+Environment="SAT_LIST=/opt/bricohams/kit/data/satelites.json" "SATPASS_PY=/usr/local/bin/bricohams-satpass"
+Environment="SATREC_MIN_EL=${SATREC_MIN_EL:-20}" "SATREC_EXCLUIR=${SATREC_EXCLUIR:-}" "SATREC_METEOR=${SATREC_METEOR:-yes}"
+Environment="SATREC_DIAS=${SATREC_DIAS:-30}" "SATREC_MAX_MB=${SATREC_MAX_MB:-2000}" "AMSAT_REPORT=${AMSAT_REPORT:-no}"
+Environment="SATREC_OWRX=ws://127.0.0.1:${owrx_p}/ws/"
+ExecStart=/usr/local/bin/bricohams-satrec
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    if si "${SATREC_ENABLE:-yes}"; then
+        systemctl enable bricohams-satrec >/dev/null 2>&1; systemctl restart bricohams-satrec
+        bien "grabación de pases ≥ ${SATREC_MIN_EL:-20}° en «Files» · calendario /static/plugins/receiver/satelites/pases.ics · AMSAT=${AMSAT_REPORT:-no}"
+    else
+        systemctl disable --now bricohams-satrec >/dev/null 2>&1 || true
+    fi
     if si "${SATDUMP_ENABLE:-yes}" && ! command -v satdump >/dev/null; then
         local url tmp
         url=$("${CURL[@]}" https://api.github.com/repos/SatDump/SatDump/releases/latest 2>/dev/null \
@@ -2311,6 +2411,8 @@ paso_web() {
     fi
     # web estática del portal
     install -d /var/www/bricohams /var/www/letsencrypt
+    local fu fsed; fu=$(fuentes_url)
+    if [ -n "$fu" ]; then fsed="s#__FUENTES__#${fu}#g"; else fsed='/__FUENTES__/d'; fi
     local op_sed qth_sed
     op_sed=$(sed_esc "${CALLSIGN:-N0CALL}"); qth_sed=$(sed_esc "${STATION_QTH:-}")
     sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
@@ -2318,7 +2420,8 @@ paso_web() {
     sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
         -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/politicas.html" >/var/www/bricohams/politicas.html
     sed -e "s#__LAN__#${ip}#g" -e "s#__WX_CALL__#${WX_APRS_CALLSIGN:-N0CALL-13}#g" -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__RADARBOX_ID__#${RADARBOX_STATION_ID:-}#g" \
-        "$FILES/web/index.html.tmpl" >/var/www/bricohams/index.html
+        -e "$fsed" "$FILES/web/index.html.tmpl" >/var/www/bricohams/index.html
+    sed -e "s#__OPERADOR__#${CALLSIGN:-N0CALL}#g" -e "$fsed" "$FILES/web/clima.html" >/var/www/bricohams/clima.html
     # certificado: primero uno autofirmado para que nginx arranque
     install -d -m 700 /etc/bricohams/ssl
     if [ "$modo" != no ] && [ ! -s /etc/bricohams/ssl/autofirmado.crt ]; then
@@ -2387,8 +2490,14 @@ paso_web() {
         envl QRZ_USER "${QRZ_USER:-}"
         envl QRZ_PASS "${QRZ_PASS:-}"
         envl AIS_ENABLE "${AIS_ENABLE:-no}"
+        # v5.0 · aviso por Telegram de cada oyente que se registra (indicativo o nombre)
+        envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
+        envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"
+        envl OYENTES_TELEGRAM "${OYENTES_TELEGRAM:-yes}"
     } >/etc/bricohams/api.env
     chown root:openwebrx /etc/bricohams/api.env; chmod 640 /etc/bricohams/api.env
+    install -d /usr/local/lib/bricohams
+    install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/lib/bricohams/bricohams_telegram.py
     cat >/etc/systemd/system/bricohams-api.service <<'EOF'
 [Unit]
 Description=BricoHams: API de indicativos (HamQTH/RadioID/QRZ)
@@ -2527,6 +2636,8 @@ EOF
         echo "VISITAS_CHAT=${VISITAS_CHAT:-yes}"
         echo "VISITAS_AVISAR_LAN=${VISITAS_AVISAR_LAN:-no}"
         echo "VISITAS_AVISAR_DESCONEXION=${VISITAS_AVISAR_DESCONEXION:-no}"
+        envl APRS_TELEGRAM "${APRS_TELEGRAM:-propios}"
+        envl APRS_TELEGRAM_CALLS "$(printf '%s,%s,%s' "${CALLSIGN:-}" "${IGATE_CALLSIGN:-}" "${RAK_CALLSIGN:-}")"
         echo "VISITAS_OUT=$HTDOCS/plugins/receiver/visitas/visitas.json"
     } >/etc/bricohams/visitas.env
     chown root:openwebrx /etc/bricohams/visitas.env; chmod 640 /etc/bricohams/visitas.env

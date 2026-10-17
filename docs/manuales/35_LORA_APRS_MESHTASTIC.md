@@ -74,7 +74,7 @@ Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
 | 433,775 · SF12 · BW 125 · CR 4/5 · 20 dBm · TX y CAD activos | igual | `RAK_TX="yes"`, `RAK_POWER="20"` |
 | baliza cada 15 min por RF y APRS-IS, «LoRa APRS igate», símbolo `L` + `a`, ruta WIDE1-1,WIDE2-1, ambigüedad 1 | igual, + `Caja 23.4C` al final del comentario | `RAK_BEACON_MIN`, `RAK_BEACON_RF`, `RAK_COMMENT`, `RAK_SYMBOL="La"`, `RAK_PATH`, `RAK_AMBIGUEDAD="1"` |
 | estado «N0CALL-tu QTH-IGate» | «N0CALL-SDR BricoHams iGate» | `RAK_STATUS` |
-| digipeater modo 1 (WIDE1-1) | **0 mientras funcione el LilyGO**: dos digis de relleno en el mismo sitio repiten dos veces cada paquete. Cuando apagues el LilyGO, `RAK_DIGI="1"` | `RAK_DIGI` |
+| digipeater WIDE1-1 automático | **`auto`** (v5.0): el RAK repite solo cuando el iGate LilyGO (`RAK_DIGI_VIGILA`, por defecto `IGATE_CALLSIGN`) lleva `RAK_DIGI_AUTO_MIN` (30) minutos sin oírse, ni como origen ni repitiendo (`N0CALL-10*`); cuando vuelve, el RAK deja de repetir. Dos digis de relleno en el mismo sitio repetirían dos veces cada paquete. Fijos: `0` apagado, `1` WIDE1-1, `2` + WIDE2-n, `3` solo vía nuestro indicativo | `RAK_DIGI` |
 | APRS-IS rotate.aprs2.net · filtro m/10 · mensajes a RF | igual (objetos a RF: no) | `RAK_APRSIS_SERVER`, `RAK_APRSIS_FILTRO`, `RAK_MENSAJES_RF` |
 | recordar estaciones 30 min | igual | `RAK_RECORDAR_MIN` |
 | syslog y MQTT a link9.net | no: el RAK publica en el MQTT **local** para OpenWebRX+ | — |
@@ -166,6 +166,20 @@ Los cambios se guardan en `bricohams.env` (el del kit y `/etc/bricohams/`), así
 
 La web antigua de meshtasticd (`https://IP:9443`) se ha quitado porque no pedía contraseña.
 
+## Mensajes 433 / 868 desde el panel (v5.0)
+`/settings/bricohams/meshtastic/chat` (botón **Mensajes** en el panel Meshtastic). Hay dos columnas, una por red:
+- **433 (LilyGO)** y **868 (HAT)**: cada una con su estado (conectado, sin conexión o servicio parado), un formulario de envío y los últimos 80 mensajes (recibidos, directos a nosotros con la marca «directo», y los nuestros resaltados con «yo ↑»).
+- **Envío:** eliges el canal (la lista sale de los canales reales del nodo) y escribes hasta 200 bytes; los caracteres de control se quitan. Si marcas «enviar también por la otra red», el mensaje sale por el canal **del mismo nombre** en la otra red o, si no lo hay, por su canal principal. Así sirve de pasarela manual entre las redes de nuestros nodos.
+- **Sin JavaScript** (la CSP lo prohíbe): «Actualizar» recarga a mano y `?auto=1` recarga cada 20 s.
+
+Funcionamiento:
+- `bricohams-mesh-owrx` es el único que habla con cada nodo (el puerto USB y el 4403 solo admiten un cliente). Guarda el historial en `/run/bricohams-mesh/chat.json` (0600, en RAM, máximo 200 por red) y abre el socket `/run/bricohams-mesh/enviar.sock` (0600), al que solo llega `bricohams-mesh-admin` (root).
+- El panel valida la red, el canal, la longitud, la sesión de admin, el origen y el CSRF antes de pedir nada al nodo.
+- Mientras el panel lee o cambia la configuración de un nodo, `bricohams-mesh-owrx` está parado y el envío dice «el servicio no está en marcha».
+- Requiere el mapa LoRa activo (`OWRX_MAPA_LORA="yes"`, que arranca `bricohams-mesh-owrx`). `MESH_CHAT="no"` lo desactiva.
+- Los directos entre otros nodos no se ven (van cifrados para ellos); los que nos mandan a nosotros sí, solo en el panel y nunca en el chat público de OpenWebRX+.
+
+
 ## Cliente web oficial de Meshtastic (:8443, solo admin)
 Si se instala con `MESH_WEB="yes"` (por defecto en v4.5):
 - `https://IP:8443/` es el cliente web oficial de Meshtastic.
@@ -210,7 +224,8 @@ OpenWebRX+ 1.2.122 y posteriores escuchan en su broker MQTT los temas `+/APRS`, 
 | Nada en el mapa | `systemctl status mosquitto bricohams-rak-aprs bricohams-mesh-owrx` · `sudo bricohams-check` · `mqtt_aprs`/`mqtt_meshtastic` en Ajustes → Integración |
 | `mesh868: sin conexión` | normal sin HAT |
 | `meshtastic --port /dev/lilygo-mesh` dice «ocupado» | `sudo systemctl stop bricohams-mesh-owrx` (lo hace solo `bricohams-lilygo`) |
-| Duplicados en aprs.fi | dos digis: `RAK_DIGI="0"` mientras funcione el LilyGO iGate |
+| Duplicados en aprs.fi | dos digis: `RAK_DIGI="auto"` (o `"0"`) mientras funcione el LilyGO iGate. Estado en `/run/bricohams-rak/rak-aprs.json` → `digi_auto` y en el registro («digi auto: …») |
+| No sale el tiempo (N0CALL-13) en aprs.fi | `systemctl is-active bricohams-wx`. Hasta la v5.0 `bricohams-io` y `bricohams-fan` llevaban `After=multi-user.target` y systemd quitaba `bricohams-wx` al arrancar («ordering cycle»); `sudo bash install.sh --solo io,sensor,ventilacion` lo corrige |
 | El nodo 868 no tiene rol o aparece con uno equivocado | hasta v5.0 el kit no lo fijaba en el nodo 868. Elige el rol en Ajustes → Meshtastic → Nodo 868 y pulsa *Aplicar* (con `meshtasticd` activo). También puedes ponerlo en `MESH868_ROLE` y ejecutar `sudo bash install.sh --solo meshtastic` |
 | El nodo sale con un nombre viejo (p. ej. «mi-qth») | el nombre se guarda en el propio nodo, no basta con cambiar `bricohams.env`. Ajusta `MESH_LONG_NAME`/`MESH_SHORT_NAME` (868) y `MESH433_LONG_NAME`/`MESH433_SHORT_NAME` (433) y pulsa *Aplicar* en Ajustes → Meshtastic (`bricohams-mesh-admin`, que llama a `meshtastic --set-owner`). El nodo 433 también se renombra con `sudo bricohams-lilygo`. Los vecinos tardan unos minutos en ver el nombre nuevo |
 

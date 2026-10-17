@@ -303,7 +303,11 @@ Origen: `N_ROWS` de `hardware/caja_v3/caja_v3.scad` (manual 17).
 | z = 56 mm | R1 | reserva |
 | z = 56 mm | R2 | reserva |
 | z = 56 mm | R3 | reserva |
-| z = 88 mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |
+| z = 86 mm | HRF | HackRF One (bandeja de SDR) |
+| z = 86 mm | AHF | Airspy HF+ (bandeja de SDR) |
+| z = 86 mm | V4 | RTL-SDR V4 (bandeja de SDR) |
+| z = 86 mm | R4 | reserva |
+| z = 116 mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |
 
 ## 14. v4 · Pico «bricohams-io» (con el HAT puesto, `IO_MODE="pico"`)
 

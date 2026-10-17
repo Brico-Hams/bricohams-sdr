@@ -17,6 +17,8 @@
 #     Lo dudoso no se reenvía a Telegram; al pasar el umbral escribe
 #     «BAN ip=…» en /var/log/bricohams-chat/moderador.log y Fail2ban
 #     (jail bricohams-chat) bloquea la IP. Nunca actúa sobre la LAN.
+#   - v5.0 · Mensajes APRS que decodifica OpenWebRX+ (tema openwebrx/APRS)
+#     dirigidos a la estación -> Telegram (APRS_TELEGRAM, APRS_TELEGRAM_CALLS).
 #  Uso: bricohams-visitas              (servicio)
 #       bricohams-visitas --moderador  (últimos bloqueos del chat)
 #       bricohams-visitas --resumen    (manda el resumen del día a Telegram)
@@ -132,6 +134,8 @@ class Visitas:
         estado, ip = m.get('state'), m.get('ip', '')
         if 'clients' in m:
             self.clientes = int(m.get('clients') or 0)
+        if m.get('mode') == 'APRS' and m.get('type') == 'message':
+            return self.aprs(m)
         if estado == 'Connected':
             return self.conectado(ip)
         if estado == 'Disconnected':
@@ -144,6 +148,26 @@ class Visitas:
             if self.tg and si(env('VISITAS_CHAT', 'yes')):
                 self.tg('💬 <b>%s</b>: %s' % (esc(m.get('name', '?')), esc(m.get('message', ''))))
         return None
+
+    def aprs(self, m):
+        """v5.0 · Mensaje APRS decodificado por OpenWebRX+ (tema openwebrx/APRS) -> Telegram.
+        APRS_TELEGRAM: «propios» (solo los dirigidos a APRS_TELEGRAM_CALLS), «todos» o «no»."""
+        modo = env('APRS_TELEGRAM', 'propios').lower()
+        texto = re.sub(r'[\x00-\x1f\x7f]+', ' ', str(m.get('message') or '')).strip()[:300]
+        de, para = str(m.get('source') or '?').upper()[:12], str(m.get('addressee') or '').upper()[:12]
+        if not self.tg or modo not in ('propios', 'todos') or not texto or not para:
+            return None
+        propios = {c.strip().upper().split('-')[0] for c in env('APRS_TELEGRAM_CALLS').split(',') if c.strip()}
+        if de.split('-')[0] in propios or (modo == 'propios' and para.split('-')[0] not in propios):
+            return None
+        t, clave = self.ahora(), (de, para, texto)
+        self.aprs_vistos = {k: v for k, v in getattr(self, 'aprs_vistos', {}).items() if t - v < 600}
+        if clave in self.aprs_vistos:
+            return None
+        self.aprs_vistos[clave] = t
+        frec = ' · %.3f MHz' % (m['freq'] / 1e6) if isinstance(m.get('freq'), (int, float)) else ''
+        self.tg('📡 <b>APRS</b> (OpenWebRX+%s) <b>%s</b> → <b>%s</b>: %s' % (frec, esc(de), esc(para), esc(texto)))
+        return clave
 
     def conectado(self, ip):
         t = self.ahora()
@@ -379,15 +403,19 @@ def servicio():
     mod = ModeradorChat(tg=tg if si(env('CHATBOT_AVISAR', 'yes')) else None) if si(env('CHATBOT_ENABLE', 'yes')) else None
     v = Visitas(abrir_db(), Geo(), tg, moderador=mod)
     tema = env('MQTT_TOPIC', 'openwebrx') + '/CLIENT'
+    tema_aprs = env('MQTT_TOPIC', 'openwebrx') + '/APRS'
 
     def on_connect(c, u, f, rc, *a):
         c.subscribe(tema)
+        if tg and env('APRS_TELEGRAM', 'propios').lower() in ('propios', 'todos'):
+            c.subscribe(tema_aprs)
         print('visitas: escuchando %s' % tema, flush=True)
 
     def on_message(c, u, msg):
         try:
             v.evento(json.loads(msg.payload.decode('utf-8', 'replace')))
-            write_atomic(WEB, v.resumen())
+            if msg.topic == tema:
+                write_atomic(WEB, v.resumen())
         except Exception as e:
             print('visitas: %s' % e, file=sys.stderr, flush=True)
 

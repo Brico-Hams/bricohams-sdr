@@ -107,6 +107,64 @@ assert t is None, 'los mensajes directos no salen nunca'
 M.paquete(nodos, {'from': 7, 'decoded': {'portnum': 'POSITION_APP', 'position': {'latitude': 37.6, 'longitude': -0.98}}}, 'm')
 M.paquete(nodos, {'from': 7, 'decoded': {'portnum': 'NODEINFO_APP', 'user': {'shortName': 'CT01'}}}, 'm')
 assert M.nombre(nodos, 7) == 'CT01' and M.nodo_a_owrx(7, nodos[7], 'm', 1)['lat'] == 37.6
+# mensajes para el panel: canales públicos y directos a nosotros; nunca los directos a otros
+m = M.mensaje(nodos, {'from': 7, 'to': M.BROADCAST, 'channel': 2, 'rxSnr': 4.5,
+                      'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'hola\x07 canal'}}, 0x99)
+assert m['canal'] == 2 and m['de'] == 'CT01' and m['id'] == '!00000007' and m['texto'] == 'hola  canal' and not m['directo']
+assert M.mensaje(nodos, {'from': 7, 'to': 0x99, 'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'a ti'}}, 0x99)['directo']
+assert M.mensaje(nodos, {'from': 7, 'to': 0x55, 'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'a otro'}}, 0x99) is None
+assert M.mensaje(nodos, {'from': 7, 'to': M.BROADCAST, 'decoded': {'portnum': 'POSITION_APP'}}, 0x99) is None
+
+
+class _Ajustes:
+    def __init__(self, n): self.name = n
+
+
+class _Canal:
+    def __init__(self, i, rol, n=''): self.index, self.role, self.settings = i, rol, _Ajustes(n)
+
+
+class _Nodo:
+    channels = [_Canal(0, 1), _Canal(1, 2, 'Murcia'), _Canal(2, 0), _Canal(3, 'SECONDARY', 'SOS')]
+
+
+class _Iface:
+    localNode = _Nodo()
+    def __init__(self): self.enviados = []
+    def sendText(self, texto, channelIndex=0): self.enviados.append((texto, channelIndex))
+
+
+cs = M.canales(_Iface())
+assert [(c['indice'], c['nombre'], c['primario']) for c in cs] == [(0, 'principal', True), (1, 'Murcia', False), (3, 'SOS', False)]
+assert M.canales(object()) == [], 'sin localNode: lista vacía'
+fx = M.Fuente('mesh868', 'tcp', 'x', 1, None, None, False)
+fx.iface, fx.estado['conectado'], fx.estado['canales'] = _Iface(), True, cs
+assert M.validar_envio({'fuente': 'mesh868', 'canal': '1', 'texto': ' hola\n '}, {'mesh868': fx})[1:] == (1, 'hola')
+for mal, aviso in (({'fuente': 'meshXXX', 'canal': 0, 'texto': 'a'}, 'red'), ({'fuente': 'mesh868', 'canal': 2, 'texto': 'a'}, 'canal 2'),
+                   ({'fuente': 'mesh868', 'canal': 'x', 'texto': 'a'}, 'canal'), ({'fuente': 'mesh868', 'canal': 0, 'texto': '  '}, 'vacío'),
+                   ({'fuente': 'mesh868', 'canal': 0, 'texto': 'ñ' * 101}, 'largo'), ('roto', 'petición')):
+    try:
+        M.validar_envio(mal, {'mesh868': fx})
+        raise AssertionError('debía fallar: %r' % (mal,))
+    except ValueError as x:
+        assert aviso in str(x), (aviso, x)
+fx.estado['conectado'] = False
+try:
+    M.validar_envio({'fuente': 'mesh868', 'canal': 0, 'texto': 'a'}, {'mesh868': fx})
+    raise AssertionError('nodo desconectado')
+except ValueError as x:
+    assert 'no está conectado' in str(x)
+Tc = tempfile.mkdtemp()
+ch = M.Chat(os.path.join(Tc, 'chat.json'))
+ch.anotar('mesh433', None, cs)
+for i in range(M.CHAT_MAX + 5):
+    ch.anotar('mesh433', {'t': i, 'texto': str(i)})
+dj = json.load(open(os.path.join(Tc, 'chat.json'), encoding='utf-8'))
+assert len(dj['redes']['mesh433']['mensajes']) == M.CHAT_MAX and dj['redes']['mesh433']['mensajes'][-1]['texto'] == str(M.CHAT_MAX + 4)
+assert dj['redes']['mesh433']['canales'] == cs
+if os.name == 'posix':
+    assert os.stat(os.path.join(Tc, 'chat.json')).st_mode & 0o777 == 0o600, 'el historial no es público'
+shutil.rmtree(Tc)
 
 # ------------------------------------------------------------------ servicio con «meshtastic» de mentira
 T = tempfile.mkdtemp()
@@ -130,9 +188,15 @@ open(os.path.join(falso, 'meshtastic', 'serial_interface.py'), 'w').write('''
 import threading, time
 from pubsub import pub
 class _Info: my_node_num = 0x1234abcd
+class _Aj:
+    def __init__(self, n): self.name = n
+class _Ca:
+    def __init__(self, i, r, n=''): self.index, self.role, self.settings = i, r, _Aj(n)
+class _Local: channels = [_Ca(0, 1), _Ca(1, 2, 'Murcia')]
 class SerialInterface:
     def __init__(self, devPath):
         self.myInfo = _Info()
+        self.localNode = _Local()
         self.nodes = {'!1234abcd': %r,
                       '!00000007': {'num': 7, 'user': {'shortName': 'CT01', 'longName': 'Cartagena 1'},
                                     'position': {'latitude': 37.605, 'longitude': -0.986}},
@@ -144,6 +208,8 @@ class SerialInterface:
                         'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'QSO de prueba'}}, interface=self)
         pub.sendMessage('meshtastic.receive', packet={'from': 9, 'decoded': {'portnum': 'POSITION_APP',
                         'position': {'latitude': 38.0, 'longitude': -1.1}}}, interface=self)
+    def sendText(self, texto, channelIndex=0):
+        if texto == 'falla': raise RuntimeError('radio ocupada')
     def close(self): pass
 ''' % nodo)
 puerto_lily = os.path.join(T, 'lilygo-mesh')
@@ -160,8 +226,41 @@ while time.time() < fin and not (any(t.endswith('/CLIENT') for t, _ in br.msgs) 
                                   any(m.get('src') == 9 for t, m in br.msgs if t == 'mesh433/Meshtastic')):
     time.sleep(0.3)
 time.sleep(1)
+envios = []
+sock_envio = os.path.join(run, 'enviar.sock')
+if os.name == 'posix':
+    import socket
+
+    def mandar(d):
+        c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        c.settimeout(5)
+        c.connect(sock_envio)
+        c.sendall(json.dumps(d).encode() + b'\n')
+        r = b''
+        while not r.endswith(b'\n'):
+            t = c.recv(4096)
+            if not t:
+                break
+            r += t
+        c.close()
+        return json.loads(r)
+    assert os.stat(sock_envio).st_mode & 0o777 == 0o600, 'solo root/servicio pueden mandar'
+    envios = [mandar({'fuente': 'mesh433', 'canal': 1, 'texto': 'hola Murcia'}),
+              mandar({'fuente': 'mesh433', 'canal': 5, 'texto': 'no'}),
+              mandar({'fuente': 'mesh868', 'canal': 0, 'texto': 'sin HAT'}),
+              mandar({'fuente': 'mesh433', 'canal': 0, 'texto': 'falla'})]
 pr.terminate()
 salida = pr.communicate(timeout=5)[0]
+if os.name == 'posix':
+    assert envios[0] == {'ok': True}, envios
+    assert not envios[1]['ok'] and 'canal 5' in envios[1]['error']
+    assert not envios[2]['ok'] and 'no está conectado' in envios[2]['error']
+    assert not envios[3]['ok'] and 'radio ocupada' in envios[3]['error']
+    cj = json.load(open(os.path.join(run, 'chat.json'), encoding='utf-8'))['redes']['mesh433']
+    assert [c['nombre'] for c in cj['canales']] == ['principal', 'Murcia']
+    assert any(x['dir'] == 'rx' and x['texto'] == 'QSO de prueba' and x['de'] == 'CT01' for x in cj['mensajes'])
+    assert any(x['dir'] == 'tx' and x['texto'] == 'hola Murcia' and x['canal'] == 1 for x in cj['mensajes'])
+    assert not any(x['texto'] == 'falla' for x in cj['mensajes']), 'lo no enviado no sale como enviado'
 mesh = {m['src']: m for t, m in br.msgs if t == 'mesh433/Meshtastic'}
 assert (mesh[0x1234abcd]['lat'], mesh[0x1234abcd]['lon']) == (37.98, -1.13), 'nuestro nodo, redondeado (manual 34)'
 assert mesh[7]['lat'] == 37.605 and mesh[7]['nickName'] == 'CT01' and mesh[9]['lat'] == 38.0

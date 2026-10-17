@@ -205,13 +205,14 @@ FILAS = re.findall(r'\[(\d+), \[([^\]]*)\]\]', re.search(r'N_ROWS = \[(.*)\];', 
 DEST3 = {'SAT': 'RTL del HAT (eggbeater + LNA)', 'HAM': 'Mini RTL-SDR (quad 2 m/70 + diplexor)', 'VHF': 'diplexor → V3 (discone grande)',
          'HF': 'inyector MLA-30 → diplexor → V3', 'ADSB': 'bias-tee 5 V → FlightStick (LNA en la antena)', '868': 'SX1262 del HAT (Bigsignal 868)',
          'GPS': 'GPS del HAT', 'M433': 'LilyGO Meshtastic (fibra 433)', 'IG433': 'FBP-433s → LilyGO iGate (Bigsignal 433)',
-         'DISC2': 'discone compacta → bahía de expansión', 'HF2': 'SDRplay antena B (futura)', 'R1': 'reserva', 'R2': 'reserva', 'R3': 'reserva'}
+         'DISC2': 'discone compacta → bahía de expansión', 'HF2': 'SDRplay antena B (futura)', 'R1': 'reserva', 'R2': 'reserva', 'R3': 'reserva',
+         'HRF': 'HackRF One (bandeja de SDR)', 'AHF': 'Airspy HF+ (bandeja de SDR)', 'V4': 'RTL-SDR V4 (bandeja de SDR)', 'R4': 'reserva'}
 L += ['## 13. Caja v3: pasamuros N de la cara inferior', '',
       'Origen: `N_ROWS` de `hardware/caja_v3/caja_v3.scad` (manual 17).', '', '| Fila (altura z) | Rótulo | Va a |', '|---|---|---|']
 for z, nombres in FILAS:
     for n in nombres.replace('"', '').replace(' ', '').split(','):
         L.append('| z = %s mm | %s | %s |' % (z, n, DEST3.get(n, '')))
-L += ['| z = 88 mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |', '']
+L += ['| z = %s mm | M25 PWR · M20 LAN · PG7 WX · PG7 VIENTO · PG7 LLUVIA · PG7 RES | prensaestopas |' % re.search(r'GL_Z = (\d+);', S3).group(1), '']
 
 L += ['## 14. v4 · Pico «bricohams-io» (con el HAT puesto, `IO_MODE="pico"`)', '', '| Pin Pico | GP | Uso |', '|---|---|---|']
 for pin, g, u in [('6 / 7', 'GP4 / GP5', 'I2C0 SDA / SCL · BME280 (0x76/0x77)'), ('29', 'GP22', 'DS18B20 1-Wire (4,7 kΩ a 3V3)'),

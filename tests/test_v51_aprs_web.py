@@ -98,7 +98,7 @@ try:
         return r.status, json.loads(r.read() or b'{}')
 
     # paquete oído por RF del otro iGate (posición) y un mensaje para nosotros con id
-    trama = rak.tnc2_a_ax25('N0CALL-10>APLRG1,WIDE1-1:!3805.00N/00000.00W>hola')
+    trama = rak.tnc2_a_ax25('N0CALL-10>APLRG1,WIDE1-1:!3805.00N/00114.00W>hola')
     p.de_rak(rak.CMD_DATA, trama)
     p.de_rak(rak.CMD_DATA, rak.tnc2_a_ax25('EA5ZZZ-7>APLRT1,WIDE1-1::N0CALL-15:prueba{7'))
     assert p.otro_visto > 0 and p.digi_deseado() == 0, 'el LilyGO se oye: el RAK deja de repetir'
