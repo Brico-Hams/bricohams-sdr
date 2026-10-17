@@ -1,4 +1,4 @@
-// =====================================================================
+﻿// =====================================================================
 //  Caja v3 BricoHams SDR · N0CALL — DOS MÓDULOS al pie del mástil (~5 m)
 //
 //   MÓDULO DE ELECTRÓNICA  (VARIANTE="electronica")
@@ -6,7 +6,8 @@
 //       cabe cualquier SDR futuro (SDRplay, HydraSDR, otro RTL) sin reimprimir.
 //     - Bandeja intermedia de SDR (bandeja_sdr) con bahías para 3 SDR más:
 //       HackRF One, RTL-SDR V4 y Airspy HF+ Discovery (lista SDR_DECK).
-//     - Bandeja superior para Pi 5 + HAT y los 2 LilyGO.
+//     - Bandeja superior para Pi 5 + HAT, LilyGO y RAK4631 (RAK19007).
+//     - Dos bandejas intermedias de SDR (3 + 8 plazas).
 //     - 18 pasamuros N hembra (filas de 7 + 7 + 4) + prensaestopas M25 (alimentación
 //       desde el módulo de potencia), M20 (LAN) y 4 × PG7 (BME280, RS485 de viento,
 //       pluviómetro y reserva) en la cara inferior.
@@ -45,11 +46,14 @@ SAI = VARIANTE == "sai";
 // ------------------------------ medidas ------------------------------
 W = EL ? 228 : SAI ? 228 : 170;
 H = EL ? 240 : SAI ? 240 : 200;
-D = EL ? 140 : SAI ? 140 : 112;   // electrónica: 140 de fondo para la 3.ª fila de N y la bandeja de SDR
+D = EL ? 190 : SAI ? 140 : 112;   // electrónica: 190 de fondo para la 3.ª fila de N, las dos bandejas de SDR y la Pi
 T = 3.6;                    // pared de 9 líneas de 0,4: más rígida que la v2
 R = 8;
 GAP_LID = 3;  LID_T = 4.4;  RIB_H = 6;  GROOVE_W = 4.6;  GASKET_W = 4.8;  GASKET_H = 4;
-EAR_L = 9;  EAR_Y = 18;  EAR_Z = 10;
+EAR_L = 9;  EAR_Y = 26;  EAR_Z = 10;   // cierres laterales anchos (v5.5)
+// diseño «caja rígida de transporte» (v5.5): faldón perimetral que enrasa con la tapa y aspa en X hundida
+BELT_H = 16;  BELT_OUT = 2.3;           // BELT_OUT = vuelo de la tapa (offset 2.3)
+LID_GR_W = 7;  LID_GR_D = 1.2;          // ancho y profundidad de las vetas de la tapa (sin voladizos al imprimir boca abajo)
 EARS_Y = H == 240 ? [24, 92, 148, 216] : [24, 100, 176];
 HOLE_M3 = 3.4;  INS_M3 = 4.0;  INS_M3_L = 6;
 HOLE_M4 = 4.5;  INS_M4 = 5.6;  INS_M4_L = 8.5;
@@ -126,6 +130,14 @@ module cuerpo() {
                 translate([0, 0, T]) linear_extrude(D) offset(-T) outline();
             }
             ears();
+            // faldón de remate: sube 45° (imprime sin soportes) y deja el borde alineado con la tapa
+            difference() {
+                hull() {
+                    translate([0, 0, D - BELT_H]) linear_extrude(E) outline();
+                    translate([0, 0, D - BELT_H + BELT_OUT]) linear_extrude(BELT_H - BELT_OUT) offset(BELT_OUT) outline();
+                }
+                translate([0, 0, D - BELT_H - 1]) linear_extrude(BELT_H + 2) offset(-T) outline();
+            }
             // nervios exteriores en la espalda (rigidez frente a la presión del viento y a la fijación)
             for (x = [W * 0.25, W * 0.75]) translate([x - 3, R, -6]) cube([6, H - 2 * R, 6 + E]);
             // pilares de la rejilla
@@ -190,6 +202,19 @@ function sum_w(l, i) = i < 0 ? 0 : l[i][1] + sum_w(l, i - 1);
 
 // ------------------------------- tapa --------------------------------
 LID_Z0 = D + GAP_LID;
+// panel decorativo: entre el rótulo inferior (y≈60) y la ventana de cámara (y≈186) o el borde superior
+module lid_aspa() {
+    x0 = 24;  x1 = W - 24;  y0 = 72;  y1 = EL ? 176 : H - 24;
+    difference() {
+        translate([x0, y0]) offset(r = 6) offset(delta = -6) square([x1 - x0, y1 - y0]);
+        translate([x0 + LID_GR_W, y0 + LID_GR_W]) offset(r = 4) offset(delta = -4) square([x1 - x0 - 2 * LID_GR_W, y1 - y0 - 2 * LID_GR_W]);
+    }
+    intersection() {
+        translate([x0, y0]) square([x1 - x0, y1 - y0]);
+        union() for (d = [[[x0, y0], [x1, y1]], [[x0, y1], [x1, y0]]])
+            hull() { translate(d[0]) circle(d = LID_GR_W, $fn = 24); translate(d[1]) circle(d = LID_GR_W, $fn = 24); }
+    }
+}
 module tapa() {
     fx = CAM_PC[0] + 2 * CAM_FRAME;  fy = CAM_PC[1] + 2 * CAM_FRAME;
     cam = EL && CAMARA;
@@ -217,6 +242,8 @@ module tapa() {
                 translate([CAM_C[0] + s * (CAM_PC[0] / 2 + CAM_FRAME / 2), CAM_C[1] + 8, LID_Z0 - CAM_FRAME_H - 1]) cylinder(d = INS_M3, h = INS_M3_L + 1);
             }
         }
+        // aspa en X y marco hundidos (cara exterior; sin voladizos al imprimir boca abajo)
+        translate([0, 0, LID_Z0 + LID_T - LID_GR_D]) linear_extrude(LID_GR_D + 1) lid_aspa();
         translate([W / 2, 48, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
             text(EL ? "BricoHams SDR" : SAI ? "SAI 230 V · Pb" : "POTENCIA 230 V", size = EL ? 15 : 11, font = FONT, halign = "center", valign = "center");
         translate([W / 2, 26, LID_Z0 + LID_T - 0.6]) linear_extrude(1)
@@ -283,7 +310,8 @@ module placa_rejilla() {
 }
 
 // ----------------------- bandeja de la Pi ----------------------------
-PI5 = [85, 56];  PI5_HOLES = [58, 49];  BAND = [170, 92];  BAND_H = 71;
+PI5 = [85, 56];  PI5_HOLES = [58, 49];  BAND = [170, 92];  BAND_H = 131;
+RAK_O = [129, 12];  RAK_C = [32.8, 62.8];   // cuna del RAK19007 (30 × 60) con RAK4631 y el GPS en el slot A
 PI_OFF = [8, 10];  BAND_Y = 118;  DONGLE_Y = 28;
 BAND_POSTS = [[6, 6], [BAND[0] - 6, 6], [6, BAND[1] - 6], [BAND[0] - 6, BAND[1] - 6]];
 module bandeja() {   // bandeja con la Pi 5 + HAT (izquierda) y 2 LilyGO (derecha)
@@ -291,25 +319,30 @@ module bandeja() {   // bandeja con la Pi 5 + HAT (izquierda) y 2 LilyGO (derech
         union() {
             cube([BAND[0], BAND[1], 3]);
             for (i = [0, 1], j = [0, 1]) translate([PI_OFF[0] + 3.5 + i * PI5_HOLES[0], PI_OFF[1] + 3.5 + j * PI5_HOLES[1], 0]) cylinder(d = 6.5, h = 9);
-            for (k = [0, 1]) translate([108 + k * 31, 12, 0]) difference() { cube([29.4, 67.4, 7]); translate([1.2, 1.2, 5]) cube([27, 65, 5]); translate([4, 6, -1]) cube([21.4, 55.4, 10]); }
+            translate([98, 12, 0]) difference() { cube([29.4, 67.4, 7]); translate([1.2, 1.2, 5]) cube([27, 65, 5]); translate([4, 6, -1]) cube([21.4, 55.4, 10]); }   // LilyGO
+            translate([RAK_O[0], RAK_O[1], 0]) difference() { cube([RAK_C[0], RAK_C[1], 8]); translate([1.2, 1.2, 5]) cube([RAK_C[0] - 2.4, RAK_C[1] - 2.4, 5]); translate([5, 6, -1]) cube([RAK_C[0] - 10, RAK_C[1] - 12, 10]); }   // RAK19007 + RAK4631
         }
         for (i = [0, 1], j = [0, 1]) translate([PI_OFF[0] + 3.5 + i * PI5_HOLES[0], PI_OFF[1] + 3.5 + j * PI5_HOLES[1], -1]) cylinder(d = 2.4, h = 20);
         for (p = BAND_POSTS) translate([p[0], p[1], -1]) cylinder(d = HOLE_M3, h = 10);
         translate([PI_OFF[0] + 16, PI_OFF[1] + 14, -1]) cube([50, 28, 10]);         // aire bajo la Pi
-        for (k = [0, 1], y = [25, 60]) translate([106 + k * 31, y, -1]) cube([2.8, 3, 20]);
-        translate([4, BAND[1] - 5, 2.5]) linear_extrude(1) text("Pi 5 + HAT          LilyGO ×2", size = 3.5, font = FONT);
+        for (x = [96, 127], y = [25, 60]) translate([x, y, -1]) cube([2.8, 3, 20]);
+        translate([4, BAND[1] - 5, 2.5]) linear_extrude(1) text("Pi 5 + HAT       LilyGO     RAK4631", size = 3.5, font = FONT);
     }
 }
 module poste(h) { difference() { cylinder(d = 10, h = h); translate([0, 0, -1]) cylinder(d = INS_M3, h = INS_M3_L + 1); translate([0, 0, h - INS_M3_L]) cylinder(d = INS_M3, h = INS_M3_L + 1); } }
 module poste_bandeja() { poste(DECK_H); }                     // 6: rejilla → bandeja_sdr (4 bajo la Pi + 2 delanteros)
-module poste_superior() { poste(BAND_H - DECK_H - DECK_T); }  // 4: bandeja_sdr → bandeja de la Pi (espárrago M3 × 14)
+module poste_medio() { poste(DECK2_H - DECK_H - DECK_T); }    // 6: bandeja_sdr → bandeja_sdr2
+module poste_superior() { poste(BAND_H - DECK2_H - DECK_T); } // 4: bandeja_sdr2 → bandeja de la Pi (espárrago M3 × 14)
 
 // -------------- bandeja intermedia de SDR (3 SDR más) ----------------
 // Va sobre la fila de dongles y la bahía SDRplay y bajo la bandeja de la Pi. Coordenadas absolutas
 // del módulo (DECK_O = esquina) y de cada SDR relativas a la bandeja: [nombre, [x, y], [largo x, ancho y, alto]].
 // Los conectores (SMA/USB) quedan en los extremos del lado largo, con ≥ 12 mm libres para el cable.
-DECK_O = [30, 54];  DECK = [167, 170];  DECK_T = 3;  DECK_H = 38;
-SDR_DECK = [["HRF", [20, 82], [124, 79, 20]], ["V4", [12, 20], [85, 26, 13]], ["AHF", [112, 6], [45, 60, 12]]];
+DECK_O = [30, 54];  DECK = [167, 170];  DECK_T = 3;  DECK_H = 38;  DECK2_H = 82;
+SDR_DECK = [["HRF", [20, 82], [120, 75, 20]], ["V4", [12, 20], [85, 26, 13]], ["AHF", [112, 6], [45, 60, 12]]];
+// segunda bandeja (v5.5): HL2 = Hermes-Lite 2 (medida a verificar con la tuya), 3 dongles tipo RTL/FlightStick (85 × 26 × 13) y 2 bahías de 52 × 30 × 15
+// Los postes están en y≈73–77 y y≈157: las bahías los esquivan (assert). RSPdx va en la bahía de expansión del suelo; HackRF Pro en «HRF» y Airspy HF+ en «AHF».
+SDR_DECK2 = [["HL2", [4, 85], [125, 62, 36]], ["S1", [4, 6], [85, 26, 13]], ["S2", [4, 36], [85, 26, 13]], ["S3", [100, 6], [52, 30, 15]], ["S4", [100, 38], [52, 24, 15]], ["S5", [136, 86], [26, 60, 13]]];
 DECK_FRONT = [[PL[0] + 40, PL[1] + 120], [PL[0] + 100, PL[1] + 120]];   // nudos de la rejilla
 function deck_posts() = concat(DECK_FRONT, [for (p = BAND_POSTS) [PL[0] + 20 + p[0], PL[1] + BAND_Y + p[1]]]);
 module bahia_x(l, w) {   // carriles en los lados largos; extremos abiertos para los conectores
@@ -317,17 +350,17 @@ module bahia_x(l, w) {   // carriles en los lados largos; extremos abiertos para
     for (x = [-2, l], y = [0, w - 8]) translate([x, y, 0]) cube([2, 8, 6]);
 }
 module bahia(l, w) { if (l >= w) bahia_x(l, w); else translate([l, 0, 0]) rotate(90) bahia_x(w, l); }
-module bandeja_sdr() {
+module bandeja_sdr(lista = SDR_DECK) {
     difference() {
         union() {
             cube([DECK[0], DECK[1], DECK_T]);
             for (p = deck_posts()) translate([p[0] - DECK_O[0], p[1] - DECK_O[1], 0]) cylinder(d = 12, h = DECK_T);
             for (x = [0, DECK[0] - 2]) translate([x, 0, 0]) cube([2, DECK[1], DECK_T + 4]);   // nervios de borde
             for (y = [0, DECK[1] - 2]) translate([0, y, 0]) cube([DECK[0], 2, DECK_T + 4]);
-            for (s = SDR_DECK) translate([s[1][0], s[1][1], DECK_T - E]) bahia(s[2][0], s[2][1]);
+            for (s = lista) translate([s[1][0], s[1][1], DECK_T - E]) bahia(s[2][0], s[2][1]);
         }
         for (p = deck_posts()) translate([p[0] - DECK_O[0], p[1] - DECK_O[1], -1]) cylinder(d = HOLE_M3, h = 10);
-        for (s = SDR_DECK) {
+        for (s = lista) {
             l = s[2][0]; w = s[2][1]; lx = l >= w;
             // rejillas de aire bajo cada SDR
             for (k = [10 : 10 : (lx ? l : w) - 10])
@@ -362,6 +395,7 @@ module soporte_dongle(ancho = 26, largo = 90) {   // cuna para un dongle (RTL, F
 module soporte_hub() { soporte_dongle(36, 124); }                    // regleta USB Vansuny 120 × 34 × 18
 module soporte_sdrplay() { soporte_dongle(100, 100); }               // RSPdx/RSP1B (≈ 98 × 88 × 32)
 module soporte_lilygo() { soporte_dongle(29, 70); }
+module soporte_rak() { soporte_dongle(32, 64); }                     // RAK19007 (30 × 60) con RAK4631 y GPS
 module soporte_wago() {   // 3 WAGO 221-415 en línea (bus de 12 V y masa)
     difference() { union() { base_rejilla(70, 26); translate([5, 3, 0]) cube([60, 20, 8]); } translate([7, 5, 3]) cube([56, 16, 10]); for (x = [20, 40, 60]) translate([x - 1.4, -1, 5]) cube([2.8, 30, 2]); }
 }
@@ -506,6 +540,7 @@ module componentes() {
         ghost("dimgray") translate([PL[0] + 20, PL[1] + 140, pz]) cube([124, 36, 18]);          // hub Vansuny
         ghost("silver") translate([PL[0] + 150, PL[1] + 140, pz]) cube([26, 50, 20]);           // diplexor HF/VHF
         ghost("orange") translate([PL[0] + 90, PL[1] + 186, pz]) cube([60, 26, 10]);            // WAGO 12 V
+        ghost("firebrick") translate([PL[0] + 20, PL[1] + 186, pz]) cube([60, 26, 22]);         // reserva: fusibles ATO por carril + 2 reductores 12→5 V (Pi y SDR USB) + 12 V del Hermes-Lite
         // bandeja intermedia con HackRF One, RTL-SDR V4 y Airspy HF+ Discovery
         for (p = deck_posts()) color("lightyellow") translate([p[0], p[1], pz]) cylinder(d = 10, h = DECK_H);
         translate([DECK_O[0], DECK_O[1], pz + DECK_H]) {
@@ -513,13 +548,20 @@ module componentes() {
             for (s = SDR_DECK) ghost(s[0] == "HRF" ? "crimson" : s[0] == "V4" ? "steelblue" : "darkorange")
                 translate([s[1][0], s[1][1], DECK_T]) cube(s[2]);
         }
-        for (p = deck_posts()) if (p[1] > PL[1] + BAND_Y) color("lightyellow") translate([p[0], p[1], pz + DECK_H + DECK_T]) cylinder(d = 10, h = BAND_H - DECK_H - DECK_T);
+        // segunda bandeja con 8 plazas de SDR más
+        for (p = deck_posts()) color("lightyellow") translate([p[0], p[1], pz + DECK_H + DECK_T]) cylinder(d = 10, h = DECK2_H - DECK_H - DECK_T);
+        translate([DECK_O[0], DECK_O[1], pz + DECK2_H]) {
+            color("lightyellow") bandeja_sdr(SDR_DECK2);
+            for (s = SDR_DECK2) ghost("mediumseagreen") translate([s[1][0], s[1][1], DECK_T]) cube(s[2]);
+        }
+        for (p = deck_posts()) if (p[1] > PL[1] + BAND_Y) color("lightyellow") translate([p[0], p[1], pz + DECK2_H + DECK_T]) cylinder(d = 10, h = BAND_H - DECK2_H - DECK_T);
         // bandeja
         translate([PL[0] + 20, PL[1] + BAND_Y, pz + BAND_H]) {
             color("lightyellow") bandeja();
             ghost("green") translate([PI_OFF[0], PI_OFF[1], 9]) cube([PI5[0], PI5[1], 18]);
             ghost("purple") translate([PI_OFF[0], PI_OFF[1], 29]) cube([PI5[0], PI5[1], 12]);
-            for (k = [0, 1]) ghost("royalblue") translate([109.2 + k * 31, 13.2, 7]) cube([27, 65, 10]);
+            ghost("royalblue") translate([99.2, 13.2, 7]) cube([27, 65, 10]);                                     // LilyGO
+            ghost("teal") translate([RAK_O[0] + 1.4, RAK_O[1] + 1.4, 8]) cube([30, 60, 26]);                      // RAK19007 + RAK4631 + GPS
         }
         if (CAMARA) ghost("black") translate([CAM_C[0] - CAM_MOD[0] / 2, CAM_C[1] - CAM_MOD[1] / 2, LID_Z0 - CAM_FRAME_H - CAM_MOD[2]]) cube(CAM_MOD);
         for (f = [[0, FAN_IN], [W - T - 25, FAN_OUT]]) ghost("black") translate([f[0] == 0 ? T : f[0], f[1][0] - 30, f[1][1] - 30]) cube([25, 60, 60]);
@@ -558,6 +600,13 @@ module montaje(abierta = false) {
 if (EL) {
     for (s = SDR_DECK) assert(s[1][0] >= 4 && s[1][1] >= 4 && s[1][0] + s[2][0] <= DECK[0] - 4 && s[1][1] + s[2][1] <= DECK[1] - 4, str("SDR fuera de la bandeja_sdr: ", s[0]));
     assert(DECK_H + DECK_T + max([for (s = SDR_DECK) s[2][2]]) + 4 <= BAND_H, "los SDR tocan la bandeja de la Pi");
+    for (s = SDR_DECK2) assert(s[1][0] >= 4 && s[1][1] >= 4 && s[1][0] + s[2][0] <= DECK[0] - 4 && s[1][1] + s[2][1] <= DECK[1] - 4, str("SDR fuera de la bandeja_sdr2: ", s[0]));
+    assert(DECK_H + DECK_T + max([for (s = SDR_DECK) s[2][2]]) + 4 <= DECK2_H, "los SDR de la bandeja 1 tocan la bandeja 2");
+    assert(DECK2_H + DECK_T + max([for (s = SDR_DECK2) s[2][2]]) + 4 <= BAND_H, "los SDR de la bandeja 2 tocan la bandeja de la Pi");
+    for (a = SDR_DECK2, b = SDR_DECK2) if (a[0] < b[0])
+        assert(max(b[1][0] - a[1][0] - a[2][0], a[1][0] - b[1][0] - b[2][0], b[1][1] - a[1][1] - a[2][1], a[1][1] - b[1][1] - b[2][1]) >= 2, str("se solapan en la bandeja 2: ", a[0], " y ", b[0]));
+    for (s = SDR_DECK2, p = deck_posts()) assert(!(p[0] - DECK_O[0] + 6 > s[1][0] - 2 && p[0] - DECK_O[0] - 6 < s[1][0] + s[2][0] + 2 && p[1] - DECK_O[1] + 6 > s[1][1] - 2 && p[1] - DECK_O[1] - 6 < s[1][1] + s[2][1] + 2), str("una bahía de la bandeja 2 pisa un poste: ", s[0]));
+    assert(RAK_O[0] + RAK_C[0] <= BAND[0] - 5 && RAK_O[1] + RAK_C[1] <= BAND[1] - 8, "la cuna RAK se sale de la bandeja");
     assert(T + STANDOFF + PL_T + BAND_H + 41 <= D + GAP_LID - RIB_H, "la Pi + HAT toca la tapa");
     assert(GL_Z + 25.4 / 2 + 8 <= D, "los prensaestopas no caben en la cara inferior");
 }
@@ -581,6 +630,10 @@ else if (PART == "placa_rejilla") placa_rejilla();
 else if (PART == "bandeja") bandeja();
 else if (PART == "poste_bandeja") poste_bandeja();
 else if (PART == "bandeja_sdr") bandeja_sdr();
+else if (PART == "bandeja_sdr2") bandeja_sdr(SDR_DECK2);
+else if (PART == "poste_medio") poste_medio();
+else if (PART == "soporte_rak") soporte_rak();
+else if (PART == "vista_sdr2") { color("lightyellow") bandeja_sdr(SDR_DECK2); for (s = SDR_DECK2) ghost("mediumseagreen") translate([s[1][0], s[1][1], DECK_T]) cube(s[2]); }
 else if (PART == "vista_sdr") { color("lightyellow") bandeja_sdr(); for (s = SDR_DECK) ghost(s[0] == "HRF" ? "crimson" : s[0] == "V4" ? "steelblue" : "darkorange") translate([s[1][0], s[1][1], DECK_T]) cube(s[2]); }
 else if (PART == "poste_superior") poste_superior();
 else if (PART == "capota") capota();
