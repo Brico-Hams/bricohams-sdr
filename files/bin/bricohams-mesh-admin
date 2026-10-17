@@ -42,6 +42,8 @@ import subprocess
 import sys
 import threading
 import time
+import tarfile
+import tempfile
 from urllib.parse import parse_qs, urlsplit
 
 PUERTO = int(os.environ.get('MESH_ADMIN_PORT', '8076'))
@@ -56,6 +58,10 @@ TAK_POSICIONES = '/settings/bricohams/tak/posiciones'
 MONITOR = '/settings/bricohams/monitorizacion'
 MAPFLIGHTS = '/settings/bricohams/mapflights'
 SEGURIDAD = '/settings/bricohams/seguridad'
+SATELITES = '/settings/bricohams/satelites'
+CLIMA = '/settings/bricohams/clima'
+AGENDA_LOCK = threading.RLock()
+AGENDA_BACKUPS = '/var/backups/bricohams'
 # mensajes Meshtastic: bricohams-mesh-owrx tiene la única conexión a cada nodo; el panel le pide
 # los envíos por su socket Unix (0600) y lee el historial que guarda (chat.json, 0600)
 MESH_CHAT = '/settings/bricohams/meshtastic/chat'
@@ -169,9 +175,10 @@ def escribir_env(ruta, cambios, comilla='"'):
 
 def guardar(cambios):
     """bricohams.env del kit (manda en la próxima instalación) y la copia de /etc (la leen los servicios)."""
-    if ENV_KIT and os.path.isfile(ENV_KIT):
-        escribir_env(ENV_KIT, cambios, '"')
-    escribir_env(ENV_ETC, cambios, "'")
+    with AGENDA_LOCK:
+        if ENV_KIT and os.path.isfile(ENV_KIT):
+            escribir_env(ENV_KIT, cambios, '"')
+        escribir_env(ENV_ETC, cambios, "'")
 
 
 def si(v, d='no'):
@@ -238,7 +245,9 @@ def leer_nodo(tipo, destino):
     if tipo == 'serie':
         i = meshtastic.serial_interface.SerialInterface(devPath=destino)
     else:
-        i = meshtastic.tcp_interface.TCPInterface(hostname=destino)
+        host, sep, port = destino.rpartition(':')
+        opciones = {'hostname': host, 'portNumber': int(port)} if sep and destino.count(':') == 1 else {'hostname': destino}
+        i = meshtastic.tcp_interface.TCPInterface(**opciones)
     try:
         num = i.myInfo.my_node_num if i.myInfo else None
         yo = (i.nodesByNum or {}).get(num, {}) if num is not None else {}
@@ -333,6 +342,8 @@ def systemctl(*a):
 
 def destino(nodo, env):
     if nodo == '433':
+        if env.get('MESH433_WEB', 'no').lower() in ('yes', 'true', '1', 'si', 'sí', 'on'):
+            return 'tcp', '127.0.0.1:4404'
         return 'serie', env.get('MESH433_PUERTO', '/dev/lilygo-mesh')
     return 'tcp', env.get('MESH868_HOST', '127.0.0.1')
 
@@ -1020,6 +1031,8 @@ def accion_seguridad(campos):
 def accion(campos):
     """Devuelve el mensaje para la web; ValueError = dato no válido."""
     a = campos.get('accion', '')
+    if a.startswith(('sat-', 'wx-')):
+        return accion_agendas(campos)
     env = leer_env()
     m = re.match(r'^(guardar|aplicar)(433|868)$', a)
     if m:
@@ -1143,9 +1156,17 @@ def accion_chat(campos):
     return hecho
 
 
-def pagina_chat(sesion, aviso='', error='', auto=False):
+def pagina_chat(sesion, aviso='', error='', auto=False, host=''):
     """Enviar y recibir mensajes por los canales de los nodos 433 y 868 (sin JavaScript: CSP script-src 'none')."""
     oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    nombre_host = urlsplit('//' + host).hostname if host else ''
+    enlaces_web = ''
+    if nombre_host and re.fullmatch(r'[A-Za-z0-9.:-]+', nombre_host):
+        nombre_host = '[%s]' % nombre_host if ':' in nombre_host else nombre_host
+        enlaces_web = ('<p>Cliente oficial (solo LAN/VPN): <a href="https://%s:8443/">868</a> · '
+                       '<a href="https://%s:8444/">433 (requiere MESH433_WEB=yes)</a>. '
+                       'Elige New Connection → HTTP → Connect, conservando el host y puerto propuestos.</p>') % (
+                           e(nombre_host), e(nombre_host))
     chat = (leer_json(os.path.join(MESH_RUN, 'chat.json')) or {}).get('redes') or {}
     est = ((leer_json(os.path.join(MESH_RUN, 'mesh.json')) or {}).get('fuentes')) or {}
     cols = []
@@ -1197,13 +1218,14 @@ def pagina_chat(sesion, aviso='', error='', auto=False):
 <nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
 <li class="breadcrumb-item"><a href="%(base)s">Meshtastic 433 / 868</a></li><li class="breadcrumb-item active">Mensajes</li></ol></nav>
 <h1>Meshtastic · mensajes</h1>
+%(enlaces_web)s
 <p class="text-muted">Envía y recibe por los canales de nuestros nodos: lo que mandes sale por radio a la red Meshtastic
 (y a los nodos conectados a ella). Se guardan los últimos 200 mensajes de cada red mientras el servicio esté en marcha
 (no se escriben en disco); los directos a otros nodos nunca se guardan.
 <a href="%(chat)s">Actualizar</a> · %(auto)s</p>
 %(aviso)s%(error)s</div></div>
 <div class="row">%(cols)s</div></div></body></html>''' % {
-        'refresco': refresco, 'base': BASE, 'chat': MESH_CHAT, 'cols': ''.join(cols),
+        'refresco': refresco, 'base': BASE, 'chat': MESH_CHAT, 'cols': ''.join(cols), 'enlaces_web': enlaces_web,
         'auto': ('<a href="%s">parar la recarga automática</a>' % MESH_CHAT) if auto else (
             '<a href="%s?auto=1">recargar cada 20 s</a> (pierde lo que estés escribiendo)' % MESH_CHAT),
         'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
@@ -1458,6 +1480,7 @@ def cabecera(titulo, ruta):
     enlaces = ' · '.join('<a href="%s">%s</a>' % (r, n) for r, n in (
         (BASE, 'Meshtastic'), (APRS, 'APRS (RAK)'), (TAK, 'TAK'), (MONITOR, 'Monitorización'),
         (MAPFLIGHTS, 'map.flights'),
+        (SATELITES, 'Satélites y agendas'), (CLIMA, 'Clima'),
         (SEGURIDAD, 'Seguridad')) if r != ruta)
     return """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%s
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
@@ -1632,7 +1655,7 @@ def tarjeta_backup_remoto(oculto):
         usuario = '%s\\%s' % (c['dominio'], usuario)
     guardada = ('<span class="text-success">guardada</span>' if hay.get('password') else '<span class="text-muted">sin guardar</span>')
     tok = ('<span class="text-success">guardado</span>' if hay.get('token') else '<span class="text-muted">sin guardar</span>')
-    destino_ph = '\\\\192.168.1.254\\fw\\backup' if p != 'nfs' else 'nas.local:/export/backup'
+    destino_ph = '\\\\192.168.1.10\\fw\\backup' if p != 'nfs' else 'nas.local:/export/backup'
     v = {
         'ruta': SEGURIDAD, 'oculto': oculto, 'timer': e(br_timer()), 'resumen': resumen, 'huella': huella,
         'tabla': ('<table class="table table-sm"><tr><th>Orden</th><th>Fecha</th><th>Estado</th><th>Mensaje</th></tr>%s</table>' % ''.join(filas))
@@ -1872,8 +1895,241 @@ def pagina_mapflights(s, aviso='', error=''):
               'envía datos a terceros desde el navegador.</p></div></div></div></body></html>')
 
 
+def agenda_json(ruta):
+    with open(ruta, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def rutas_agenda(env):
+    base = '/usr/lib/python3/dist-packages/htdocs/plugins/receiver'
+    return (env.get('SAT_LIST', '/opt/bricohams/kit/data/satelites.json'),
+            env.get('SATREC_PASES', base + '/satelites/pases.json'),
+            env.get('SATREC_OUT', base + '/satelites/grabaciones.json'),
+            env.get('WXRED_OUT', base + '/meteo/wx-red.json'))
+
+
+def backup_agendas():
+    """Verifica todos los bytes antes de guardar; los entornos contienen secretos."""
+    os.makedirs(AGENDA_BACKUPS, mode=0o700, exist_ok=True)
+    carpeta = tempfile.mkdtemp(prefix='settings-agendas-', dir=AGENDA_BACKUPS)
+    rutas = list(dict.fromkeys([ENV_ETC] + ([ENV_KIT] if ENV_KIT else [])))
+    archivo = os.path.join(carpeta, 'previo.tar.gz')
+    nombres = {ruta: os.path.splitdrive(ruta)[1].replace(os.sep, '/').lstrip('/') for ruta in rutas}
+    with tarfile.open(archivo, 'w:gz') as t:
+        for ruta in rutas:
+            if os.path.islink(ruta) or not os.path.isfile(ruta):
+                raise OSError('No se puede respaldar el entorno: ' + ruta)
+            t.add(ruta, arcname=nombres[ruta], recursive=False)
+    os.chmod(archivo, 0o600)
+    with tarfile.open(archivo, 'r:gz') as t:
+        for ruta in rutas:
+            with open(ruta, 'rb') as f:
+                if t.extractfile(nombres[ruta]).read() != f.read():
+                    raise OSError('Fallo al verificar el backup: ' + ruta)
+    with open(archivo, 'rb') as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    with open(archivo + '.sha256', 'w', encoding='utf-8') as f:
+        f.write(digest + '  previo.tar.gz\n')
+    restaurar = os.path.join(carpeta, 'RESTAURAR.sh')
+    with open(restaurar, 'w', encoding='utf-8', newline='\n') as f:
+        f.write('#!/bin/bash\nset -euo pipefail\ncd -- "$(dirname -- "$0")"\n'
+                'sha256sum -c previo.tar.gz.sha256\n'
+                'tar -xzf previo.tar.gz -C /\n'
+                'systemctl restart bricohams-satrec bricohams-wx-red\n')
+    os.chmod(restaurar, 0o700)
+    return carpeta
+
+
+def numero_agenda(campos, clave, minimo, maximo):
+    texto = campos.get(clave, '')
+    if not re.fullmatch(r'[0-9]+', texto) or not minimo <= int(texto) <= maximo:
+        raise ValueError('%s debe estar entre %s y %s' % (clave, minimo, maximo))
+    return texto
+
+
+def accion_agendas(campos):
+    with AGENDA_LOCK:
+        env = leer_env()
+        lista, pases_f, estado_f, _ = rutas_agenda(env)
+        a = campos.get('accion')
+        if a == 'wx-guardar':
+            cambios = {'WXRED_RADIO_KM': numero_agenda(campos, 'WXRED_RADIO_KM', 5, 500),
+                       'WXRED_HORAS': numero_agenda(campos, 'WXRED_HORAS', 1, 24),
+                       'WXRED_SATELITES': 'yes' if campos.get('WXRED_SATELITES') == 'yes' else 'no'}
+            unidad = 'bricohams-wx-red'
+        elif a in ('sat-guardar', 'sat-omitir', 'sat-incluir'):
+            pases = agenda_json(pases_f)['pases']
+            estado = agenda_json(estado_f)
+            ahora = time.time()
+            if any(p['aos'] - 60 <= ahora <= p['los'] + 60
+                   for p in pases + estado.get('plan', [])):
+                raise ValueError('Hay un pase en curso o inminente. Guarda al terminar para no interrumpirlo.')
+            if a == 'sat-guardar':
+                catalogo = agenda_json(lista)['satelites']
+                nombres = {s['nombre'].upper() for s in catalogo}
+                excluir = {x.strip().upper() for x in env.get('SATREC_EXCLUIR', '').split(',') if x.strip()}
+                excluir -= nombres
+                excluir.update(s['nombre'].upper() for s in catalogo
+                               if campos.get('sat_' + str(s['norad'])) != 'yes')
+                cambios = {'SATREC_MIN_EL': numero_agenda(campos, 'SATREC_MIN_EL', 0, 90),
+                           'SATREC_ENABLE': 'yes' if campos.get('SATREC_ENABLE') == 'yes' else 'no',
+                           'SATREC_METEOR': 'yes' if campos.get('SATREC_METEOR') == 'yes' else 'no',
+                           'SATREC_EXCLUIR': ','.join(sorted(excluir))}
+            else:
+                ident = campos.get('pase', '')
+                validos = {'%s:%s' % (p['norad'], int(p['aos'])) for p in pases if p['aos'] > ahora + 60}
+                if ident not in validos:
+                    raise ValueError('Pase caducado o desconocido; recarga la agenda.')
+                omitir = {x for x in env.get('SATREC_OMITIR_PASES', '').split(',') if x in validos}
+                if a == 'sat-omitir':
+                    omitir.add(ident)
+                else:
+                    omitir.discard(ident)
+                cambios = {'SATREC_OMITIR_PASES': ','.join(sorted(omitir))}
+            unidad = 'bricohams-satrec'
+        else:
+            raise ValueError('Acción de agenda desconocida')
+        copia = backup_agendas()
+        try:
+            guardar(cambios)
+            r = subprocess.run(['systemctl', 'restart', unidad], capture_output=True, text=True, timeout=30)
+            if r.returncode:
+                raise OSError('No se pudo reiniciar %s; revisa su journal local.' % unidad)
+            r = subprocess.run(['systemctl', 'is-active', '--quiet', unidad], timeout=10)
+            if r.returncode:
+                raise OSError('El servicio %s no está activo.' % unidad)
+        except (OSError, subprocess.TimeoutExpired) as x:
+            raise OSError('Cambios sin confirmar: %s. Backup: %s; restaura con sudo bash %s/RESTAURAR.sh'
+                          % (x, copia, copia)) from x
+        return 'Guardado y servicio activo. Backup verificado: %s. Restauración: sudo bash %s/RESTAURAR.sh' % (copia, copia)
+
+
+def campo_agenda(nombre, titulo, valor, minimo, maximo):
+    return ('<label class="d-block">%s <input class="form-control" type="number" name="%s" '
+            'min="%s" max="%s" value="%s" required></label>' % (
+                e(titulo), e(nombre), minimo, maximo, e(valor)))
+
+
+def check_agenda(nombre, titulo, activo):
+    return '<label class="d-block"><input type="checkbox" name="%s" value="yes"%s> %s</label>' % (
+        e(nombre), ' checked' if activo else '', e(titulo))
+
+
+def informes_capturas(capturas, catalogo, env):
+    ruta = os.environ.get('SATREC_PY', '/usr/local/bin/bricohams-satrec')
+    if not os.path.isfile(ruta):
+        ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bricohams-satrec.py')
+    loader = importlib.machinery.SourceFileLoader('bh_satrec_informes', ruta)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(mod)
+    cfg = mod.cfg_desde_env(env)
+    asociaciones = {x['norad']: x['amsat'] for x in catalogo if x.get('amsat')}
+    filas = []
+    for c in capturas[:60]:
+        datos = dict(c)
+        datos['amsat'] = datos.get('amsat') or asociaciones.get(c['norad'], '')
+        f = mod.informe_amsat(datos, cfg)
+        fecha = time.strftime('%d/%m/%Y %H:%M UTC', time.gmtime(c['aos']))
+        informe = '<span>No disponible: requiere captura grabada, asociación AMSAT e indicativo configurado.</span>'
+        if c.get('amsat_enviado'):
+            informe = '<span>Informe ya enviado automáticamente a AMSAT.</span>'
+        elif f:
+            ocultos = ''.join('<input type="hidden" name="%s" value="%s">' % (e(k), e(v))
+                              for k, v in f.items() if k != 'SatReport')
+            opciones = '<option value="" disabled%s>Selecciona el resultado observado</option>' % (
+                ' selected' if not f['SatReport'] else '')
+            opciones += ''.join('<option value="%s"%s>%s</option>' % (
+                v, ' selected' if v == f['SatReport'] else '', titulo)
+                for v, titulo in (('Heard', 'Oído (Heard)'), ('Telemetry Only', 'Solo telemetría'),
+                                  ('Not Heard', 'No oído (Not Heard)')))
+            informe = ('<form method="post" action="https://www.amsat.org/status/submit.php" '
+                       'target="_blank" rel="noopener noreferrer">' + ocultos
+                       + '<p>%s · %s · %s</p>' % (e(f['SatName']), e(f['SatCall']), e(f['SatGridSquare']))
+                       + '<label>Resultado <select name="SatReport" required class="form-control">'
+                       + opciones + '</select></label>'
+                       '<p><label><input type="checkbox" required> He revisado el resultado y autorizo enviar '
+                       'indicativo, locator y fecha a AMSAT.</label></p>'
+                       '<button class="btn btn-primary" name="SatSubmit" value="Submit Data">'
+                       'Enviar reporte a AMSAT.org</button></form>')
+        filas.append('<tr><td>%s<br>%s</td><td>%s</td><td>%s</td></tr>' % (
+            e(c.get('nombre')), fecha, e(c.get('estado')), informe))
+    return ('<h2>Capturas y reportes AMSAT.org</h2><p>El botón envía el informe al sitio oficial en otra pestaña; '
+            'no es una vista previa. Revisa su respuesta: este panel no confirma la aceptación ni impide '
+            'duplicados manuales. No se envían informes por abrir esta página. En SSB elige tú el resultado.</p>'
+            '<div class="table-responsive"><table class="table"><tr><th>Captura (UTC)</th>'
+            '<th>Resultado de captura</th><th>Informe manual</th></tr>' + ''.join(filas) + '</table></div>')
+
+
+def pagina_satelites(s, aviso='', error=''):
+    inicio = cabecera('Satélites y agendas de captura', SATELITES)
+    try:
+        env = leer_env()
+        lista, pases_f, estado_f, _ = rutas_agenda(env)
+        catalogo = agenda_json(lista)['satelites']
+        pases = agenda_json(pases_f)['pases']
+        estado = agenda_json(estado_f)
+        excluir = {x.strip().upper() for x in env.get('SATREC_EXCLUIR', '').split(',')}
+        omitidos = set(env.get('SATREC_OMITIR_PASES', '').split(','))
+        planificados = {'%s:%s' % (p['norad'], int(p['aos'])) for p in estado['plan']}
+        oculto = '<input type="hidden" name="csrf" value="%s">' % token(s)
+        formulario = ('<form method="post" action="%s">%s' % (SATELITES, oculto)
+                      + check_agenda('SATREC_ENABLE', 'Captura automática habilitada', si(env.get('SATREC_ENABLE'), 'yes'))
+                      + check_agenda('SATREC_METEOR', 'Preparar perfil METEOR / SatDump', si(env.get('SATREC_METEOR'), 'yes'))
+                      + campo_agenda('SATREC_MIN_EL', 'Elevación mínima (grados)', env.get('SATREC_MIN_EL', '20'), 0, 90)
+                      + '<h2>Agendas por satélite</h2><p>Desmarca un satélite para excluir todos sus pases.</p>'
+                      + ''.join(check_agenda('sat_' + str(x['norad']), x['nombre'], x['nombre'].upper() not in excluir)
+                                for x in catalogo)
+                      + '<button class="btn btn-primary" name="accion" value="sat-guardar">Guardar agendas</button></form>')
+        filas = []
+        for p in sorted(pases, key=lambda x: x['aos']):
+            if p['los'] <= time.time():
+                continue
+            ident = '%s:%s' % (p['norad'], int(p['aos']))
+            omitido = ident in omitidos
+            estado_p = 'Omitido' if omitido else ('Programado' if ident in planificados else 'No programado (filtros, solape o ya capturado)')
+            fecha = time.strftime('%d/%m %H:%M', time.localtime(p['aos']))
+            filas.append('<tr><td>%s</td><td>%s</td><td>%s°</td><td>%s</td><td>'
+                         '<form method="post" action="%s">%s<input type="hidden" name="pase" value="%s">'
+                         '<button class="btn btn-sm btn-secondary" name="accion" value="%s">%s</button></form></td></tr>' % (
+                             e(p['nombre']), fecha, e(p['max_el']), estado_p, SATELITES, oculto, e(ident),
+                             'sat-incluir' if omitido else 'sat-omitir', 'Reconsiderar' if omitido else 'Omitir este pase'))
+        capturas = informes_capturas(estado.get('capturas', []), catalogo, env)
+        return (inicio + avisos(aviso, error) + '<h1>Satélites y agendas de captura</h1>'
+                '<p>Un solo receptor: los pases solapados se priorizan por inicio. Reconsiderar un pase no evita '
+                'los filtros ni garantiza recepción. Horas locales del servidor. Los cambios no se aplican durante un pase.</p>'
+                + formulario + '<h2>Próximos pases</h2><p><a href="/static/plugins/receiver/satelites/pases.ics">'
+                'Descargar agenda de capturas (ICS)</a> · <a href="/files">Grabaciones e imágenes (Files)</a></p>'
+                '<div class="table-responsive"><table class="table"><tr><th>Satélite</th><th>Inicio</th>'
+                '<th>Máxima</th><th>Estado</th><th>Agenda</th></tr>' + ''.join(filas[:100]) + '</table></div>'
+                + capturas + '</div></div></div></body></html>')
+    except (OSError, ValueError, KeyError, TypeError) as x:
+        return inicio + avisos(aviso, error or 'No se puede cargar la agenda: %s' % x) + '</div></div></div></body></html>'
+
+
+def pagina_clima(s, aviso='', error=''):
+    inicio = cabecera('Clima en red', CLIMA)
+    try:
+        env = leer_env()
+        datos = agenda_json(rutas_agenda(env)[3])
+        oculto = '<input type="hidden" name="csrf" value="%s">' % token(s)
+        return (inicio + avisos(aviso, error) + '<h1>Clima en red</h1>'
+                '<p>Recepción APRS-IS de solo lectura. No cambia el sensor local ni transmite por radio.</p>'
+                '<form method="post" action="%s">%s' % (CLIMA, oculto)
+                + campo_agenda('WXRED_RADIO_KM', 'Radio de búsqueda (km)', env.get('WXRED_RADIO_KM', '100'), 5, 500)
+                + campo_agenda('WXRED_HORAS', 'Antigüedad máxima de datos (horas)', env.get('WXRED_HORAS', '3'), 1, 24)
+                + check_agenda('WXRED_SATELITES', 'Incluir paquetes recibidos por satélite', si(env.get('WXRED_SATELITES'), 'yes'))
+                + '<button class="btn btn-primary" name="accion" value="wx-guardar">Guardar y aplicar clima</button></form>'
+                '<h2>Estado recibido</h2><pre>' + e(json.dumps(
+                    {k: datos[k] for k in ('actualizado', 'conexion', 'conectado', 'error') if k in datos},
+                    ensure_ascii=False, indent=2)) + '</pre><p><a href="/bricohams/clima.html">'
+                'Abrir estaciones, mapa y datos meteorológicos</a></p></div></div></div></body></html>')
+    except (OSError, ValueError, KeyError, TypeError) as x:
+        return inicio + avisos(aviso, error or 'No se puede cargar el clima: %s' % x) + '</div></div></div></body></html>'
+
+
 PAGINAS = {BASE: pagina, APRS: pagina_aprs, TAK: pagina_tak, MONITOR: pagina_monitor,
-           SEGURIDAD: pagina_seguridad, MAPFLIGHTS: pagina_mapflights, MESH_CHAT: pagina_chat}
+           SEGURIDAD: pagina_seguridad, MAPFLIGHTS: pagina_mapflights, MESH_CHAT: pagina_chat,
+           SATELITES: pagina_satelites, CLIMA: pagina_clima}
 
 # Igual que en bricohams-owrx-botones (el test comprueba que coinciden): los paneles
 # salen oscuros y legibles aunque admin.css de OpenWebRX+ aún no esté parcheado.
@@ -1914,7 +2170,8 @@ def con_tema(html):
 
 # acciones que acepta cada página; la de Meshtastic no puede tocar TAK, monitorización ni seguridad
 ACCIONES = {APRS: re.compile(r'^reiniciarrak$'), TAK: re.compile(r'^tak-'), MONITOR: re.compile(r'^mon-'),
-            SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-|mesh-)'),
+            SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-|mesh-|sat-|wx-)'),
+            SATELITES: re.compile(r'^sat-(guardar|omitir|incluir)$'), CLIMA: re.compile(r'^wx-guardar$'),
             MESH_CHAT: re.compile(r'^mesh-enviar$')}
 
 
@@ -1959,7 +2216,8 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(cuerpo)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Robots-Tag', 'noindex')
-        self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'; frame-ancestors 'self'")
+        formularios = "'self' https://www.amsat.org/status/submit.php" if self._ruta() == SATELITES else "'self'"
+        self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action %s; frame-ancestors 'self'" % formularios)
         for k, v in cabeceras:
             self.send_header(k, v)
         self.end_headers()
@@ -2007,7 +2265,8 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         if ruta == MONITOR:
             return PAGINAS[ruta](s, aviso, error, host=self.headers.get('Host', ''))
         if ruta == MESH_CHAT:
-            return pagina_chat(s, aviso, error, auto=parse_qs(urlsplit(self.path).query).get('auto') == ['1'])
+            return pagina_chat(s, aviso, error, auto=parse_qs(urlsplit(self.path).query).get('auto') == ['1'],
+                               host=self.headers.get('Host', ''))
         return PAGINAS[ruta](s, aviso, error)
 
     do_HEAD = do_GET

@@ -88,6 +88,10 @@ assert mq.simbolo(',', 'M') == {'symbol': ',', 'table': 'M', 'index': 11, 'table
 
 # ------------------------------------------------------------------ Meshtastic -> formato de OpenWebRX+
 M = cargar('mesh', os.path.join(BIN, 'bricohams-mesh-owrx'))
+os.environ['MESH433_WEB'] = 'yes'
+assert M.fuentes()[0][1:3] == ('tcp', '127.0.0.1:4404')
+os.environ['MESH433_WEB'] = 'no'
+assert M.fuentes()[0][1] == 'serie'
 nodo = {'num': 0x1234abcd, 'user': {'longName': 'SDR BricoHams 433', 'shortName': 'SB43', 'hwModel': 'TLORA_V2_1_1P6',
                                     'role': 'CLIENT'},
         'position': {'latitude': 37.983812, 'longitude': -1.128011, 'altitude': 230},

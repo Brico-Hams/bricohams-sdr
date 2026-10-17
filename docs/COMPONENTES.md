@@ -9,6 +9,7 @@ servicios y puertos usa, dónde guarda su configuración, desde dónde se gestio
 qué prueba lo cubre y qué manual lo explica**. El detalle fichero a fichero está en
 [ESTRUCTURA_FICHEROS.md](ESTRUCTURA_FICHEROS.md) y las decisiones de diseño en
 [ARQUITECTURA.md](ARQUITECTURA.md) (incluye la integración adicional map.flights, ADR-70).
+La lista de módulos creados, la historia de desarrollo de cada uno y los plugins de OpenWebRX+ uno a uno están en [DESARROLLO_MODULOS.md](DESARROLLO_MODULOS.md).
 
 ## Reglas comunes a todos los componentes
 

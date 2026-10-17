@@ -32,10 +32,15 @@ BOTON_WEB = '''
         <div class="col-4">
             <a class="btn btn-secondary" id="bricohams-meshweb" href="settings/bricohams/meshtastic">Meshtastic Web (868)</a>
         </div>'''
+BOTON_WEB433 = '''
+        <div class="col-4">
+            <a class="btn btn-secondary" id="bricohams-meshweb433" href="settings/bricohams/meshtastic/chat">Meshtastic Web (433)</a>
+        </div>'''
 # sin «$»: OpenWebRX+ pasa la plantilla por string.Template
 JS = ("<script>if(location.port==='8073'){document.querySelectorAll('a[data-bricohams]').forEach(function(a){"
       "a.href='https://'+location.hostname+'/'+a.getAttribute('href');});}"
-      "var w=document.getElementById('bricohams-meshweb');if(w){w.href='https://'+location.hostname+':8443/';}</script>")
+      "var w=document.getElementById('bricohams-meshweb');if(w){w.href='https://'+location.hostname+':8443/';}"
+      "var q=document.getElementById('bricohams-meshweb433');if(q){q.href='https://'+location.hostname+':8444/';}</script>")
 
 
 BOTON_TAK = '''
@@ -48,7 +53,7 @@ BOTON_MON = '''
         </div>'''
 
 
-def bloque(web=True, tak=False, mon=False):
+def bloque(web=True, tak=False, mon=False, web433=False):
     return MARCA_INI + '''
         <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/meshtastic">Meshtastic 433 / 868</a>
@@ -60,8 +65,14 @@ def bloque(web=True, tak=False, mon=False):
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/mapflights">map.flights (ADS-B)</a>
         </div>
         <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/satelites">Satélites y agendas</a>
+        </div>
+        <div class="col-4">
+            <a class="btn btn-secondary" data-bricohams href="settings/bricohams/clima">Clima en red</a>
+        </div>
+        <div class="col-4">
             <a class="btn btn-secondary" data-bricohams href="settings/bricohams/seguridad">Seguridad</a>
-        </div>''' + (BOTON_WEB if web else '') + (BOTON_TAK if tak else '') + (BOTON_MON if mon else '') + '''
+        </div>''' + (BOTON_WEB if web else '') + (BOTON_WEB433 if web and web433 else '') + (BOTON_TAK if tak else '') + (BOTON_MON if mon else '') + '''
         ''' + JS + '''
         ''' + MARCA_FIN + '\n'
 
@@ -195,7 +206,7 @@ def quitar(texto):
 
 def poner(texto):
     limpio = quitar(texto)
-    b = bloque(mesh_web(), tak(), monitorizacion())
+    b = bloque(mesh_web(), tak(), monitorizacion(), env_val('MESH433_WEB', 'no') == 'yes')
     m = ANCLA.search(limpio)
     if m:
         return limpio[:m.start()] + '        ' + b + limpio[m.start():]

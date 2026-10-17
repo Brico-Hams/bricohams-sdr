@@ -14,7 +14,7 @@ EA5HKX publica dos plugins de receptor para OpenWebRX+ en
 | Plugin | Qué hace | Variable en `bricohams.env` |
 |---|---|---|
 | [`callsign_gate`](https://gitlab.com/openwebrx-plugins/callsign_gate) | Ventana de bienvenida (ES/EN) que pide indicativo o nombre antes de usar el receptor. Lo guarda solo en el navegador, 14 días desde la última visita, y lo pone como nombre del chat | `PLUGIN_CALLSIGN_GATE="yes"` |
-| [`tone_detector`](https://gitlab.com/openwebrx-plugins/tone_detector) | Panel «CTCSS» en el navegador del oyente: detecta el subtono (50 tonos, Goertzel) del audio FM/NFM que recibe | `PLUGIN_TONE_DETECTOR="yes"` |
+| [`tone_detector`](https://gitlab.com/openwebrx-plugins/tone_detector) | Panel «CTCSS» externo opcional, desactivado por defecto para no duplicar el control integrado | `PLUGIN_TONE_DETECTOR="no"` |
 
 Créditos: ambos son obra de **EA5HKX** (<https://www.qrz.com/db/EA5HKX>); la
 estación de referencia es <https://ea5hkx.myqnapcloud.com:8073/>.
@@ -44,7 +44,8 @@ Para pasar a una versión nueva: revisa sus cambios, actualiza commit y sha256 e
 ```bash
 PLUGIN_CALLSIGN_GATE="yes"        # identificación obligatoria al entrar
 CALLSIGN_GATE_ANUNCIO="no"        # «Chat iniciado por …» en el chat en cada visita
-PLUGIN_TONE_DETECTOR="yes"        # panel CTCSS en el navegador
+PLUGIN_TONE_DETECTOR="no"         # sin boton CTCSS externo duplicado
+OWRX_CTCSS_ENABLE="yes"           # conservar Subtono FM integrado
 ```
 
 Aplica los cambios con `sudo bash install.sh --solo plugins` y recarga la web
@@ -78,8 +79,10 @@ El plugin `identificacion` ([manual 39](39_REGISTRO_OYENTES.md)) comparte la ide
 `tone_detector` usa sus propios identificadores (`#openwebrx-panel-tone-detector`,
 botón «CTCSS») y no se mezcla con el detector CTCSS del servidor
 (`OWRX_CTCSS_ENABLE`, línea «CTCSS» bajo el S‑meter y campo «Subtono FM» de los
-marcadores). Son complementarios: el del servidor sirve de squelch por tono; el
-del navegador solo informa del tono que oye cada oyente.
+marcadores). El del servidor sirve de squelch por tono; el del navegador solo
+informa del tono que oye cada oyente. La configuracion recomendada conserva
+el integrado y no carga el panel externo ni su boton superior. No se elimina
+el detector del servidor, su JavaScript ni los subtonos de los marcadores.
 
 ## Privacidad
 

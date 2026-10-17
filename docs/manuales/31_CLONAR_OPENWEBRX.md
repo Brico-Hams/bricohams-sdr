@@ -54,7 +54,7 @@ sudo owrx-clone importar ~/estacion.owrx.tar.gz.enc --simular               # 1.
 sudo owrx-clone importar ~/estacion.owrx.tar.gz.enc --todo                  # 2.º aplícalo
 sudo owrx-clone comprobar
 ```
-Abre `http://IP:8073/`: deben salir los mismos receptores, perfiles, marcadores, plugins e imágenes, y entras con **los mismos usuarios** de administración.
+Abre `https://DOMINIO/`: deben salir los mismos receptores, perfiles, marcadores, plugins e imágenes, y entras con **los mismos usuarios** de administración. El backend queda en loopback, sin acceso directo desde la LAN o Internet.
 
 **Qué hace `importar`, en orden:**
 1. **Verifica el perfil.** Comprueba el SHA-256 de cada fichero y que ninguna entrada salga de su carpeta. Si el perfil está cifrado, pide la contraseña.

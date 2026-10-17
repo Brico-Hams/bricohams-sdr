@@ -62,7 +62,8 @@ def fuentes():
     """[(nombre, tipo, destino, frecuencia Hz)] según bricohams.env."""
     out = []
     if si('MESH433_OWRX', 'yes'):
-        out.append(('mesh433', 'serie', env('MESH433_PUERTO', '/dev/lilygo-mesh'), int(env('MESH433_FREQ', '433875000'))))
+        tipo, dest = ('tcp', '127.0.0.1:4404') if si('MESH433_WEB') else ('serie', env('MESH433_PUERTO', '/dev/lilygo-mesh'))
+        out.append(('mesh433', tipo, dest, int(env('MESH433_FREQ', '433875000'))))
     if si('MESH868_OWRX', 'yes'):
         out.append(('mesh868', 'tcp', env('MESH868_HOST', '127.0.0.1'), int(env('MESH868_FREQ', '869618000'))))
     return out
@@ -349,7 +350,9 @@ class Fuente:
                 raise OSError('no existe %s' % self.destino)
             self.iface = meshtastic.serial_interface.SerialInterface(devPath=self.destino)
         else:
-            self.iface = meshtastic.tcp_interface.TCPInterface(hostname=self.destino)
+            host, sep, port = self.destino.rpartition(':')
+            opciones = {'hostname': host, 'portNumber': int(port)} if sep and self.destino.count(':') == 1 else {'hostname': self.destino}
+            self.iface = meshtastic.tcp_interface.TCPInterface(**opciones)
         with self.lock:
             self.mio = getattr(getattr(self.iface, 'myInfo', None), 'my_node_num', None)
             for n in (self.iface.nodes or {}).values():

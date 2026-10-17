@@ -37,11 +37,23 @@ Todas las órdenes del kit en una página. El detalle de cada una está en su ma
 ## Web
 | Qué | Dónde |
 |---|---|
-| Receptor público | `http://DOMINIO/` (o `http://IP:8073/` en casa) |
+| Receptor público | `https://DOMINIO/` (también desde la LAN; sin puerto explícito) |
 | Administración (siempre HTTPS) | `https://DOMINIO/settings` |
-| Portal de servicios | `http://DOMINIO/bricohams/` |
+| Portal de servicios | `https://DOMINIO/bricohams/` |
 | Cambiar el modo SSL | `SSL_MODO` (admin, todo o no) en `bricohams.env` + `sudo bash install.sh --solo web` (manual 23) |
 | Filtro y DSP de audio | botones **FILTRO** y **DSP** de la barra superior (manual 30) |
+
+El backend solo debe escuchar en loopback (`OWRX_SOLO_LOCAL="yes"` y
+`BLINDAJE_8073="cerrado"`). No anuncies su puerto en Receiverbook ni abras una
+redirección hacia él en el router. Para corregir una instalación nativa existente:
+`sudo bash tools/cerrar-backend-publico.sh /ruta/bricohams.env https://DOMINIO/`.
+El script exige backup verificado y deja una orden de restauración antes de cambiar
+la configuración. Reinicia OpenWebRX+, por lo que interrumpe las sesiones activas.
+
+En Receiverbook registra la URL HTTPS sin puerto. Las claves se configuran en
+**Settings → General settings → Receiver keys**, una por línea; nunca en Git.
+La validación usa un desafío `Authorization: ReceiverId` contra `/status.json`:
+un HTTP 200 sin desafío no acredita por sí solo la verificación de propiedad.
 
 ## bricohams.env: claves con símbolos
 - **Lo más claro:** comillas simples, `QRZ_PASS='abc$def!'`.

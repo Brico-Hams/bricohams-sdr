@@ -47,8 +47,9 @@ assert instalador.index('plugin_ea5hkx "$p"') < instalador.index('-e "s#__CALLSI
 for marca in ('__CALLSIGN_GATE__', '__TONE_DETECTOR__', '__CALLSIGN_ANUNCIO__'):
     assert f'-e "s#{marca}#' in instalador and f"'{marca}' === 'yes'" in init, marca
 assert 'si "${CALLSIGN_GATE_ANUNCIO:-no}" && callsign_anuncio=yes' in instalador
-for var in ('PLUGIN_CALLSIGN_GATE="yes"', 'PLUGIN_TONE_DETECTOR="yes"', 'CALLSIGN_GATE_ANUNCIO="no"'):
+for var in ('PLUGIN_CALLSIGN_GATE="yes"', 'PLUGIN_TONE_DETECTOR="no"', 'CALLSIGN_GATE_ANUNCIO="no"', 'OWRX_CTCSS_ENABLE="yes"'):
     assert var in configuracion, var
+assert '[tone_detector]="${PLUGIN_TONE_DETECTOR:-no}"' in instalador
 
 # --- init.js: orden de carga ---------------------------------------------------------
 carga = re.search(r"for \(const name of \[([^\]]+)\]\)", init).group(1)
@@ -123,11 +124,11 @@ function cargarPuente(cfg, gate, chat, mensaje) {
 let gate = ventanaGate();
 let chat = { enviados: [], send() { this.enviados.push(mensaje.value); mensaje.value = ''; } };
 let mensaje = { value: '' };
-let r = cargarPuente({ callsign_gate: true, anuncio: false, titulo: 'EA1ZZZ', telegram: 'https://t.me/bricohams',
+let r = cargarPuente({ callsign_gate: true, anuncio: false, titulo: 'N0CALL', telegram: 'https://t.me/bricohams',
                        privacidad: '/bricohams/privacidad.html' }, gate, chat, mensaje);
 comprobar(r.ok === true, 'init devuelve true');
 const texto = gate.textContent;
-comprobar(!/EA5HKX SDR|SDR de EA5HKX/.test(texto) && /SDR de EA1ZZZ/.test(texto) && /EA1ZZZ SDR/.test(texto), 'títulos: ' + texto);
+comprobar(!/EA5HKX SDR|SDR de EA5HKX/.test(texto) && /SDR de N0CALL/.test(texto) && /N0CALL SDR/.test(texto), 'títulos: ' + texto);
 const enlaces = gate.todos().filter(n => n.tagName === 'A');
 comprobar(enlaces.some(a => a.href === 'https://t.me/bricohams' && a.textContent === '@bricohams'), 'Telegram propio');
 comprobar(!enlaces.some(a => /ea5hkxSDR/.test(a.href)), 'sin el Telegram de EA5HKX');

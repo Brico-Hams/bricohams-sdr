@@ -69,8 +69,8 @@ HamQTH es la fuente principal; RadioID y QRZ XML completan los campos que falten
 si están configurados. QRZ XML requiere suscripción para los datos completos.
 Las fotos de QRZ se enlazan, no se copian. Credenciales solo en
 `bricohams.env` con permisos privados, nunca en JavaScript. La ficha completa
-requiere nginx; desde `http://IP:8073` solo se muestran los datos que entrega
-OpenWebRX+.
+requiere nginx y se consulta por `https://DOMINIO/`; el backend de OpenWebRX+
+permanece en loopback, sin acceso directo desde la red.
 
 ### `satelites`
 

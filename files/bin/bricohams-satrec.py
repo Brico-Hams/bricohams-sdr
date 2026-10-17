@@ -69,6 +69,7 @@ def cfg_desde_env(env=os.environ):
         'en_files': int(env.get('SATREC_EN_FILES', '10')),
         'min_el': float(env.get('SATREC_MIN_EL', '20')),
         'excluir': {x.strip().upper() for x in re.split(r'[,;]+', env.get('SATREC_EXCLUIR', '')) if x.strip()},
+        'omitir_pases': set(env.get('SATREC_OMITIR_PASES', '').split(',')),
         'meteor': si(env.get('SATREC_METEOR', 'yes')),
         'dias': float(env.get('SATREC_DIAS', '30')),
         'max_mb': float(env.get('SATREC_MAX_MB', '2000')),
@@ -100,6 +101,8 @@ def prefijo(nombre):
 #  Plan de grabaciones
 # ---------------------------------------------------------------------
 def accion(p, cfg):
+    if '%s:%s' % (p['norad'], int(p['aos'])) in cfg.get('omitir_pases', set()):
+        return None
     if p['nombre'].upper() in cfg['excluir'] or p.get('max_el', 0) < cfg['min_el']:
         return None
     if p.get('perfil', '').endswith('|meteor'):
@@ -302,6 +305,8 @@ class WS:
                 continue
             if op == 8:
                 raise ConnectionError('OpenWebRX+ cerró el websocket')
+            if op == 10:
+                return op, d
             if op in (1, 2):
                 op0, partes = op, d
             elif op == 0:
@@ -329,38 +334,49 @@ def clave_magica(cfg):
 def conectar(cfg, perfil, timeout=20):
     """Conecta, elige el perfil y espera la configuración del receptor. Devuelve (ws, config)."""
     ws = WS(cfg['owrx'])
-    ws.s.settimeout(timeout)
-    ws.enviar('SERVER DE CLIENT client=bricohams-satrec type=receiver')
     sdr, prof = perfil.split('|', 1)
     conf, pedido = {}, False
-    limite = time.time() + timeout
-    while time.time() < limite:
-        op, d = ws.recibir()
-        if op != 1:
-            continue
-        txt = d.decode('utf-8', 'replace')
-        if txt.startswith('CLIENT DE SERVER'):
-            ws.json({'type': 'connectionproperties', 'params': {'output_rate': TASA, 'hd_output_rate': 48000}})
-            m = {'profile': perfil}
-            k = clave_magica(cfg)
-            if k:
-                m['key'] = k
-            ws.json({'type': 'selectprofile', 'params': m})
-            pedido = True
-            continue
-        try:
-            j = json.loads(txt)
-        except ValueError:
-            continue
-        if j.get('type') == 'config':
-            conf.update(j.get('value') or {})
-            if pedido and conf.get('sdr_id') == sdr and conf.get('profile_id') == prof and 'center_freq' in conf:
+    limite = time.monotonic() + timeout
+    confirmado = False
+    try:
+        ws.s.settimeout(timeout)
+        ws.enviar('SERVER DE CLIENT client=bricohams-satrec type=receiver')
+        while time.monotonic() < limite:
+            ws.s.settimeout(max(0.001, limite - time.monotonic()))
+            try:
+                op, d = ws.recibir()
+            except socket.timeout:
+                break
+            if op == 10 and pedido:
+                confirmado = True
+            elif op == 1:
+                txt = d.decode('utf-8', 'replace')
+                if txt.startswith('CLIENT DE SERVER'):
+                    ws.json({'type': 'connectionproperties', 'params': {'output_rate': TASA, 'hd_output_rate': 48000}})
+                    m = {'profile': perfil}
+                    k = clave_magica(cfg)
+                    if k:
+                        m['key'] = k
+                    ws.json({'type': 'selectprofile', 'params': m})
+                    # OpenWebRX+ procesa el ping después de todos los cambios síncronos del perfil.
+                    ws.enviar(b'', 9)
+                    pedido = True
+                    continue
+                try:
+                    j = json.loads(txt)
+                except ValueError:
+                    continue
+                if j.get('type') == 'config':
+                    conf.update(j.get('value') or {})
+                elif j.get('type') == 'log_message' and 'locked' in str(j.get('value', '')).lower():
+                    raise PermissionError('perfil %s bloqueado: pon la clave en %s' % (perfil, cfg['clave_fichero']))
+            if (confirmado and conf.get('sdr_id') == sdr and conf.get('profile_id') == prof
+                    and conf.get('center_freq') is not None and conf.get('samp_rate') is not None):
                 return ws, conf
-        elif j.get('type') == 'log_message' and 'locked' in str(j.get('value', '')).lower():
-            ws.cerrar()
-            raise PermissionError('perfil %s bloqueado: pon la clave en %s' % (perfil, cfg['clave_fichero']))
-    ws.cerrar()
-    raise TimeoutError('OpenWebRX+ no ha puesto el perfil %s' % perfil)
+        raise TimeoutError('OpenWebRX+ no ha confirmado la configuración del perfil %s' % perfil)
+    except (OSError, ValueError):
+        ws.cerrar()
+        raise
 
 
 FILTROS = {'nfm': (-7500, 7500), 'am': (-5000, 5000), 'usb': (300, 3000), 'lsb': (-3000, -300), 'cw': (-400, 400)}

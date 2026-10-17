@@ -1,5 +1,64 @@
 # Historial
 
+## v5.4.1 · 2026-10-17
+
+Publicación coordinada en los repositorios privado y público, con historiales
+separados y distribución pública anonimizada. No implica un despliegue en la estación.
+Incluye la demo SDR anonimizada con narración femenina en español, subtítulos y capítulos.
+
+### Documentación de módulos
+**Desarrollo de cada módulo** ([ES](docs/DESARROLLO_MODULOS.md) · [EN](docs/en/MODULE_DEVELOPMENT.md))
+- 21 módulos enumerados con objetivo, historia de desarrollo, ADR, ficheros, comandos, pruebas y estado.
+- Apartado de plugins de OpenWebRX+ uno a uno (propios, de terceros y del mapa) y extensiones de `/settings`.
+- Manual 24: solución al HTTP 400 de Telegram cuando el grupo pasa a supergrupo.
+
+### Conexión dual Meshtastic y administración
+
+- Puente: la petición de desconexión TCP cierra solo el cliente solicitante,
+  desbloqueando el cierre de la biblioteca oficial sin desconectar la radio compartida.
+- Login: solo los envíos POST consumen el límite de intentos; las consultas API
+  sin sesión devuelven 401, sin redirigir continuamente a la página de acceso.
+
+- Acceso: las APIs Meshtastic sin sesion devuelven401 en vez de redirigir
+  sus sondeos a login. El limite12/min por IP cuenta solo POST de credenciales,
+  evitando429 al abrir administracion sin retirar proteccion de contrasenas.
+
+- Files: borrado manual bloqueado en servidor (403) incluso para administradores,
+  sin botones de eliminacion; descargas y retencion automatica conservadas.
+- Settings/Satelites: informes manuales AMSAT por captura, resultado revisable y
+  consentimiento explicito; asociaciones historicas desde catalogo y permiso
+  CSP acotado al formulario oficial. Sin envios automaticos nuevos.
+
+- Grabador: confirmacion websocket despues de seleccionar perfil, evitando
+  combinar el identificador nuevo con la frecuencia central anterior.
+  Regresion reproducida con configuraciones parciales y corregida sin esperas
+  fijas; despliegue acotado con backup y proteccion de pases.
+
+- Settings: paneles privados de satelites/agendas y clima. Seleccion por
+  satelite, omision de pases individuales, calendario y ultimas capturas;
+  radio/antiguedad APRS-IS y paquetes espaciales. Backup verificado antes
+  de guardar, proteccion de pases en curso, CSRF y errores de servicio visibles.
+
+- CTCSS: panel externo desactivado por defecto, conservando Subtono FM integrado.
+- Satelites: el instalador actualiza el catalogo usado por los servicios para
+  conservar las asociaciones de los informes AMSAT.
+
+- Favoritos permanentes 868/433 en el propio cliente oficial, con conexión y selección
+  desde el mismo origen autenticado. Adaptador limitado por checksum al cliente
+  2.6.7 ACFA7D2; no modifica el original ni guarda claves en el navegador.
+
+- Puente USB único para compartir el 433 entre mapa, panel y cliente oficial
+  autenticado en HTTPS 8444; 868 conserva HTTPS 8443. Activación explícita
+  `MESH433_WEB=yes`, compatible con instalaciones anteriores por serie directa.
+- Conexiones TCP con puerto explícito en mapa y administración, enlaces de ambos
+  clientes y guía de conexión. Sin cambios en canales, claves ni parámetros RF.
+- Pruebas del protocolo serie/HTTP, dos clientes TCP con la biblioteca oficial,
+  reconexión USB y cierre de sockets sin bloqueo.
+- Corrección acotada de instalaciones nativas con backend expuesto: copia
+  verificada y restauración antes de limitar OpenWebRX+ a loopback, persistiendo
+  la política cerrada en ambos ficheros de entorno. Publicación HTTPS sin puerto
+  explícito y guía de verificación de propiedad en Receiverbook.
+
 ## v5.4.0 · 2026-10-17
 
 Publicación coordinada del público y privado, posterior a la v5.3 pública.

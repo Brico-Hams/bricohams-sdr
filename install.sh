@@ -323,6 +323,11 @@ nginx_sitio() {
     esac
     # v4.5 · cliente web de Meshtastic en :8443 (solo admin) si MESH_WEB=yes
     if [ "${MESH_WEB:-yes}" = yes ]; then e+=(-e 's/^#@MW@//'); else e+=(-e '/^#@MW@/d'); fi
+    if [ "${MESH_WEB:-yes}" = yes ] && [ "${MESH433_WEB:-no}" = yes ]; then
+        e+=(-e 's/^#@M43@//')
+    else
+        e+=(-e '/^#@M43@/d')
+    fi
     sed "${e[@]}" -e "s#__DOMINIO__#${dom}#g" -e "s#__CERT__#${cert}#" -e "s#__KEY__#${key}#"
 }
 cargar_env "$KIT/bricohams.env"
@@ -1039,7 +1044,7 @@ paso_plugins() {
         --exclude 'meteo/wx-red.json' --exclude 'meteo/wspr.json' --exclude 'satelites/grabaciones.json' --exclude 'satelites/pases.ics' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     local callsign_gate=no tone_detector=no callsign_anuncio=no p
-    local -A pedido=([callsign_gate]="${PLUGIN_CALLSIGN_GATE:-yes}" [tone_detector]="${PLUGIN_TONE_DETECTOR:-yes}")
+    local -A pedido=([callsign_gate]="${PLUGIN_CALLSIGN_GATE:-yes}" [tone_detector]="${PLUGIN_TONE_DETECTOR:-no}")
     si "${CALLSIGN_GATE_ANUNCIO:-no}" && callsign_anuncio=yes
     for p in callsign_gate tone_detector; do
         si "${pedido[$p]}" || continue
@@ -1596,12 +1601,26 @@ paso_lilygo() {
     PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install esptool >/dev/null 2>&1 || true
     # v4.5 · nodos Meshtastic (LilyGO 433 y HAT 868) en el MAPA de OpenWebRX+ por su MQTT
     install -m 755 "$FILES/bin/bricohams-mesh-owrx" /usr/local/bin/bricohams-mesh-owrx
+    install -m 755 "$FILES/bin/bricohams-mesh-puente" /usr/local/bin/bricohams-mesh-puente
+    install -m 644 "$FILES/systemd/bricohams-mesh-puente.service" /etc/systemd/system/bricohams-mesh-puente.service
+    systemctl stop bricohams-mesh-owrx || true
+    systemctl daemon-reload
+    if si "${MESH433_WEB:-no}"; then
+        if [ "${MESH_WEB:-yes}" != yes ]; then
+            fallo "MESH433_WEB=yes requiere MESH_WEB=yes"
+            return 1
+        fi
+        systemctl enable bricohams-mesh-puente
+        systemctl restart bricohams-mesh-puente
+    else
+        systemctl disable --now bricohams-mesh-puente
+    fi
     if si "${OWRX_MAPA_LORA:-yes}" && [ -x /opt/pipx/venvs/meshtastic/bin/python ]; then
         mqtt_local
         cat >/etc/systemd/system/bricohams-mesh-owrx.service <<'UNIDAD'
 [Unit]
 Description=BricoHams · nodos Meshtastic en el mapa de OpenWebRX+ (MQTT local)
-After=network-online.target mosquitto.service meshtasticd.service
+After=network-online.target mosquitto.service meshtasticd.service bricohams-mesh-puente.service
 Wants=network-online.target
 
 [Service]
@@ -1701,6 +1720,13 @@ paso_meshtastic() {
         apt_i meshtasticd
     fi
     install -d /etc/meshtasticd/config.d
+    if [ "${MESH_WEB:-yes}" = yes ]; then
+        install -m 755 "$FILES/bin/bricohams-meshweb" /usr/local/bin/bricohams-meshweb
+        install -d /usr/local/share/bricohams/meshweb
+        install -m 644 "$FILES/meshweb/favoritos.js" /usr/local/share/bricohams/meshweb/favoritos.js
+        bricohams-meshweb --check
+        bricohams-meshweb
+    fi
     {
         echo "# BricoHams: LoRa SX1262 del HAT HackerGadgets (A VERIFICAR con su documentación)"
         echo "Lora:"
@@ -2093,6 +2119,7 @@ EOF
 #  para las imágenes LRPT de los METEOR (servicio de fondo de OpenWebRX+).
 # =====================================================================
 paso_satelites() {
+    install -D -m 644 "$KIT/data/satelites.json" /opt/bricohams/kit/data/satelites.json
     apt_i python3-sgp4
     install -m 755 "$FILES/bin/bricohams-satpass.py" /usr/local/bin/bricohams-satpass
     install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/satelites"
@@ -2522,6 +2549,10 @@ EOF
     install -m 755 "$FILES/bin/bricohams-mesh-admin" /usr/local/bin/bricohams-mesh-admin
     # botones Meshtastic y APRS en /settings de OpenWebRX+ (y de nuevo tras cada apt de openwebrx)
     install -m 755 "$FILES/bin/bricohams-owrx-botones" /usr/local/bin/bricohams-owrx-botones
+    install -m 755 "$FILES/bin/bricohams-owrx-files" /usr/local/bin/bricohams-owrx-files
+    /usr/local/bin/bricohams-owrx-files || { aviso "No se ha podido bloquear el borrado web de Files"; return 1; }
+    echo 'DPkg::Post-Invoke { "/usr/local/bin/bricohams-owrx-files"; };' \
+        >/etc/apt/apt.conf.d/99bricohams-owrx-files
     echo 'DPkg::Post-Invoke { "if [ -x /usr/local/bin/bricohams-owrx-botones ]; then /usr/local/bin/bricohams-owrx-botones -q; fi"; };' \
         >/etc/apt/apt.conf.d/99bricohams-owrx-botones
     /usr/local/bin/bricohams-owrx-botones || aviso "No he podido poner los botones Meshtastic/APRS/TAK/Monitorización en /settings de OpenWebRX+"
@@ -2579,6 +2610,7 @@ ExecStart=$py /usr/local/bin/bricohams-mesh-admin servicio
 RuntimeDirectory=bricohams-mesh-admin
 ProtectSystem=strict
 ReadWritePaths=/etc/bricohams $KIT/bricohams.env
+ReadWritePaths=-/var/backups/bricohams
 # v5.0: el cambio de clave TAK arranca OpenTAKServer, que escribe su log aquí ("-": opcional si no hay TAK)
 ReadWritePaths=-/var/lib/bricohams-tak
 # v5.0: el panel borra known_hosts del backup remoto al cambiar de servidor SFTP

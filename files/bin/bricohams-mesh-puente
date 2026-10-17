@@ -33,7 +33,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 START1, START2, MAXIMO = 0x94, 0xC3, 512
-RUN = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh')
+RUN = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh-puente')
 
 
 def env(k, d=''):
@@ -50,8 +50,8 @@ def cargar_env():
             m = re.match(r'^\s*(MESH433_[A-Z_]+)=\s*(["\']?)([^"\'#]*?)\2\s*(#.*)?$', l)
             if m and m.group(1) not in ('MESH433_CHANNEL_URL',):
                 os.environ.setdefault(m.group(1), m.group(3).strip())
-    except OSError:
-        pass
+    except OSError as e:
+        raise RuntimeError('no se pudo leer la configuracion del puente: %s' % e) from e
 
 
 def trama(datos):
@@ -101,6 +101,7 @@ class Puente:
         self.abrir_radio = abrir_radio          # función -> objeto con read(n)/write(b)/close()
         self.radio = None
         self.lock = threading.Lock()
+        self.escritura = threading.Lock()
         self.clientes = set()                   # sockets TCP
         self.http = deque(maxlen=int(env('MESH_PUENTE_COLA', '3000')))
         self.http_visto = 0.0
@@ -109,23 +110,29 @@ class Puente:
 
     # --- radio
     def a_radio(self, datos):
-        with self.lock:
-            r = self.radio
-        if r is None:
-            self.cuenta['descartadas'] += 1
-            return False
-        try:
-            r.write(trama(datos))
-            self.cuenta['a_radio'] += 1
+        # ToRadio.disconnect=true desconectaria tambien a los otros consumidores.
+        if datos == b'\x20\x01':
             return True
-        except (OSError, ValueError) as e:
-            self.ultimo_error = str(e)
-            return False
+        with self.escritura:
+            r = self.radio
+            if r is None:
+                self.cuenta['descartadas'] += 1
+                return False
+            try:
+                r.write(trama(datos))
+                self.cuenta['a_radio'] += 1
+                return True
+            except (OSError, ValueError) as e:
+                self.ultimo_error = str(e)
+                print('puente: escritura: %s' % e, flush=True)
+                return False
 
     def repartir(self, datos):
         self.cuenta['de_radio'] += 1
         t = trama(datos)
-        for c in list(self.clientes):
+        with self.lock:
+            clientes = list(self.clientes)
+        for c in clientes:
             try:
                 c.sendall(t)
             except OSError:
@@ -138,7 +145,7 @@ class Puente:
             try:
                 r = self.abrir_radio()
                 r.write(bytes([START2] * 32))     # despierta la API serie del nodo
-                with self.lock:
+                with self.escritura:
                     self.radio = r
                 print('puente: radio abierta', flush=True)
                 lector = Lector()
@@ -149,7 +156,7 @@ class Puente:
             except (OSError, ValueError) as e:
                 self.ultimo_error = str(e)
                 print('puente: radio: %s; reintento en 5 s' % e, flush=True)
-            with self.lock:
+            with self.escritura:
                 if self.radio:
                     try:
                         self.radio.close()
@@ -164,21 +171,31 @@ class Puente:
 
     # --- clientes TCP (API stream)
     def quitar(self, c):
-        self.clientes.discard(c)
+        with self.lock:
+            self.clientes.discard(c)
+        try:
+            c.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
         try:
             c.close()
         except OSError:
             pass
 
     def atender_tcp(self, c):
-        self.clientes.add(c)
         lector = Lector()
         try:
             while True:
-                d = c.recv(1024)
+                try:
+                    d = c.recv(1024)
+                except TimeoutError:
+                    continue
                 if not d:
                     break
                 for p in lector.alimentar(d):
+                    if p == b'\x20\x01':
+                        self.quitar(c)
+                        return
                     self.a_radio(p)
         except OSError:
             pass
@@ -193,9 +210,12 @@ class Puente:
             listo.append(s.getsockname()[1])
         while True:
             c, _ = s.accept()
-            if len(self.clientes) >= 8:
-                c.close()
-                continue
+            with self.lock:
+                if len(self.clientes) >= 8:
+                    c.close()
+                    continue
+                self.clientes.add(c)
+            c.settimeout(5)
             c.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             threading.Thread(target=self.atender_tcp, args=(c,), daemon=True).start()
 
@@ -205,6 +225,10 @@ class Puente:
 
         class H(BaseHTTPRequestHandler):
             protocol_version = 'HTTP/1.1'
+
+            def setup(self):
+                super().setup()
+                self.connection.settimeout(10)
 
             def log_message(self, *a):
                 pass
@@ -253,6 +277,7 @@ class Puente:
             do_POST = do_PUT
 
         srv = ThreadingHTTPServer(('127.0.0.1', puerto), H)
+        srv.daemon_threads = True
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         return srv
 
@@ -273,9 +298,13 @@ def abrir_serie():
 def servicio():
     cargar_env()
     p = Puente(abrir_serie)
-    threading.Thread(target=p.servidor_tcp, args=(int(env('MESH433_PUENTE_TCP', '4404')),), daemon=True).start()
-    p.servidor_http(int(env('MESH433_PUENTE_HTTP', '4480')))
+    p.servidor_http(4480)
     threading.Thread(target=p.bucle_radio, daemon=True).start()
+    threading.Thread(target=estado_periodico, args=(p,), daemon=True).start()
+    p.servidor_tcp(4404)
+
+
+def estado_periodico(p):
     os.makedirs(RUN, exist_ok=True)
     while True:
         try:
@@ -283,8 +312,8 @@ def servicio():
             with open(tmp, 'w') as f:
                 json.dump(p.estado(), f)
             os.replace(tmp, os.path.join(RUN, 'puente.json'))
-        except OSError:
-            pass
+        except OSError as e:
+            print('puente: estado: %s' % e, flush=True)
         time.sleep(10)
 
 

@@ -25,6 +25,67 @@ loader.exec_module(sr)
 random.seed(7)
 
 
+def config_frame(**value):
+    return 1, json.dumps({'type': 'config', 'value': value}).encode()
+
+
+class PerfilWS:
+    def __init__(self, frames):
+        self.frames = iter(frames)
+        self.s = self
+        self.enviados = []
+        self.cerrado = False
+
+    def settimeout(self, timeout):
+        assert timeout > 0
+
+    def enviar(self, datos, op=1):
+        self.enviados.append((op, datos))
+
+    def json(self, datos):
+        self.enviados.append((1, datos))
+
+    def recibir(self):
+        try:
+            return next(self.frames)
+        except StopIteration:
+            raise socket.timeout()
+
+    def cerrar(self):
+        self.cerrado = True
+
+
+real_ws = sr.WS
+try:
+    saludo = (1, b'CLIENT DE SERVER server=openwebrx')
+    viejo = config_frame(sdr_id='sat', profile_id='meteor', center_freq=137500000, samp_rate=2048000)
+    nuevo = config_frame(sdr_id='sat', profile_id='sat2m', samp_rate=2048000)
+    frecuencia = config_frame(center_freq=145900000)
+    for frames in (
+        [saludo, viejo, nuevo, frecuencia, (10, b'')],
+        [saludo, viejo, frecuencia, nuevo, (10, b'')],
+        [saludo, config_frame(sdr_id='sat', profile_id='sat2m', center_freq=145900000,
+                             samp_rate=2048000), (10, b'')],
+        [saludo, viejo, config_frame(sdr_id='sat', profile_id='otro'), (10, b'')],
+    ):
+        falso_perfil = PerfilWS(frames)
+        sr.WS = lambda url: falso_perfil
+        perfil = 'sat|otro' if frames[-2] == config_frame(sdr_id='sat', profile_id='otro') else 'sat|sat2m'
+        ws, conf = sr.conectar({'owrx': 'no-red', 'clave_fichero': ''}, perfil)
+        esperado = 137500000 if perfil == 'sat|otro' else 145900000
+        assert conf['center_freq'] == esperado and not ws.cerrado
+        assert ws.enviados[-1] == (9, b'')
+    falso_perfil = PerfilWS([saludo, viejo, nuevo, frecuencia])
+    sr.WS = lambda url: falso_perfil
+    try:
+        sr.conectar({'owrx': 'no-red', 'clave_fichero': ''}, 'sat|sat2m')
+        raise AssertionError('No debe aceptar sin confirmacion')
+    except TimeoutError as x:
+        assert 'no ha confirmado' in str(x) and falso_perfil.cerrado
+finally:
+    sr.WS = real_ws
+
+
 # --- ADPCM: codificador de prueba que usa el mismo estado que el decodificador -----------
 class Codif:
     def __init__(self):
@@ -84,6 +145,9 @@ ps = [pase('ISS', T + 100, 45), pase('SO-50', T + 300, 60, norad=2),   # solapa 
       pase('VIEJO', T - 1000, 80, norad=7)]
 pl = sr.plan(ps, cfg, T)
 assert [(p['nombre'], p['accion']) for p in pl] == [('ISS', 'grabar'), ('METEOR-M2-4', 'meteor')], pl
+omitida = dict(cfg, omitir_pases={'1:%s' % (T + 100)})
+assert [p['nombre'] for p in sr.plan(ps, omitida, T)] == ['SO-50', 'METEOR-M2-4']
+assert '1:1234' in sr.cfg_desde_env({'SATREC_OMITIR_PASES': '1:1234'})['omitir_pases']
 cal = sr.ics(pl, 'DL0XYZ')
 assert cal.count('BEGIN:VEVENT') == 2 and 'DTSTART:20270115T080140Z' in cal and cal.endswith('END:VCALENDAR\r\n'), cal
 
@@ -187,6 +251,9 @@ class FalsoOWRX(threading.Thread):
                 break
             if op is None or op == 8:
                 break
+            if op == 9:
+                self.enviar(c, b'', 10)
+                continue
             if op == 1:
                 t = d.decode()
                 self.recibido.append(t)
@@ -201,8 +268,9 @@ class FalsoOWRX(threading.Thread):
                         self.enviar(c, json.dumps({'type': 'log_message', 'value': 'This profile is locked, keeping current profile.'}).encode(), 1)
                     else:
                         sdr, prof = j['params']['profile'].split('|')
-                        self.enviar(c, json.dumps({'type': 'config', 'value': {'sdr_id': sdr, 'profile_id': prof, 'center_freq': 145900000,
+                        self.enviar(c, json.dumps({'type': 'config', 'value': {'sdr_id': sdr, 'profile_id': prof,
                                                                                 'samp_rate': 2048000, 'audio_compression': 'adpcm'}}).encode(), 1)
+                        self.enviar(c, json.dumps({'type': 'config', 'value': {'center_freq': 145900000}}).encode(), 1)
                 if j['type'] == 'dspcontrol' and j.get('action') == 'start':
                     audio = True
             if audio:

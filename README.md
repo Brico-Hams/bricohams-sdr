@@ -1,9 +1,12 @@
 # BricoHams SDR · N0CALL · tu QTH (Región de Murcia)
 
-**Versión coordinada: v5.4.0 · 2026-10-17.** [VERSION](VERSION) es la fuente
+**Versión coordinada: v5.4.1 · 2026-10-17.** [VERSION](VERSION) es la fuente
 del número de publicación. Público y privado comparten versión, fecha y etiqueta
-Git `v5.4.0`, pero no hashes ni historial: solo se exporta código anonimizado.
+Git `v5.4.1`, pero no hashes ni historial: solo se exporta código anonimizado.
 Toda publicación futura debe actualizar VERSION, el historial y la etiqueta en ambos.
+
+**Demostración SDR:** [vídeo narrado en español, subtítulos y capítulos](docs/demo-sdr/README.md),
+con datos sensibles ocultados y escenas privadas sustituidas por tarjetas explicativas.
 
 > **Rama `openwebrxplus-generico`: kit anonimizado para cualquier estación OpenWebRX+.**
 > No lleva el indicativo, el QTH, el locator, la red local ni los usuarios de la estación
@@ -21,11 +24,13 @@ en `/settings`, con estado local e instrucciones; conserva RadarBox.
 Documentación / Documentation: [Español](docs/manuales/38_MAPFLIGHTS_PLUGIN.md) ·
 [English](docs/en/MAPFLIGHTS_PLUGIN.md). Generado, sin desplegar / Generated, not deployed.
 
+**Módulos y plugins:** [desarrollo de cada módulo y plugins de OpenWebRX+](docs/DESARROLLO_MODULOS.md) · [English](docs/en/MODULE_DEVELOPMENT.md).
+
 **Primera instalación o nuevo módulo:** abre la
 [guía visual de módulos](docs/GUIA_VISUAL_MODULOS.md), con ilustraciones,
 capturas reales anonimizadas y cuadros de comandos por módulo.
 
-Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.0**):
+Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.1**):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT y, opcionalmente, también para map.flights.
@@ -33,7 +38,7 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
 - Estación meteorológica propia publicada en APRS.
 - Cámara del mástil e imagen BricoHams con Murcia.
 - **Caja de intemperie impresa en 3D** (PETG + TPU) para el mástil Televés, con compartimento de potencia aparte.
-- **Funciones de la línea v5, consolidadas en v5.4.0:**
+- **Funciones de la línea v5, consolidadas en v5.4.1:**
   - **Seguridad desde `/settings`:** bloqueo por IP/red y país, desbaneo de Fail2ban, estado de cortafuegos/nginx, usuarios y avisos de login ([manual 34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)).
   - **Ficha de aviones** con foto, modelo, operador y ruta mediante un proxy con caché, y **envío opcional a map.flights** además de RadarBox ([manual 04](docs/manuales/04_ADSB.md)).
   - **Meteo desde el RAK4631** y posición APRS desde su GPS, con respaldo Pico/I2C; corrección del arranque de lgpio y nombre por defecto «BricoHams WX» ([manual 06](docs/manuales/06_SENSOR_WX.md)).

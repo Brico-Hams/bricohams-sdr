@@ -17,6 +17,45 @@ Página nueva del portal: **`https://TU_DOMINIO/bricohams/clima.html`** (tarjeta
 | 🗓️ Próximos pases que se grabarán · 🎙️ Grabaciones · AMSAT | `satelites/grabaciones.json` y `pases.ics` | `bricohams-satrec` |
 
 ## 1. Clima en red (APRS-IS)
+
+### Administracion sencilla desde Settings
+
+Con sesion de administrador, **Settings > Satelites y agendas** abre
+`/settings/bricohams/satelites`. Permite activar la captura automatica, ajustar
+la elevacion minima, habilitar METEOR y marcar los satelites que se desean
+capturar. La tabla muestra los proximos pases y permite **Omitir este pase**
+sin desactivar el resto de la agenda de ese satelite. **Reconsiderar** retira
+esa exclusion; los filtros de elevacion, disponibilidad de perfil y solapes
+siguen aplicandose. No fuerza una captura ni envia informes AMSAT.
+
+El calendario ICS contiene las capturas planificadas, no todos los pases
+visibles. Las horas de la tabla corresponden a la zona horaria del servidor.
+Se muestran las ultimas capturas con sus resultados reales y enlaces a Files.
+Las omisiones se guardan como `NORAD:epoch_AOS` en `SATREC_OMITIR_PASES`.
+Un recalculo orbital que cambie el AOS crea un pase distinto; revisar la agenda.
+
+**Settings > Clima en red**, `/settings/bricohams/clima`, permite ajustar el
+radio APRS-IS (5-500 km), la antiguedad maxima (1-24 h) y la inclusion de
+paquetes espaciales. Muestra el estado de conexion publicado y enlaza a las
+estaciones y datos meteorologicos. No modifica el sensor local ni transmite RF.
+
+Ambos paneles requieren sesion administrativa, mismo origen y token CSRF.
+Antes de guardar se crea y verifica una copia de ambos entornos en
+`/var/backups/bricohams/settings-agendas-*`, con permisos privados y
+`RESTAURAR.sh`. El aviso indica su ubicacion y el comando de restauracion.
+Si falla la copia, no se guarda ni reinicia nada. Los cambios de agenda se
+bloquean durante un pase y en el minuto anterior/posterior, para no cortarlo.
+Al guardar se reinicia unicamente el servicio correspondiente; si no arranca,
+se muestra el error y como restaurar. El clima puede tardar un minuto en
+publicar nuevas estaciones tras reconectar. No se cambian las claves ni
+`AMSAT_REPORT`.
+
+El instalador habilita la escritura del directorio de backups en la unidad
+administrativa. Para actualizar una instalacion existente puede utilizarse
+`tools/desplegar-agendas.sh` con el kit nuevo y el instalado como argumentos.
+El despliegue crea y verifica su propia copia de los ejecutables, unidad,
+plantillas, estilos y fuentes afectadas antes de modificarlos.
+
 - `bricohams-wx-red` abre una conexión **de solo lectura** con APRS-IS (`rotate.aprs2.net:14580`, login con `pass -1`: no necesita ni envía el passcode). Filtro: `r/LAT/LON/WXRED_RADIO_KM` más los digis espaciales.
 - Decodifica las tramas WX de APRS: sin posición (`_`), con posición sin comprimir o comprimida (`!`, `=`, `@`, `/`) y objetos (`;`). Pasa °F→°C, mph→km/h, centésimas de pulgada→mm y décimas de hPa→hPa. Descarta valores imposibles (p. ej. `t288`).
 - **Vía** de cada estación:
@@ -44,6 +83,13 @@ Página nueva del portal: **`https://TU_DOMINIO/bricohams/clima.html`** (tarjeta
 
 Cómo graba:
 1. 20 s antes del AOS se conecta al websocket local de OpenWebRX+ (`ws://127.0.0.1:8073/ws/`) como un oyente más, selecciona el perfil del satélite y sintoniza la bajada.
+   Antes de calcular el desplazamiento, espera la respuesta al ping enviado
+   despues de seleccionar el perfil. OpenWebRX+ puede anunciar el identificador
+   nuevo antes de actualizar la frecuencia central; la respuesta confirma que
+   termino de procesar esa seleccion. Evita usar la frecuencia del perfil
+   anterior (por ejemplo, METEOR al cambiar a ISS), sin pausas arbitrarias.
+   Si falta la confirmacion o el perfil no coincide, cierra la conexion y
+   registra un error; no graba con una configuracion sin confirmar.
 2. Corrige el **Doppler con SGP4** cada 2 s (los mismos elementos orbitales de CelesTrak).
 3. Decodifica el audio (ADPCM, igual que el navegador) a WAV de 12 kHz y, al acabar, lo pasa a **MP3** (`lame`, 32 kbps mono).
 4. En NFM estima si **se oyó el satélite**: compara el ruido de los primeros segundos (antes del AOS) con el del pase; si el silenciador de FM se cierra lo bastante tiempo, lo marca como «oído».
@@ -53,14 +99,44 @@ Cómo graba:
 > **Importante:** durante el pase el grabador ocupa el SDR de satélites con ese perfil, igual que lo haría un oyente. Los oyentes que estén en otro perfil de ese mismo SDR verán el cambio. Si no lo quieres, `SATREC_ENABLE="no"`.
 > **IO-117 (435,310 MHz)** queda fuera de la banda del perfil `sat70` (centro 436,7 MHz, 2,4 MS/s): el grabador no lo intenta y lo anota como error de frecuencia. Para grabarlo, crea un perfil centrado más abajo.
 
+Para actualizar solo el grabador en una instalacion existente, usar
+`sudo bash tools/actualizar-satrec.sh /ruta/kit-nuevo /ruta/kit-instalado`.
+Rechaza pases en curso o inminentes y verifica el backup de ambos ejecutables
+antes de modificarlos. Muestra su ubicacion y `RESTAURAR.sh`; no borra
+capturas anteriores ni cambia frecuencias, agendas o el modo de informes AMSAT.
+
 ### Calendario
 `/static/plugins/receiver/satelites/pases.ics` (enlace «📅 Pases en tu calendario» en la página): todos los pases planificados con aviso 5 min antes. Se puede suscribir desde Google Calendar, Outlook o el móvil.
 
 ## 4. Informe a AMSAT
+- **Settings > Satelites y agendas > Capturas y reportes AMSAT.org** permite
+  revisar el resultado de cada grabacion y enviarlo manualmente al sitio
+  oficial. Incluye satelite, fecha UTC, indicativo y locator; exige seleccionar
+  el resultado observado y confirmar el envio. El boton **envia**, no abre
+  una vista previa. Comprobar la respuesta de AMSAT en la nueva pestana:
+  el panel no puede confirmar su aceptacion ni detectar duplicados manuales.
+- Las capturas historicas grabadas sin campo `amsat` pueden usar la asociacion
+  NORAD del catalogo actual para generar el formulario, sin alterar su historial.
+  No hay formulario para errores de captura, satelites sin asociacion o
+  indicativo no configurado. En SSB no se presupone que el satelite fue oido.
+- **Files no permite borrar manualmente desde la web**, tampoco con sesion
+  administrativa: no muestra botones y el servidor devuelve HTTP 403.
+  Las descargas y la limpieza automatica por retencion/espacio siguen activas;
+  no es un archivo permanente. Descargar aparte lo que se quiera conservar.
+  El parche se reaplica tras actualizar el paquete OpenWebRX+ mediante el
+  gancho `99bricohams-owrx-files`; un formato incompatible produce un error.
+  Actualizacion segura: `tools/desplegar-files-amsat.sh /kit/nuevo /kit/instalado`
+  con sudo, fuera de los pases. Verifica backup y restauracion antes de cambiar
+  controlador, panel y gancho. Reinicia OpenWebRX+ y el panel (breve desconexion
+  de oyentes); no elimina ficheros ni cambia la retencion o `AMSAT_REPORT`.
 - AMSAT recoge el estado de los satélites en [amsat.org/status](https://www.amsat.org/status/). Cada grabación de SO-50, AO-91, RS-44 o TO-108 genera un **borrador** con los campos del formulario oficial: satélite, fecha, hora y cuarto de hora UTC, indicativo y locator de 6 caracteres.
 - `AMSAT_REPORT="no"` (por defecto): en «Grabaciones e informe AMSAT» cada pase tiene un desplegable *Heard / Telemetry Only / Not Heard* (preseleccionado con el detector de FM; en SSB lo eliges tú) y el botón **Enviar a AMSAT**, que abre el formulario oficial ya relleno en otra pestaña.
 - `AMSAT_REPORT="auto"`: envía solo los pases marcados como **Heard** por el detector. Los «Not Heard» nunca se envían solos (un falso negativo diría que un satélite en servicio está muerto).
 - Para añadir otro satélite pon en `data/satelites.json` su nombre exacto del formulario en `"amsat"` (p. ej. `"SO-50_[FM]"`).
+- El paso `satelites` actualiza el catalogo de servicio en
+  `/opt/bricohams/kit/data/satelites.json`; ambos servicios leen esa copia.
+  Un catalogo antiguo sin el campo `amsat` permite grabar pero no prepara
+  los borradores de informe.
 
 ## 5. Configuración (`bricohams.env`)
 ```bash

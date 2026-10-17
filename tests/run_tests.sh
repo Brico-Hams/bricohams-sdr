@@ -42,6 +42,7 @@ python3 tests/test_anclajes.py
 python3 tests/test_actualizar.py
 python3 tests/test_env_red.py
 python3 tests/test_ssl_admin.py
+python3 tests/test_login_rate.py
 python3 tests/test_blindaje.py
 python3 tests/test_audio_plugins.py
 python3 tests/test_audio_navegador.py
@@ -56,6 +57,12 @@ python3 tests/test_clima_web.py
 python3 tests/test_v45_dispositivos.py
 python3 tests/test_mesh_owrx.py
 python3 tests/test_mesh_admin.py
+python3 tests/test_mesh_puente.py
+python3 tests/test_meshweb.py
+node tests/test_meshweb_favoritos.cjs
+python3 tests/test_agendas_admin.py
+python3 tests/test_files_protegidos.py
+python3 tests/test_finalizar_satelites_ctcss.py
 python3 tests/test_bookmarks_io.py
 python3 tests/test_repeaterbook.py
 python3 tests/test_ctcss_patch.py

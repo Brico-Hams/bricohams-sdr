@@ -60,6 +60,11 @@ try:
     M.TAK_ACCESO = os.path.join(tmp, 'tak-access.txt')  # nunca el /etc de verdad
 
     # --- funciones sueltas
+    assert M.destino('433', {}) == ('serie', '/dev/lilygo-mesh')
+    assert M.destino('433', {'MESH433_WEB': 'yes'}) == ('tcp', '127.0.0.1:4404')
+    assert M.destino('868', {'MESH433_WEB': 'yes'}) == ('tcp', '127.0.0.1')
+    html_web = M.pagina_chat(SESION, host='sdr.ejemplo.es:443')
+    assert 'https://sdr.ejemplo.es:8443/' in html_web and 'https://sdr.ejemplo.es:8444/' in html_web
     assert M.tapar('meshtastic --seturl https://meshtastic.org/e/#CgMSAQE --ch-set psk base64:QUJDREVGR0hJSktMTU5PUA==') \
         .count('…') == 2 and 'CgMSAQE' not in M.tapar('https://meshtastic.org/e/#CgMSAQE')
     for malo in ('a"b', "a'b", 'a$b', 'a`b', 'a\\b', 'a\nb'):
@@ -510,6 +515,21 @@ try:
     finally:
         M.subprocess.run = real_run
     assert M.tapar('{"access_token":"ya29.abc","refresh_token":"1//xyz"}').count('ya29') == 0
+    # Paneles de agendas: misma autenticacion, CSRF y aislamiento de acciones.
+    for ruta in (M.SATELITES, M.CLIMA):
+        assert pide('GET', ruta)[0] == 302
+        st, h, pag = pide('GET', ruta, cab=COOKIE)
+        assert st == 200 and 'no-store' in h['Cache-Control']
+        assert ('https://www.amsat.org/status/submit.php' in h['Content-Security-Policy']) == (ruta == M.SATELITES)
+        assert 'ClaveSecretaPSK123456' not in pag
+        assert pide('POST', ruta, urlencode({'accion': 'wx-guardar', 'csrf': 'malo'}), ORIGEN)[0] == 403
+        assert pide('POST', ruta, urlencode({'accion': 'wx-guardar', 'csrf': tks}),
+                    dict(COOKIE, Origin='https://evil.example'))[0] == 403
+        st, _, pag = pide('POST', ruta, urlencode({'accion': 'mesh-enviar', 'csrf': tks}), ORIGEN)
+        assert st == 200 and 'alert-danger' in pag
+    for ruta, otra in ((M.SATELITES, 'wx-guardar'), (M.CLIMA, 'sat-guardar'), (BASE, 'sat-guardar')):
+        st, _, pag = pide('POST', ruta, urlencode({'accion': otra, 'csrf': tks}), ORIGEN)
+        assert st == 200 and 'alert-danger' in pag
     srv.shutdown()
     owrx.shutdown()
 
@@ -587,7 +607,7 @@ try:
     assert mw and T.index('#@MW@') < T.index('#@SSL<'), 'el 8443 va dentro del bloque SSL'
     mw = '\n'.join(mw)
     assert 'listen 8443 ssl' in mw and 'proxy_pass http://127.0.0.1:8076/settings/bricohams/auth;' in mw
-    assert mw.count('auth_request /_bh_auth;') == 2 and 'proxy_pass https://127.0.0.1:9443;' in mw
+    assert mw.count('auth_request /_bh_auth;') == 4 and 'proxy_pass https://127.0.0.1:9443;' in mw
     assert 'location /' in mw and 'location /api/' in mw and 'internal;' in mw
     assert "s/^#@MW@//" in S and "/^#@MW@/d" in S
     assert 'Port: 9443' in S and 'iifname != "lo" tcp dport 9443 drop' in S and 'bricohams-meshweb-fw' in S

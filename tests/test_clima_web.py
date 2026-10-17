@@ -40,6 +40,7 @@ def main():
             assert 'User=openwebrx' in cuerpo, u
     assert 'StateDirectory=bricohams/satelites' in sat and 'apt_i lame' in sat
     assert 'AMSAT_REPORT=${AMSAT_REPORT:-no}' in sat, 'AMSAT automático debe ir apagado por defecto'
+    assert 'install -D -m 644 "$KIT/data/satelites.json" /opt/bricohams/kit/data/satelites.json' in sat
     assert 'WXRED_OUT=${HTDOCS}/plugins/receiver/meteo/wx-red.json' in meteo
     assert 'WSPR_OUT=${HTDOCS}/plugins/receiver/meteo/wspr.json' in meteo
     assert 'OWRX_SETTINGS_FILE=${OWRX_DATA}/settings.json' in meteo

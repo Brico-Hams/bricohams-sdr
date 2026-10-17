@@ -30,9 +30,10 @@ assert 'add_header Cache-Control $bh_admin_cache always;' in RUTAS
 FUNC = re.search(r'^nginx_sitio\(\) \{.*?^\}', S, re.S | re.M).group(0)
 
 
-def sitio(modo, cert='/c.pem', key='/k.pem'):
+def sitio(modo, cert='/c.pem', key='/k.pem', mesh433='no', meshweb='yes'):
+    env = dict(os.environ, MESH433_WEB=mesh433, MESH_WEB=meshweb)
     r = subprocess.run(['bash', '-c', FUNC + '\nnginx_sitio "$@"', '_', modo, 'sdr.ejemplo.es', cert, key],
-                       input=PLANTILLA, capture_output=True, text=True)
+                       input=PLANTILLA, capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr
     return r.stdout
 
@@ -49,6 +50,12 @@ for m in ('admin', 'todo', 'no'):
     assert ('location ~ ^/(login' in c) == (m == 'admin')
     assert 'http2 on;' not in c, '«http2 on» no existe en el nginx 1.22 de Bookworm'
 assert 'proxy_cookie_flags owrx-session secure' in sitio('admin')
+assert 'listen 8444' not in sitio('admin')
+doble = sitio('admin', mesh433='yes')
+assert 'listen 8444 ssl' in doble and 'proxy_pass http://127.0.0.1:4480;' in doble
+assert doble.count('auth_request /_bh_auth;') == 8
+assert 'listen 8444' not in sitio('admin', mesh433='yes', meshweb='no')
+assert 'listen 8444' not in sitio('no', mesh433='yes')
 assert subprocess.run(['bash', '-c', FUNC + '\nnginx_sitio raro a b c'], input='', capture_output=True).returncode == 1
 rx = re.search(r'location ~ \^/\(([^)]*)\)', sitio('admin')).group(1).split('|')
 for r in ADMIN:
