@@ -12,3 +12,6 @@ tests/salida/
 secrets/
 .vscode/
 *.tgz
+# binarios compilados en lote (322 MB): se publican como Release, no en el git
+firmware-compilado/*
+!firmware-compilado/build_all.py
