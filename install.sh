@@ -2171,7 +2171,7 @@ Environment="STATION_LAT=${STATION_LAT}" "STATION_LON=${STATION_LON}" "STATION_A
 Environment="SAT_LIST=/opt/bricohams/kit/data/satelites.json" "SATPASS_PY=/usr/local/bin/bricohams-satpass"
 Environment="SATREC_MIN_EL=${SATREC_MIN_EL:-20}" "SATREC_EXCLUIR=${SATREC_EXCLUIR:-}" "SATREC_METEOR=${SATREC_METEOR:-yes}"
 Environment="SATREC_DIAS=${SATREC_DIAS:-30}" "SATREC_MAX_MB=${SATREC_MAX_MB:-2000}" "AMSAT_REPORT=${AMSAT_REPORT:-no}"
-Environment="SATREC_OWRX=ws://127.0.0.1:${owrx_p}/ws/"
+Environment="SATREC_OWRX=ws://127.0.0.1:${owrx_p}/ws/" "SATREC_EN_FILES=${ARCHIVO_FILES_ULTIMOS:-2}"
 ExecStart=/usr/local/bin/bricohams-satrec
 Restart=always
 RestartSec=60
@@ -2179,7 +2179,35 @@ RestartSec=60
 [Install]
 WantedBy=multi-user.target
 EOF
+    # Archivo permanente de todo lo que sale en «Files»; Files conserva solo los últimos
+    install -m 755 "$FILES/bin/bricohams-archivo-files.py" /usr/local/bin/bricohams-archivo-files
+    cat >/etc/systemd/system/bricohams-archivo-files.service <<EOF
+[Unit]
+Description=BricoHams: archiva los ficheros de Files (satélites, SSTV, FAX, MP3) y deja los últimos
+
+[Service]
+Type=oneshot
+User=openwebrx
+StateDirectory=bricohams/satelites
+Environment="ARCHIVO_DIR=${ARCHIVO_DIR:-/var/lib/bricohams/satelites/archivo}" "ARCHIVO_FILES_ULTIMOS=${ARCHIVO_FILES_ULTIMOS:-2}"
+Environment="ARCHIVO_MIN_LIBRE_MB=${ARCHIVO_MIN_LIBRE_MB:-500}"
+ExecStart=/usr/local/bin/bricohams-archivo-files
+EOF
+    cat >/etc/systemd/system/bricohams-archivo-files.timer <<'EOF'
+[Unit]
+Description=BricoHams: archivo de Files cada minuto
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+EOF
     systemctl daemon-reload
+    systemctl enable --now bricohams-archivo-files.timer >/dev/null 2>&1
+    bien "archivo de Files en ${ARCHIVO_DIR:-/var/lib/bricohams/satelites/archivo} · Files deja los ${ARCHIVO_FILES_ULTIMOS:-2} últimos"
     if si "${SATREC_ENABLE:-yes}"; then
         systemctl enable bricohams-satrec >/dev/null 2>&1; systemctl restart bricohams-satrec
         bien "grabación de pases ≥ ${SATREC_MIN_EL:-20}° en «Files» · calendario /static/plugins/receiver/satelites/pases.ics · AMSAT=${AMSAT_REPORT:-no}"
@@ -2666,6 +2694,7 @@ EOF
     {
         envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
         envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"
+        envl CHAT_TELEGRAM_NICK "${CHAT_TELEGRAM_NICK:-${CALLSIGN:-BricoHams}}"
         echo "VISITAS_DIAS=${VISITAS_DIAS:-90}"
         echo "VISITAS_CHAT=${VISITAS_CHAT:-yes}"
         echo "VISITAS_AVISAR_LAN=${VISITAS_AVISAR_LAN:-no}"

@@ -1,5 +1,16 @@
 # Historial
 
+## Sin publicar · 2026-10-19
+
+### Chat web ↔ Telegram
+- `/chat@NombreDelBot mensaje` en el grupo de Telegram responde en el chat web compartido (`PuenteTelegram`, MQTT), sin eco, con reintento si MQTT no está y nombre `CHAT_TELEGRAM_NICK`.
+- Manual 24, apartado 9: problemas detectados, diagnóstico y corrección.
+
+### Archivo permanente de «Files»
+- `bricohams-archivo-files` (timer de 1 min) copia todo lo de «Files» (METEOR/SatDump, SSTV, FAX, MP3) a `/var/lib/bricohams/satelites/archivo/AAAA-MM/` con verificación SHA-256 y sin borrado automático.
+- «Files» deja los 2 últimos (`ARCHIVO_FILES_ULTIMOS`), y `SATREC_EN_FILES` pasa de 10 a 2. `keep_files` sube a 100 para que SatDump no pierda imágenes antes de archivarlas.
+- `tools/actualizar-archivo-files.sh`: comprueba que no hay pase en curso, hace una copia verificada con `RESTAURAR.sh` e instala.
+- Manual 42, apartado 8: problemas detectados, diagnóstico y corrección.
 ## v5.4.1 · 2026-10-17
 
 Publicación coordinada en los repositorios privado y público, con historiales

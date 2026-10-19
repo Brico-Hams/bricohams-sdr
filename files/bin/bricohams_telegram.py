@@ -51,6 +51,36 @@ def enviar_mensaje(token, chat, texto, formato_html=True):
     return resultado['result']
 
 
+def obtener_actualizaciones(token, offset=None, timeout=25):
+    """Lee mensajes nuevos del bot por long polling, ocultando el token en errores."""
+    if not token:
+        raise ValueError('Telegram sin configurar (token ausente).')
+    campos = {'timeout': int(timeout), 'allowed_updates': json.dumps(['message'])}
+    if offset is not None:
+        campos['offset'] = int(offset)
+    url = 'https://api.telegram.org/bot%s/getUpdates?%s' % (
+        token, urllib.parse.urlencode(campos))
+    try:
+        with urllib.request.urlopen(url, timeout=int(timeout) + 10) as respuesta:
+            resultado = json.load(respuesta)
+    except urllib.error.HTTPError as ex:
+        try:
+            resultado = json.load(ex)
+        except (ValueError, OSError) as lectura:
+            raise RuntimeError('Telegram HTTP %s; respuesta no válida.' % ex.code) from lectura
+    except OSError as ex:
+        raise RuntimeError('Telegram: fallo de conexión (%s).' % type(ex).__name__) from None
+    if not isinstance(resultado, dict):
+        raise RuntimeError('Telegram: respuesta de actualizaciones no válida.')
+    if not resultado.get('ok'):
+        detalle = str(resultado.get('description', 'Respuesta sin confirmación')).replace(token, '***')[:250]
+        raise RuntimeError('Telegram %s: %s' % (resultado.get('error_code', ''), detalle))
+    actualizaciones = resultado.get('result')
+    if not isinstance(actualizaciones, list):
+        raise RuntimeError('Telegram: respuesta de actualizaciones no válida.')
+    return actualizaciones
+
+
 def esc(texto):
     return html.escape(str(texto if texto is not None else ''), quote=False)
 
