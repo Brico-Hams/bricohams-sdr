@@ -93,8 +93,19 @@ Cómo graba:
 2. Corrige el **Doppler con SGP4** cada 2 s (los mismos elementos orbitales de CelesTrak).
 3. Decodifica el audio (ADPCM, igual que el navegador) a WAV de 12 kHz y, al acabar, lo pasa a **MP3** (`lame`, 32 kbps mono).
 4. En NFM estima si **se oyó el satélite**: compara el ruido de los primeros segundos (antes del AOS) con el del pase; si el silenciador de FM se cierra lo bastante tiempo, lo marca como «oído».
-5. Guarda la grabación en `/var/lib/bricohams/satelites/grabaciones/` (se borran las de más de `SATREC_DIAS` días o cuando pasan de `SATREC_MAX_MB`).
-6. Enlaza las **10 últimas** en `/tmp` con el nombre que acepta OpenWebRX+ (`SO50-261017-082700-436795.mp3`), así salen en el menú **Files** del receptor y en la página «Clima en red» con reproductor y descarga.
+5. Guarda la grabación en `/var/lib/bricohams/satelites/grabaciones/` (se borran las de más de `SATREC_DIAS` días o cuando pasan de `SATREC_MAX_MB`; antes ya se han copiado al archivo permanente, ver 3.1).
+6. Enlaza las **2 últimas** (`SATREC_EN_FILES`, igual a `ARCHIVO_FILES_ULTIMOS`) en `/tmp` con el nombre que acepta OpenWebRX+ (`SO50-261017-082700-436795.mp3`), así salen en el menú **Files** del receptor y en la página «Clima en red» con reproductor y descarga.
+
+### 3.1 Archivo permanente de «Files»
+`bricohams-archivo-files.timer` (cada minuto) copia **todo** lo que aparece en «Files» —imágenes METEOR/SatDump, SSTV, FAX, MP3 de pases y grabaciones de los oyentes— a `/var/lib/bricohams/satelites/archivo/AAAA-MM/`. Cada copia se verifica con SHA-256 y **el archivo nunca se borra automáticamente**; un nombre repetido con otro contenido se guarda como `nombre~1.ext`.
+
+Después deja en «Files» solo los `ARCHIVO_FILES_ULTIMOS` (2) ficheros más recientes, más las 2 últimas grabaciones de `bricohams-satrec`. Solo quita de Files lo que ya está archivado y verificado; los ficheros modificados hace menos de 60 s se esperan (aún se están escribiendo). Si el disco baja de `ARCHIVO_MIN_LIBRE_MB` (500) no copia ni quita nada y lo anota en el registro. `keep_files` de OpenWebRX+ queda en 100 solo como red de seguridad: con un valor bajo, SatDump (que genera varias imágenes por pase) perdería imágenes antes de archivarlas.
+
+```bash
+sudo -u openwebrx bricohams-archivo-files --simular   # qué copiaría y qué quitaría de Files
+journalctl -u bricohams-archivo-files -n 20 --no-pager
+ls -lR /var/lib/bricohams/satelites/archivo | tail
+```
 
 > **Importante:** durante el pase el grabador ocupa el SDR de satélites con ese perfil, igual que lo haría un oyente. Los oyentes que estén en otro perfil de ese mismo SDR verán el cambio. Si no lo quieres, `SATREC_ENABLE="no"`.
 > **IO-117 (435,310 MHz)** queda fuera de la banda del perfil `sat70` (centro 436,7 MHz, 2,4 MS/s): el grabador no lo intenta y lo anota como error de frecuencia. Para grabarlo, crea un perfil centrado más abajo.
@@ -121,8 +132,9 @@ capturas anteriores ni cambia frecuencias, agendas o el modo de informes AMSAT.
   indicativo no configurado. En SSB no se presupone que el satelite fue oido.
 - **Files no permite borrar manualmente desde la web**, tampoco con sesion
   administrativa: no muestra botones y el servidor devuelve HTTP 403.
-  Las descargas y la limpieza automatica por retencion/espacio siguen activas;
-  no es un archivo permanente. Descargar aparte lo que se quiera conservar.
+  Las descargas y la limpieza automatica de Files siguen activas;
+  Files no es un archivo permanente: todo queda copiado en
+  `/var/lib/bricohams/satelites/archivo/` (apartado 3.1).
   El parche se reaplica tras actualizar el paquete OpenWebRX+ mediante el
   gancho `99bricohams-owrx-files`; un formato incompatible produce un error.
   Actualizacion segura: `tools/desplegar-files-amsat.sh /kit/nuevo /kit/instalado`
@@ -142,6 +154,7 @@ capturas anteriores ni cambia frecuencias, agendas o el modo de informes AMSAT.
 ```bash
 SATREC_ENABLE="yes"      SATREC_MIN_EL="20"     SATREC_EXCLUIR=""
 SATREC_METEOR="yes"      SATREC_DIAS="30"       SATREC_MAX_MB="2000"
+ARCHIVO_FILES_ULTIMOS="2" ARCHIVO_MIN_LIBRE_MB="500" ARCHIVO_DIR="/var/lib/bricohams/satelites/archivo"
 AMSAT_REPORT="no"        WSPR_CALLSIGN=""
 WXRED_ENABLE="yes"       WXRED_RADIO_KM="100"
 ```
@@ -164,3 +177,19 @@ Pruebas del repositorio: `tests/test_wx_red.py`, `tests/test_wspr.py`, `tests/te
 - Cada parte por separado: `SATREC_ENABLE="no"`, `WXRED_ENABLE="no"` y `sudo bash install.sh --solo meteo,satelites`.
 - Parar a mano: `sudo systemctl disable --now bricohams-satrec bricohams-wx-red bricohams-wspr.timer`.
 - Las grabaciones no se borran al desactivar: están en `/var/lib/bricohams/satelites/`.
+
+## 8. Problemas detectados, diagnóstico y corrección (archivo de «Files», 2026-10-19)
+
+Instalación en una estación existente, fuera de los pases y con copia previa verificada:
+`sudo bash tools/actualizar-archivo-files.sh /ruta/kit-nuevo /ruta/kit-instalado`.
+Muestra `BACKUP_VERIFICADO=` y la orden de `RESTAURAR.sh`; restaurar no borra el archivo.
+Pruebas: `tests/test_archivo_files.py`.
+
+| # | Problema detectado | Diagnóstico | Corrección |
+|---|---|---|---|
+| 1 | «Files» se vaciaba solo: OpenWebRX+ borra lo que pasa de `keep_files` (20) y `bricohams-satrec` borraba las grabaciones por días/espacio. No había archivo permanente. | Lectura de `owrx/storage.py` (`cleanStoredFiles`, ordena por `ctime`) y de `limpiar_archivo` en `bricohams-satrec`. | Nueva tarea `bricohams-archivo-files` (cada minuto): copia todo lo de «Files» a `satelites/archivo/AAAA-MM/`, verificado con SHA-256, sin borrado automático. |
+| 2 | Se pedía que «Files» mostrara solo los 2 últimos. Bajar `keep_files` a 2 haría que OpenWebRX+ borrase imágenes de SatDump (varias por pase) antes de archivarlas. | Análisis del orden de borrado de OpenWebRX+ frente a la tarea de archivo (intervalo de 1 min). | El recorte a 2 lo hace la tarea **después** de archivar (`ARCHIVO_FILES_ULTIMOS`); `keep_files` sube a 100 como red de seguridad; `SATREC_EN_FILES` pasa de 10 a 2. |
+| 3 | Riesgo de perder un fichero que aún se está escribiendo o de sobrescribir otro con el mismo nombre. | Revisión del flujo de SatDump/grabadores, que escriben durante segundos. | Espera de 60 s desde la última modificación; los nombres repetidos con otro contenido se guardan como `nombre~1.ext`. |
+| 4 | En la simulación, la tarea terminaba con error cada minuto y no decía por qué. | Contenedor Debian con `systemctl`/`sudo` simulados: un fichero de otro usuario en `/tmp` (bit *sticky*) no se puede borrar (`Operation not permitted`). | Ya no es un error: se anota `AVISO no se puede quitar de Files (ya archivado)` y la tarea sigue. |
+| 5 | El primer despliegue terminó con «error (1)» sin indicar en qué paso. | La salida remota no se guardaba. En la simulación, `install` fallaba cuando el kit indicado no tenía `files/bin`; el kit de servicio está en `/opt/bricohams/kit`. | El instalador solo actualiza la copia del kit si existe (si no, avisa). El script de despliegue detecta el kit, numera los pasos (pruebas, sudo, instalación) y guarda un registro en la Pi (`~/bh-archivo-deploy.log`). |
+| 6 | En Windows falla la prueba de enlaces simbólicos (`WinError 1314`). | Windows exige privilegios para `os.symlink`. | La prueba se marca `SKIP` donde no se pueden crear enlaces; en Linux (Pi o contenedor) se ejecuta completa. |

@@ -141,6 +141,8 @@ class Visitas:
         if estado == 'Disconnected':
             return self.desconectado(ip)
         if estado == 'ChatMessage':
+            if m.get('telegram_bridge'):
+                return None
             if self.moderador and ip:
                 ok, _ = self.moderador.revisar(ip, m.get('name', '?'), m.get('message', ''))
                 if not ok:
@@ -361,6 +363,90 @@ def telegram_envio():
     return enviar
 
 
+class PuenteTelegram:
+    """Reenvía /chat del grupo autorizado al chat web por MQTT."""
+
+    def __init__(self, token, chat_id, publicar, nombre='BricoHams', obtener=None, enviar=None):
+        if obtener is None or enviar is None:
+            from bricohams_telegram import obtener_actualizaciones, enviar_mensaje
+            obtener = obtener or obtener_actualizaciones
+            enviar = enviar or enviar_mensaje
+        self.token, self.chat_id, self.publicar, self.nombre = token, str(chat_id), publicar, nombre
+        self.obtener, self.enviar = obtener, enviar
+        self.offset = None
+        self.hilo = None
+
+    def procesar(self, actualizacion):
+        if not isinstance(actualizacion, dict):
+            return True
+        mensaje = actualizacion.get('message')
+        if not isinstance(mensaje, dict):
+            return True
+        chat = mensaje.get('chat') or {}
+        remitente = mensaje.get('from') or {}
+        if str(chat.get('id', '')) != self.chat_id or remitente.get('is_bot'):
+            return True
+        contenido = mensaje.get('text')
+        if not isinstance(contenido, str):
+            return True
+        orden = re.match(r'^\s*/chat(?:@[A-Za-z0-9_]+)?(?:\s+(.*))?\s*$', contenido, re.I | re.S)
+        if not orden:
+            return True
+        texto = re.sub(r'[\x00-\x1f\x7f]+', ' ', orden.group(1) or '').strip()
+        if not texto:
+            self.confirmar('Uso: <code>/chat mensaje</code>')
+            return True
+        if len(texto) > 300:
+            self.confirmar('El mensaje es demasiado largo (máximo 300 caracteres).')
+            return True
+        evento = {'state': 'ChatMessage', 'name': self.nombre + ' (Telegram)', 'message': texto,
+                  'telegram_bridge': True}
+        try:
+            if not self.publicar(evento):
+                print('visitas: Telegram -> chat web: MQTT no disponible; se reintentará',
+                      file=sys.stderr, flush=True)
+                return False
+        except (OSError, RuntimeError, ValueError) as e:
+            print('visitas: Telegram -> chat web: %s' % str(e)[:200], file=sys.stderr, flush=True)
+            return False
+        self.confirmar('Publicado en el chat web como <b>%s</b>.' % esc(self.nombre))
+        return True
+
+    def confirmar(self, texto):
+        try:
+            self.enviar(self.token, self.chat_id, texto)
+        except (RuntimeError, ValueError) as e:
+            print('visitas: Telegram: no pude confirmar el envío: %s' % str(e)[:200],
+                  file=sys.stderr, flush=True)
+
+    def leer_una_vez(self):
+        for actualizacion in self.obtener(self.token, self.offset, timeout=25):
+            if not isinstance(actualizacion, dict):
+                continue
+            try:
+                nuevo_offset = int(actualizacion['update_id']) + 1
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not self.procesar(actualizacion):
+                return False
+            self.offset = nuevo_offset
+        return True
+
+    def bucle(self):
+        while True:
+            try:
+                if not self.leer_una_vez():
+                    time.sleep(3)
+            except (OSError, RuntimeError, ValueError) as e:
+                print('visitas: Telegram bot: %s' % str(e)[:200], file=sys.stderr, flush=True)
+                time.sleep(10)
+
+    def iniciar(self):
+        if self.hilo is None or not self.hilo.is_alive():
+            self.hilo = threading.Thread(target=self.bucle, name='telegram-chat', daemon=True)
+            self.hilo.start()
+
+
 def write_atomic(path, obj):
     d = os.path.dirname(path)
     os.makedirs(d, exist_ok=True)
@@ -425,6 +511,23 @@ def servicio():
     c.on_connect, c.on_message = on_connect, on_message
     c.connect_async(env('MQTT_HOST', 'localhost'), int(env('MQTT_PORT', '1883')))
     c.loop_start()
+    puente = None
+    if si(env('VISITAS_CHAT', 'yes')):
+        if tg:
+            nick = env('CHAT_TELEGRAM_NICK', 'BricoHams')
+
+            def publicar_chat(evento):
+                if not c.is_connected():
+                    return False
+                info = c.publish(tema, json.dumps(evento, ensure_ascii=False), qos=0)
+                return info.rc == mqtt.MQTT_ERR_SUCCESS
+
+            puente = PuenteTelegram(env('TELEGRAM_TOKEN'), env('TELEGRAM_CHAT_ID'), publicar_chat, nick)
+            puente.iniciar()
+            print('visitas: respuestas /chat de Telegram -> chat web habilitadas', flush=True)
+        else:
+            print('visitas: respuestas /chat desactivadas: falta TELEGRAM_TOKEN o TELEGRAM_CHAT_ID',
+                  file=sys.stderr, flush=True)
     while True:
         write_atomic(WEB, v.resumen())
         v.limpiar()

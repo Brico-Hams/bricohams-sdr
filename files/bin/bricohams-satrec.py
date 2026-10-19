@@ -66,7 +66,7 @@ def cfg_desde_env(env=os.environ):
         'ics': env.get('SATREC_ICS', os.path.join(sat, 'pases.ics')),
         'dir': env.get('SATREC_DIR', '/var/lib/bricohams/satelites'),
         'files': env.get('SATREC_FILES_DIR', '/tmp'),
-        'en_files': int(env.get('SATREC_EN_FILES', '10')),
+        'en_files': int(env.get('SATREC_EN_FILES', '2')),
         'min_el': float(env.get('SATREC_MIN_EL', '20')),
         'excluir': {x.strip().upper() for x in re.split(r'[,;]+', env.get('SATREC_EXCLUIR', '')) if x.strip()},
         'omitir_pases': set(env.get('SATREC_OMITIR_PASES', '').split(',')),

@@ -84,6 +84,20 @@ with patch.object(tgm.urllib.request, 'urlopen', respuesta_migrada):
         raise AssertionError('Confunde error HTTP con entrega')
     except RuntimeError as ex:
         assert 'migrado' in str(ex) and 'SECRETO' not in str(ex)
+def respuesta_actualizaciones(*args, **kwargs):
+    assert 'getUpdates' in args[0] and 'offset=12' in args[0]
+    return io.BytesIO(json.dumps({'ok': True, 'result': [{'update_id': 12}]}).encode())
+with patch.object(tgm.urllib.request, 'urlopen', respuesta_actualizaciones):
+    assert tgm.obtener_actualizaciones('123:SECRETO', offset=12, timeout=0) == [{'update_id': 12}]
+def error_actualizaciones(*args, **kwargs):
+    cuerpo = json.dumps({'ok': False, 'error_code': 401, 'description': 'invalid token 123:SECRETO'}).encode()
+    raise urllib.error.HTTPError('url', 401, 'Unauthorized', {}, io.BytesIO(cuerpo))
+with patch.object(tgm.urllib.request, 'urlopen', error_actualizaciones):
+    try:
+        tgm.obtener_actualizaciones('123:SECRETO', timeout=0)
+        raise AssertionError('el error de getUpdates debe propagarse')
+    except RuntimeError as ex:
+        assert '***' in str(ex) and 'SECRETO' not in str(ex)
 login = cargar('login_aviso', os.path.join(BIN, 'bricohams-login-aviso'))
 linea = '192.168.1.5 - [17/Oct/2026:17:00:00 +0200] "POST /login HTTP/2.0" 303 "/settings"'
 avisador = login.Avisador(enviar=lambda texto: False)
@@ -178,6 +192,42 @@ for k in ('CALLSIGN', 'IGATE_CALLSIGN', 'RAK_CALLSIGN'):
 
 # ------------------------------------------------------------------ APRS que decodifica OpenWebRX+ (MQTT openwebrx/APRS)
 vis = cargar('visitas', os.path.join(BIN, 'bricohams-visitas.py'))
+publicados, confirmaciones = [], []
+fallar_mqtt = [False]
+
+def publicar_web(evento):
+    if fallar_mqtt[0]:
+        return False
+    publicados.append(evento)
+    return True
+
+def confirmar_telegram(token, chat, texto):
+    confirmaciones.append((token, chat, texto))
+
+bot = vis.PuenteTelegram('123:SECRETO', '-100', publicar_web, 'N0CALL',
+                         obtener=lambda *a, **kw: [], enviar=confirmar_telegram)
+assert bot.procesar({'message': {'chat': {'id': -200}, 'text': '/chat no'}})
+assert bot.procesar({'message': {'chat': {'id': -100}, 'from': {'is_bot': True}, 'text': '/chat no'}})
+assert bot.procesar({'message': {'chat': {'id': -100}, 'text': 'mensaje normal'}})
+assert not publicados, 'solo /chat del grupo configurado puede publicarse'
+reintento = vis.PuenteTelegram('123:SECRETO', '-100', publicar_web, 'N0CALL',
+                              obtener=lambda *a, **kw: [{'update_id': 11, 'message': {
+                                  'chat': {'id': -100}, 'text': '/chat prueba'}}],
+                              enviar=confirmar_telegram)
+fallar_mqtt[0] = True
+assert not reintento.leer_una_vez() and reintento.offset is None, 'no debe confirmar antes de publicar'
+fallar_mqtt[0] = False
+assert reintento.leer_una_vez() and reintento.offset == 12, 'reintenta y avanza el offset al publicar'
+publicados.clear()
+bot.obtener = lambda *a, **kw: [{'update_id': 12, 'message': {'chat': {'id': -100},
+                                                              'text': '/chat@bricohamsbot Hola <todos>\n73'}}]
+assert bot.leer_una_vez() and bot.offset == 13
+assert publicados == [{'state': 'ChatMessage', 'name': 'N0CALL (Telegram)', 'message': 'Hola <todos> 73',
+                       'telegram_bridge': True}], publicados
+assert 'Publicado en el chat web' in confirmaciones[-1][2]
+assert bot.procesar({'message': {'chat': {'id': -100}, 'text': '/chat'}})
+assert 'Uso:' in confirmaciones[-1][2]
+
 with tempfile.TemporaryDirectory() as d:
     db_resumen = vis.abrir_db(os.path.join(d, 'resumen.sqlite'))
     with patch.object(vis, 'abrir_db', return_value=db_resumen), patch(

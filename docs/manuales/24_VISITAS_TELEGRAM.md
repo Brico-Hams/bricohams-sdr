@@ -24,6 +24,10 @@
    - guarda en `/var/lib/bricohams/visitas.sqlite` solo la **IP truncada** (`83.45.x.x`), el país y la ciudad. **La IP completa no se escribe en disco.**
    - avisa por Telegram como mucho **una vez por IP cada 10 min**, para que no se repita en cada recarga. No avisa de las conexiones desde casa.
    - reenvía el **chat** de la web a Telegram (`VISITAS_CHAT`).
+   - permite publicar una respuesta desde el grupo con `/chat@NombreDelBot texto`
+     (o `/chat texto` si el bot recibe comandos sin mención). Se publica en el chat
+     web compartido como `CALLSIGN (Telegram)` y Telegram confirma el envío. No es
+     una respuesta privada a un oyente: la ven todos los usuarios del chat web.
    - deja `visitas.json` para la web, **sin IPs**.
    - borra las visitas a los **90 días** (`VISITAS_DIAS`) y conserva solo los contadores diarios por país.
 3. **Cron** (manual 25):
@@ -46,6 +50,13 @@
    sudo bash install.sh --solo visitas,tareas
    bricohams-telegram "prueba desde la estación"
    ```
+   Para responder desde el grupo al chat web, escribe `/chat@NombreDelBot mensaje`.
+   El bot debe estar en el grupo indicado por `TELEGRAM_CHAT_ID`; Telegram debe tener
+   desactivado el webhook del bot para que funcione el sondeo `getUpdates`. La ruta
+   solo acepta comandos del chat configurado (cualquier miembro de ese grupo podrá
+   publicar al chat web). Los mensajes de canal Meshtastic
+   siguen llegando por `MESH_TELEGRAM`; los mensajes directos/privados no se reenvían.
+   El indicativo publicado se toma de `CHAT_TELEGRAM_NICK`; si está vacío, usa `CALLSIGN`.
 ### Si los mensajes dejan de llegar (HTTP 400)
 Si `journalctl -u bricohams-visitas` muestra `Telegram: HTTP Error 400: Bad Request`,
 comprueba el motivo sin mostrar el token:
@@ -138,3 +149,16 @@ journalctl -u bricohams-mesh-owrx -u bricohams-rak-aprs | grep telegram
 ![Acceso, administración y Files protegidos](../esquemas/29_acceso_administracion.png)
 
 sudo tools/desplegar-agenda-telegram.sh <kit-nuevo> <kit-instalado> actualiza agendas, avisos de login y paneles privados con copia previa en /var/backups/bricohams/ y restauración automática si falla; no actúa durante un pase protegido. Prueba: 	ests/test_agendas_admin.py, 	ests/test_login_rate.py (12 intentos/min, ráfaga 5, 429) y 	ests/test_files_protegidos.py (Files sin borrado, 403 incluso autenticado).
+
+## 9. Problemas detectados, diagnóstico y corrección (puente chat ↔ Telegram, 2026-10-19)
+
+| # | Problema detectado | Diagnóstico | Corrección |
+|---|---|---|---|
+| 1 | No se podía responder desde Telegram a quien escribía en el chat web. | Revisión de `bricohams-visitas`: el chat web solo se reenviaba a Telegram (`VISITAS_CHAT=yes`); no existía el camino inverso. | Nueva clase `PuenteTelegram`: `/chat@NombreDelBot mensaje` en el grupo configurado (`TELEGRAM_CHAT_ID`) se publica por MQTT (`openwebrx/CLIENT`) en el chat web compartido, firmado con `CHAT_TELEGRAM_NICK (Telegram)`. |
+| 2 | Riesgo de bucle: la respuesta publicada en el chat web volvería a Telegram. | Los mensajes del puente pasan por el mismo `ChatMessage` que reenvía al grupo. | Los mensajes del puente llevan `telegram_bridge: true` y no se reenvían. |
+| 3 | Si MQTT no está disponible, una orden de Telegram podía perderse. | `getUpdates` confirma el mensaje al avanzar el `offset`. | El `offset` solo avanza si la publicación MQTT funciona; si no, se reintenta. |
+| 4 | Seguridad del puente. | Cualquier grupo o bot podría escribir al bot. | Solo se aceptan `/chat` del chat configurado y de personas (no bots). Se quitan caracteres de control, se limita a 300 caracteres y el token se oculta en los errores. |
+| 5 | Los mensajes de los nodos Meshtastic no llegaban a Telegram. | `bricohams-mesh-owrx` ya los reenvía con `MESH_TELEGRAM=yes` y Telegram configurado; los mensajes directos o privados se excluyen a propósito. Comprobar `journalctl -u bricohams-mesh-owrx \| grep telegram` (`mensajes de canal -> Telegram`). | Sin cambio de código: se reenvían los mensajes de **todos los canales públicos** de los nodos conectados; los directos siguen excluidos. |
+| 6 | `/chat` no responde si el bot usa un *webhook*. | Telegram no entrega `getUpdates` mientras hay un webhook activo. | Documentado: el bot debe trabajar sin webhook (`deleteWebhook`). |
+
+Pruebas: `tests/test_telegram_avisos.py` (getUpdates, filtros, reintento MQTT, offset, eco) y `tests/test_visitas.py` (sin eco hacia Telegram).

@@ -44,6 +44,9 @@ v.evento({'mode': 'CLIENT', 'state': 'ChatMessage', 'ip': '151.20.1.1', 'name': 
 assert len(mensajes) == 3, mensajes
 assert 'Murcia, España' in mensajes[0] and '83.45.x.x' in mensajes[0] and '🇪🇸' in mensajes[0]
 assert 'Roma' in mensajes[1] and 'IU1ABC' in mensajes[2] and '&lt;b&gt;' in mensajes[2]
+v.evento({'mode': 'CLIENT', 'state': 'ChatMessage', 'name': 'N0CALL (Telegram)', 'message': 'respuesta',
+          'telegram_bridge': True})
+assert len(mensajes) == 3, 'la respuesta de Telegram no debe generar un eco de vuelta a Telegram'
 
 r = v.resumen()
 assert r['ahora'] == 3 and r['hoy'] == 4 and r['total'] == 4, r
