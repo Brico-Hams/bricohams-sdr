@@ -129,10 +129,14 @@ Página `/settings/bricohams/seguridad`, solo para administradores, con CSRF en 
 - **Cortafuegos y nginx.**
   - Muestra el estado de `nftables`, `bricohams-cortafuegos`, `fail2ban`, `nginx`, `openwebrx`, `bricohams-bloqueo-arranque` y `bricohams-login-aviso`, junto con los últimos registros.
   - *Recargar cortafuegos* reinicia el cortafuegos y fail2ban, recarga nginx y vuelve a aplicar el bloqueo.
-- **Usuarios de la web (OpenWebRX).**
+- **Usuarios de la web (OpenWebRX+, usuarios locales).**
   - Permite crear usuarios, cambiar la clave (12 caracteres o más, escrita dos veces), activar, desactivar y borrar (escribiendo el nombre para confirmar).
   - Usa `openwebrx admin`, nativo o en Docker con `docker exec`. Las claves nunca se muestran.
   - No deja borrar ni desactivar el último usuario activo.
+- **Métodos de acceso de administradores (v5.5).**
+  - Elige entre solo usuarios locales, «usuario local o cuenta de Google», Google y además usuario local, o solo Google.
+  - Guarda el ID y el secreto del cliente OAuth (el secreto nunca se muestra) y la lista de correos administradores.
+  - Paso a paso, antibloqueo y acceso de emergencia en el [manual 46](46_ACCESO_GOOGLE.md).
 - **Aviso por Telegram de inicios de sesión.**
   - `bricohams-login-aviso` vigila `/var/log/nginx/bricohams-sdr-login.access.log` y envía por `bricohams-telegram` un aviso de cada entrada a la web, con el usuario y la IP.
   - Una misma IP no repite el aviso en 10 minutos.

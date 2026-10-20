@@ -87,6 +87,17 @@ BLOQUEO_PROTEGIDAS = tuple(ipaddress.ip_network(r) for r in (
 FW_UNIDADES = ('nftables', 'bricohams-cortafuegos', 'fail2ban', 'nginx', 'openwebrx', 'bricohams-bloqueo-arranque',
                'bricohams-login-aviso')
 USUARIO_OWRX = re.compile(r'^[A-Za-z0-9._-]{1,32}$')
+# acceso de administradores: usuarios locales de OpenWebRX+ y/o Google (bricohams-google-auth)
+GOOGLE_DIR = os.environ.get('BRICOHAMS_GOOGLE_DIR', '/etc/bricohams/google')
+GOOGLE_APLICAR = 'bricohams-google-auth-aplicar.service'
+GOOGLE_AUTH_LOCAL = os.environ.get('BRICOHAMS_GOOGLE_AUTH_URL', 'http://127.0.0.1:8077/_bh_google/auth')
+GOOGLE_MODOS = (('local', 'Solo usuarios locales (base de datos de OpenWebRX+)'),
+                ('alternativa', 'Usuario local o cuenta de Google (cualquiera de los dos)'),
+                ('doble', 'Cuenta de Google y además usuario local (doble factor)'),
+                ('solo_google', 'Solo cuenta de Google'))
+GOOGLE_CLIENT_RE = re.compile(r'^[0-9]{6,30}-[a-z0-9]{10,64}\.apps\.googleusercontent\.com$')
+GOOGLE_SECRETO_RE = re.compile(r'^[A-Za-z0-9_-]{10,200}$')
+GOOGLE_ADMIN_RE = re.compile(r'^(@[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)+)$')
 GRAFANA = '/settings/bricohams/grafana/d/bricohams/bricohams?orgId=1&kiosk&refresh=30s'
 # v5.0 · únicas unidades que se pueden tocar desde los paneles TAK y Monitorización
 TAK_UNIDADES = ('postgresql', 'rabbitmq-server', 'bricohams-tak-ssl', 'bricohams-tak-cot', 'bricohams-tak')
@@ -886,6 +897,114 @@ def accion_bloqueo(a, campos):
     return None
 
 
+# ---------------------------------------------------------------- métodos de acceso (local y/o Google)
+def google_cuenta_servicio(env=None):
+    env = env if env is not None else leer_env()
+    u = env.get('GOOGLE_OWRX_USUARIO') or 'bricohams-google'
+    return u if USUARIO_OWRX.match(u) else 'bricohams-google'
+
+
+def google_modo(env):
+    if not si(env.get('GOOGLE_AUTH')):
+        return 'local'
+    m = env.get('GOOGLE_AUTH_MODO') or 'alternativa'
+    return m if m in dict(GOOGLE_MODOS) else 'alternativa'
+
+
+def google_sesion_valida(cookie):
+    """True si la petición trae una sesión de Google de un administrador (la valida la propia pasarela)."""
+    import urllib.request
+    if not cookie or 'bh-google=' not in cookie:
+        return False
+    pet = urllib.request.Request(GOOGLE_AUTH_LOCAL, headers={'Cookie': cookie})
+    try:
+        with urllib.request.urlopen(pet, timeout=4) as r:
+            return r.status == 204
+    except (OSError, ValueError):
+        return False
+
+
+def google_admins(texto):
+    lista = []
+    for x in re.split(r'[\s,;]+', (texto or '').strip().lower()):
+        if not x:
+            continue
+        if not GOOGLE_ADMIN_RE.match(x):
+            raise ValueError('«%s» no es un correo ni un @dominio válido' % x[:60])
+        if x not in lista:
+            lista.append(x)
+    if not lista:
+        raise ValueError('pon al menos un correo de administrador (o @dominio de Google Workspace)')
+    if len(lista) > 50:
+        raise ValueError('como mucho 50 correos o dominios')
+    return lista
+
+
+def google_guardar_secreto(secreto):
+    os.makedirs(GOOGLE_DIR, mode=0o700, exist_ok=True)
+    os.chmod(GOOGLE_DIR, 0o700)
+    ruta = os.path.join(GOOGLE_DIR, 'client_secret')
+    tmp = ruta + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(secreto + '\n')
+    os.replace(tmp, ruta)
+
+
+def accion_acceso(a, campos):
+    """Guarda el método de acceso y lanza la unidad que lo aplica (nginx y servicio); None si no es de este bloque."""
+    if a != 'seg-acceso':
+        return None
+    env = leer_env()
+    modo = campos.get('modo', '')
+    if modo not in dict(GOOGLE_MODOS):
+        raise ValueError('método de acceso no válido')
+    actual = google_modo(env)
+    servicio = google_cuenta_servicio(env)
+    locales = [u for u, activo in owrx_usuarios() if activo and u != servicio]
+    if modo in ('local', 'doble') and not locales:
+        raise ValueError('no hay ningún usuario local activo: créalo antes de usar este método')
+    if modo == 'local':
+        cambios = {'GOOGLE_AUTH': 'no'}
+    else:
+        if env.get('SSL_MODO', 'todo') == 'no' or not env.get('SSL_DOMAIN', '').strip():
+            raise ValueError('Google exige HTTPS con dominio: configura SSL_DOMAIN y SSL_MODO (admin o todo) antes')
+        cid = campos.get('client_id', '').strip() or env.get('GOOGLE_CLIENT_ID', '')
+        if not GOOGLE_CLIENT_RE.match(cid):
+            raise ValueError('el ID de cliente debe acabar en .apps.googleusercontent.com')
+        admins = google_admins(campos.get('admins', ''))
+        try:
+            horas = float(campos.get('horas', '') or '8')
+        except ValueError:
+            raise ValueError('horas de sesión no válidas')
+        if not 0.25 <= horas <= 168:
+            raise ValueError('las horas de sesión deben estar entre 0.25 y 168')
+        secreto = campos.get('secreto', '').strip()
+        if secreto and not GOOGLE_SECRETO_RE.match(secreto):
+            raise ValueError('el secreto del cliente tiene caracteres inesperados')
+        if not secreto and not os.path.exists(os.path.join(GOOGLE_DIR, 'client_secret')):
+            raise ValueError('falta el secreto del cliente de Google')
+        if modo in ('doble', 'solo_google') and actual not in ('doble', 'solo_google') \
+                and not google_sesion_valida(campos.get('_cookie', '')):
+            # antibloqueo: antes de exigir Google hay que haber entrado con Google al menos una vez
+            raise ValueError('para exigir Google primero activa «Usuario local o cuenta de Google», entra con '
+                             '«Entrar con Google» con un correo administrador y vuelve aquí')
+        if secreto:
+            google_guardar_secreto(secreto)
+        cambios = {'GOOGLE_AUTH': 'yes', 'GOOGLE_AUTH_MODO': modo, 'GOOGLE_CLIENT_ID': cid,
+                   'GOOGLE_ADMINS': ','.join(admins), 'GOOGLE_SESION_HORAS': '%g' % horas}
+        if modo == 'doble':
+            # al volver a alternativa o solo_google la pasarela genera otra clave para su cuenta de servicio
+            try:
+                os.unlink(os.path.join(GOOGLE_DIR, 'owrx_password'))
+            except OSError:
+                pass
+    guardar(cambios)
+    r = subprocess.run(['systemctl', 'start', '--no-block', GOOGLE_APLICAR], capture_output=True, text=True, timeout=30)
+    if r.returncode:
+        raise OSError('guardado, pero no se pudo lanzar %s; ¿está instalado bricohams-google-auth?' % GOOGLE_APLICAR)
+    return 'Guardado: %s. Aplicándolo (nginx y servicio); recarga la página en unos segundos.' % dict(GOOGLE_MODOS)[modo]
+
 # ---------------------------------------------------------------- usuarios de OpenWebRX
 def owrx_usuarios_ruta():
     if os.environ.get('BRICOHAMS_OWRX_USUARIOS'):
@@ -947,7 +1066,10 @@ def accion_usuarios(a, campos):
     if not USUARIO_OWRX.match(usuario):
         raise ValueError('usuario no válido (letras, números, punto, guion o guion bajo; máx. 32)')
     lista = dict(owrx_usuarios())
-    activos = [u for u, si in lista.items() if si]
+    servicio = google_cuenta_servicio()
+    if usuario == servicio:
+        raise ValueError('%s es la cuenta de servicio del acceso con Google; se gestiona en «Métodos de acceso»' % usuario)
+    activos = [u for u, si in lista.items() if si and u != servicio]
 
     def clave():
         c = campos.get('clave', '')
@@ -985,7 +1107,7 @@ def accion_usuarios(a, campos):
 
 def accion_seguridad(campos):
     a = campos.get('accion', '')
-    for bloque in (accion_bloqueo, accion_usuarios):
+    for bloque in (accion_bloqueo, accion_usuarios, accion_acceso):
         msg = bloque(a, campos)
         if msg is not None:
             return msg
@@ -1799,21 +1921,27 @@ def tarjeta_cortafuegos(oculto):
 
 def tarjeta_usuarios(oculto):
     lista = owrx_usuarios()
-    activos = sum(1 for _, si in lista if si)
+    servicio = google_cuenta_servicio()
+    activos = sum(1 for u, si in lista if si and u != servicio)
     filas = []
     for u, si in lista:
+        if u == servicio:
+            filas.append('<tr><td><b>%s</b></td><td class="text-info">Google (cuenta de servicio)</td>'
+                         '<td class="small text-muted">la usa «Entrar con Google»; clave aleatoria que nadie conoce</td></tr>' % e(u))
+            continue
         ultimo = si and activos == 1
         acciones = (boton_seg(oculto, 'seg-usuariodesactivar', 'Desactivar', 'btn-outline-warning', {'usuario': u})
                     if si and not ultimo else '' if si else
                     boton_seg(oculto, 'seg-usuarioactivar', 'Activar', 'btn-outline-success', {'usuario': u}))
         filas.append('<tr><td><b>%s</b></td><td class="%s">%s</td><td>%s</td></tr>' % (
             e(u), 'text-success' if si else 'text-muted', 'activo' if si else 'desactivado', acciones))
-    opciones = ''.join('<option value="%s">%s</option>' % (e(u), e(u)) for u, _ in lista)
+    opciones = ''.join('<option value="%s">%s</option>' % (e(u), e(u)) for u, _ in lista if u != servicio)
     clave = ('<div class="col-md-3"><input class="form-control form-control-sm" type="password" name="clave" minlength="12" '
              'maxlength="128" autocomplete="new-password" placeholder="Clave (12+)"></div>'
              '<div class="col-md-3"><input class="form-control form-control-sm" type="password" name="clave2" minlength="12" '
              'maxlength="128" autocomplete="new-password" placeholder="Repite la clave"></div>')
-    return """<div class="card mb-4"><div class="card-header"><b>Usuarios de la web (OpenWebRX)</b></div><div class="card-body">
+    return """<div class="card mb-4"><div class="card-header"><b>Usuarios de la web (OpenWebRX+)</b> · usuarios locales, rol administrador</div><div class="card-body">
+<p class="small text-muted mb-2">Para que los administradores entren también (o solo) con una cuenta de Google, configúralo en <a href="#acceso">Métodos de acceso de administradores</a>.</p>
 %s
 <h6 class="mt-3">Crear usuario</h6>
 <form method="post" action="%s" class="row g-2 mb-3" autocomplete="off">%s
@@ -1835,10 +1963,74 @@ def tarjeta_usuarios(oculto):
         SEGURIDAD, oculto, clave, SEGURIDAD, oculto, opciones, clave, SEGURIDAD, oculto, opciones)
 
 
+def tarjeta_acceso(oculto):
+    env = leer_env()
+    modo = google_modo(env)
+    dominio = env.get('SSL_DOMAIN', '').strip().lower()
+    st = leer_json(os.path.join(GOOGLE_DIR, 'estado.json'))
+    if st.get('hora'):
+        estado = '<span class="%s">%s</span> <span class="small text-muted">(%s)</span>' % (
+            'text-success' if st.get('ok') else 'text-danger', e(str(st.get('mensaje', ''))[:400]),
+            e(time.strftime('%Y-%m-%d %H:%M', time.localtime(st['hora']))) if isinstance(st['hora'], (int, float)) else '')
+    else:
+        estado = '<span class="text-muted">sin aplicar desde el panel</span>'
+    cargada, activa, texto = estado_unidad('bricohams-google-auth')
+    pasarela = ('<span class="text-muted">no instalada</span>' if not cargada else
+                '<span class="%s">%s</span>' % ('text-success' if activa else 'text-warning', e(texto)))
+    opciones = ''.join('<div class="form-check"><input class="form-check-input" type="radio" name="modo" id="m-%s" value="%s"%s>'
+                       '<label class="form-check-label" for="m-%s">%s</label></div>' % (
+                           k, k, ' checked' if k == modo else '', k, e(v)) for k, v in GOOGLE_MODOS)
+    hay_secreto = os.path.exists(os.path.join(GOOGLE_DIR, 'client_secret'))
+    servicio = google_cuenta_servicio(env)
+    origen = 'https://%s' % dominio if dominio else '(configura SSL_DOMAIN)'
+    entrar = ('<a class="btn btn-sm btn-outline-primary" href="/_bh_google/login?rd=%s">Entrar con Google ahora</a>' % SEGURIDAD
+              if modo != 'local' and activa else '')
+    return """<div class="card mb-4" id="acceso"><div class="card-header"><b>Métodos de acceso de administradores</b> · usuarios locales y Google
+<span class="float-end">%s</span></div><div class="card-body">
+<p class="small mb-1">Estado: %s · pasarela Google: %s</p>
+<form method="post" action="%s" autocomplete="off">%s
+<div class="mb-3">%s</div>
+<div class="row g-2">
+<div class="col-md-6"><label class="form-label small">ID de cliente OAuth (Google Cloud Console)</label>
+<input class="form-control form-control-sm" name="client_id" maxlength="120" value="%s" placeholder="123456789012-xxxx.apps.googleusercontent.com" spellcheck="false"></div>
+<div class="col-md-6"><label class="form-label small">Secreto del cliente %s</label>
+<input class="form-control form-control-sm" type="password" name="secreto" maxlength="200" autocomplete="new-password" placeholder="%s"></div>
+<div class="col-md-9"><label class="form-label small">Correos de Google administradores (o @dominio de Workspace), separados por comas</label>
+<input class="form-control form-control-sm" name="admins" maxlength="2000" value="%s" placeholder="tu.correo@gmail.com" spellcheck="false"></div>
+<div class="col-md-3"><label class="form-label small">Horas de sesión de Google</label>
+<input class="form-control form-control-sm" name="horas" maxlength="6" value="%s"></div>
+</div>
+<button class="btn btn-primary mt-3" name="accion" value="seg-acceso">Guardar y aplicar</button></form>
+<details class="mt-3"><summary>Cómo crear el cliente de Google</summary><ol class="small">
+<li>Abre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console → Credenciales</a> y crea o elige un proyecto.</li>
+<li>APIs y servicios → Pantalla de consentimiento de OAuth (tipo Externo; ámbitos <code>openid</code> y <code>email</code>; mientras esté «en pruebas», añade tus correos como usuarios de prueba).</li>
+<li>Credenciales → Crear credenciales → ID de cliente de OAuth → «Aplicación web».</li>
+<li>Orígenes de JavaScript autorizados: <code>%s</code></li>
+<li>URI de redirección autorizados: <code>%s/_bh_google/callback</code></li>
+<li>Copia aquí el ID y el secreto, pon tus correos y elige «Usuario local o cuenta de Google».</li>
+<li>Pulsa «Guardar y aplicar», recarga para ver el <b>Estado</b>, cierra la sesión y prueba «Entrar con Google» en <code>/login</code>.</li></ol></details>
+<details class="mt-2"><summary>Dónde se configura cada cosa</summary><ul class="small">
+<li><b>Método de acceso, cliente de Google y correos</b>: esta tarjeta (se guarda en <code>bricohams.env</code>, claves <code>GOOGLE_*</code>; el secreto en <code>/etc/bricohams/google/client_secret</code>, 0600).</li>
+<li><b>Usuarios locales</b> (base de datos de OpenWebRX+): tarjeta «Usuarios de la web» de esta página.</li>
+<li><b>Consola</b>: <code>sudo bricohams-google-auth configurar --kit-env …</code>, <code>… aplicar --kit-env …</code>, <code>… comprobar --kit-env …</code> y <code>bricohams-google-auth --help</code>.</li>
+<li><b>Registros</b>: <code>journalctl -u bricohams-google-auth</code> (accesos y denegaciones) y <code>journalctl -u bricohams-google-auth-aplicar</code> (aplicar).</li>
+<li><b>Documentación</b>: manual 46 del kit (<code>docs/manuales/46_ACCESO_GOOGLE.md</code>) y manual 34, apartado 5 bis.</li></ul></details>
+<ul class="small text-muted mt-2 mb-0">
+<li>Los usuarios locales son los de la tabla de abajo (base de datos de OpenWebRX+). Todos son administradores; con Google entran los correos de la lista.</li>
+<li>«Entrar con Google» usa la cuenta de servicio <code>%s</code> (clave aleatoria guardada solo en el servidor).</li>
+<li>Antibloqueo: para exigir Google (doble o solo Google) primero hay que entrar con Google en el modo «usuario local o Google». No se puede volver a «solo locales» ni a «doble» sin un usuario local activo.</li>
+<li>El secreto nunca se devuelve al navegador. Si te quedas fuera: <code>sudo bricohams-google-auth configurar --kit-env … --desactivar</code> y <code>sudo bricohams-google-auth aplicar --kit-env …</code></li></ul>
+</div></div>""" % (
+        entrar, estado, pasarela, SEGURIDAD, oculto, opciones, e(env.get('GOOGLE_CLIENT_ID', '')),
+        '(guardado)' if hay_secreto else '(obligatorio)', 'déjalo vacío para conservar el actual' if hay_secreto else 'GOCSPX-…',
+        e(env.get('GOOGLE_ADMINS', '').replace(',', ', ')), e(env.get('GOOGLE_SESION_HORAS') or '8'),
+        e(origen), e(origen), e(servicio))
+
+
 def pagina_seguridad(sesion, aviso='', error=''):
     oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
     return (cabecera('Seguridad', SEGURIDAD) + '<h1>Seguridad</h1>' + avisos(aviso, error) + '</div></div>'
-            + tarjeta_bloqueo(oculto) + tarjeta_cortafuegos(oculto) + tarjeta_usuarios(oculto)
+            + tarjeta_bloqueo(oculto) + tarjeta_cortafuegos(oculto) + tarjeta_acceso(oculto) + tarjeta_usuarios(oculto)
             + tarjeta_backup_remoto(oculto) + '</div></body></html>')
 
 
@@ -2342,7 +2534,10 @@ class Manejador(http.server.BaseHTTPRequestHandler):
             largo = 0
         if largo <= 0 or largo > 16384:
             return self._enviar(400, b'peticion no valida', 'text/plain; charset=utf-8')
-        campos = {k: v[0] for k, v in parse_qs(self.rfile.read(largo).decode('utf-8', 'replace')).items()}
+        campos = {k: v[0] for k, v in parse_qs(self.rfile.read(largo).decode('utf-8', 'replace')).items()
+                  if not k.startswith('_')}
+        if ruta == SEGURIDAD:
+            campos['_cookie'] = self.headers.get('Cookie', '')
         if not (self._mismo_origen() and hmac.compare_digest(campos.get('csrf', ''), token(s))):
             return self._enviar(403, b'origen no valido', 'text/plain; charset=utf-8')
         aviso = error = ''

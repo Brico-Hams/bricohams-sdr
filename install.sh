@@ -2486,6 +2486,34 @@ paso_web() {
     fi
     cert=/etc/bricohams/ssl/autofirmado.crt; key=/etc/bricohams/ssl/autofirmado.key
     [ -n "$dom" ] && [ -s "/etc/letsencrypt/live/$dom/fullchain.pem" ] && { cert="/etc/letsencrypt/live/$dom/fullchain.pem"; key="/etc/letsencrypt/live/$dom/privkey.pem"; }
+    # v5.5 · acceso de administradores (usuarios locales y/o Google) (OpenID Connect) delante de /settings (manual 46).
+    # Si falta algo se sigue solo con la contraseña de OpenWebRX+ para no dejar fuera al administrador.
+    local google_listo=0 grc=0
+    install -m 755 "$FILES/bin/bricohams-google-auth" /usr/local/bin/bricohams-google-auth
+    # unidad que usa el panel Seguridad para aplicar el método de acceso (local, local o Google, doble, solo Google)
+    /usr/local/bin/bricohams-google-auth instalar-aplicar --kit-env "$KIT/bricohams.env" \
+        || aviso "No he podido instalar bricohams-google-auth-aplicar: el panel Seguridad no podrá cambiar el método de acceso"
+    systemctl daemon-reload
+    /usr/local/bin/bricohams-google-auth preparar --kit-env "$KIT/bricohams.env" || grc=$?
+    case "$grc" in
+        0)
+            systemctl daemon-reload
+            systemctl enable bricohams-google-auth >/dev/null 2>&1 || true
+            systemctl restart bricohams-google-auth || true
+            sleep 1
+            if systemctl is-active --quiet bricohams-google-auth; then
+                google_listo=1
+            else
+                aviso "bricohams-google-auth no arranca (journalctl -u bricohams-google-auth): /settings sigue solo con contraseña"
+            fi
+            ;;
+        3)
+            if [ -f /etc/systemd/system/bricohams-google-auth.service ]; then
+                systemctl disable --now bricohams-google-auth >/dev/null 2>&1 || true
+            fi
+            ;;
+        *) aviso "GOOGLE_AUTH=yes pero la configuración está incompleta (mensaje de arriba): /settings sigue solo con contraseña" ;;
+    esac
     # v4.2 · SSL_MODO: admin = receptor por HTTP y administración por HTTPS (decisión de N0CALL)
     escribir_nginx() {
         install -d /etc/nginx/snippets /etc/nginx/conf.d
@@ -2520,6 +2548,10 @@ paso_web() {
                 aviso "nginx: desactivado el sitio $(basename "$s") (default_server se saltaba la protección de /settings); copia en /etc/bricohams/nginx-desactivados"
             fi
         done
+        if [ "$google_listo" = 1 ]; then
+            /usr/local/bin/bricohams-google-auth nginx --aplicar \
+                || aviso "No he podido poner el acceso con Google en nginx: /settings sigue solo con contraseña"
+        fi
         nginx -t || fallo "nginx no acepta la configuración (mensaje de arriba): /etc/nginx/sites-available/bricohams-sdr"
         systemctl reload-or-restart nginx
     }

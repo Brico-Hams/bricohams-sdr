@@ -960,3 +960,13 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - El UUID va en `bricohams.env` y en `/etc/bricohams/mapflights.env` (600), nunca en el repositorio. No se usa la clave `mf_feed_` del cliente JSON alternativo.
 - Opcional (`MAPFLIGHTS_FEED="no"` por defecto); desactivarlo quita el conector y la unidad.
 **Consecuencias:** sin proceso nuevo para posiciones; un segundo mlat-client lee 30005. El UUID viaja en claro por TCP: si se filtra, se cambia en map.flights.
+
+## ADR-71 · Acceso de administradores con usuarios locales y/o Google (v5.5)
+**Contexto:** los administradores entran con los usuarios de OpenWebRX+ (`users.json`). Se quiere poder entrar también con una cuenta de Google, sin perder el acceso local y configurándolo desde el panel Seguridad.
+**Decisión:**
+- Pasarela propia `bricohams-google-auth` (Python estándar, `DynamicUser`, 127.0.0.1:8077) con OpenID Connect (código + PKCE, `state`, `nonce`) y una cookie `bh-google` firmada con HMAC. No usa bibliotecas externas ni guarda tokens de Google.
+- Cuatro modos: solo locales (`GOOGLE_AUTH=no`), `alternativa` (local O Google; botón «Entrar con Google» en `/login` con `sub_filter`), `doble` (`auth_request` de Google y además el usuario local) y `solo_google`. En `alternativa` y `solo_google`, la sesión de OpenWebRX+ se abre con la cuenta de servicio `bricohams-google` (clave aleatoria en `/etc/bricohams/google`, 0600).
+- Los cambios en nginx se marcan (`# bricohams-google`) y son reversibles e idempotentes (`nginx --quitar`).
+- El panel (`ProtectSystem=strict`) solo valida y guarda (`bricohams.env`, secreto 0600) y lanza la unidad *oneshot* `bricohams-google-auth-aplicar.service`, que ejecuta `aplicar`: preparar, servicio, nginx, `nginx -t` (restaura si falla) y `estado.json`.
+- Antibloqueo: siempre queda un usuario local activo en los modos que lo usan, y solo se puede exigir Google si la petición ya trae una sesión de Google válida.
+**Consecuencias:** el secreto del cliente no vuelve al navegador ni entra en Git. Si Google cae, en `alternativa` se sigue entrando con el usuario local; en los demás modos, el acceso de emergencia es `configurar --desactivar` + `aplicar` por SSH. Manual 46.
