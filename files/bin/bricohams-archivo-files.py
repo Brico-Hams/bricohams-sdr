@@ -58,6 +58,9 @@ def candidatos(cfg):
     salida = []
     for n in nombres:
         ruta = os.path.join(cfg['files'], n)
+        # en /tmp cualquiera puede crear enlaces: solo se siguen los de bricohams-satrec
+        if os.path.islink(ruta) and not es_enlace_satrec(ruta, cfg):
+            continue
         if PATRON.match(n) and os.path.isfile(ruta):
             salida.append(ruta)
     return salida

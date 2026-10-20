@@ -87,6 +87,21 @@ def test_enlaces_satrec_se_archivan_pero_no_se_quitan():
     assert all(not os.path.islink(os.path.join(r, f)) for r, _, fs in os.walk(cfg['archivo']) for f in fs)
 
 
+def test_enlaces_ajenos_a_satrec_se_ignoran():
+    cfg = entorno()
+    ajeno = os.path.join(os.path.dirname(cfg['files']), 'secreto.txt')
+    fichero(ajeno, b'no-archivar', 600)
+    enlace = os.path.join(cfg['files'], 'FAX-261019-101800.txt')
+    try:
+        os.symlink(ajeno, enlace)
+    except OSError:
+        print('SKIP enlaces simbólicos no permitidos en este sistema')
+        return
+    res = af.vuelta(cfg, log=lambda *_: None)
+    assert res['copiados'] == [] and res['borrados'] == [] and nombres_archivo(cfg) == []
+    assert os.path.islink(enlace) and open(ajeno, 'rb').read() == b'no-archivar'
+
+
 def test_sin_espacio_no_copia_ni_borra():
     cfg = entorno()
     cfg['min_libre_mb'] = 1e15

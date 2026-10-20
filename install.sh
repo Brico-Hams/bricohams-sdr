@@ -2192,6 +2192,18 @@ StateDirectory=bricohams/satelites
 Environment="ARCHIVO_DIR=${ARCHIVO_DIR:-/var/lib/bricohams/satelites/archivo}" "ARCHIVO_FILES_ULTIMOS=${ARCHIVO_FILES_ULTIMOS:-2}"
 Environment="ARCHIVO_MIN_LIBRE_MB=${ARCHIVO_MIN_LIBRE_MB:-500}"
 ExecStart=/usr/local/bin/bricohams-archivo-files
+# sin PrivateTmp: «Files» de OpenWebRX+ está en el /tmp real
+ProtectSystem=strict
+ReadWritePaths=-/tmp -${ARCHIVO_DIR:-/var/lib/bricohams/satelites/archivo}
+ProtectHome=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+SystemCallArchitectures=native
 EOF
     cat >/etc/systemd/system/bricohams-archivo-files.timer <<'EOF'
 [Unit]
