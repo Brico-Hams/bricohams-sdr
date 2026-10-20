@@ -132,6 +132,13 @@ copia de seguridad verificada (`BACKUP_VERIFICADO=…` y `RESTAURAR.sh`), instal
 del panel, unidad de aplicar, `nginx -t` y comprobaciones. Si algo falla, restaura solo. **No activa
 Google**: se elige después en el panel.
 
+Antes de la copia, el `.ps1` ofrece liberar espacio con `tools/limpiar-copias-despliegue.sh`:
+muestra el espacio libre y la lista de copias de **despliegue** antiguas (`/var/backups/bricohams/<tipo>-FECHA-PID/`
+y `/var/backups/bricohams-<tipo>-FECHA[.tar.gz]`), conserva la más reciente de cada tipo y solo borra si se
+escribe `BORRAR`. Nunca toca las copias diarias (`backup-openwebrx-*`, `perfil-owrx-*`, con su propia
+retención de cinco días), las de deshacer (`bricohams-blindaje/`, `owrx-clone/`) ni los enlaces simbólicos.
+Para ver qué borraría sin borrar nada: `sudo bash tools/limpiar-copias-despliegue.sh --lista`.
+
 ## 8. Problemas
 
 | Síntoma | Causa y solución |
