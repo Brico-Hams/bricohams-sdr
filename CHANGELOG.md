@@ -20,6 +20,7 @@
 - `tools/actualizar-google-auth.sh`: copia verificada con `RESTAURAR.sh`, instalación de la pasarela y del panel. No activa Google.
 - Manual 46 y ADR-71. Pruebas: `test_google_auth.py` (más E2E con nginx 1.22) y `test_mesh_admin.py`.
 - Referencias de configuración en el módulo y en la web: desplegable «Dónde se configura cada cosa» y enlace a la consola de Google en el panel (`#acceso`), nota bajo el botón de `/login`, páginas de error con enlace al usuario local, `bricohams-google-auth --help` y `comprobar` con la guía, y apartado 0 del manual 46.
+- `tools/limpiar-copias-despliegue.sh`: libera espacio borrando las copias de despliegue antiguas (conserva la última de cada tipo; nunca las diarias ni las de deshacer), solo si se escribe `BORRAR`. `Desplegar-GoogleAuth.ps1` la ofrece antes de la copia de seguridad.
 ## v5.4.1 · 2026-10-17
 
 Publicación coordinada en los repositorios privado y público, con historiales
