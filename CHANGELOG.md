@@ -11,6 +11,15 @@
 - «Files» deja los 2 últimos (`ARCHIVO_FILES_ULTIMOS`), y `SATREC_EN_FILES` pasa de 10 a 2. `keep_files` sube a 100 para que SatDump no pierda imágenes antes de archivarlas.
 - `tools/actualizar-archivo-files.sh`: comprueba que no hay pase en curso, hace una copia verificada con `RESTAURAR.sh` e instala.
 - Manual 42, apartado 8: problemas detectados, diagnóstico y corrección.
+
+### Acceso de administradores: usuarios locales y Google
+- `bricohams-google-auth`: pasarela OpenID Connect con Google (PKCE, `state`, `nonce`, cookie HMAC, `DynamicUser`, 127.0.0.1:8077).
+- Modos: solo locales, «usuario local o Google» (botón «Entrar con Google» en `/login`), Google y además local, y solo Google.
+- Panel Seguridad: tarjeta «Métodos de acceso de administradores» con validación, secreto guardado en 0600 y antibloqueo. Se aplica con la unidad `bricohams-google-auth-aplicar.service` (`nginx -t` y restauración si falla).
+- La cuenta de servicio `bricohams-google` aparece aparte en la tabla de usuarios y no se puede tocar.
+- `tools/actualizar-google-auth.sh`: copia verificada con `RESTAURAR.sh`, instalación de la pasarela y del panel. No activa Google.
+- Manual 46 y ADR-71. Pruebas: `test_google_auth.py` (más E2E con nginx 1.22) y `test_mesh_admin.py`.
+- Referencias de configuración en el módulo y en la web: desplegable «Dónde se configura cada cosa» y enlace a la consola de Google en el panel (`#acceso`), nota bajo el botón de `/login`, páginas de error con enlace al usuario local, `bricohams-google-auth --help` y `comprobar` con la guía, y apartado 0 del manual 46.
 ## v5.4.1 · 2026-10-17
 
 Publicación coordinada en los repositorios privado y público, con historiales

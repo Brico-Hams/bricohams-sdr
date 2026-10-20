@@ -510,6 +510,80 @@ try:
         st, _, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
         assert 'abc123' not in pag and '<b>x</b>' not in pag and '<i>' not in pag and '3.0 MB' in pag
         assert 'SECRETO' not in pag and 'value="b!AbC-123_x"' in pag
+        # --- métodos de acceso: usuarios locales (OpenWebRX+) y/o Google
+        M.GOOGLE_DIR = os.path.join(tmp, 'google')
+        real_usuarios = M.owrx_usuarios
+        M.owrx_usuarios = lambda: [('admin', True), ('bricohams-google', True)]
+
+        class FalsaPasarela(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                self.send_response(204 if 'bh-google=bueno' in (self.headers.get('Cookie') or '') else 401)
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+        pasarela = http.server.HTTPServer(('127.0.0.1', 0), FalsaPasarela)
+        threading.Thread(target=pasarela.serve_forever, daemon=True).start()
+        M.GOOGLE_AUTH_LOCAL = 'http://127.0.0.1:%d/_bh_google/auth' % pasarela.server_port
+        try:
+            assert not M.google_sesion_valida('owrx-session=x') and not M.google_sesion_valida('bh-google=malo')
+            assert M.google_sesion_valida('owrx-session=x; bh-google=bueno')
+            st, _, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
+            assert 'Métodos de acceso' in pag and 'value="seg-acceso"' in pag and 'value="local" checked' in pag
+            assert 'Dónde se configura cada cosa' in pag and 'id="acceso"' in pag and 'href="#acceso"' in pag, 'referencias de configuración'
+            assert 'console.cloud.google.com/apis/credentials' in pag and '46_ACCESO_GOOGLE.md' in pag
+            assert 'Google (cuenta de servicio)' in pag and '<option value="bricohams-google">' not in pag
+            assert '/_bh_google/callback' in pag
+            st, _, pag = seg(accion='seg-usuarioborrar', usuario='bricohams-google', confirmar='bricohams-google')
+            assert 'alert-danger' in pag and 'cuenta de servicio' in pag
+            st, _, pag = seg(accion='seg-usuariodesactivar', usuario='admin')
+            assert 'único usuario activo' in pag, 'la cuenta de servicio no cuenta como usuario local'
+            cid = '123456789012-abcdefghij0123456789.apps.googleusercontent.com'
+            buena = dict(accion='seg-acceso', modo='alternativa', client_id=cid, admins='yo@ejemplo.es', secreto='GOCSPX-secreto_123')
+            n = len(ordenes)
+            st, _, pag = seg(**buena)
+            assert 'SSL_DOMAIN' in pag and len(ordenes) == n, 'sin dominio HTTPS no se activa Google'
+            M.guardar({'SSL_DOMAIN': 'sdr.ejemplo.org', 'SSL_MODO': 'admin'})
+            for malo, texto in ((dict(client_id='malo'), 'ID de cliente'), (dict(admins='nadie'), 'no es un correo'),
+                                (dict(secreto=''), 'falta el secreto'), (dict(horas='999'), 'horas'),
+                                (dict(secreto='con espacio'), 'caracteres'), (dict(modo='raro'), 'no válido'),
+                                (dict(admins="x@y.es'; rm"), 'no es un correo')):
+                st, _, pag = seg(**dict(buena, **malo))
+                assert 'alert-danger' in pag and texto in pag and len(ordenes) == n, (malo, pag[-400:])
+            assert not os.path.exists(os.path.join(M.GOOGLE_DIR, 'client_secret')), 'nada guardado si hay error'
+            st, _, pag = seg(**dict(buena, modo='solo_google'))
+            assert 'primero activa' in pag and len(ordenes) == n, 'antibloqueo: sin sesión de Google no se exige Google'
+            st, _, pag = seg(**dict(buena, admins='Yo@Ejemplo.es, @empresa.es', horas='4'))
+            assert 'alert-danger' not in pag and ordenes[-1] == ['systemctl', 'start', '--no-block', M.GOOGLE_APLICAR]
+            env = M.leer_env()
+            assert (env['GOOGLE_AUTH'], env['GOOGLE_AUTH_MODO'], env['GOOGLE_ADMINS'], env['GOOGLE_SESION_HORAS']) == \
+                ('yes', 'alternativa', 'yo@ejemplo.es,@empresa.es', '4')
+            assert M.leer_env(kit)['GOOGLE_CLIENT_ID'] == cid, 'también en el env del kit'
+            sec = os.path.join(M.GOOGLE_DIR, 'client_secret')
+            assert open(sec).read().strip() == 'GOCSPX-secreto_123'
+            if os.name == 'posix':
+                assert (os.stat(sec).st_mode & 0o777) == 0o600 and (os.stat(M.GOOGLE_DIR).st_mode & 0o777) == 0o700
+            st, _, pag = pide('GET', M.SEGURIDAD, cab=COOKIE)
+            assert 'GOCSPX' not in pag and 'value="alternativa" checked' in pag and '(guardado)' in pag
+            assert 'ClaveSecretaPSK123456' not in pag
+            sin_secreto = dict(buena, secreto='', modo='solo_google')
+            st, _, pag = pide('POST', M.SEGURIDAD, urlencode(dict(sin_secreto, csrf=tks, _cookie='bh-google=bueno')), ORIGEN)
+            assert 'primero activa' in pag, 'el formulario no puede inyectar la cookie'
+            st, _, pag = pide('POST', M.SEGURIDAD, urlencode(dict(sin_secreto, csrf=tks)),
+                              dict(ORIGEN, Cookie=ORIGEN['Cookie'] + '; bh-google=bueno'))
+            assert 'alert-danger' not in pag and M.leer_env()['GOOGLE_AUTH_MODO'] == 'solo_google', pag[-400:]
+            assert open(sec).read().strip() == 'GOCSPX-secreto_123', 'secreto vacío = se conserva'
+            M.owrx_usuarios = lambda: [('bricohams-google', True)]
+            for modo in ('local', 'doble'):
+                st, _, pag = seg(**dict(buena, modo=modo, secreto=''))
+                assert 'ningún usuario local' in pag, modo
+            M.owrx_usuarios = lambda: [('admin', True), ('bricohams-google', True)]
+            st, _, pag = seg(accion='seg-acceso', modo='local')
+            assert 'alert-danger' not in pag and M.leer_env()['GOOGLE_AUTH'] == 'no'
+        finally:
+            M.owrx_usuarios = real_usuarios
+            pasarela.shutdown()
         st, _, pag = seg(accion='seg-olvidar')
         assert not os.path.exists(M.BR_CONF) and not os.path.exists(M.BR_SECRETO), 'olvidar borra credenciales'
     finally:
