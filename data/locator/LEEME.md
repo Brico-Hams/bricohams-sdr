@@ -5,7 +5,7 @@ Lo usa el instalador con `STATION_LOCATOR` / `LOCATOR_CATALOG` para elegir los a
 | Fichero | Qué es | Fuente y licencia |
 |---|---|---|
 | `catalogo_es.json` | **Generado** con `python3 tools/locator_catalogo.py`. No lo edites a mano | — |
-| `fuentes/ourairports_es_aeropuertos.csv` | aeropuertos de España con alguna frecuencia publicada | [OurAirports](https://ourairports.com/data/), dominio público. Se refresca con `tools/locator_catalogo.py --bajar-ourairports` |
+| `fuentes/ourairports_es_aeropuertos.csv` | aeropuertos de España con alguna frecuencia publicada | [OurAirports open-data](https://github.com/davidmegginson/ourairports-data), dominio público. Se refresca con `tools/locator_catalogo.py --bajar-ourairports` |
 | `fuentes/ourairports_es_frecuencias.csv` | sus frecuencias. Los canales de 8,33 kHz se convierten a la frecuencia real en el catálogo | OurAirports, dominio público |
 | `fuentes/aemet_estaciones.csv` | 150 estaciones de observación (indicativo AEMET) | Indicativos validados con la lista de estaciones convencionales de AEMET OpenData. Coordenadas de OurAirports (estaciones de aeropuerto) o aproximadas, del centro urbano (`aprox`). En la Pi, con `AEMET_API_KEY`, se usa la lista completa con coordenadas exactas |
 | `fuentes/puertos_es.csv` | puertos de interés general (Puertos del Estado) y algunos deportivos, con los canales VHF habituales | coordenadas aproximadas del puerto. Canales según ITU-R M.1084: 16 socorro, 12/14 operaciones portuarias, 9 deportivos |

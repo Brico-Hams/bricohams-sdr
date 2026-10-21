@@ -112,7 +112,7 @@
 - **Imagen Docker de OpenWebRX+** (volúmenes `/etc/openwebrx`, `/var/lib/openwebrx`, `htdocs/plugins`; `--device /dev/bus/usb`, `--tmpfs /tmp`, variables `OPENWEBRX_ADMIN_*`): https://hub.docker.com/r/slechev/openwebrxplus · softmbe https://hub.docker.com/r/slechev/openwebrxplus-softmbe · constructor y `run.sh` (siembra de `/etc` y `/var`, admin, `FORWARD_LOCALPORT_*`): https://github.com/0xAF/openwebrxplus-docker-builder
 - **Docker Compose** (formato 2.4, `device_cgroup_rules`, `network_mode`): https://docs.docker.com/reference/compose-file/ · grupo de dispositivos USB 189: https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
 - **Locator Maidenhead:** https://en.wikipedia.org/wiki/Maidenhead_Locator_System
-- **OurAirports** (aeropuertos y frecuencias, dominio público): https://ourairports.com/data/ · https://github.com/davidmegginson/ourairports-data
+- **OurAirports** (aeropuertos y frecuencias, dominio público): https://github.com/davidmegginson/ourairports-data
 - **Canales de 8,33 kHz** (nombre del canal frente a frecuencia): EUROCONTROL https://www.eurocontrol.int/concept/833-khz-voice-channel-spacing
 - **AEMET OpenData** (observación convencional, todas las estaciones): https://opendata.aemet.es/dist/index.html · lista de indicativos de estaciones convencionales usada para validar: paquete python-aemet (MIT) https://pypi.org/project/python-aemet/
 - **maps.fmdx.org** (emisores de FM por QTH, datos de FMLIST) tal como lo usa FM-DX Webserver: https://github.com/NoobishSVK/fm-dx-webserver/blob/main/server/tx_search.js · FMLIST https://www.fmlist.org/
