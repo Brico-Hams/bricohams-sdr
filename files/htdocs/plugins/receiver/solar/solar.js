@@ -14,7 +14,7 @@
  * El punto del botón toma el color de la escala NOAA más alta.
  *
  * Ajustes opcionales en init.js (antes de cargar el plugin):
- *   window.solar_config = { lat: 37.98, lon: -1.13, after: '#owrx-rig-dx-button' };
+ *   window.solar_config = { lat: 42.23, lon: -8.71, after: '#owrx-rig-dx-button' };
  */
 
 Plugins.solar._version = '1.0.0';

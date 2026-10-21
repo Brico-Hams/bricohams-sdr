@@ -16,7 +16,7 @@ On older OpenWebRX+ versions, the plugin depends on [utils](https://0xaf.github.
 
 ## Preview
 
-![mouse_freq](mouse_freq/mouse_freq.png "Preview")
+![mouse_freq](mouse_freq.png "Preview")
 
 ## Load
 
@@ -29,7 +29,7 @@ await Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/mouse_
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).
 
 ## Code
 

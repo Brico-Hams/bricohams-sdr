@@ -676,7 +676,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **El cortafuegos** se carga con un temporizador de vuelta atrás de 3 minutos (`systemd-run`) y solo se hace permanente con `confirmar`.
   - **nginx (kit):** `server_tokens off`, `limit_req` de 12/min en `/login` y `/pwchange` (regex, para que en `SSL_MODO=admin` gane la redirección a HTTPS), `X-Frame-Options`, `Permissions-Policy` y ficheros ocultos 404. Fail2ban bloquea una IP tras 5 POST fallidos al login (HTTP 303 de vuelta al formulario) en 10 min.
 - **Por qué:**
-  - **Sin acceso remoto a la Pi:** N0CALL pidió revisar y blindar el servidor (192.168.1.50, `sdr.example.org`), pero desde la sesión no se llega a su red (la salida va por una lista de dominios permitidos). Iniciar sesión con una contraseña escrita en el chat tampoco es aceptable.
+  - **Sin acceso remoto al servidor:** la revisión debe ejecutarse en la propia estación; no compartas contraseñas ni datos de acceso en el chat.
   - **Herramienta para la Pi:** él la ejecuta en la Pi, se puede repetir y queda en el kit para cualquier estación.
   - **Lo visto desde fuera** (`/status.json`) confirmó una fuga real: la posición exacta de la casa (ADR-48).
   - **Contraseña solo con claves:** quitar la contraseña de SSH sin una clave instalada deja a la gente fuera.
@@ -694,14 +694,14 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `OWRX_GPS_DECIMALES="2"` (por defecto) redondea `receiver_gps` en `settings.json` (mapa, `/status.json`, directorios de receptores).
   - `meteo.json`, `pases.json` e `init.js` (todos públicos) llevan siempre 2 decimales.
   - `STATION_LAT/LON` siguen exactas para los cálculos (distancias AEMET, pases, Open-Meteo) y el APRS.
-- **Por qué:** `https://sdr.example.org/status.json` publicaba 37.983812, -1.128011, la casa con unos 10 cm de precisión. Dos decimales (unos 1 km) bastan para el mapa, la meteo y el día/noche.
+- **Por qué:** una revisión detectó que `/status.json` podía publicar la ubicación con demasiada precisión. Dos decimales (aproximadamente 1 km) bastan para el mapa, la meteo y el día/noche.
 - **Implica:**
   - **El APRS WX sigue publicando su posición:** el protocolo lo exige; queda a elección del operador.
   - **Volver a publicar la posición exacta:** `"exacta"`.
 
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
-2. **Repetidor digital de Sierra Espuña**: hay dos marcadores, 438,950 (dato de N0CALL) y 438,250 (ED5ZAN, de la lista anterior). Confirmar cuál está activo.
+2. **Repetidor digital**: confirmar la frecuencia aplicable a la estación con fuentes oficiales antes de configurar el equipo.
 3. **WPI408**: comprobar si el filtro IR es fijo o se puede quitar, para elegir `CAM_TUNING`.
 4. **SDRplay**: modelo (RSP1A/1B/dx) para `SDRPLAY_ANTENNA`.
 5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8; 11 con la bandeja de SDR, o un segundo hub USB 3.0 alimentado).
@@ -714,7 +714,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
 13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
 14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.
-15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real** (192.168.1.50): comprobar SSH desde la LAN, web desde Internet, que el 8073 se decida (cerrar en el router + `BLINDAJE_8073="lan"`) y `confirmar`. Cambiar la contraseña de `pi` (salió en un chat).
+15. **v4.4 · Primer «bricohams-blindaje aplicar» en la Pi real**: comprobar SSH desde la LAN, web desde Internet, decidir la política del puerto 8073 y confirmar. No reutilizar credenciales que se hayan compartido por canales inseguros.
 16. **v4:**
     - **Dominio para el SSL** (`SSL_DOMAIN`) y reenvío de los puertos 80/443 en el router.
     - **Token y chat de Telegram.**

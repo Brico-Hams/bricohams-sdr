@@ -69,8 +69,8 @@ poner(A, '/etc/bricohams/bricohams.env', "CALLSIGN='EA5ZZZ'\nQRZ_PASS='%s'\nLIST
       "BLINDAJE_8073='publico'\nOWRX_DATA='/var/lib/openwebrx'\nOWRX_HTDOCS='%s'\n" % (SECRETO, ANON, HT), 0o644)
 poner(A, '/etc/bricohams/meteo.env', "AEMET_API_KEY='x'\n", 0o644)
 poner(A, HT + '/plugins/receiver/fuga/fuga.js', 'var k = "%s";' % SECRETO)                     # fuga de verdad
-poner(A, HT + '/plugins/receiver/init.js', "const LISTENERS = { key: '%s' };\nwindow.solar_config = { lat: 37.983812, lon: -1.128011 };\n" % ANON)
-poner(A, '/var/lib/openwebrx/settings.json', json.dumps({'receiver_gps': {'lat': 37.983812, 'lon': -1.128011}, 'receiver_admin': 'a@b.es'}), 0o644)
+poner(A, HT + '/plugins/receiver/init.js', "const LISTENERS = { key: '%s' };\nwindow.solar_config = { lat: 12.345678, lon: -98.765432 };\n" % ANON)
+poner(A, '/var/lib/openwebrx/settings.json', json.dumps({'receiver_gps': {'lat': 12.345678, 'lon': -98.765432}, 'receiver_admin': 'a@b.es'}), 0o644)
 poner(A, '/var/lib/openwebrx/users.json', '[]', 0o644)
 poner(A, '/etc/nginx/conf.d/bricohams-login-log.conf',
       'log_format bricohams_login \'$remote_addr - [$time_local] "$request" $status "$sent_http_location";\'\n')

@@ -20,21 +20,21 @@ def escribe(rak, edad=0):
 
 # BME680: T, HR y P (hPa -> Pa)
 escribe({'t': 21.5, 'h': 48.2, 'p': 1009.3, 'sensor': 'BME680',
-         'gps': {'present': True, 'fix': True, 'sats': 7, 'lat': 37.98381, 'lon': -1.12801, 'alt': 210}})
+         'gps': {'present': True, 'fix': True, 'sats': 7, 'lat': 42.22917, 'lon': -8.70833, 'alt': 210}})
 s = wx.SensorRak(ruta, esperas=1)
 t, p, h = s.read()
 assert (t, round(p), h) == (21.5, 100930, 48.2), (t, p, h)
 assert s.chip == 'BME680 (RAK)'
-assert wx.posicion_gps(wx.leer_rak(ruta)) == (37.98381, -1.12801, 210.0)
+assert wx.posicion_gps(wx.leer_rak(ruta)) == (42.22917, -8.70833, 210.0)
 
 # SHTC3: sin presión y sin respaldo -> p None; paquete APRS sin campo b
 escribe({'t': 19.0, 'h': 60, 'sensor': 'SHTC3', 'gps': {'present': True, 'fix': False, 'lat': 0, 'lon': 0}})
 t, p, h = wx.SensorRak(ruta, esperas=1).read()
 assert p is None and t == 19.0 and h == 60.0
 assert wx.posicion_gps(wx.leer_rak(ruta)) is None          # sin fix
-pk = wx.aprs_wx_packet('N0CALL-13', 37.98, -1.13, t, h, None, 'COM')
+pk = wx.aprs_wx_packet('N0CALL-13', 42.23, -8.71, t, h, None, 'COM')
 assert pk.endswith('t066h60COM'), pk
-assert wx.aprs_wx_packet('N0CALL-13', 37.98, -1.13, t, h, 1013.2, 'COM').endswith('h60b10132COM')
+assert wx.aprs_wx_packet('N0CALL-13', 42.23, -8.71, t, h, 1013.2, 'COM').endswith('h60b10132COM')
 
 
 # SHTC3 + respaldo con presión (Pico/I2C)

@@ -27,7 +27,7 @@ La estación está en Internet: `sdr.example.org`, con **80, 443 y 8073** abiert
 | Núcleo | redirecciones ICMP, rp_filter, syncookies, kptr/dmesg, enlaces protegidos |
 | Hardware | recuerda que, sin el HAT, el Mini y el SDRplay, los errores de meshtasticd, gpsd y de los receptores SATÉLITES y RADIOAFICIONADOS **no** son de seguridad |
 
-Lo comprobado desde fuera el 11/10/2026: `https://sdr.example.org/status.json` publicaba la posición **exacta** (37.983812, -1.128011, unos 10 cm) y el correo de contacto.
+Una revisión externa puede detectar que `/status.json` publica la ubicación con demasiada precisión. Comprueba la configuración de tu propia estación y publica únicamente la precisión necesaria.
 
 ## 2. Procedimiento: revisar y blindar (paso a paso)
 **Antes:** entra a la Pi por SSH **desde casa** y deja otra ventana de SSH abierta (por si acaso).
@@ -45,8 +45,8 @@ Lo comprobado desde fuera el 11/10/2026: `https://sdr.example.org/status.json` p
 3. **Clave SSH (recomendado):** así SSH ya no acepta contraseñas. En tu PC (PowerShell o terminal):
    ```bash
    ssh-keygen -t ed25519                         # si no tienes clave
-   ssh-copy-id pi@192.168.1.50              # en Windows: type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh pi@192.168.1.50 "mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"
-   ssh pi@192.168.1.50                      # comprueba que entra SIN pedir contraseña
+   ssh-copy-id usuario@IP-DE-LA-PI            # sustituye usuario y dirección de la Pi
+   ssh usuario@IP-DE-LA-PI                    # comprueba que entra SIN pedir contraseña
    ```
 4. **Aplica:**
    ```bash

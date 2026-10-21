@@ -8,7 +8,7 @@ This `receiver` plugin will allow you to set the MagicKey without typing it in t
 
 ## Preview
 
-![magic_key](magic_key/magic_key.png "Preview")
+![magic_key](magic_key.png "Preview")
 
 ## Load
 
@@ -20,4 +20,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/magic_key/ma
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

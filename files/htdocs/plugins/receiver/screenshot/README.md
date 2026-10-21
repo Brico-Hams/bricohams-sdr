@@ -8,7 +8,7 @@ This `receiver` plugin will allow you to take screenshot of your waterfall.
 
 ## Preview
 
-![screenshot](screenshot/screenshot.png "Preview")
+![screenshot](screenshot.png "Preview")
 
 ## Load
 
@@ -20,4 +20,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/screenshot/s
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

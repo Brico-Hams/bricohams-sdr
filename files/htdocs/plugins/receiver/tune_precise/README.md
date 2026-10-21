@@ -14,7 +14,7 @@ Default steps are 10kHz, 1kHz, 500Hz. To change the steps see below.
 
 ## Preview
 
-![tune_precise](tune_precise/tune_precise.jpg "Preview")
+![tune_precise](tune_precise.jpg "Preview")
 
 ## Load
 
@@ -37,4 +37,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/tune_precise
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

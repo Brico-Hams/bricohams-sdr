@@ -13,7 +13,7 @@ The purpose is to minimize the space occupied by the legend, making it more usef
 
 ## Preview
 
-![reduce_map_legend_sections_preview](reduce_map_legend_sections/reduce_map_legend_sections.png "Preview")
+![reduce_map_legend_sections_preview](reduce_map_legend_sections.png "Preview")
 
 ## Load
 
@@ -25,4 +25,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/map/reduce_map_legend
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

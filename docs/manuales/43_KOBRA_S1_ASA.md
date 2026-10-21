@@ -26,7 +26,7 @@ Fuentes consultadas el 2026-10-17:
    funcionamiento, prioridad automática/manual y capturas de la interfaz.
 5. [Mantenimiento S1](https://wiki.anycubic.com/en/fdm-3d-printer/kobra-s1-combo/maintenance-recommendations):
    **X sin grasa**, revisión mensual de Y y mantenimiento de husillos Z aproximadamente trimestral.
-6. [Inicio rápido de Anycubic Slicer Next](https://wiki.anycubic.com/en/software-and-app/new-page-anycubic-slicer-beta(orca-version)/anycubic-slicer-next-slicing-software-quick-start-guide).
+6. [Inicio rápido de Anycubic Slicer Next](https://wiki.anycubic.com/en/software-and-app/new-page-anycubic-slicer-beta%28orca-version%29/anycubic-slicer-next-slicing-software-quick-start-guide).
 7. [Ellis: Print Tuning Guide](https://ellis3dp.com/Print-Tuning-Guide/) y
    [multiplicador de extrusión](https://ellis3dp.com/Print-Tuning-Guide/articles/extrusion_multiplier.html):
    ajuste visual de superficies y separación entre flujo y precisión dimensional.

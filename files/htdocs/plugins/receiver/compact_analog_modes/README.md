@@ -8,7 +8,7 @@ This is a `receiver` plugin to compact the receiver analog modes section. It rep
 Can be useful on small screen devices.
 
 ## Preview
-![compact_analog_modes](compact_analog_modes/compact_analog_modes.png "Preview")
+![compact_analog_modes](compact_analog_modes.png "Preview")
 
 ## Load
 Add this line in your `init.js` file:
@@ -19,4 +19,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/compact_anal
 ```
 
 ## init.js
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

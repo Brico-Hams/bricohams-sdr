@@ -67,7 +67,7 @@ bricohams-locator info [LOCATOR]          # aeropuertos, AEMET, puertos, FM y NA
 sudo bricohams-locator refrescar          # baja AEMET (AEMET_API_KEY) y las FM de la zona
 sudo bricohams-locator marcadores --aplicar   # pone los [AUTO-LOCATOR] en OpenWebRX+ y lo reinicia
 bricohams-locator meteo                   # METEO_STATIONS de la zona
-bricohams-locator locator 37.9838 -1.1280 # IM97kx · bricohams-locator coordenadas IM97kx
+bricohams-locator locator 42.22917 -8.70833 # IN52pf · bricohams-locator coordenadas IN52pf
 sudo bash install.sh --solo configuracion,meteo   # tras cambiar STATION_LOCATOR o LOCATOR_*
 ```
 
@@ -90,7 +90,7 @@ sudo bricohams-lilygo firmware            # v4.5 · actualizar el Meshtastic del
 bricohams-mesh-url ver "URL"              # v4.5 · canales y radio de una URL de Meshtastic (sin claves)
 bricohams-banner ver                      # v4.5 · cómo se ve el banner SSH
 sudo bricohams-blindaje auditar           # informe (no cambia nada, no enseña claves)
-ssh-copy-id pi@192.168.1.50          # desde tu PC: entrar con clave
+ssh-copy-id <usuario>@<IP-DE-LA-PI>  # desde tu PC: entrar con clave
 sudo bricohams-blindaje aplicar           # cortafuegos, SSH, fail2ban, permisos… (con copia)
 sudo bricohams-blindaje confirmar         # en 3 min; si no, el cortafuegos se quita solo
 sudo bricohams-blindaje deshacer          # volver a como estaba
@@ -147,7 +147,7 @@ journalctl -u bricohams-backup-limpieza.service --no-pager
 | `nginx no acepta la configuración` | mira el mensaje de `nginx -t` encima; `sudo nginx -t` |
 | `git pull no puede avanzar el kit` | `git stash`, actualiza y `git stash pop` (manual 29) |
 | No entro por SSH tras `bricohams-blindaje aplicar` | espera 3 min (vuelta atrás) o en la Pi: `sudo bricohams-blindaje deshacer` |
-| `STATION_LOCATOR=… no es un locator Maidenhead válido` | 4, 6, 8 o 10 caracteres: `IM97kx` (manual 32) |
+| `STATION_LOCATOR=… no es un locator Maidenhead válido` | 4, 6, 8 o 10 caracteres: `IN52pf` (manual 32) |
 | `Sin datos de zona en línea (AEMET/FM)` | sin red o sin `AEMET_API_KEY`: sigue con el catálogo del kit; luego `sudo bricohams-locator refrescar` |
 | `Falta el volumen Docker persistente …` | el contenedor no monta etc/var/plugins: deja que lo cree el kit (`OWRX_DOCKER_DESPLEGAR="yes"`, manual 33) |
 | lgpio: `can not open … .lgd-nfy` | la unidad WX necesita `WorkingDirectory=/var/lib/bricohams`; ver manual 06 |

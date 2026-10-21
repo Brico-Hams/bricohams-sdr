@@ -146,7 +146,7 @@ permanecen separados para no publicar datos de la estación.
 - La lista `SDR_DECK` del `.scad` define posición y tamaño de cada SDR. El `.scad` (asserts) y `test_v3_hardware.py` comprueban que no pisan postes, ventiladores, el SDRplay, la bandeja de la Pi ni la tapa. 32 STL.
 
 **Rama `openwebrxplus-generico`: kit anonimizado para otras estaciones**
-- Contenido del kit genérico en la raíz y sin datos de la estación original: QTH de ejemplo en la Catedral de Murcia (`IM97kx`), LAN `192.168.1.x`, balizas APRS de prueba recalculadas y esquema 22 regenerado. El manual 32 enlaza ahora el SVG; el PNG se rehace con `tools/esquemas.py` si está instalado cairosvg. La guía visual (`tools/generar-guia-visual.cjs`) trabaja con un solo kit. Prueba nueva: `test_anonimato.py`.
+- Contenido del kit genérico en la raíz y sin datos de la estación original: locator de muestra `IN52pf`, valores de red ficticios, balizas APRS de prueba recalculadas y esquema 22 regenerado. El manual 32 enlaza ahora el SVG; el PNG se rehace con `tools/esquemas.py` si está instalado cairosvg. La guía visual (`tools/generar-guia-visual.cjs`) trabaja con un solo kit. Prueba nueva: `test_anonimato.py`.
 
 **Corregido: el aviso de privacidad daba 404 entrando por el :8073**
 - Las páginas `/bricohams/` (privacidad, políticas y portal) las sirve nginx en el 443, no OpenWebRX+. `init.js` define `BH_WEB`: si la web se abre por un puerto propio (p. ej. `http://<ip>:8073`) los enlaces van a `https://SSL_DOMAIN/bricohams/…`, porque el certificado solo vale para el dominio y por IP el navegador lo rechaza (a `https://<host>/` si no hay dominio; a `http://` solo con `SSL_MODO=no`); por el 443 siguen relativos. `install.sh` sustituye `__SSL_MODO__` y `__SSL_DOMAIN__`. Con `publicar.sh` (modo `todo`) el 8073 queda solo en la Pi y todo entra por HTTPS. Prueba: `test_politicas_mapa_local.py`.
@@ -402,7 +402,7 @@ permanecen separados para no publicar datos de la estación.
   - le manda al RAK su configuración desde `bricohams.env`;
   - `grabar` (DFU), `prueba`, `estado`, `baliza`;
   - servicio sin root (DynamicUser, credencial).
-- Configuración **clonada del iGate actual** (192.168.1.142) con el indicativo **N0CALL-15**.
+- La configuración del iGate se mantiene local en `bricohams.env` y no se publica.
 - El control de ventiladores usa la temperatura del RAK si no hay DS18B20 (`FAN_CAJA_RAK`).
 
 **Meshtastic** (manual 35, ADR-51)

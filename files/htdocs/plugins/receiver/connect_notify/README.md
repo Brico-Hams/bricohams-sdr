@@ -13,7 +13,7 @@ The plugin depends on [notify](https://0xaf.github.io/openwebrxplus-plugins/rece
 
 ## Preview
 
-![connect](connect_notify/connect_notify.png "Preview")
+![connect](connect_notify.png "Preview")
 
 ## Load
 
@@ -26,4 +26,4 @@ await Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/connec
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

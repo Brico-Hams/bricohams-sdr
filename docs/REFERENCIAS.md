@@ -69,7 +69,7 @@
 - **Pico y MicroPython (rp2):** https://docs.micropython.org/en/latest/rp2/quickref.html · pinout: https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf · mpremote: https://docs.micropython.org/en/latest/reference/mpremote.html
 - **Cámara Waveshare RPi Camera (F):** https://www.waveshare.com/wiki/RPi_Camera_(F) · cable de la Pi 5: https://www.raspberrypi.com/products/camera-cable/ · cámaras en la Pi 5: https://www.raspberrypi.com/documentation/accessories/camera.html
 - **Estación WX LoRa de CA2RXU (pines y firmware):** https://github.com/richonguzman/LoRa_APRS_Wx_Station
-- **Sensores de viento Renke RS485:** https://www.renkeer.com/product/wind-speed-sensor/
+- **Sensores de viento Renke RS485:** https://www.renkeer.com/
 - **0xAF plugins (doppler, show_band_plan, listeners):** https://github.com/0xAF/openwebrxplus-plugins
 - **Pases de satélites:** CelesTrak GP/OMM https://celestrak.org/NORAD/documentation/gp-data-formats.php · python-sgp4 https://pypi.org/project/sgp4/
 - **SatDump:** https://github.com/SatDump/SatDump · METEOR-M LRPT 137,9 MHz.

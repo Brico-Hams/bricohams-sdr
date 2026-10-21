@@ -77,7 +77,7 @@ assert chat.recibir(packet, 1000)
 assert not chat.recibir(packet.replace('TCPIP*', 'WIDE1-1'), 1001)
 assert chat.recibir(packet, 1301)
 assert all(topic == 'aprs/CLIENT' for topic, _ in mqtt.sent)
-pos = rak.aprs_mapa('EA1AAA>APRS,TCPIP*:!3759.00N/00107.00W>moving', origen='APRS-IS')
+pos = rak.aprs_mapa('EA1AAA>APRS,TCPIP*:!4213.75N/00842.50W>moving', origen='APRS-IS')
 assert pos['source'] == 'EA1AAA' and 'freq' not in pos and 'APRS-IS' in pos['comment']
 assert 'LoRa' not in pos['comment']
 assert rak.aprs_mapa('EA1AAA>APRS:') is None

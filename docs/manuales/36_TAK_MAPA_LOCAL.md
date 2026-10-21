@@ -6,11 +6,12 @@
 > Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
 <!-- guia-visual:fin -->
 
-## Estacion desplegada
+## Ejemplo de estación
 
-Servidor OpenWebRX+: `192.168.1.50`, Debian 13 ARM64.
+Servidor OpenWebRX+: Raspberry Pi con Debian ARM64. Sustituye los marcadores
+por los valores de tu instalación.
 
-- Mapa publico Leaflet: <http://192.168.1.50/map>.
+- Mapa publico Leaflet: `http://<IP-DE-LA-PI>/map`.
 - ADS-B local: lectura de `/run/readsb/aircraft.json`, cada dos segundos.
 - APRS: posiciones recibidas por OpenWebRX+, RF del RAK y APRS-IS del RAK.
 - Trayectorias APRS: hasta dos horas **desde la apertura del mapa**,
@@ -28,9 +29,9 @@ a la pagina publica.
 
 ## ADS-B, RadarBox y MLAT
 
-Se comprobo un fallo real: readsb buscaba la serie USB `00001090`, que no
-estaba conectada. Con autorizacion del operador se selecciono `00000401`;
-OpenWebRX+ mantiene `00000001`. No se cambia la EEPROM del receptor.
+readsb puede buscar un identificador USB distinto del conectado. Comprueba los
+identificadores disponibles en tu equipo y configura el que corresponda;
+OpenWebRX+ mantiene su propia configuración. No se cambia la EEPROM del receptor.
 
 Se conservaron el fichero `/etc/rbfeeder.ini`, los puertos de readsb y los
 parametros de MLAT:
@@ -107,7 +108,7 @@ a local; los servicios llevan usuario dedicado y limites de recursos.
 | 8081 loopback | Backend interno |
 | 8443 | Se conserva para Meshtastic, no se reasigna a TAK |
 
-El acceso de red TAK se limita a `192.168.1.0/24`. La CA local no es
+El acceso de red TAK se limita a `<SUBRED-LAN-CONFIGURADA>`. La CA local no es
 confiable para un navegador nuevo hasta importarla voluntariamente:
 no se debe desactivar la verificacion TLS como solucion.
 

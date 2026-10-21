@@ -6,8 +6,8 @@
 #    bricohams-rak4631-lora-aprs.uf2  (doble RESET y copiar a la unidad RAK4631)
 #    bricohams-rak4631-lora-aprs.hex  (J-Link / RAKDAP1)
 #  Necesita arduino-cli (https://arduino.github.io/arduino-cli) e Internet la primera vez.
-#  Versiones fijas (las mismas con las que se compiló el binario del repositorio):
-#    BSP RAKwireless nRF 1.3.3 · RadioLib 7.6.0 · ArduinoJson 7.4.3 · TinyGPSPlus 1.1.0
+#  Versiones fijas:
+#    BSP RAKwireless nRF 1.3.3 · RadioLib 7.6.0 · ArduinoJson 7.4.3 · TinyGPSPlus 1.0.3
 #    Adafruit BME280 2.3.0 · Adafruit BME680 2.0.6 · Adafruit Unified Sensor 1.1.15
 #  Uso: bash tools/compilar_rak.sh            (en un PC o en la Pi)
 # =====================================================================
@@ -23,23 +23,33 @@ command -v adafruit-nrfutil >/dev/null || { echo "✘ Falta adafruit-nrfutil (pi
 
 "$CLI" core update-index --additional-urls "$IDX"
 "$CLI" core install rakwireless:nrf52@1.3.3 --additional-urls "$IDX"
-for l in "RadioLib@7.6.0" "ArduinoJson@7.4.3" "TinyGPSPlus@1.1.0" "Adafruit BME280 Library@2.3.0" \
+for l in "RadioLib@7.6.0" "ArduinoJson@7.4.3" "TinyGPSPlus@1.0.3" "Adafruit BME280 Library@2.3.0" \
          "Adafruit BME680 Library@2.0.6" "Adafruit Unified Sensor@1.1.15" "Adafruit BusIO"; do
     "$CLI" lib install "$l"
 done
 EXTRA="-DRADIOLIB_EXCLUDE_CC1101=1 -DRADIOLIB_EXCLUDE_RF69=1 -DRADIOLIB_EXCLUDE_SX1231=1 -DRADIOLIB_EXCLUDE_SI443X=1"
 EXTRA+=" -DRADIOLIB_EXCLUDE_RFM2X=1 -DRADIOLIB_EXCLUDE_SX128X=1 -DRADIOLIB_EXCLUDE_SX127X=1 -DRADIOLIB_EXCLUDE_LR11X0=1"
 EXTRA+=" -DRADIOLIB_EXCLUDE_NRF24=1"
+PATH_MAP="-ffile-prefix-map=$KIT=."
+if [ -n "${HOME:-}" ]; then
+    PATH_MAP+=" -ffile-prefix-map=$HOME=~"
+fi
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-"$CLI" compile -b "$FQBN" --build-property "compiler.cpp.extra_flags=$EXTRA" --output-dir "$TMP" "$FW"
+"$CLI" compile -b "$FQBN" --build-property "compiler.cpp.extra_flags=$EXTRA $PATH_MAP" \
+    --build-property "compiler.c.extra_flags=$PATH_MAP" --output-dir "$TMP" "$FW"
 mkdir -p "$OUT"
 cp "$TMP/rak4631-lora-aprs.ino.zip" "$OUT/bricohams-rak4631-lora-aprs.zip"
 cp "$TMP/rak4631-lora-aprs.ino.hex" "$OUT/bricohams-rak4631-lora-aprs.hex"
 UF2=$(find "${ARDUINO_DATA:-$HOME/.arduino15}" -path '*rakwireless*' -name uf2conv.py 2>/dev/null | head -1)
-if [ -n "$UF2" ]; then
-    python3 "$UF2" -f 0xADA52840 -c -o "$OUT/bricohams-rak4631-lora-aprs.uf2" "$OUT/bricohams-rak4631-lora-aprs.hex"
+if [ -z "$UF2" ]; then
+    echo "✘ No se encontró uf2conv.py en el BSP RAKwireless; no se generó el firmware UF2." >&2
+    exit 1
 fi
+python3 "$UF2" -f 0xADA52840 -c -o "$OUT/bricohams-rak4631-lora-aprs.uf2" "$OUT/bricohams-rak4631-lora-aprs.hex"
+test -s "$OUT/bricohams-rak4631-lora-aprs.zip"
+test -s "$OUT/bricohams-rak4631-lora-aprs.hex"
+test -s "$OUT/bricohams-rak4631-lora-aprs.uf2"
 (cd "$OUT" && sha256sum bricohams-rak4631-lora-aprs.* >SHA256SUMS)
 echo "✔ Firmware en $OUT"
 cat "$OUT/SHA256SUMS"

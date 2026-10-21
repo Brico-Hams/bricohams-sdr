@@ -10,7 +10,7 @@ shellcheck -S warning files/bin/bricohams-backup-limpieza tests/test_backup_limp
 echo "== python";      python3 -m py_compile files/bin/*.py files/bin/bricohams-ft2-decode files/bin/bricohams-locator files/bin/bricohams-rak-aprs files/bin/bricohams-dispositivos files/bin/bricohams-mesh-url files/bin/bricohams-mesh-owrx files/bin/bricohams-mesh-admin files/bin/bricohams-google-auth files/bin/bricohams-bloqueo files/bin/bricohams-login-aviso files/bin/bricohams-oyentes files/bin/bricohams-owrx-bookmarks-io files/bin/bricohams-owrx-repeaterbook files/bin/bricohams-owrx-mapflights files/bin/bricohams-owrx-ctcss files/bin/bricohams-owrx-rbimport files/share/bricohams-ctcss/*.py files/share/bricohams-rbimport/*.py owrx-clone/owrx-clone tools/*.py hardware/antenas/sim/*.py firmware/pico-io/main.py && find . -name __pycache__ -prune -exec rm -rf {} +
 echo "== javascript"
 for f in files/htdocs/plugins/receiver/{idioma,marca,consentimiento,solar,meteo,camara,bricohams,banderas,dvficha,satelites,visitas,identificacion,ea5hkx_puente,audio_cadena,filtro_audio,dsp_audio}/*.js files/htdocs/plugins/receiver/init.js files/htdocs/plugins/map/init.js files/htdocs/plugins/map/bricohams_live/*.js; do
-    sed -e 's/__LAT__/37.98/;s/__LON__/-1.13/;s/__CAM_SNAPSHOT_SECONDS__/60/;s/__OPERADOR__/N0CALL/g;s/__QTH__/Mi QTH/g' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
+    sed -e 's/__LAT__/42.23/;s/__LON__/-8.71/;s/__CAM_SNAPSHOT_SECONDS__/60/;s/__OPERADOR__/N0CALL/g;s/__QTH__/Mi QTH/g' "$f" > /tmp/bh-check.js && node --check /tmp/bh-check.js
 done
 node --check files/share/bricohams-ctcss/bricohams-ctcss.js
 echo "== pruebas"

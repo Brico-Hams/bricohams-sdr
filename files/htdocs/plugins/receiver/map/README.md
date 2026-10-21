@@ -22,4 +22,4 @@ Do not add `map` to `PluginsToLoad` and do not call `Plugins.load()` for it. Thi
 
 ## init.js
 
-Learn how to [configure receiver plugins](/openwebrxplus-plugins/#beginner-quickstart).
+Learn how to [configure receiver plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
         Config.ambiguity = 1; Config.status = "N0CALL-SDR BricoHams"; Config.path = "WIDE1-1,WIDE2-1";
         std::cout << APRS_Utils::beacon(true).c_str() << "\n" << APRS_Utils::status(false).c_str() << "\n";
         Config.ambiguity = 3;
-        std::cout << APRS_Utils::latitude(37.983815).c_str() << "|" << APRS_Utils::longitude(-1.128013).c_str() << "\n";
+        std::cout << APRS_Utils::latitude(42.229175).c_str() << "|" << APRS_Utils::longitude(-8.708335).c_str() << "\n";
         return 0;
     }
     if (c == "telem") {

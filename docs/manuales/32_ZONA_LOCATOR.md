@@ -33,7 +33,7 @@ Fuera de España, avisa y sigue.
 
 ## 1. Configuración (bricohams.env)
 ```bash
-STATION_LOCATOR="IM97kx"          # 4, 6, 8 o 10 caracteres
+STATION_LOCATOR="IN52pf"          # 4, 6, 8 o 10 caracteres
 STATION_LAT="0.0"                 # si pones las coordenadas exactas, mandan sobre el locator
 STATION_LON="0.0"
 LOCATOR_CATALOG="data/locator/catalogo_es.json"   # vacío = desactivado
@@ -79,8 +79,8 @@ sudo bricohams-locator refrescar         # vuelve a bajar AEMET y FM (caché de 
 bricohams-locator marcadores             # enseña los que pondría
 sudo bricohams-locator marcadores --aplicar   # los pone en OpenWebRX+ y lo reinicia (nativo o Docker)
 bricohams-locator meteo                  # la METEO_STATIONS que saldría
-bricohams-locator coordenadas IM97kx     # 37.979167 -1.125000
-bricohams-locator locator 37.9838 -1.1280   # IM97kx
+bricohams-locator coordenadas IN52pf     # 42.229167 -8.708333
+bricohams-locator locator 42.22917 -8.70833 # IN52pf
 ```
 
 ## 4. Qué pasa con los marcadores que ya tienes

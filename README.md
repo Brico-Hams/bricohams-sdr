@@ -1,4 +1,4 @@
-# BricoHams SDR · N0CALL · tu QTH (Región de Murcia)
+# BricoHams SDR · estación de ejemplo
 
 **Versión coordinada: v5.4.1 · 2026-10-17.** [VERSION](VERSION) es la fuente
 del número de publicación. Público y privado comparten versión, fecha y etiqueta
@@ -11,8 +11,7 @@ con datos sensibles ocultados y escenas privadas sustituidas por tarjetas explic
 > **Rama `openwebrxplus-generico`: kit anonimizado para cualquier estación OpenWebRX+.**
 > No lleva el indicativo, el QTH, el locator, la red local ni los usuarios de la estación
 > original, y `tests/test_anonimato.py` comprueba que no vuelvan a entrar.
-> Los ejemplos usan **N0CALL**, la **Catedral de Murcia** (37.9838, -1.1280 · `IM97kx`)
-> como QTH de muestra y la LAN `192.168.1.x`.
+> Los ejemplos usan **N0CALL**, el locator de muestra **IN52pf** y valores de red ficticios.
 > Para tu estación: `cp bricohams.env.example bricohams.env` y rellena al menos
 > `CALLSIGN`, `STATION_LOCATOR` (o `STATION_LAT`/`STATION_LON`), `ADSB_ANT_ALT` y las claves
 > (RadarBox, map.flights, Telegram, ReceiverBook). Esas claves las pones tú y no se suben al repositorio.

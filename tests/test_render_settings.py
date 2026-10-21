@@ -56,9 +56,9 @@ fallo = subprocess.run([sys.executable, 'files/bin/bricohams-render-settings.py'
                                       'APRS_IGATE_ENABLE': 'yes'}, capture_output=True, text=True)
 assert fallo.returncode != 0 and 'CALLSIGN propio' in fallo.stderr
 # v4.3 · si STATION_LAT/LON están puestas mandan sobre el centro del locator (son más precisas)
-precisas = render(False, {'STATION_LOCATOR': 'IM98', 'STATION_LAT': '37.9838', 'STATION_LON': '-1.1280', 'OWRX_GPS_DECIMALES': 'exacta'})
-assert precisas['receiver_gps'] == {'lat': 37.9838, 'lon': -1.1280}, precisas['receiver_gps']
+precisas = render(False, {'STATION_LOCATOR': 'IN52', 'STATION_LAT': '42.22917', 'STATION_LON': '-8.70833', 'OWRX_GPS_DECIMALES': 'exacta'})
+assert precisas['receiver_gps'] == {'lat': 42.22917, 'lon': -8.70833}, precisas['receiver_gps']
 # v4.4 · por defecto la posición pública va redondeada a 2 decimales (~1 km): no se publica la casa
-publica = render(False, {'STATION_LAT': '37.983812', 'STATION_LON': '-1.128011'})
-assert publica['receiver_gps'] == {'lat': 37.98, 'lon': -1.13}, publica['receiver_gps']
+publica = render(False, {'STATION_LAT': '42.229172', 'STATION_LON': '-8.708331'})
+assert publica['receiver_gps'] == {'lat': 42.23, 'lon': -8.71}, publica['receiver_gps']
 print('OK test_render_settings: locator solo si faltan las coordenadas')

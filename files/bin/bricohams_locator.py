@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Locator Maidenhead ⇄ coordenadas (v4.3).
 
-  bricohams_locator.py IM98iu            → «38.854167 -1.291667» (centro de la cuadrícula)
-  bricohams_locator.py --a-locator 37.9838 -1.1280   → «IM97KX»
-  bricohams_locator.py --espana IM98iu   → sale con 0 si cae en España (península, Baleares,
+  bricohams_locator.py IN52pf            → «42.229167 -8.708333» (centro de la cuadrícula)
+  bricohams_locator.py --a-locator 42.22917 -8.70833 → «IN52PF»
+  bricohams_locator.py --espana IN52pf   → sale con 0 si cae en España (península, Baleares,
                                            Canarias, Ceuta o Melilla) y con 3 si no
 
 Funciones para los demás scripts: locator_to_latlon, latlon_to_locator, celda (límites de la

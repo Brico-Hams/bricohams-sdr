@@ -94,14 +94,14 @@ os.environ['MESH433_WEB'] = 'no'
 assert M.fuentes()[0][1] == 'serie'
 nodo = {'num': 0x1234abcd, 'user': {'longName': 'SDR BricoHams 433', 'shortName': 'SB43', 'hwModel': 'TLORA_V2_1_1P6',
                                     'role': 'CLIENT'},
-        'position': {'latitude': 37.983812, 'longitude': -1.128011, 'altitude': 230},
+        'position': {'latitude': 42.22917, 'longitude': -8.70833, 'altitude': 230},
         'deviceMetrics': {'voltage': 4.1, 'channelUtilization': 3.2, 'airUtilTx': 0.5, 'uptimeSeconds': 600}}
 d = M.nodo_a_owrx(nodo['num'], nodo, 'mesh433', 433875000, decimales=2)
-assert d['mode'] == 'Meshtastic' and d['src'] == 0x1234abcd and (d['lat'], d['lon']) == (37.98, -1.13), d
+assert d['mode'] == 'Meshtastic' and d['src'] == 0x1234abcd and (d['lat'], d['lon']) == (42.23, -8.71), d
 assert d['nickName'] == 'SB43' and d['longName'] == 'SDR BricoHams 433' and d['device'] == 'TLORA_V2_1_1P6'
 assert d['battery'] == 4.1 and d['symbol']['table'] == 'M' and d['freq'] == 433875000 and d['timestamp'] > 1.7e12
 assert M.nodo_a_owrx(1, {'user': {}}, 'mesh433', 1) is None, 'sin posición no va al mapa'
-assert M.nodo_a_owrx(1, {'position': {'latitudeI': 379838120, 'longitudeI': -11280110}}, 'm', 1)['lat'] == 37.983812
+assert M.nodo_a_owrx(1, {'position': {'latitudeI': 422291700, 'longitudeI': -87083300}}, 'm', 1)['lat'] == 42.22917
 nodos = {}
 n, t, extra = M.paquete(nodos, {'from': 7, 'to': M.BROADCAST, 'rxSnr': 6.25, 'rxRssi': -95, 'hopStart': 3, 'hopLimit': 1,
                                 'decoded': {'portnum': 'TEXT_MESSAGE_APP', 'text': 'hola Murcia'}}, 'mesh433')
@@ -266,7 +266,7 @@ if os.name == 'posix':
     assert any(x['dir'] == 'tx' and x['texto'] == 'hola Murcia' and x['canal'] == 1 for x in cj['mensajes'])
     assert not any(x['texto'] == 'falla' for x in cj['mensajes']), 'lo no enviado no sale como enviado'
 mesh = {m['src']: m for t, m in br.msgs if t == 'mesh433/Meshtastic'}
-assert (mesh[0x1234abcd]['lat'], mesh[0x1234abcd]['lon']) == (37.98, -1.13), 'nuestro nodo, redondeado (manual 34)'
+assert (mesh[0x1234abcd]['lat'], mesh[0x1234abcd]['lon']) == (42.23, -8.71), 'nuestro nodo, redondeado (manual 34)'
 assert mesh[7]['lat'] == 37.605 and mesh[7]['nickName'] == 'CT01' and mesh[9]['lat'] == 38.0
 assert 8 not in mesh, 'nodo sin posición: no va al mapa'
 assert ('mesh433/CLIENT', {'state': 'ChatMessage', 'name': 'CT01', 'message': 'QSO de prueba'}) in br.msgs
@@ -277,14 +277,14 @@ assert 'bricohams-mesh-owrx' in br.clientes
 
 # ------------------------------------------------------------------ LoRa APRS (RAK) -> formato de OpenWebRX+
 R = cargar('rak', os.path.join(BIN, 'bricohams-rak-aprs'))
-a = R.aprs_mapa('EA5ZZZ-7>APLRT1,WIDE1-1:!3759.00N/00107.00W>hola LoRa', {'rssi': -97, 'snr': 6.5})
+a = R.aprs_mapa('EA5ZZZ-7>APLRT1,WIDE1-1:!4213.75N/00842.50W>hola LoRa', {'rssi': -97, 'snr': 6.5})
 assert a['mode'] == 'APRS' and a['source'] == 'EA5ZZZ-7' and a['path'] == ['WIDE1-1'] and a['freq'] == 433775000
-assert (round(a['lat'], 4), round(a['lon'], 4)) == (37.9833, -1.1167) and a['symbol'] == mq.simbolo('>', '/')
+assert (round(a['lat'], 4), round(a['lon'], 4)) == (42.2292, -8.7083) and a['symbol'] == mq.simbolo('>', '/')
 assert a['comment'] == 'hola LoRa · LoRa 433,775 · -97 dBm · SNR 6.5 dB'
 c = R.aprs_mapa('EA5YYY-9>APLRT1:=/5L!!<*e7>{?!test')          # comprimida (ejemplo de la especificación APRS)
 assert abs(c['lat'] - 49.5) < 0.01 and abs(c['lon'] + 72.75) < 0.01 and c['symbol']['symbol'] == '>'
-o = R.aprs_mapa('N0CALL-10>APZBH1:;REPE70   *111111z3759.03N/00107.68Wr438.775')
-assert o['type'] == 'object' and o['object'] == 'REPE70' and round(o['lat'], 2) == 37.98
+o = R.aprs_mapa('N0CALL-10>APZBH1:;REPE70   *111111z4213.75N/00842.50Wr438.775')
+assert o['type'] == 'object' and o['object'] == 'REPE70' and round(o['lat'], 2) == 42.23
 assert R.aprs_mapa('EA5ZZZ>APRS:>solo estado') is None and R.aprs_mapa('roto') is None
 assert R.aprs_mapa('EA5ZZZ>APRS:@111111z3804.9 N/00115.2 W-')['lat'] > 38, 'con ambigüedad'
 # mensajes de APRS-IS a RF (messagesToRF): solo para estaciones oídas por RF y no si el remitente está en RF

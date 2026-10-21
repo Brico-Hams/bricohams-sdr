@@ -827,7 +827,7 @@ def zona_locator():
     W, H = 1500, 900
     b = markers([C['ink'], C['or'], C['pi'], C['sdr'], C['cr'], C['net'], C['rf']])
     b += caja_s(30, 90, 330, 250, 'bricohams.env', '', C['or'], '#fff3e0', arriba=True)
-    for k, t in enumerate(['STATION_LOCATOR="IM97kx"', 'STATION_LAT / STATION_LON  (si están, mandan)',
+    for k, t in enumerate(['STATION_LOCATOR="IN52pf"', 'STATION_LAT / STATION_LON  (si están, mandan)',
                            'LOCATOR_CATALOG=data/locator/catalogo_es.json', 'LOCATOR_RADIUS_KM=100 · LOCATOR_MAX_SITES=3',
                            'LOCATOR_ONLINE=aemet,fmdx', 'LOCATOR_RADIOS=regional,local (MAX 30)', 'LOCATOR_METEO=yes · LOCATOR_KIT_ZONA_KM=150']):
         b += txt(45, 140 + k * 26, t, 10.8)
@@ -846,21 +846,21 @@ def zona_locator():
                            '3  los 3 más cercanos de cada categoría en 100 km', '   (aeropuerto y AEMET: al menos uno, hasta 250 km)',
                            '4  FM: regionales y locales que mejor se oyen', '   (potencia / distancia², una por frecuencia)',
                            '5  canales repetidos juntos: Canal 16 · A / B', '6  etiqueta [AUTO-LOCATOR] y distancia en km',
-                           '7  lejos de Murcia: fuera los del kit de Murcia']):
+                           '7  fuera de la zona ejemplo: marcadores del kit']):
         b += txt(490, 290 + k * 28, t, 10.8)
     b += arrow(940, 330, 1060, 200, C['ink']) + txt(950, 245, 'marcadores', 10.5, C['ink'])
     b += arrow(940, 420, 1060, 470, C['ink']) + txt(948, 425, 'METEO', 10.5, C['ink'])
     b += arrow(940, 500, 1060, 700, C['ink']) + txt(1000, 570, 'informe', 10.5, C['ink'])
     b += caja_s(1060, 90, 410, 270, 'OpenWebRX+ · bookmarks.json', '', C['rf'], '#f3e5f5', arriba=True)
-    for k, t in enumerate(['los tuyos: nunca se tocan', 'los del kit: se quedan (en la zona de Murcia)',
-                           '   o se adaptan (lejos: Canal 12 · Cartagena → Canal 12)', '[AUTO-LOCATOR]: se sustituyen en cada pasada',
+    for k, t in enumerate(['los tuyos: nunca se tocan', 'los del kit: se quedan en la zona de ejemplo',
+                           '   o se adaptan a los datos de la zona', '[AUTO-LOCATOR]: se sustituyen en cada pasada',
                            '   (misma frecuencia que uno tuyo: gana el tuyo)', 'sudo bricohams-locator marcadores --aplicar']):
         b += txt(1075, 140 + k * 34, t, 10.8)
     b += caja_s(1060, 400, 410, 170, 'Meteo (bricohams-meteo)', '', C['pi'], '#edf7ee', arriba=True)
     for k, t in enumerate(['meteo.env: METEO_STATIONS de la zona', 'LOCATOR_METEO="no" conserva la tuya', 'plugin METEO de la web: tiempo real AEMET']):
         b += txt(1075, 450 + k * 30, t, 10.8)
     b += caja_s(1060, 610, 410, 210, 'bricohams-locator info', '', C['ink'], '#fafafa', arriba=True)
-    for k, t in enumerate(['QTH IM97KX · 37.98, -1.13 · península', 'aeropuertos, AEMET, puertos, FM y NAVTEX', 'con su distancia',
+    for k, t in enumerate(['QTH IN52PF · 42.23, -8.71 · península', 'aeropuertos, AEMET, puertos, FM y NAVTEX', 'con su distancia',
                            'refrescar · meteo · coordenadas · locator', 'bricohams-check: «zona … N marcadores»']):
         b += txt(1075, 660 + k * 28, t, 10.8)
     b += txt(30, 860, 'Vale para cualquier locator de España: IN, IM, JN, JM (península y Baleares), IL (Canarias), IM75 (Ceuta) e IM85 (Melilla). '
@@ -923,7 +923,7 @@ def blindaje():
     b += txt(350, 320, '(!) /login por 8073 va', 10.5, C['cr']) + txt(350, 338, 'sin cifrar: ciérralo', 10.5, C['cr'])
     b += arrow(280, 240, 330, 240, C['cr'])
     b += arrow(560, 240, 610, 240, C['ink'])
-    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · 192.168.1.50', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
+    b += caja_s(610, 90, 860, 600, 'Raspberry Pi 5 · IP-DE-LA-PI', 'bricohams-blindaje aplicar · confirmar · deshacer', C['sdr'], '#eef4fb', arriba=True)
     capas = [('Cortafuegos del host (nftables)', 'público 80/443/8073 · LAN: SSH, 4403, 8443, 8554 · resto: descartado y registrado', C['or']),
              ('nginx', '/settings → HTTPS · /login 12/min (429) · sin versión · X-Frame · ocultos 404', C['net']),
              ('SSH', 'solo LAN · sin root · 3 intentos · solo clave si la hay · fail2ban', C['pi']),
@@ -935,7 +935,7 @@ def blindaje():
         b += caja_s(630, y, 820, 70, t, d, c, '#ffffff')
     b += caja_s(30, 430, 530, 260, 'Procedimiento (manual 34)', '', C['ink'], '#fafafa', arriba=True)
     for k, t in enumerate(['1  sudo bash install.sh --actualizar', '2  sudo bricohams-blindaje auditar   (no cambia nada)',
-                           '3  ssh-copy-id pi@192.168.1.50', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
+                           '3  ssh-copy-id usuario@IP-DE-LA-PI', '4  sudo bricohams-blindaje aplicar', '5  otra ventana: ¿entro? ¿va la web?',
                            '6  sudo bricohams-blindaje confirmar  (si no, 3 min y se quita)', '7  sudo bricohams-blindaje auditar']):
         b += txt(50, 485 + k * 28, t, 11)
     b += txt(30, 760, 'La auditoría nunca enseña una clave: solo la variable y el fichero donde aparece. bricohams-check muestra el resumen cada 30 min.', 11)

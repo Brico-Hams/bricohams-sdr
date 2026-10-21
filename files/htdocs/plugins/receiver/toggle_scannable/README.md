@@ -10,7 +10,7 @@ The scanner (enabled by right-clicking the SQ button on the left of the SQL slid
 
 ## Preview
 
-![toggle_scannable](toggle_scannable/toggle_scannable.png "Preview")
+![toggle_scannable](toggle_scannable.png "Preview")
 
 ## Load
 
@@ -22,4 +22,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/toggle_scann
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

@@ -36,7 +36,7 @@ El chip se reconoce solo: **BME280** (ID 0x60) mide humedad y **BMP280** (ID 0x5
 - **Web:** ventana 🌡️ METEO de OpenWebRX. Arriba sale la tarjeta «🏠 BricoHams WX» (nombre por defecto, configurable con `WX_NAME`) con temperatura, humedad, punto de rocío, presión a nivel del mar y en el QTH, y la curva de 24 h. El botón de la barra muestra la temperatura.
 - **APRS-IS:** cada 10 min, como **N0CALL-13**:
   ```
-  N0CALL-13>APZBHW,TCPIP*:!3759.03N/00107.68W_.../...g...t072h55b10143WX station · BME280
+  N0CALL-13>APZBHW,TCPIP*:!4213.75N/00842.50W_.../...g...t072h55b10143WX station · BME280
   ```
   Se ve en https://aprs.fi/#!call=N0CALL-13
 

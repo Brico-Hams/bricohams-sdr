@@ -10,7 +10,7 @@ The antenna buttons appear in a collapsible **Antenna** section in the receiver 
 
 It consists of a **front-end** and **back-end** part.
 
-The front-end is a standard OpenWebRX+ plugin and its installation does not differ from the standard way you [install plugins](/openwebrxplus-plugins/#load-plugins):
+The front-end is a standard OpenWebRX+ plugin and its installation does not differ from the standard way you [install plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart):
 
 ## I. Front-end installation
 
@@ -30,7 +30,7 @@ You probably don't want to change the default back-end instance URL, but if you 
 
 ### init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).
 
 ## II. Back-end installation
 

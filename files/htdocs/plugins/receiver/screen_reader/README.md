@@ -14,7 +14,7 @@ The plugin depends on [utils](https://0xaf.github.io/openwebrxplus-plugins/recei
 
 ## Preview
 
-![screen_reader](screen_reader/screen_reader.png "Preview")
+![screen_reader](screen_reader.png "Preview")
 
 ## Load
 
@@ -28,4 +28,4 @@ Plugins.screen_reader.log_messages = true; // if you want to log the messages to
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

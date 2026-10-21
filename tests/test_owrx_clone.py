@@ -72,7 +72,7 @@ poner(A, HT + '/plugins/receiver/mio/mio.js', 'Plugins.mio.init=function(){retur
 poner(A, HT + '/plugins/receiver/init.js.antes-20261001', 'viejo')
 poner(A, HT + '/plugins/receiver/mio/__pycache__/x.pyc', 'pyc')
 SET = {'receiver_name': 'N0CALL · Murcia', 'aprs_igate_password': '12345', 'receiver_keys': ['abc'],
-       'magic_key': 'secreta', 'receiver_gps': {'lat': 37.98, 'lon': -1.13},
+       'magic_key': 'secreta', 'receiver_gps': {'lat': 42.23, 'lon': -8.71},
        'sdrs': {'rtl': {'name': 'HAM', 'type': 'rtl_sdr', 'device': 'serial=00000102', 'profiles': {'2m': {}, '70': {}}},
                 'v3': {'name': 'MULTI', 'type': 'rtl_sdr', 'device': '00000103', 'profiles': {'fm': {}}}}}
 poner(A, '/var/lib/openwebrx/settings.json', json.dumps(SET), 0o644)
@@ -119,7 +119,7 @@ pub = os.path.join(T, 'publico.owrx.tar.gz')
 rc, out = correr(A, 'exportar', '-o', pub, '--publico', '--niveles', 'config,web')
 m2, tmp = oc.abrir_perfil(pub)
 s2 = json.load(open(os.path.join(tmp, 'archivos/config/DATA/settings.json')))
-assert s2['aprs_igate_password'] == '' and s2['receiver_keys'] == [] and s2['magic_key'] == '' and s2['receiver_gps']['lat'] == 37.98
+assert s2['aprs_igate_password'] == '' and s2['receiver_keys'] == [] and s2['magic_key'] == '' and s2['receiver_gps']['lat'] == 42.23
 assert '{DATA}/users.json' not in {e['ruta'] for e in m2['ficheros']} and m2['secretos'] == 'quitados'
 assert set(m2['niveles']) == {'config', 'web'} and 'aprs_igate_password' in m2['secretos_quitados']
 shutil.rmtree(tmp)

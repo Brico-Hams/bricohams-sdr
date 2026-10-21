@@ -21,11 +21,13 @@ Manual completo: [docs/manuales/35_LORA_APRS_MESHTASTIC.md](../../docs/manuales/
 | `rak4631-lora-aprs.ino` | vacío a propósito: el código va en los `.cpp` |
 | `test/` | `Arduino.h` mínimo para compilar la lógica en el PC (`tests/test_rak_aprs.py`) |
 
-**Compilar:** `bash tools/compilar_rak.sh`. Necesita arduino-cli, el BSP de RAKwireless 1.3.3, RadioLib 7.6.0, ArduinoJson 7.4.3, TinyGPSPlus 1.1.0, Adafruit BME280 2.3.0 y BME680 2.0.6.
+**Compilar:** `bash tools/compilar_rak.sh`. Necesita arduino-cli, el BSP de RAKwireless 1.3.3, RadioLib 7.6.0, ArduinoJson 7.4.3, TinyGPSPlus 1.0.3, Adafruit BME280 2.3.0 y BME680 2.0.6.
+
+**Firmware precompilado:** [descarga el UF2 para flasheo web](https://github.com/anatolbricoham/bricohams-sdr/releases/download/fw-v5.4.1/bricohams-rak4631-lora-aprs-v1.0.1.uf2). El [resto de formatos y sus checksums](https://github.com/anatolbricoham/bricohams-sdr/releases/tag/fw-v5.4.1) están en la release pública.
 
 **Grabar:**
 - `sudo bricohams-rak-aprs grabar` (DFU por USB);
 - o doble RESET y copiar el `.uf2` a la unidad `RAK4631`.
 - Un RAK de fábrica con **RUI3** (USB `1915:521f`) hay que pasarlo antes a bootloader WisBlock (manual 35, apartado 3).
 
-**Pendiente (11/10/2026):** los binarios de `bin/` son 1.0.0, anteriores a la corrección de `medidaValida()`. Sin batería mandan `"vbat": nan`; la Pi lo tolera, pero conviene recompilar y volver a grabar.
+Los binarios publicados corresponden a la versión 1.0.1. Verifica `SHA256SUMS` antes de grabar y usa únicamente el firmware adecuado para el RAK4631.

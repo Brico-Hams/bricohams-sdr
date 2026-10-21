@@ -143,7 +143,7 @@ zona_locator() {
     COORDS_DEL_LOCATOR=0
     STATION_QTH_LOCATOR=""; LOCATOR_CATALOG_PATH=""; LOCATOR_DERIVADAS=()
     if [ -n "${STATION_LOCATOR:-}" ]; then
-        c=$(python3 "$FILES/bin/bricohams_locator.py" "$STATION_LOCATOR") || fallo "STATION_LOCATOR=$STATION_LOCATOR no es un locator Maidenhead válido (4, 6, 8 o 10 caracteres, p. ej. IM97kx)"
+        c=$(python3 "$FILES/bin/bricohams_locator.py" "$STATION_LOCATOR") || fallo "STATION_LOCATOR=$STATION_LOCATOR no es un locator Maidenhead válido (4, 6, 8 o 10 caracteres, p. ej. IN52pf)"
         if ! coords_ok; then
             read -r STATION_LAT STATION_LON <<<"$c"; export STATION_LAT STATION_LON
             LOCATOR_DERIVADAS+=(STATION_LAT STATION_LON); COORDS_DEL_LOCATOR=1

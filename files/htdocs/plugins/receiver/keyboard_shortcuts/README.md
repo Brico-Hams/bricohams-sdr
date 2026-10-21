@@ -28,4 +28,4 @@ await Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/keyboa
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

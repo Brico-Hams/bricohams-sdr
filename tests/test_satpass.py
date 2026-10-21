@@ -16,7 +16,7 @@ if sp.Satrec is None:
     raise SystemExit(0)
 
 d = json.load(open(os.path.join(RAIZ, 'tests/datos/iss_omm.json')))
-LAT, LON, ALT = 37.9838, -1.1280, 200
+LAT, LON, ALT = 42.22917, -8.70833, 200
 import calendar
 t0 = calendar.timegm((2026, 10, 3, 12, 0, 0))
 sat = sp.satrec_de_omm(d['omm'])

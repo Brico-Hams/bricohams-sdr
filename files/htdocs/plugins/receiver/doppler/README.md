@@ -13,7 +13,7 @@ Then I switched to [CelesTrak JSON API](https://celestrak.org/) and created Sate
 
 ## Preview
 
-![doppler](doppler/doppler.png "Preview")
+![doppler](doppler.png "Preview")
 
 ## Usage
 
@@ -21,7 +21,7 @@ Then I switched to [CelesTrak JSON API](https://celestrak.org/) and created Sate
  2. Click TRACK.
 
 The Satellite Finder window will help you find a satellite and will give useful information on each satellite.
-![doppler1](doppler/doppler1.png "FindSat")
+![doppler1](doppler1.png "FindSat")
 
 ## Load
 
@@ -33,7 +33,7 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/doppler/dopp
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).
 
 ## Code
 

@@ -16,13 +16,14 @@ PROHIBIDOS = {
     'locator de 6 caracteres original': 'IM98' + '(ib|wb)',
     'latitud de la casa': r'38\.0' + r'8[0-9]{2}',
     'longitud de la casa': r'-1\.2' + r'5[0-9]{2}',
+    'coordenadas exactas de la estación': r'37\.' + r'9838[0-9]{2,}|-1\.' + r'1280[0-9]{2,}',
     'APRS de la casa': '3804' + r'\.8|0011' + r'5\.0',
     'LAN original': r'192\.168' + r'\.254\.',
     'usuario de la Pi original': r'\bael' + r'm\b',
-    'usuario de Windows original': 'anato' + 'l',
+    'usuario de Windows original': r'(?i)(?:Users[\\/])anato' + r'l(?:\.lopez)?[\\/]',
 }
 # Ficheros con números que coinciden por casualidad (tablas de firmware, claves)
-EXCLUIR_NOMBRES = {'mastil.py', 'magic_key.js', 'test_anonimato.py', '.git'}
+EXCLUIR_NOMBRES = {'mastil.py', 'magic_key.js', 'test_anonimato.py', 'LICENSE', '.git'}
 EXCLUIR_EXT = {'.hex', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.uf2', '.bin',
                '.stl', '.pdf', '.woff', '.woff2', '.ttf', '.zip', '.gz'}
 

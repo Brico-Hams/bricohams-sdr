@@ -115,7 +115,7 @@ En el repositorio público **sí** pueden ir:
 
 **No** pueden ir:
 
-- la IP de la red de casa: los ejemplos usan `192.168.1.50`;
+- la IP de la red de casa: sustituye `<IP-DE-LA-PI>` por un marcador;
 - el usuario del sistema: se escribe `<usuario>`;
 - la posición exacta;
 - los SSID ni ninguna clave;

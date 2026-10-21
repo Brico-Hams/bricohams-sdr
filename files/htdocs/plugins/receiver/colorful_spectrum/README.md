@@ -8,7 +8,7 @@ This `receiver` plugin will colorify your spectrum analyzer.
 
 ## Preview
 
-![spectrum](colorful_spectrum/colorful_spectrum.png "Preview")
+![spectrum](colorful_spectrum.png "Preview")
 
 ## Load
 
@@ -20,4 +20,4 @@ Plugins.load('https://0xaf.github.io/openwebrxplus-plugins/receiver/colorful_spe
 
 ## init.js
 
-Learn how to [load plugins](/openwebrxplus-plugins/#load-plugins).
+Learn how to [load plugins](https://0xaf.github.io/openwebrxplus-plugins/#beginner-quickstart).

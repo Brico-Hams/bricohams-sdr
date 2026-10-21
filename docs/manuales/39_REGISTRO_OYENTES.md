@@ -80,7 +80,7 @@ En una instalación ya hecha se puede cambiar a mano en
   consentimiento lo indica.
 - No existe endpoint público para leer la lista. El acceso se hace localmente
   desde la Pi. Para solicitar acceso o supresión de entradas previas, usa el
-  contacto publicado en el [aviso de privacidad](/bricohams/privacidad.html).
+  contacto publicado en el [aviso de privacidad](../../files/web/privacidad.html).
 - Desactivar la preferencia en el navegador detiene las próximas entradas, pero
   no borra automáticamente registros ya guardados; el operador tramita la
   supresión solicitada.

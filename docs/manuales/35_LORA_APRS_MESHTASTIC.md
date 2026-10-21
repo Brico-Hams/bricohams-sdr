@@ -130,24 +130,27 @@ Compilados con el BSP de RAKwireless 1.3.3 y RadioLib 7.6.0 (`tools/compilar_rak
 
 Cualquier programa KISS (Direwolf, APRX, Xastir) puede usar el RAK: las tramas 0x06 las ignora.
 
-## 2. Configuración clonada del iGate actual (192.168.1.142)
-Leída de su `/configuration.json` el 11/10/2026; en `bricohams.env` (personal):
+## 2. Configuración del iGate
 
-| iGate LilyGO (N0CALL-10) | RAK4631 | Variable |
-|---|---|---|
-| callsign N0CALL-10 | **N0CALL-15**. «N0CALL-SDR» no vale: en RF el SSID es un número de 0 a 15 y en APRS-IS caben 9 caracteres | `RAK_CALLSIGN` |
-| 433,775 · SF12 · BW 125 · CR 4/5 · 20 dBm · TX y CAD activos | igual | `RAK_TX="yes"`, `RAK_POWER="20"` |
-| baliza cada 15 min por RF y APRS-IS, «LoRa APRS igate», símbolo `L` + `a`, ruta WIDE1-1,WIDE2-1, ambigüedad 1 | igual, + `Caja 23.4C` al final del comentario | `RAK_BEACON_MIN`, `RAK_BEACON_RF`, `RAK_COMMENT`, `RAK_SYMBOL="La"`, `RAK_PATH`, `RAK_AMBIGUEDAD="1"` |
-| estado «N0CALL-tu QTH-IGate» | «N0CALL-SDR BricoHams iGate» | `RAK_STATUS` |
-| digipeater WIDE1-1 automático | **`auto`** (v5.0): el RAK repite solo cuando el iGate LilyGO (`RAK_DIGI_VIGILA`, por defecto `IGATE_CALLSIGN`) lleva `RAK_DIGI_AUTO_MIN` (30) minutos sin oírse, ni como origen ni repitiendo (`N0CALL-10*`); cuando vuelve, el RAK deja de repetir. Dos digis de relleno en el mismo sitio repetirían dos veces cada paquete. Fijos: `0` apagado, `1` WIDE1-1, `2` + WIDE2-n, `3` solo vía nuestro indicativo | `RAK_DIGI` |
-| APRS-IS rotate.aprs2.net · filtro m/10 · mensajes a RF | igual (objetos a RF: no) | `RAK_APRSIS_SERVER`, `RAK_APRSIS_FILTRO`, `RAK_MENSAJES_RF` |
-| recordar estaciones 30 min | igual | `RAK_RECORDAR_MIN` |
-| syslog y MQTT a link9.net | no: el RAK publica en el MQTT **local** para OpenWebRX+ | — |
+La configuración de cada estación se guarda localmente en `bricohams.env`; ese
+archivo contiene datos del operador y **no debe subirse al repositorio**. Usa
+el indicativo autorizado para tu estación y comprueba la normativa local antes
+de habilitar transmisión:
 
-> **Aviso de seguridad del iGate viejo:** su web no tiene usuario (`webadmin.active=false`). Cualquiera en tu red puede leer en `/configuration.json` la **contraseña de la WiFi** y el passcode APRS. Activa `webadmin` con una contraseña en su web, o apágalo cuando el RAK funcione.
+- `RAK_CALLSIGN`: indicativo y SSID APRS válido (de 0 a 15).
+- `RAK_TX` y `RAK_POWER`: transmisión y potencia RF autorizadas para la ubicación.
+- `RAK_BEACON_*`, `RAK_COMMENT`, `RAK_SYMBOL` y `RAK_PATH`: baliza de la estación.
+- `RAK_DIGI`: `auto` permite repetición solo cuando no se oye el iGate asociado;
+  evita configurar dos digipeaters simultáneos en el mismo sitio.
+- `RAK_APRSIS_*`, `RAK_MENSAJES_RF` y `RAK_RECORDAR_MIN`: conexión APRS-IS,
+  mensajes y memoria de estaciones.
+
+No copies sin revisar la configuración de otro iGate: sus archivos pueden
+contener contraseñas WiFi, passcodes APRS u otros datos personales. Protege su
+interfaz de administración con autenticación o desactívala si no se utiliza.
 
 ## 3. Procedimiento en la Pi (paso a paso)
-**Antes:** por SSH desde casa (`ssh pi@192.168.1.50`); el RAK y el LilyGO enchufados al hub USB; sus antenas puestas. **Nunca transmitas sin antena.**
+**Antes:** accede por SSH a la dirección configurada para tu Pi (`ssh usuario@IP-DE-LA-PI`); conecta el RAK y el LilyGO al hub USB y coloca sus antenas. **Nunca transmitas sin antena.**
 
 1. Kit y servicios al día:
    ```bash
