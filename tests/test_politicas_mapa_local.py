@@ -62,6 +62,7 @@ for nombre in ('consentimiento', 'idioma', 'marca'):
     assert re.search(r'receiver/\{[^}]*\b' + nombre + r'\b[^}]*\}/\*\.js', pruebas), nombre
 assert not re.search(r'receiver/\{[^}]*\bexternos\b', pruebas)
 assert 'python3 tests/test_politicas_mapa_local.py' in pruebas
+assert '"usage_policy_url": "/bricohams/politicas.html"' in leer('files/openwebrx/settings.json.tmpl'), 'el aviso de OpenWebRX+ debe usar la politica propia'
 
 # --- init.js: configuración y orden de carga -----------------------------------------
 assert "politicas: BH_WEB + '/bricohams/politicas.html'" in init_js

@@ -1,5 +1,10 @@
 # Historial
 
+## Sin publicar · 2026-10-22
+
+- OpenWebRX+: «Usage policy URL» apunta a la política propia `/bricohams/politicas.html`,
+  no a la página genérica `policy`. Prueba de regresión en `test_politicas_mapa_local.py`.
+
 ## v5.4.2 · 2026-10-22
 
 - Ayuda autenticada integrada en todos los paneles privados (`?ayuda=1`),
