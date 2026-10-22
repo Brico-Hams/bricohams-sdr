@@ -1,5 +1,9 @@
 # 46 · Acceso de administradores: usuarios locales y Google (v5.5)
 
+Guía integrada, enlaces directos y creación de tokens del backup:
+[manual 47](47_CONFIGURACION_MODULOS.md). Entra ID no es un proveedor de acceso
+web implementado; no confundirlo con el backup OneDrive.
+
 **Edición 2026-10-19.** Complementa el [manual 34](34_BLINDAJE_SEGURIDAD.md) (panel Seguridad).
 Decisión de diseño: ADR-71 en [ARQUITECTURA](../ARQUITECTURA.md).
 

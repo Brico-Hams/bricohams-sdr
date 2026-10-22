@@ -1,5 +1,16 @@
 # Historial
 
+## v5.4.2 · 2026-10-22
+
+- Ayuda autenticada integrada en todos los paneles privados (`?ayuda=1`),
+  enlaces directos y manual 47: configuración de módulos, creación de cliente
+  Google, tokens Drive/OneDrive, drive_id, SMB, NFS, SFTP y recuperación.
+- Se distingue explícitamente Entra ID (login web no implementado) del backup
+  OneDrive; no se anuncian callbacks o métodos de acceso inexistentes.
+- Backup remoto: campos opcionales de cliente OAuth propio, secreto protegido
+  y renovación de tokens con la misma identidad del cliente que los generó.
+- Pruebas de acceso a la ayuda, ausencia de secretos y configuración OAuth de rclone.
+
 ## Sin publicar · 2026-10-19
 
 ### Chat web ↔ Telegram

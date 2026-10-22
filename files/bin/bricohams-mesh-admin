@@ -715,12 +715,23 @@ def br_validar(campos, actual):
     c['retencion'] = ret
     c['incluir_secretos'] = campos.get('incluir_secretos') == 'yes'
     c['programado'] = campos.get('programado') == 'yes'
+    if p in ('gdrive', 'onedrive'):
+        client_id = campos.get('oauth_client_id', '').strip()
+        if len(client_id) > 200 or re.search(r'[^A-Za-z0-9._-]', client_id):
+            raise ValueError('ID de cliente OAuth no válido')
+        if client_id:
+            c['oauth_client_id'] = client_id
     return c
 
 
 def br_secretos(campos, p, previo):
     """Contraseña / token nuevos; un campo vacío conserva lo guardado (nunca se devuelve al navegador)."""
-    s = {k: v for k, v in previo.items() if k in ('password', 'token')}
+    s = {k: v for k, v in previo.items() if k in ('password', 'token', 'oauth_client_secret')}
+    secreto = campos.get('oauth_client_secret', '')
+    if p in ('gdrive', 'onedrive') and secreto:
+        if len(secreto) > 512 or any(ch in secreto for ch in '\r\n\x00'):
+            raise ValueError('secreto OAuth no válido')
+        s['oauth_client_secret'] = secreto
     clave = campos.get('password', '')
     if clave:
         if clave != campos.get('password2', ''):
@@ -1114,9 +1125,17 @@ def accion_seguridad(campos):
     if a == 'seg-guardar':
         actual = leer_json(BR_CONF)
         c = br_validar(campos, actual)
+        if (actual.get('oauth_client_id', '') != c.get('oauth_client_id', '')
+                and c.get('protocolo') in ('gdrive', 'onedrive') and not campos.get('token', '').strip()):
+            raise ValueError('al cambiar el cliente OAuth debes generar y pegar un token nuevo con ese cliente')
         huella_reset = c.pop('huella_reset', False)
         previo = leer_json(BR_SECRETO) if actual.get('protocolo') == c['protocolo'] else {}
         s = br_secretos(campos, c['protocolo'], previo)
+        if (actual.get('oauth_client_id', '') != c.get('oauth_client_id', '')
+                and not campos.get('oauth_client_secret', '')):
+            s.pop('oauth_client_secret', None)
+        if s.get('oauth_client_secret') and not c.get('oauth_client_id'):
+            raise ValueError('el secreto OAuth necesita su ID de cliente')
         os.makedirs(os.path.dirname(BR_CONF), mode=0o750, exist_ok=True)
         escribir_json_seguro(BR_SECRETO, s, 0o600)
         escribir_json_seguro(BR_CONF, c, 0o600)
@@ -1791,6 +1810,7 @@ def tarjeta_backup_remoto(oculto):
         'smb': sel('smb_version', [('3.1.1', 'SMB 3.1.1'), ('3.0', 'SMB 3.0'), ('2.1', 'SMB 2.1')], c.get('smb_version', '3.0')),
         'nfs': sel('nfs_version', [('4.2', 'NFS 4.2'), ('4.1', 'NFS 4.1'), ('4', 'NFS 4'), ('3', 'NFS 3')], c.get('nfs_version', '4')),
         'drive_id': txt('drive_id', c.get('drive_id', ''), 'b!abc… o 0123ABCD'),
+        'oauth_client_id': txt('oauth_client_id', c.get('oauth_client_id', '')),
         'drive_type': sel('drive_type', [('personal', 'Personal'), ('business', 'Empresa / OneDrive for Business'),
                                          ('documentLibrary', 'Biblioteca SharePoint')], c.get('drive_type', 'personal')),
         'retencion': txt('retencion', str(c.get('retencion', 14)), '14', 'number'),
@@ -1799,8 +1819,9 @@ def tarjeta_backup_remoto(oculto):
         'guardada': guardada, 'tok': tok,
         'registro': e(registro('%s@copiar' % BR_UNIDAD, 30)),
     }
-    return """<div class="card mb-4"><div class="card-header"><b>Backup remoto</b> · copia programada: %(timer)s</div>
+    return """<div class="card mb-4" id="backup-remoto"><div class="card-header"><b>Backup remoto</b> · copia programada: %(timer)s</div>
 <div class="card-body">%(resumen)s%(huella)s%(tabla)s
+<p><a href="%(ruta)s?ayuda=1#backup-remoto">Paso a paso: crear tokens, obtener drive_id y verificar la copia</a></p>
 <form method="post" action="%(ruta)s" class="mb-3">%(oculto)s
 <button class="btn btn-sm btn-secondary me-1" name="accion" value="seg-probar">Probar conexión</button>
 <button class="btn btn-sm btn-primary me-1" name="accion" value="seg-copiar">Copiar ahora</button>
@@ -1824,6 +1845,9 @@ def tarjeta_backup_remoto(oculto):
 <div class="col-md-4"><label class="form-label" for="br-drive_type">OneDrive: tipo</label>%(drive_type)s</div>
 <div class="col-12"><label class="form-label" for="br-token">Token OAuth de Google Drive / OneDrive (%(tok)s)</label>
 <textarea class="form-control font-monospace" name="token" id="br-token" rows="2" placeholder='{"access_token":"…","refresh_token":"…"} · vacío = no cambiar'></textarea></div>
+<div class="col-md-6"><label class="form-label" for="br-oauth_client_id">ID de cliente OAuth del backup (opcional)</label>%(oauth_client_id)s</div>
+<div class="col-md-6"><label class="form-label" for="br-oauth-secret">Secreto OAuth del backup</label>
+<input class="form-control" type="password" name="oauth_client_secret" id="br-oauth-secret" maxlength="512" autocomplete="new-password" placeholder="vacío = conservar; no es el secreto de acceso Google"></div>
 <div class="col-md-3"><label class="form-label" for="br-retencion">Copias a conservar</label>%(retencion)s</div>
 <div class="col-md-9 pt-4">
 <div class="form-check"><input class="form-check-input" type="checkbox" name="programado" value="yes" id="br-prog"%(prog)s>
@@ -1988,6 +2012,8 @@ def tarjeta_acceso(oculto):
     return """<div class="card mb-4" id="acceso"><div class="card-header"><b>Métodos de acceso de administradores</b> · usuarios locales y Google
 <span class="float-end">%s</span></div><div class="card-body">
 <p class="small mb-1">Estado: %s · pasarela Google: %s</p>
+<p><a href="?ayuda=1#google">Guía completa de Google: ID, secreto y prueba</a> ·
+<a href="?ayuda=1#entra">Microsoft Entra ID: compatibilidad y credenciales</a></p>
 <form method="post" action="%s" autocomplete="off">%s
 <div class="mb-3">%s</div>
 <div class="row g-2">
@@ -2402,6 +2428,128 @@ def con_tema(html):
         return html
     return html.replace('</head>', '<style id="bricohams-tema">' + TEMA_OSCURO + '</style></head>', 1)
 
+
+def pagina_ayuda(ruta):
+    """Guía local sin secretos, bajo la misma sesión de administrador que el panel."""
+    return cabecera('Configuración paso a paso', ruta) + """
+<h1>Configuración de los módulos</h1>
+<p>Usa estos enlaces en el dominio de tu estación. No pegues secretos en Git, chats ni comandos.
+Los enlaces externos abren los portales oficiales; sus menús pueden cambiar.</p>
+<p><a href="#google">Google</a> · <a href="#entra">Entra ID</a> · <a href="#backup-remoto">Backup externo</a> ·
+<a href="#modulos">Todos los módulos</a> · <a href="#validacion">Validación y recuperación</a></p>
+<h2 id="google">Acceso con Google</h2>
+<p><a href="/settings/bricohams/seguridad#acceso">Abrir la configuración de acceso</a>.
+Necesitas un dominio HTTPS y un administrador local de recuperación.</p>
+<ol><li>Abre <a href="https://console.cloud.google.com/">Google Cloud Console</a>, crea o selecciona un proyecto.</li>
+<li>En <a href="https://console.cloud.google.com/auth/branding">Google Auth Platform: Branding</a> configura nombre y correo.
+En <a href="https://console.cloud.google.com/auth/audience">Audience</a> elige la audiencia; si es externa y está en pruebas, añade tus usuarios de prueba.</li>
+<li>En <a href="https://console.cloud.google.com/auth/clients">Clients</a> crea un cliente de tipo <b>Aplicación web</b>.
+Origen: el origen HTTPS de esta estación. Redirección exacta: ese origen seguido de <code>/_bh_google/callback</code>.
+La tarjeta de acceso muestra los valores calculados con SSL_DOMAIN.</li>
+<li>Copia el ID y el <b>valor del secreto</b> en la tarjeta de acceso. No es una API key ni un access_token.
+Si ya no puedes ver el secreto, crea uno nuevo en el cliente y rota el anterior después de probar.</li>
+<li>Añade correos administradores exactos; usa @dominio solo si quieres autorizar todo ese dominio.
+Elige «Usuario local o cuenta de Google», guarda y aplica.</li>
+<li>Sin cerrar tu sesión de recuperación, abre otra ventana privada e inicia sesión con Google.
+Solo después considera «doble» o «solo Google». Comprueba también que una cuenta no autorizada es rechazada.</li></ol>
+<p><code>redirect_uri_mismatch</code>: revisa HTTPS, dominio y ruta exacta. «Cuenta sin permiso»:
+revisa usuarios de prueba y lista de administradores. Un secreto vacío conserva el actual.</p>
+<h2 id="entra">Microsoft Entra ID</h2>
+<p><b>El inicio de sesión con Entra ID no está implementado en esta versión.</b> La pasarela valida exclusivamente
+emisores y clientes Google. No pegues un secreto Microsoft en el formulario Google ni inventes una URL de callback Entra.
+OneDrive para backups sí está soportado y no habilita inicio de sesión Microsoft en la web.</p>
+<p>Para localizar credenciales Microsoft: <a href="https://entra.microsoft.com/">Centro de administración Entra</a>
+→ Identidad → Aplicaciones → Registros de aplicaciones → tu aplicación. «Información general» muestra
+Application (client) ID y Directory (tenant) ID. «Certificados y secretos» → Nuevo secreto de cliente:
+el dato utilizable es <b>Valor</b>, no «Id. del secreto»; copia el valor una sola vez a un almacén seguro
+y registra su caducidad. No crees permisos ni redirecciones para un login que aún no existe.</p>
+<p><a href="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app">Registro oficial de aplicaciones</a>.
+Para OneDrive usa la guía siguiente y las políticas de consentimiento de tu organización.</p>
+<h2 id="backup-remoto">Backup externo: credenciales y tokens</h2>
+<p><a href="/settings/bricohams/seguridad#backup-remoto">Abrir Backup remoto</a>.
+Usa una cuenta dedicada y una carpeta vacía. La retención elimina copias antiguas: empieza sin programación
+y revisa su valor antes de activarla. Un token OAuth equivale a una contraseña.</p>
+<h3>Google Drive</h3><ol>
+<li>En un PC de confianza con navegador instala <a href="https://rclone.org/downloads/">rclone oficial</a>.
+Usa una versión compatible con la del servidor (<code>rclone version</code>).</li>
+<li>Para un cliente propio (recomendado), habilita <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</a>
+en tu proyecto; configura Branding/Audience y crea un cliente OAuth de <b>Aplicación de escritorio</b>.
+Es distinto del cliente web de acceso Google. Sigue <a href="https://rclone.org/drive/#making-your-own-client-id">la guía oficial de rclone</a>.</li>
+<li>Ejecuta <code>rclone config</code>, crea un remoto de nombre <code>bhbackup</code> y tipo <code>drive</code>.
+Introduce ID y secreto en los prompts interactivos, no como argumentos de terminal. Selecciona permisos
+de escritura adecuados para la carpeta dedicada y autoriza tu cuenta en el navegador.
+No uses un cliente propio solo en el PC: el servidor necesita el mismo ID y secreto para renovar el token.</li>
+<li>En <code>rclone config file</code> localiza el fichero privado. Abre su sección [bhbackup] en un editor local:
+copia únicamente el JSON completo de <code>token = {...}</code>, sin «token =», al campo Token del panel.
+Copia ID y secreto a los campos OAuth del <b>backup</b>. No uses config show en una terminal registrada.</li>
+<li>Selecciona Google Drive, carpeta remota y retención. Guarda, prueba conexión, copia y verifica.
+Con un cliente externo en pruebas Google puede limitar la duración del refresh_token; revisa el estado de publicación y consentimiento.</li></ol>
+<p>La alternativa <code>rclone authorize "drive"</code> sirve solo si PC y servidor usan el mismo cliente
+compartido. Su disponibilidad depende de rclone/Google; el cliente compartido se está retirando.
+No confundas el JSON del token con el JSON descargado del cliente OAuth.</p>
+<h3>OneDrive / Microsoft 365 / SharePoint</h3><ol>
+<li>En el PC ejecuta <code>rclone config</code>, crea bhbackup y selecciona <code>onedrive</code>.
+Normalmente deja Client ID y Client Secret vacíos para usar el cliente compartido, si tu tenant lo permite.</li>
+<li>Autoriza en el navegador y selecciona OneDrive Personal/Business o la biblioteca SharePoint correcta.
+El asistente muestra el drive. Si requiere aprobación, solicita consentimiento al administrador del tenant;
+un token personal no evita las políticas de Microsoft 365.</li>
+<li>Con <code>rclone config file</code> abre el fichero local privado y copia de [bhbackup] el JSON de
+<code>token</code>, <code>drive_id</code> y <code>drive_type</code> al panel. El drive_id no es el tenant ID.
+Tipo: personal, business o documentLibrary según el asistente.</li>
+<li>Si tu organización exige cliente propio, sigue <a href="https://rclone.org/onedrive/#getting-your-own-client-id-and-key">la guía oficial</a>
+para registrar la app y su redirección de rclone, no la de BricoHams.
+Usa permisos delegados mínimos necesarios y la misma pareja ID/secreto en PC y campos OAuth del backup.
+Copia el <b>Valor</b> del secreto de Entra, no su identificador. Guarda la caducidad y rota antes de vencer.</li>
+<li>Guarda, prueba conexión, copia ahora y verifica última copia. Solo después habilita programación.
+<code>invalid_grant</code>: autoriza de nuevo y pega un token nuevo; cambiar de cliente exige token nuevo.</li></ol>
+<h3>SMB, NFS y SFTP</h3><ol>
+<li><b>SMB/CIFS:</b> crea usuario y carpeta compartida en el NAS con permiso de escritura. Pon
+<code>\\\\nas.ejemplo\\copias\\bricohams</code>, usuario o DOMINIO\\usuario y contraseña repetida.
+Usa SMB 3 si está disponible; no necesita token OAuth.</li>
+<li><b>NFS:</b> crea un export y autoriza la IP de la estación en el NAS. Pon <code>nas.ejemplo:/export/copias</code>
+y versión NFS. Comprueba permisos UID/GID y root-squash; no desactives protecciones globales para resolver un error.
+No necesita usuario ni token en el panel.</li>
+<li><b>SFTP:</b> crea una cuenta con contraseña y carpeta escribible, indica servidor, puerto, usuario y contraseña.
+Esta implementación no configura claves privadas SFTP. Pulsa Obtener huella; compárala por otro canal con
+<code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code> en el servidor destino y confirma solo si coincide.</li>
+<li>En todos: Guardar → Probar conexión → Copiar ahora → Verificar última copia. Revisa estado y fecha.
+El destino contiene datos sensibles si marcas Incluir secretos: no es cifrado de extremo a extremo.
+La prueba crea y elimina un fichero temporal; verificar una copia no sustituye ensayar restauración aislada.</li></ol>
+<h2 id="modulos">Configuración de cada módulo</h2>
+<p>Los módulos opcionales deben estar instalados. Un enlace no instala hardware ni servicios.
+Si no hay formulario web dedicado se indica consola; no existe una URL secreta de configuración.</p>
+<table class="table table-sm"><thead><tr><th>Módulo</th><th>Abrir configuración</th><th>Pasos y comprobación</th></tr></thead><tbody>
+<tr><td>Instalador / actualización / red / hardware</td><td>Consola</td><td>Revisa bricohams.env con bricohams-env.py; simula con install.sh --actualizar --simular, respalda, aplica solo los pasos necesarios. No cambies red en una sesión sin recuperación.</td></tr>
+<tr><td>OpenWebRX+ nativo o Docker</td><td><a href="/settings">Settings</a></td><td>Configura receptor y dispositivos; guarda y comprueba audio y waterfall. No ejecutes simultáneamente dos procesos sobre el mismo SDR.</td></tr>
+<tr><td>owrx-clone</td><td>Consola</td><td>Consulta owrx-clone --help, exporta antes de importar, revisa el contenido sin publicar claves y prueba la restauración en otra instalación.</td></tr>
+<tr><td>Plugins web / audio</td><td><a href="/settings">Settings</a></td><td>Revisa preferencias del receptor y activa el plugin instalado; comprueba en el navegador el control correspondiente. Los valores persistentes se gestionan en el kit/env, no todos tienen formulario.</td></tr>
+<tr><td>Bookmarks / CTCSS / RepeaterBook / locator</td><td><a href="/settings">Settings</a></td><td>General Settings: configura API RepeaterBook si procede; importa primero una zona pequeña, valida frecuencias y tonos. Locator y catálogos: consola del kit. Exporta bookmarks antes de sustituirlos.</td></tr>
+<tr><td>Meshtastic 433/868</td><td><a href="/settings/bricohams/meshtastic">Meshtastic</a></td><td>Selecciona radio y región legal, nombres y canal; guarda y lee nodos. No publiques PSK/URL de canal. Prueba cada radio por separado.</td></tr>
+<tr><td>Mensajería Meshtastic</td><td><a href="/settings/bricohams/meshtastic/chat">Mensajes</a></td><td>Selecciona red/canal, envía un mensaje de prueba y comprueba recepción y límites de uso.</td></tr>
+<tr><td>RAK LoRa APRS</td><td><a href="/settings/bricohams/aprs">APRS</a></td><td>Revisa estado y registro. Indicativo, passcode, puerto serie y región se configuran en el env del kit; consulta manual 35. Reinicia solo tras guardar y verifica paquetes.</td></tr>
+<tr><td>ADS-B / RadarBox / AIS / mapa local</td><td><a href="/settings">Settings</a></td><td>Configura serial SDR, feeds y AIS en el env; consulta manuales 04 y 40. Comprueba mapa y recepción antes de habilitar envíos externos.</td></tr>
+<tr><td>map.flights (feed y plugin)</td><td><a href="/settings/bricohams/mapflights">map.flights</a></td><td>Registra estación en <a href="https://map.flights/es/stations/build">map.flights</a>, guarda identificadores solo en la estación y revisa diagnóstico. Conserva el feed RadarBox.</td></tr>
+<tr><td>Meteo / sensores / Pico I/O / ventilación</td><td><a href="/settings/bricohams/clima">Clima</a></td><td>Selecciona fuente y revisa lecturas. Cableado, GPIO, puertos y ventiladores: env/manuales 06, 07 y 09; verifica valores plausibles antes de automatizar.</td></tr>
+<tr><td>Cámara</td><td>Consola</td><td>Configura fuente y credenciales mediante env/secretos, instala paso camara y comprueba imagen sin hacer pública la URL con contraseña.</td></tr>
+<tr><td>Satélites / agendas / grabación</td><td><a href="/settings/bricohams/satelites">Satélites</a></td><td>Revisa estación, agenda, filtros y capturas; guarda y comprueba próximo pase y espacio disponible. FT2 es experimental; consulta su manual antes de transmitir.</td></tr>
+<tr><td>Web / HTTPS / API / privacidad / idioma / logo</td><td><a href="/settings">Settings</a></td><td>Configura dominio HTTPS, identidad y datos de contacto en el kit; respalda antes de aplicar web/configuracion. Comprueba HTTPS, políticas y ausencia de secretos públicos.</td></tr>
+<tr><td>Visitas / Telegram / chat / registro oyentes</td><td><a href="/settings">Settings</a></td><td>Crea bot con <a href="https://t.me/BotFather">BotFather oficial</a> → /newbot; guarda su token solo en el campo secreto/asistente previsto. Obtén chat_id con la herramienta del kit, prueba aviso y revisa consentimiento y retención del registro.</td></tr>
+<tr><td>TAK</td><td><a href="/settings/bricohams/tak">TAK</a></td><td>Comprueba servicios y acceso, cambia credenciales iniciales mediante el panel, configura cliente y certificados y valida posición en el mapa. No publiques paquetes de enrolamiento.</td></tr>
+<tr><td>Monitorización / Grafana</td><td><a href="/settings/bricohams/monitorizacion">Monitorización</a></td><td>Comprueba servicios, abre Grafana desde este panel, revisa CPU, temperatura, RAM y disco; no expongas exporters ni bases de datos.</td></tr>
+<tr><td>Seguridad / usuarios / Google</td><td><a href="/settings/bricohams/seguridad#acceso">Seguridad</a></td><td>Mantén administrador de recuperación; configura acceso con la guía anterior, prueba desde otra sesión y aplica restricciones progresivamente.</td></tr>
+<tr><td>Copias / copia externa / limpieza</td><td><a href="/settings/bricohams/seguridad#backup-remoto">Backup</a></td><td>Elige destino, genera credenciales según protocolo, prueba y verifica. Conserva una copia externa y no borres logs durante investigación.</td></tr>
+<tr><td>Hardware / diseños / documentación</td><td>Consola y documentación del kit</td><td>Consulta COMPONENTES, HARDWARE_Y_GPIO y manuales de laboratorio antes de conectar; no tienen formulario web de configuración.</td></tr>
+</tbody></table>
+<h2 id="validacion">Validación y recuperación</h2>
+<ol><li>Antes de cambiar: copia verificada, ruta anotada y procedimiento de restauración.</li>
+<li>Cambia un módulo cada vez. Guarda y revisa su estado, journal del servicio y resultado funcional.</li>
+<li>No consideres guardado = conectado: prueba el login en ventana privada o copia/verificación en el destino.</li>
+<li>Si pierdes acceso Google: por SSH ejecuta bricohams-google-auth configurar --kit-env RUTA --desactivar
+y después aplicar --kit-env RUTA con sudo. No desactives el usuario local de recuperación.</li></ol>
+<p>Documentación ampliada en el kit: docs/manuales/47_CONFIGURACION_MODULOS.md, manual 46 (Google),
+manual 34 (seguridad) y docs/DESARROLLO_MODULOS.md.</p>
+</div></div></div></body></html>"""
+
 # acciones que acepta cada página; la de Meshtastic no puede tocar TAK, monitorización ni seguridad
 ACCIONES = {APRS: re.compile(r'^reiniciarrak$'), TAK: re.compile(r'^tak-'), MONITOR: re.compile(r'^mon-'),
             SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-|mesh-|sat-|wx-)'),
@@ -2491,7 +2639,12 @@ class Manejador(http.server.BaseHTTPRequestHandler):
         return self._enviar(200, self._pagina(ruta, s).encode('utf-8'))
 
     def _pagina(self, ruta, s, aviso='', error='', mostrar=False):
-        return con_tema(self._pagina_cruda(ruta, s, aviso, error, mostrar))
+        if parse_qs(urlsplit(self.path).query).get('ayuda') == ['1'] and self.command in ('GET', 'HEAD'):
+            return con_tema(pagina_ayuda(ruta))
+        cuerpo = self._pagina_cruda(ruta, s, aviso, error, mostrar)
+        ayuda = ('<p class="m-3"><a class="btn btn-outline-primary" href="%s?ayuda=1">'
+                 'Configuración paso a paso y enlaces directos de los módulos</a></p>') % ruta
+        return con_tema(cuerpo.replace('<body>', '<body>' + ayuda, 1))
 
     def _pagina_cruda(self, ruta, s, aviso='', error='', mostrar=False):
         if ruta == TAK:

@@ -247,6 +247,10 @@ class Rclone:
                     raise Fallo('falta el drive_id de OneDrive')
                 sec = {'type': 'onedrive', 'token': token, 'drive_id': self.c['drive_id'],
                        'drive_type': self.c.get('drive_type') or 'personal'}
+            if self.c.get('oauth_client_id'):
+                sec['client_id'] = self.c['oauth_client_id']
+                if self.s.get('oauth_client_secret'):
+                    sec['client_secret'] = self.s['oauth_client_secret']
             # rclone renueva el token y lo guarda en el propio fichero: solo se
             # reescribe cuando el administrador pega uno nuevo
             huella = hashlib.sha256(json.dumps(sec, sort_keys=True).encode()).hexdigest()

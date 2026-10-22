@@ -157,6 +157,19 @@ try:
     assert st == 302 and h['Location'] == BASE
     st, h, pag = pide('GET', BASE, cab=COOKIE)
     assert st == 200 and 'Viejo 433' in pag and 'Meshtastic' in pag
+    assert BASE + '?ayuda=1' in pag
+    for ruta in M.PAGINAS:
+        st, h, guia = pide('GET', ruta + '?ayuda=1', cab=COOKIE)
+        assert st == 200 and 'Configuración de los módulos' in guia
+        assert h['Cache-Control'] == 'no-store' and "script-src 'none'" in h['Content-Security-Policy']
+        for ancla in ('google', 'entra', 'backup-remoto', 'modulos', 'validacion'):
+            assert 'id="%s"' % ancla in guia
+        assert 'Entra ID no está implementado' in guia
+        assert 'https://console.cloud.google.com/auth/clients' in guia
+        assert 'drive_id' in guia and 'rclone config file' in guia
+        assert 'ClaveSecretaPSK123456' not in guia
+        assert pide('GET', ruta + '?ayuda=1')[0] == 302, 'la guía exige sesión'
+    assert pide('HEAD', BASE + '?ayuda=1', cab=COOKIE)[2] == ''
     assert 'no-store' in h['Cache-Control'] and "frame-ancestors 'self'" in h['Content-Security-Policy']
     for secreto in ('ClaveSecretaPSK123456', urls['MESH433_CHANNEL_URL'].split('#')[1][:20],
                     urls['MESH_CHANNEL_URL'].split('#')[1][:20], '12345"'):
@@ -504,6 +517,28 @@ try:
         assert 'alert-danger' not in pag and 'SECRETO' not in pag and 'RefrescoSecreto' not in pag
         assert json.loads(json.load(open(M.BR_SECRETO, encoding='utf-8'))['token'])['refresh_token'] == '1//RefrescoSecreto'
         assert json.load(open(M.BR_CONF, encoding='utf-8'))['ruta'] == 'bricohams-backup'
+        st, _, pag = seg(accion='seg-guardar', protocolo='onedrive', token=tokj, drive_id='b!AbC-123_x',
+                         oauth_client_id='11111111-2222-3333-4444-555555555555',
+                         oauth_client_secret='SecretoOAuthDePrueba')
+        assert 'alert-danger' not in pag and 'SecretoOAuthDePrueba' not in pag
+        assert json.load(open(M.BR_SECRETO, encoding='utf-8'))['oauth_client_secret'] == 'SecretoOAuthDePrueba'
+        assert 'oauth_client_secret' not in json.load(open(M.BR_CONF, encoding='utf-8'))
+        st, _, pag = seg(accion='seg-guardar', protocolo='onedrive', drive_id='b!AbC-123_x',
+                         oauth_client_id='11111111-2222-3333-4444-555555555555')
+        assert 'alert-danger' not in pag
+        assert json.load(open(M.BR_SECRETO, encoding='utf-8'))['oauth_client_secret'] == 'SecretoOAuthDePrueba'
+        st, _, pag = seg(accion='seg-guardar', protocolo='onedrive', drive_id='b!AbC-123_x',
+                         oauth_client_id='otro-cliente')
+        assert 'token nuevo' in pag
+        for campos in ({'oauth_client_secret': 'x\n[otra]'}, {'oauth_client_secret': 'x' * 513}):
+            try:
+                M.br_secretos(campos, 'onedrive', {'token': tokj})
+                raise AssertionError('acepta secreto OAuth inválido')
+            except ValueError:
+                pass
+        st, _, pag = seg(accion='seg-guardar', protocolo='onedrive', drive_id='b!AbC-123_x', token=tokj)
+        assert 'alert-danger' not in pag
+        assert 'oauth_client_secret' not in json.load(open(M.BR_SECRETO, encoding='utf-8'))
         with open(M.BR_ESTADO, 'w', encoding='utf-8') as f:
             json.dump({'copiar': {'fecha': '2025-01-01 04:30', 'ok': False, 'mensaje': 'token: abc123 <b>x</b>'},
                        'ultima_copia': 'bricohams-<i>.tar.gz', 'ultimo_tamano': 3 * 1024 * 1024}, f)

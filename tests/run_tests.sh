@@ -14,6 +14,7 @@ for f in files/htdocs/plugins/receiver/{idioma,marca,consentimiento,solar,meteo,
 done
 node --check files/share/bricohams-ctcss/bricohams-ctcss.js
 echo "== pruebas"
+python3 tests/test_backup_oauth.py
 bash tests/test_backup_limpieza.sh
 python3 tests/test_wx_bme280.py
 python3 tests/test_render_settings.py

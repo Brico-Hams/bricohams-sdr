@@ -1,5 +1,8 @@
 # Módulos creados y su desarrollo
 
+[Configuración paso a paso de todos los módulos, URLs directas y credenciales](manuales/47_CONFIGURACION_MODULOS.md).
+La misma guía está dentro de cada panel privado mediante «Configuración paso a paso».
+
 [English version](en/MODULE_DEVELOPMENT.md) · [Guía visual de instalación](GUIA_VISUAL_MODULOS.md) ·
 [Catálogo técnico](COMPONENTES.md) · [Decisiones (ADR)](ARQUITECTURA.md) · [Historial](../CHANGELOG.md)
 
