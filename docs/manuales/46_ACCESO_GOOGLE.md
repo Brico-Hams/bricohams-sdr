@@ -131,7 +131,7 @@ Así se vuelve a «solo usuarios locales». Si tampoco recuerdas la contraseña 
 
 ## 7. Despliegue en una estación ya instalada
 
-`tools/actualizar-google-auth.sh` (o `scripts-despliegue/Desplegar-GoogleAuth.ps1` desde Windows):
+`tools/actualizar-google-auth.sh`:
 copia de seguridad verificada (`BACKUP_VERIFICADO=…` y `RESTAURAR.sh`), instalación de la pasarela y
 del panel, unidad de aplicar, `nginx -t` y comprobaciones. Si algo falla, restaura solo. **No activa
 Google**: se elige después en el panel.

@@ -6,7 +6,6 @@ import importlib.util
 import json
 import os
 import stat
-import sqlite3
 import subprocess
 import sys
 import tempfile

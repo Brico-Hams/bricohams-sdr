@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Presupuesto de potencia de la estación con los SDR futuros.
 
 Consumos NOMINALES (verifícalos con la hoja de datos de tu unidad). Carril 12 V = bus de la caja de

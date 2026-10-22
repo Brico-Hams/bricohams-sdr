@@ -1,4 +1,4 @@
-import itertools, json, math
+import itertools
 import quad_2m70 as q
 lam2, lam7 = 299.79/145, 299.79/436
 def score(ev, z0):

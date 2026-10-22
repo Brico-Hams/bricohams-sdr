@@ -356,7 +356,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - `bricohams-wx` hace las medias APRS: viento de 1 min, dirección vectorial de 2 min, racha de 5 min y lluvia en 1 h, 24 h y desde medianoche.
   - Alternativa: `bricohams-lilygo wxstation` graba el firmware de CA2RXU.
 - **Por qué:**
-  - El usuario pidió **las dos**.
+  - Requisito: soportar **ambas** opciones.
   - En la Pi aprovecha el BME280 y la conexión que ya hay.
   - El LilyGO sirve para una estación aislada o de respaldo, y usa los mismos sensores que el proyecto de CA2RXU.
 - **Implica:**

@@ -149,7 +149,7 @@ def png():
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle, Polygon, Circle
+    from matplotlib.patches import Rectangle
     fig, ax = plt.subplots(figsize=(11, 11))
     ax.set_aspect('equal'); ax.set_xlim(-2.1, 2.6); ax.set_ylim(-2.1, 3.75); ax.axis('off')
     ax.add_patch(Rectangle((-0.02, -1.0), 0.04, 1.0 + L_MASTIL, color='#78909c'))

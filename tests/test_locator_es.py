@@ -9,7 +9,6 @@
   · bricohams-locator (info, meteo, marcadores) y la zona en install.sh (coordenadas que mandan,
     locator desde coordenadas, LOCATOR_METEO, avisos)."""
 import json
-import math
 import os
 import random
 import re
