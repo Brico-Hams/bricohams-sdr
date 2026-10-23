@@ -42,6 +42,31 @@ curl -skI https://127.0.0.1/ | grep -i strict-transport
 
 ## 2. Mapa en vivo con recepción propia
 
+### Conservación del endurecimiento desplegado
+
+En servidores migrados, `/etc/bricohams/web-data.env` y los drop-ins
+`zz-web-data.conf` dirigen los productores a `/var/lib/bricohams/web/`.
+Los directorios de código de meteo, visitas y satélites pertenecen a root; los
+JSON/ICS públicos son enlaces a los datos, conservando las URL anteriores.
+La cámara y su montaje de capturas no forman parte de esta migración.
+
+El paso de plugins conserva propietarios y permisos existentes, excluye todos
+los datos publicados y comprueba los enlaces de la migración. Si está instalado
+el snippet `bricohams-static-seguro.conf`, actualiza también las copias protegidas
+de JavaScript. El paso web conserva ese include y añade HSTS a cada bloque de
+tar1090 que declara sus propias cabeceras, solo con `SSL_MODO="todo"`.
+Estas medidas conservan una migración existente; no migran automáticamente
+servidores antiguos. Antes de migrar o actualizar, verificar backup y restauración.
+
+Las redirecciones públicas usan el dominio configurado, no el Host enviado por el
+cliente. HSTS no incluye subdominios.
+
+El instalador de TAK desactiva la caché de nginx y publica `Cache-Control:
+no-store` en las cinco rutas proxy hacia su API, incluidos errores y OAuth.
+Es una mitigación de exposición por caché, no una actualización de Flask.
+Las versiones fijadas por OpenTAKServer deben actualizarse con una combinación
+compatible y probada; `pip check` no certifica ausencia de vulnerabilidades.
+
 El plugin de mapa `bricohams_live.js` añade capas a `/map` de OpenWebRX+:
 
 - **ADS-B local**: readsb/tar1090 de la estación (`/bricohams/api/aviones`), incluidos los

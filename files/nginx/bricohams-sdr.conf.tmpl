@@ -31,9 +31,9 @@ server {
     location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
 #@ADMIN@    # páginas de administración (rutas de OpenWebRX+ con AuthorizationMixin): siempre HTTPS
 #@ADMIN@    location ~ ^/(login|logout|pwchange|settings|imageupload|clients|services|ban|unban|broadcast|files/delete)(/|$) {
-#@ADMIN@        return 301 https://$host$request_uri;
+#@ADMIN@        return 301 https://__DOMINIO__$request_uri;
 #@ADMIN@    }
-#@TODO@    location / { return 301 https://$host$request_uri; }
+#@TODO@    location / { return 301 https://__DOMINIO__$request_uri; }
 #@HTTP@    include /etc/nginx/snippets/bricohams-sdr-rutas.conf;
 }
 

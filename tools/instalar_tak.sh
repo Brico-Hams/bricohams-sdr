@@ -294,6 +294,11 @@ server {
     location /Marti { return 404; }
     location /api {
         proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Robots-Tag noindex always;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -301,6 +306,11 @@ server {
     }
     location /socket.io {
         proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Robots-Tag noindex always;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -326,6 +336,11 @@ server {
     location /Marti/api/tls { return 404; }
     location / {
         proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Robots-Tag noindex always;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -343,6 +358,11 @@ server {
     deny all;
     location /Marti/api/tls {
         proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Robots-Tag noindex always;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -350,6 +370,11 @@ server {
     }
     location /oauth {
         proxy_pass http://127.0.0.1:8081;
+        proxy_cache off;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Robots-Tag noindex always;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto https;

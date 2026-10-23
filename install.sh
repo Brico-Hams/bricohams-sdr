@@ -224,7 +224,10 @@ owrx_owner() {
         # v4.3 · OpenWebRX+ corre como root DENTRO del contenedor (lee todo); en la Pi las carpetas son
         # del usuario «openwebrx» del sistema para que los servicios del host (meteo, cámara, visitas…)
         # escriban en plugins/ igual que en la instalación nativa.
-        chown -R openwebrx:openwebrx "$OWRX_DATA" "$HTDOCS/plugins"
+        chown -R openwebrx:openwebrx "$OWRX_DATA"
+        if [ ! -f "$ETC_BH/web-data.env" ]; then
+            chown -R openwebrx:openwebrx "$HTDOCS/plugins"
+        fi
     else
         chown -R openwebrx:openwebrx "$OWRX_DATA"
     fi
@@ -1040,7 +1043,9 @@ paso_plugins() {
         guardar=(--exclude 'receiver/init.js')       # v4.2: el init.js del perfil importado manda
         aviso "Perfil importado: conservo su plugins/receiver/init.js (los plugins de BricoHams quedan copiados, pero sin cargar)"
     fi
-    rsync -a --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
+    rsync -a --no-perms --no-owner --no-group \
+        --exclude 'meteo/sensor.json' --exclude 'meteo/caja.json' \
+        --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
         --exclude 'meteo/wx-red.json' --exclude 'meteo/wspr.json' --exclude 'satelites/grabaciones.json' --exclude 'satelites/pases.ics' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     local callsign_gate=no tone_detector=no callsign_anuncio=no p
@@ -1066,7 +1071,23 @@ paso_plugins() {
         -e "s#__CALLSIGN_ANUNCIO__#${callsign_anuncio}#" -e "s#__SSL_MODO__#${SSL_MODO:-todo}#" -e "s#__SSL_DOMAIN__#${SSL_DOMAIN:-}#g" \
         -e "s#__OPERADOR__#$(sed_esc "${CALLSIGN:-N0CALL}")#g" -e "s#__QTH__#$(sed_esc "${STATION_QTH:-}")#g" \
         -e "s#__FUENTES__#$(fuentes_url)#g" "$R/init.js"
-    if [ "${OWRX_BACKEND:-native}" = docker ]; then
+    if [ -f "$ETC_BH/web-data.env" ]; then
+        local carpeta dato
+        for carpeta in meteo visitas satelites; do
+            chown root:root "$R/$carpeta"; chmod 755 "$R/$carpeta"
+            chown root:root "$R/$carpeta/$carpeta.js"; chmod 644 "$R/$carpeta/$carpeta.js"
+            if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
+                install -o root -g root -m 644 "$R/$carpeta/$carpeta.js" "/usr/local/share/bricohams-static/$carpeta.js"
+            fi
+        done
+        for dato in meteo/{meteo,sensor,wx-red,wspr,caja}.json visitas/visitas.json satelites/{pases.json,grabaciones.json,pases.ics}; do
+            [ "$(readlink "$R/$dato")" = "/var/lib/bricohams/web/$dato" ] \
+                || fallo "Separación de datos dañada: $R/$dato"
+        done
+        if [ ! -d "$R/camara/snap" ]; then
+            install -d -o openwebrx -g openwebrx "$R/camara/snap"
+        fi
+    elif [ "${OWRX_BACKEND:-native}" = docker ]; then
         mkdir -p "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
         owrx_owner
     else
@@ -2537,12 +2558,19 @@ paso_web() {
             sed -e '/^#@GF@/d' "$FILES/nginx/bricohams-sdr-rutas.conf" >/etc/nginx/snippets/bricohams-sdr-rutas.conf
         fi
         chmod 644 /etc/nginx/snippets/bricohams-sdr-rutas.conf
+        if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
+            printf '\ninclude /etc/nginx/snippets/bricohams-static-seguro.conf;\n' >>/etc/nginx/snippets/bricohams-sdr-rutas.conf
+        fi
         # v5.0 · tar1090 servido por nginx (ADS-B local) sin depender de lighttpd
         if [ -f /usr/local/share/tar1090/nginx-tar1090.conf ]; then
             install -m 644 /usr/local/share/tar1090/nginx-tar1090.conf /etc/nginx/snippets/bricohams-tar1090.conf
         else
             printf 'location /tar1090/ {\n    proxy_pass http://127.0.0.1:8504/tar1090/;\n    proxy_set_header Host $host;\n}\n' >/etc/nginx/snippets/bricohams-tar1090.conf
             chmod 644 /etc/nginx/snippets/bricohams-tar1090.conf
+        fi
+        if [ "$modo" = todo ]; then
+            python3 "$FILES/bin/bricohams-nginx-hsts.py" /etc/nginx/snippets/bricohams-tar1090.conf \
+                || fallo "No se ha podido conservar HSTS en tar1090"
         fi
         nginx_sitio "$modo" "${dom:-$(hostname)}" "$1" "$2" <"$FILES/nginx/bricohams-sdr.conf.tmpl" >/etc/nginx/sites-available/bricohams-sdr
         ln -sf /etc/nginx/sites-available/bricohams-sdr /etc/nginx/sites-enabled/bricohams-sdr

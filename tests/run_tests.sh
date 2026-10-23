@@ -44,6 +44,7 @@ python3 tests/test_anclajes.py
 python3 tests/test_actualizar.py
 python3 tests/test_env_red.py
 python3 tests/test_ssl_admin.py
+python3 tests/test_seguridad_web.py
 python3 tests/test_login_rate.py
 python3 tests/test_blindaje.py
 python3 tests/test_audio_plugins.py
