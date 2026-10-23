@@ -120,6 +120,9 @@ assert '-N 8100 IP_BIND 127.0.0.1' in instalador and 'aiscatcher-install -p --no
 assert 'envl AIS_ENABLE "${AIS_ENABLE:-no}"' in instalador
 assert "fetch('bricohams/api/barcos'" in live_js and "'AIS local (AIS-catcher)'" in live_js
 assert 'if (response.status === 404) return false;' in live_js, 'sin AIS instalado el mapa deja de preguntar'
+assert "u.mode !== 'APRS' && u.mode !== 'AIS'" in live_js, 'la capa complementaria admite APRS y AIS'
+assert 'marker.bindTooltip(markerLabel).addTo(aprsLayer)' in live_js, 'posiciones APRS/AIS visibles desde el primer reporte'
+assert "a.category === 'A7'" in live_js and '&#128641;' in live_js, 'helicópteros ADS-B con icono propio'
 assert 'function tercerosAceptados()' in live_js, 'las fotos de aviones esperan al consentimiento'
 assert "'/bricohams/api/barcos'" in api_py
 

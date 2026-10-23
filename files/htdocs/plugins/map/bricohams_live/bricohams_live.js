@@ -21,6 +21,7 @@
             t.points = t.points.filter(p => now - p.time <= TTL);
             if (!t.points.length) {
                 aprsLayer.removeLayer(t.line);
+                aprsLayer.removeLayer(t.marker);
                 tracks.delete(id);
             } else {
                 t.line.setLatLngs(t.points.map(p => p.pos));
@@ -34,24 +35,40 @@
         items.forEach(function (u) {
             const p = u.location;
             const ts = u.lastseen;
-            if (u.mode !== 'APRS' || !p || p.type !== 'latlon' ||
+            if ((u.mode !== 'APRS' && u.mode !== 'AIS') || !p || p.type !== 'latlon' ||
                 !position(p.lat, p.lon) || typeof u.callsign !== 'string' ||
                 !Number.isFinite(ts) || ts > now + 5000 || now - ts > TTL) return;
-            let t = tracks.get(u.callsign);
+            const id = u.mode + ':' + u.callsign;
+            let t = tracks.get(id);
             if (!t) {
                 if (tracks.size >= MAX_STATIONS) {
                     const oldest = tracks.keys().next().value;
-                    aprsLayer.removeLayer(tracks.get(oldest).line);
+                    const old = tracks.get(oldest);
+                    aprsLayer.removeLayer(old.line);
+                    aprsLayer.removeLayer(old.marker);
                     tracks.delete(oldest);
                 }
-                const label = document.createElement('span');
-                label.textContent = u.callsign + ' - trayectoria APRS';
-                t = {points: [], line: L.polyline([], {color: '#e87524', weight: 3}).bindTooltip(label)};
+                const markerLabel = document.createElement('span');
+                markerLabel.textContent = u.callsign + ' (' + u.mode + ')';
+                const lineLabel = document.createElement('span');
+                lineLabel.textContent = markerLabel.textContent;
+                const color = u.mode === 'AIS' ? '#1769aa' : '#e87524';
+                const marker = u.mode === 'AIS'
+                    ? L.marker([p.lat, p.lon], {
+                        icon: L.divIcon({className: 'bricohams-ais-target', html: '&#128674;', iconSize: [22, 22]})
+                    })
+                    : L.circleMarker([p.lat, p.lon], {
+                        color: color, fillColor: color, fillOpacity: 0.9, radius: 6, weight: 2
+                    });
+                marker.bindTooltip(markerLabel).addTo(aprsLayer);
+                t = {points: [], marker: marker,
+                    line: L.polyline([], {color: color, weight: 3}).bindTooltip(lineLabel)};
                 t.line.addTo(aprsLayer);
-                tracks.set(u.callsign, t);
+                tracks.set(id, t);
             }
             const prev = t.points[t.points.length - 1];
             if (prev && ts <= prev.time) return;
+            t.marker.setLatLng([p.lat, p.lon]);
             if (prev && prev.pos[0] === p.lat && prev.pos[1] === p.lon) {
                 prev.time = ts;
                 return;
@@ -273,17 +290,26 @@
                     !Number.isFinite(a.timestamp) || Date.now() - a.timestamp > 75000) return;
                 seen.add(a.hex);
                 let marker = aircraft.get(a.hex);
+                const flight = typeof a.flight === 'string' ? a.flight.trim() : '';
+                const helicopter = a.category === 'A7';
+                const iconHtml = helicopter ? '&#128641;' : '&#9992;';
+                const iconClass = helicopter ? 'bricohams-helicopter' : 'bricohams-aircraft';
+                const label = document.createElement('span');
+                label.textContent = (flight || a.hex) + ' (' + a.hex + ')' +
+                    (helicopter ? ' · Helicóptero' : '');
                 if (!marker) {
                     marker = L.marker([a.lat, a.lon], {
-                        icon: L.divIcon({className: 'bricohams-aircraft', html: '&#9992;', iconSize: [24, 24]})
+                        icon: L.divIcon({className: iconClass, html: iconHtml, iconSize: [24, 24]})
                     }).addTo(aircraftLayer);
-                    aircraft.set(a.hex, marker);
+                } else if (marker.bhHelicopter !== helicopter) {
+                    marker.setIcon(L.divIcon({
+                        className: iconClass, html: iconHtml, iconSize: [24, 24]
+                    }));
                 }
+                aircraft.set(a.hex, marker);
+                marker.bhHelicopter = helicopter;
                 marker.setLatLng([a.lat, a.lon]);
                 if (marker.bhRuta) fichaAvion(marker.bhHex, marker.bhFlight).then(function (f) { dibujarRuta(marker, f); });
-                const flight = typeof a.flight === 'string' ? a.flight.trim() : '';
-                const label = document.createElement('span');
-                label.textContent = (flight || a.hex) + ' (' + a.hex + ')';
                 marker.unbindTooltip().bindTooltip(label);
                 if (!marker.bhPopup) {
                     marker.bhPopup = document.createElement('div');
@@ -463,7 +489,7 @@
         aprsLayer = L.layerGroup().addTo(map);
         aircraftLayer = L.layerGroup().addTo(map);
         layerControl.addOverlay(aircraftLayer, 'ADS-B local (readsb)');
-        layerControl.addOverlay(aprsLayer, 'Trayectorias APRS (2 h desde apertura)');
+        layerControl.addOverlay(aprsLayer, 'Posiciones y trayectorias APRS/AIS (2 h)');
         const control = L.control({position: 'bottomright'});
         control.onAdd = function () {
             status = L.DomUtil.create('div', 'leaflet-control bricohams-live-status');
@@ -501,7 +527,7 @@
         if (mapManager && mapManager.mman) {
             updates(Object.keys(mapManager.mman.markers).map(function (id) {
                 const m = mapManager.mman.markers[id];
-                const p = m.mode === 'APRS' ? m.getPos() : [];
+                const p = m.mode === 'APRS' || m.mode === 'AIS' ? m.getPos() : [];
                 return {callsign: id, mode: m.mode, lastseen: m.lastseen,
                     location: {type: 'latlon', lat: p[0], lon: p[1]}};
             }));

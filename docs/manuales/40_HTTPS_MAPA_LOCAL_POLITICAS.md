@@ -44,8 +44,10 @@ curl -skI https://127.0.0.1/ | grep -i strict-transport
 
 El plugin de mapa `bricohams_live.js` añade capas a `/map` de OpenWebRX+:
 
-- **ADS-B local**: readsb/tar1090 de la estación (`/bricohams/api/aviones`), con ficha
-  map.flights (foto solo con consentimiento de terceros).
+- **ADS-B local**: readsb/tar1090 de la estación (`/bricohams/api/aviones`), incluidos los
+  helicópteros ADS-B (categoría A7), con ficha map.flights (foto solo con consentimiento de terceros).
+- **APRS y AIS de OpenWebRX+**: posiciones visibles desde el primer reporte y trayectorias
+  durante dos horas; AIS se dibuja con icono de barco.
 - **AIS local** (nuevo): AIS-catcher con un SDR propio en 162 MHz. La capa
   «AIS local (AIS-catcher)» solo aparece si `/bricohams/api/barcos` responde 200; con
   `AIS_ENABLE="no"` responde 404 y el mapa deja de consultarla.

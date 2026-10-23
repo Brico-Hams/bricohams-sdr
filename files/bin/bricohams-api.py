@@ -66,6 +66,9 @@ def aviones(ruta=ADSB_JSON, ahora=None):
             continue
         r = {'hex': hexid, 'lat': lat, 'lon': lon, 'timestamp': (generado - edad) * 1000,
              'flight': str(a.get('flight') or hexid).strip()[:32]}
+        category = a.get('category')
+        if isinstance(category, str) and re.fullmatch(r'[A-Z][0-9]', category.upper()):
+            r['category'] = category.upper()
         for k in ('alt_baro', 'gs', 'track'):
             v = a.get(k)
             if isinstance(v, (float, int)) and math.isfinite(v):

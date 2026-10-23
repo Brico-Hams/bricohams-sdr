@@ -24,17 +24,21 @@ rak = load('rak', 'bricohams-rak-aprs')
 with tempfile.TemporaryDirectory() as t:
     p = os.path.join(t, 'aircraft.json')
     records = [
-        {'hex': 'abcdef', 'flight': '<script>', 'lat': 38, 'lon': -1, 'seen_pos': 1, 'alt_baro': 12000},
+        {'hex': 'abcdef', 'flight': '<script>', 'lat': 38, 'lon': -1, 'seen_pos': 1, 'alt_baro': 12000,
+         'category': 'A7'},
         {'hex': '123456', 'lat': 38, 'lon': -1, 'seen_pos': 61},
         {'hex': '123457', 'lat': float('nan'), 'lon': -1, 'seen_pos': 1},
         {'hex': '123458', 'lat': 91, 'lon': -1, 'seen_pos': 1},
         {'hex': '123459'},
         {'hex': 'bad-id', 'lat': 38, 'lon': -1, 'seen_pos': 1},
+        {'hex': '123460', 'lat': 38, 'lon': -1, 'seen_pos': 1, 'category': '<script>'},
     ]
     with open(p, 'w') as f:
         json.dump({'now': 1000, 'aircraft': records}, f)
     d = api.aviones(p, ahora=1005)
-    assert len(d['aircraft']) == 1 and d['aircraft'][0]['timestamp'] == 999000
+    assert len(d['aircraft']) == 2 and d['aircraft'][0]['timestamp'] == 999000
+    assert d['aircraft'][0]['category'] == 'A7'
+    assert 'category' not in d['aircraft'][1]
     assert 'alt_baro' in d['aircraft'][0] and 'receiver' not in d
     for now in (1016, 990):
         try:
