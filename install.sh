@@ -49,6 +49,8 @@
 #       opciones de --actualizar: --sin-git  --sin-apt  --todo (repite todos los pasos)
 #    sudo bash install.sh --exportar [fichero]     # v4.2: perfil de este OpenWebRX+ (owrx-clone)
 #    sudo bash install.sh --importar perfil.owrx.tar.gz   # v4.2: instala y aplica un perfil
+#    sudo bash install.sh --modulo satelites      # solo satélites y agenda de pases sobre un
+#                                                 # OpenWebRX+ nativo ya instalado (manual 26)
 #  Se puede repetir sin miedo: cada paso deja el sistema igual.
 #  Registro: /var/log/bricohams-install.log
 # =====================================================================
@@ -66,6 +68,7 @@ CMDLINE=/boot/firmware/cmdline.txt
 PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb ais meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
 BACKUP=""
 SOLO=""
+MODULO=""                       # --modulo satelites: solo ese módulo sobre un OpenWebRX+ existente
 REINICIAR=0
 ARGS=("$@")                     # para volver a lanzarse si --actualizar trae un install.sh nuevo
 ACTUALIZAR=0; SIMULAR=0; TODO=0; SIN_GIT=0; SIN_APT=0; CONTINUAR=0; OWRX_CAMBIO=0
@@ -87,6 +90,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --backup) BACKUP="$2"; shift 2 ;;
         --solo)   SOLO="$2"; shift 2 ;;
+        --modulo) [ -n "${2:-}" ] || fallo "--modulo necesita el nombre del módulo (satelites)"
+                  MODULO="$2"; shift 2 ;;
         --lista)  printf '%s\n' "${PASOS[@]}"; exit 0 ;;
         --actualizar) ACTUALIZAR=1; shift ;;
         --simular)    SIMULAR=1; shift ;;
@@ -106,6 +111,11 @@ done
 { [ "$SIMULAR" -eq 0 ] && [ "$TODO" -eq 0 ] && [ "$SIN_GIT" -eq 0 ] && [ "$SIN_APT" -eq 0 ]; } || [ "$ACTUALIZAR" -eq 1 ] \
     || fallo "--simular, --todo, --sin-git y --sin-apt van con --actualizar"
 [ "$ACTUALIZAR" -eq 0 ] || [ -z "$BACKUP$SOLO$IMPORTAR" ] || fallo "--actualizar no se combina con --backup, --solo ni --importar"
+if [ -n "$MODULO" ]; then
+    [ "$MODULO" = satelites ] || fallo "Módulo desconocido: $MODULO (disponible: satelites)"
+    [ "$ACTUALIZAR" -eq 0 ] && [ -z "$BACKUP$SOLO$IMPORTAR$EXPORTAR" ] \
+        || fallo "--modulo no se combina con --actualizar, --backup, --solo, --importar ni --exportar"
+fi
 [ -z "$IMPORTAR" ] || [ -r "$IMPORTAR" ] || fallo "No puedo leer el perfil $IMPORTAR"
 [ "$(id -u)" -eq 0 ] || fallo "Ejecútalo con sudo: sudo bash $0"
 # Si el kit se copió por Windows, un móvil, un pendrive FAT o un unzip que no guarda
@@ -2890,7 +2900,72 @@ EOF
     bien "cuenta de servicio «bricohams» + /etc/cron.d/bricohams (copia, actualización, reinicio, salud, resumen, GeoIP)"
 }
 
+# Añade a init.js la carga de doppler y satelites entre marcas propias; el resto del fichero no se toca.
+init_js_satelites() {
+    local f="$HTDOCS/plugins/receiver/init.js" tag=bricohams-satelites tmp
+    tmp=$(mktemp)
+    [ -f "$f" ] && awk -v b="// >>> $tag" -v e="// <<< $tag" 'index($0,b)==1{s=1;next} index($0,e)==1{s=0;next} !s' "$f" >"$tmp"
+    if grep -q "'satelites'" "$tmp"; then      # init.js completo de BricoHams: ya carga los dos plugins
+        rm -f "$tmp"; bien "init.js ya carga doppler y satelites"; return 0
+    fi
+    [ -f "$f" ] && cp "$f" "$f.antes-$(date +%Y%m%d-%H%M%S)"
+    {
+        cat "$tmp"
+        cat <<'EOF'
+// >>> bricohams-satelites · añadido por «install.sh --modulo satelites»; se regenera al repetirlo
+(async () => {
+    const rp = 'https://0xaf.github.io/openwebrxplus-plugins/receiver';
+    for (let i = 0; i < 50 && !(Plugins.utils && Plugins.utils.on_ready); i++) await new Promise(r => setTimeout(r, 200));
+    if (!(Plugins.utils && Plugins.utils.on_ready)) await Plugins.load(rp + '/utils/utils.js');
+    await new Promise(resolve => Plugins.utils.on_ready(resolve));
+    for (const name of ['doppler', 'satelites']) {
+        try { await Plugins.load(name); } catch (e) { console.warn(name, e); }
+    }
+})();
+// <<< bricohams-satelites
+EOF
+    } >"$f"
+    rm -f "$tmp"
+    chmod 644 "$f"
+    bien "init.js: carga doppler y satelites (copia previa init.js.antes-*)"
+}
+
+# --modulo satelites: pases, aviso y botón PASES, Doppler, grabaciones, calendario ICS y archivo
+# de Files sobre un OpenWebRX+ nativo que ya funciona. No toca receptores, perfiles ni otros plugins.
+modulo_satelites() {
+    PASO_ACTUAL=satelites
+    [ "${OWRX_BACKEND:-native}" = native ] || fallo "El módulo de satélites necesita OpenWebRX+ nativo (OWRX_BACKEND=native)"
+    [ -d "$HTDOCS/plugins/receiver" ] && id openwebrx >/dev/null 2>&1 \
+        || fallo "No encuentro OpenWebRX+ nativo ($HTDOCS y usuario openwebrx). Instálalo antes o usa la instalación completa"
+    coords_ok || fallo "Pon STATION_LAT y STATION_LON (o STATION_LOCATOR) en bricohams.env: sin QTH no hay pases"
+    if [ -z "${STATION_ASL:-}" ]; then aviso "Sin STATION_ASL: uso 0 m de altitud"; STATION_ASL=0; fi
+    esperar_red
+    apt_update
+    apt_i jq curl
+    local R="$HTDOCS/plugins/receiver"
+    install -d "$R/doppler"
+    cp -r "$FILES/htdocs/plugins/receiver/doppler/." "$R/doppler/"
+    install -D -m 644 "$FILES/htdocs/plugins/receiver/satelites/satelites.js" "$R/satelites/satelites.js"
+    bien "plugins doppler y satelites copiados en $R"
+    init_js_satelites
+    paso_satelites
+    estado_guardar satelites
+    echo
+    info "Módulo de satélites instalado."
+    cat <<EOF
+
+  Comprueba:  systemctl status bricohams-satpass.timer bricohams-satrec --no-pager
+              sudo -u openwebrx bricohams-satrec --plan
+  Web:        recarga el receptor: franja del próximo pase y botón «PASES» con ▶ Escuchar
+  Calendario: /static/plugins/receiver/satelites/pases.ics
+  Agenda:     SATREC_MIN_EL, SATREC_EXCLUIR, SATREC_METEOR, SATREC_ENABLE y AMSAT_REPORT en
+              bricohams.env; repite «sudo bash install.sh --modulo satelites» tras cambiarlas.
+EOF
+}
+
 # ---------------------------------------------------------------------
+if [ "$MODULO" = satelites ]; then modulo_satelites; exit 0; fi
+
 if [ "$ACTUALIZAR" -eq 1 ]; then
     if [ "$SIN_GIT" -eq 0 ] && [ "$CONTINUAR" -eq 0 ]; then info "Kit"; kit_git; fi
     arreglar_kit

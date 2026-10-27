@@ -1,5 +1,13 @@
 # Historial
 
+## Sin publicar · 2026-10-27
+
+- `install.sh --modulo satelites`: instala solo los pases de satélites, el aviso y el botón
+  PASES con Doppler, la grabación de pases, el calendario ICS y el archivo de Files sobre un
+  OpenWebRX+ nativo ya instalado. En `init.js` solo añade un bloque marcado e idempotente.
+  La opción rechaza combinaciones con otras opciones. Manual 26, apartado 4 bis.
+  Prueba en `test_modulo_satelites.py`.
+
 ## Sin publicar · 2026-10-22
 
 - OpenWebRX+: «Usage policy URL» apunta a la política propia `/bricohams/politicas.html`,

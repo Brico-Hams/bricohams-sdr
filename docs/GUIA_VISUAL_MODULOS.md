@@ -556,6 +556,9 @@ una prueba. Para cambios de hardware vuelve a intervenir sin tensión.
 sudo bash install.sh --solo satelites,ft2
 ```
 
+En otro equipo con OpenWebRX+ nativo, solo satélites y su agenda (sin el resto del kit):
+`sudo bash install.sh --modulo satelites` ([manual 26, apartado 4 bis](manuales/26_SATELITES.md)).
+
 **Configuración.** [Plantilla comentada](../bricohams.env.example).
 Variables referenciadas por estos pasos y sus ayudantes indicados (inventario estático, sin
 valores privados; las herramientas llamadas pueden leer otras variables):

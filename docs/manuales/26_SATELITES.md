@@ -78,6 +78,32 @@ ls -l /usr/local/lib/satdump                 # enlace a /usr/lib/satdump
 ```
 - **En la web:** pulsa **PASES** y después ▶ en un pase en curso. La frecuencia del receptor debe moverse sola unos pocos kHz durante el pase.
 
+## 4 bis. Instalar solo este módulo en otro OpenWebRX+
+Para una Pi que ya tiene **OpenWebRX+ nativo** funcionando y no quiere el resto del kit:
+
+```bash
+cp bricohams.env.example bricohams.env   # rellena CALLSIGN y STATION_LAT/LON/ASL (o STATION_LOCATOR)
+sudo bash install.sh --modulo satelites
+```
+
+- **Instala:** el cálculo de pases cada 15 min, la franja de aviso y el botón **PASES** con
+  ▶ Escuchar y Doppler, la grabación de pases en **Files**, el calendario
+  `/static/plugins/receiver/satelites/pases.ics`, el archivo permanente de Files y SatDump
+  si `SATDUMP_ENABLE="yes"`.
+- **No toca:** receptores, perfiles, marcadores, otros plugins, nginx ni el panel de
+  administración. En `plugins/receiver/init.js` solo añade, entre las marcas
+  `// >>> bricohams-satelites` y `// <<< bricohams-satelites`, la carga de los plugins
+  `doppler` y `satelites`, y guarda antes una copia `init.js.antes-*`. Si el `init.js` es el
+  completo de BricoHams, no lo cambia.
+- **Agenda:** se ajusta en `bricohams.env` con `SATREC_ENABLE`, `SATREC_MIN_EL`,
+  `SATREC_EXCLUIR`, `SATREC_METEOR`, `SATREC_DIAS`, `SATREC_MAX_MB` y `AMSAT_REPORT`, y se
+  aplica repitiendo la orden. La página «Satélites y agendas de captura» de `/settings` forma
+  parte del panel de administración y requiere la instalación completa.
+- **▶ Escuchar** cambia a los perfiles `sat|…` solo si existen en ese receptor; si no, sintoniza
+  en el perfil actual y activa el Doppler.
+- **Requisitos:** OpenWebRX+ nativo (`OWRX_BACKEND=native`, no Docker), usuario `openwebrx` y
+  QTH en `bricohams.env`. Si falta algo, el instalador se detiene sin cambiar nada.
+
 ## 5. Grabación automática, calendario e informe AMSAT (v5.0)
 Los pases de más de 20° se graban solos en MP3 y salen en **Files** y en la página «Clima en red» (`/bricohams/clima.html`), con su calendario `.ics` y el borrador del informe para AMSAT: [manual 42](42_CLIMA_RED_SATELITES_GRABACION.md).
 

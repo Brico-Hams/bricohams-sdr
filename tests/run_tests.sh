@@ -30,6 +30,7 @@ python3 tests/test_instalador_docker.py
 python3 tests/test_pico_io.py
 python3 tests/test_satpass.py
 python3 tests/test_satpass_fuentes.py
+python3 tests/test_modulo_satelites.py
 python3 tests/test_visitas.py
 python3 tests/test_api.py
 python3 tests/test_registro_oyentes.py
