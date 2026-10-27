@@ -1,8 +1,8 @@
 # BricoHams SDR · estación de ejemplo
 
-**Versión coordinada: v5.4.2 · 2026-10-22.** [VERSION](VERSION) es la fuente
+**Versión coordinada: v5.4.3 · 2026-10-27.** [VERSION](VERSION) es la fuente
 del número de publicación. Público y privado comparten versión, fecha y etiqueta
-Git `v5.4.2`, pero no hashes ni historial: solo se exporta código anonimizado.
+Git `v5.4.3`, pero no hashes ni historial: solo se exporta código anonimizado.
 Toda publicación futura debe actualizar VERSION, el historial y la etiqueta en ambos.
 
 **Configurar cada módulo:** [paso a paso, URLs y credenciales](docs/manuales/47_CONFIGURACION_MODULOS.md).
@@ -43,7 +43,7 @@ calibración, perfiles personalizados, capturas oficiales, pruebas de aceptació
 y mantenimiento preventivo. Las tapas grandes caben sin brim, pero **no con
 un brim exterior de 5 mm**; revisar la huella final antes de imprimir.
 
-Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.2**):
+Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de BricoHams en una Raspberry Pi 5 con **Raspberry Pi OS Lite 64-bit, Trixie o Bookworm** (**v5.4.3**):
 
 - OpenWebRX+ con 3 receptores (y un 4.º SDRplay preparado).
 - ADS-B para AirNav RadarBox con MLAT y, opcionalmente, también para map.flights.
