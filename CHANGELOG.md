@@ -2,6 +2,10 @@
 
 ## Sin publicar · 2026-10-28
 
+- `bricohams-satrec`: antes de pedir el perfil comprueba que OpenWebRX+ ofrece ese receptor. Si el SDR
+  de satélites no está (desconectado, sobrecorriente USB), registra «receptor … no disponible» y no envía
+  `selectprofile`, que en OpenWebRX+ 1.2.x provocaba un `KeyError` y dejaba un websocket colgado
+  escribiendo miles de avisos por hora. Los servidores que no envían la lista reciben la petición a los 5 s.
 - `bricohams-check`: la antigüedad de `pases`, `grabaciones.json`, `wx-red.json` y `meteo.json` se mide
   en el dato y no en el enlace simbólico (`stat -L`). Con los datos web separados en
   `/var/lib/bricohams/web` daba «viejo o ausente» aunque estuvieran al día.

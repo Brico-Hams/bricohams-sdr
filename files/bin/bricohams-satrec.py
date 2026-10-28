@@ -331,6 +331,9 @@ def clave_magica(cfg):
         return None
 
 
+ESPERA_PERFILES = 5
+
+
 def conectar(cfg, perfil, timeout=20):
     """Conecta, elige el perfil y espera la configuración del receptor. Devuelve (ws, config)."""
     ws = WS(cfg['owrx'])
@@ -338,14 +341,29 @@ def conectar(cfg, perfil, timeout=20):
     conf, pedido = {}, False
     limite = time.monotonic() + timeout
     confirmado = False
+    espera = None       # plazo para la lista de perfiles; servidores sin ella reciben la petición igualmente
+
+    def pedir():
+        m = {'profile': perfil}
+        k = clave_magica(cfg)
+        if k:
+            m['key'] = k
+        ws.json({'type': 'selectprofile', 'params': m})
+        # OpenWebRX+ procesa el ping después de todos los cambios síncronos del perfil.
+        ws.enviar(b'', 9)
     try:
         ws.s.settimeout(timeout)
         ws.enviar('SERVER DE CLIENT client=bricohams-satrec type=receiver')
         while time.monotonic() < limite:
-            ws.s.settimeout(max(0.001, limite - time.monotonic()))
+            hasta = limite if pedido or espera is None else min(limite, espera)
+            ws.s.settimeout(max(0.001, hasta - time.monotonic()))
             try:
                 op, d = ws.recibir()
             except socket.timeout:
+                if not pedido and espera is not None and time.monotonic() >= espera:
+                    pedir()
+                    pedido = True
+                    continue
                 break
             if op == 10 and pedido:
                 confirmado = True
@@ -353,20 +371,22 @@ def conectar(cfg, perfil, timeout=20):
                 txt = d.decode('utf-8', 'replace')
                 if txt.startswith('CLIENT DE SERVER'):
                     ws.json({'type': 'connectionproperties', 'params': {'output_rate': TASA, 'hd_output_rate': 48000}})
-                    m = {'profile': perfil}
-                    k = clave_magica(cfg)
-                    if k:
-                        m['key'] = k
-                    ws.json({'type': 'selectprofile', 'params': m})
-                    # OpenWebRX+ procesa el ping después de todos los cambios síncronos del perfil.
-                    ws.enviar(b'', 9)
-                    pedido = True
+                    espera = time.monotonic() + ESPERA_PERFILES
                     continue
                 try:
                     j = json.loads(txt)
                 except ValueError:
                     continue
-                if j.get('type') == 'config':
+                if j.get('type') == 'profiles' and not pedido:
+                    # Pedir un receptor ausente (SDR caído, sobrecorriente USB) rompe OpenWebRX+ 1.2.x
+                    # (KeyError en isLocked) y deja un websocket colgado: se comprueba antes.
+                    ofrecidos = {x.get('id') for x in j.get('value') or [] if isinstance(x, dict)}
+                    if perfil not in ofrecidos:
+                        raise ConnectionError('receptor %s no disponible en OpenWebRX+ (¿SDR desconectado o sobrecorriente USB?)'
+                                              % perfil)
+                    pedir()
+                    pedido = True
+                elif j.get('type') == 'config':
                     conf.update(j.get('value') or {})
                 elif j.get('type') == 'log_message' and 'locked' in str(j.get('value', '')).lower():
                     raise PermissionError('perfil %s bloqueado: pon la clave en %s' % (perfil, cfg['clave_fichero']))

@@ -47,9 +47,12 @@ class PerfilWS:
 
     def recibir(self):
         try:
-            return next(self.frames)
+            f = next(self.frames)
         except StopIteration:
             raise socket.timeout()
+        if f == 'timeout':
+            raise socket.timeout()
+        return f
 
     def cerrar(self):
         self.cerrado = True
@@ -58,15 +61,17 @@ class PerfilWS:
 real_ws = sr.WS
 try:
     saludo = (1, b'CLIENT DE SERVER server=openwebrx')
+    lista = (1, json.dumps({'type': 'profiles', 'value': [{'id': 'sat|sat2m', 'name': '2 m'}, {'id': 'sat|otro', 'name': 'otro'},
+                                                         {'id': 'ham|2m', 'name': 'ham'}]}).encode())
     viejo = config_frame(sdr_id='sat', profile_id='meteor', center_freq=137500000, samp_rate=2048000)
     nuevo = config_frame(sdr_id='sat', profile_id='sat2m', samp_rate=2048000)
     frecuencia = config_frame(center_freq=145900000)
     for frames in (
-        [saludo, viejo, nuevo, frecuencia, (10, b'')],
-        [saludo, viejo, frecuencia, nuevo, (10, b'')],
-        [saludo, config_frame(sdr_id='sat', profile_id='sat2m', center_freq=145900000,
-                             samp_rate=2048000), (10, b'')],
-        [saludo, viejo, config_frame(sdr_id='sat', profile_id='otro'), (10, b'')],
+        [saludo, lista, viejo, nuevo, frecuencia, (10, b'')],
+        [saludo, viejo, lista, frecuencia, nuevo, (10, b'')],
+        [saludo, lista, config_frame(sdr_id='sat', profile_id='sat2m', center_freq=145900000,
+                                    samp_rate=2048000), (10, b'')],
+        [saludo, lista, viejo, config_frame(sdr_id='sat', profile_id='otro'), (10, b'')],
     ):
         falso_perfil = PerfilWS(frames)
         sr.WS = lambda url: falso_perfil
@@ -75,7 +80,24 @@ try:
         esperado = 137500000 if perfil == 'sat|otro' else 145900000
         assert conf['center_freq'] == esperado and not ws.cerrado
         assert ws.enviados[-1] == (9, b'')
-    falso_perfil = PerfilWS([saludo, viejo, nuevo, frecuencia])
+    # receptor sat ausente (SDR caído): error claro y sin selectprofile, que rompe OpenWebRX+ 1.2.x
+    falso_perfil = PerfilWS([saludo, viejo, lista])
+    sr.WS = lambda url: falso_perfil
+    try:
+        sr.conectar({'owrx': 'no-red', 'clave_fichero': ''}, 'sat|sat70')
+        raise AssertionError('No debe pedir un perfil que OpenWebRX+ no ofrece')
+    except ConnectionError as x:
+        assert 'no disponible' in str(x) and falso_perfil.cerrado
+        assert not [e for e in falso_perfil.enviados if isinstance(e[1], dict) and e[1]['type'] == 'selectprofile']
+    # servidor sin lista de perfiles: se pide igualmente pasado el plazo
+    espera_orig, sr.ESPERA_PERFILES = sr.ESPERA_PERFILES, 0
+    falso_perfil = PerfilWS([saludo, 'timeout', config_frame(sdr_id='sat', profile_id='sat2m', center_freq=145900000,
+                                                             samp_rate=2048000), (10, b'')])
+    sr.WS = lambda url: falso_perfil
+    ws, conf = sr.conectar({'owrx': 'no-red', 'clave_fichero': ''}, 'sat|sat2m')
+    assert conf['center_freq'] == 145900000 and ws.enviados[-1] == (9, b'')
+    sr.ESPERA_PERFILES = espera_orig
+    falso_perfil = PerfilWS([saludo, lista, viejo, nuevo, frecuencia])
     sr.WS = lambda url: falso_perfil
     try:
         sr.conectar({'owrx': 'no-red', 'clave_fichero': ''}, 'sat|sat2m')
@@ -260,6 +282,7 @@ class FalsoOWRX(threading.Thread):
                 if t.startswith('SERVER DE CLIENT'):
                     self.enviar(c, b'CLIENT DE SERVER server=openwebrx version=falso', 1)
                     self.enviar(c, json.dumps({'type': 'config', 'value': {'sdr_id': 'ham', 'profile_id': '2m', 'center_freq': 145e6}}).encode(), 1)
+                    self.enviar(c, json.dumps({'type': 'profiles', 'value': [{'id': i} for i in ('ham|2m', 'sat|sat2m', 'sat|sat70')]}).encode(), 1)
                     self.enviar(c, b'\x01' + bytes(100), 2)                   # FFT: se ignora
                     continue
                 j = json.loads(t)
