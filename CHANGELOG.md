@@ -2,6 +2,8 @@
 
 ## Sin publicar · 2026-10-28
 
+- MARMOTSat (CO-128, UVic CfAR) en la lista de satélites: NORAD 69912 (SatNOGS 98272), 145,875 MHz NFM en
+  `sat|sat2m`. Avisos, PASES, grabación y rotor; el digipeater FSK AX.100 modo 5 se graba pero no se decodifica.
 - Nuevo `bricohams-rotor` (opcional, `ROTOR_ENABLE`): apunta el rotor AZ/EL PortableSatLite a los pases que
   graba `bricohams-satrec` (preposición 2 min antes del AOS, az/el SGP4 cada 2 s por la Wi-Fi de casa con
   clave), deja fuera los METEOR y aparca fuera de pase o con racha ≥ `ROTOR_VIENTO_MAX_KMH` (histéresis del

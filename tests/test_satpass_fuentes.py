@@ -16,10 +16,11 @@ catalogo = json.loads((root / 'data/satelites.json').read_text(encoding='utf-8')
 por_nombre = {s['nombre']: s for s in catalogo}
 for nombre, norad, mhz in (('RS-44', 44909, 435.640), ('FO-29', 24278, 435.850),
                            ('SO-50', 27607, 436.795), ('ISS', 25544, 145.800),
-                           ('Replicator-2', 69927, 400.500), ('SAKHACUBE-CHOLBON', 67290, 437.350)):
+                           ('Replicator-2', 69927, 400.500), ('SAKHACUBE-CHOLBON', 67290, 437.350),
+                           ('MARMOTSat', 69912, 145.875)):
     assert por_nombre[nombre]['norad'] == norad and por_nombre[nombre]['mhz'] == mhz
 template = json.loads((root / 'files/openwebrx/settings.json.tmpl').read_text(encoding='utf-8'))
-for nombre in ('RS-44', 'FO-29', 'SO-50', 'ISS', 'Replicator-2', 'SAKHACUBE-CHOLBON'):
+for nombre in ('RS-44', 'FO-29', 'SO-50', 'ISS', 'Replicator-2', 'SAKHACUBE-CHOLBON', 'MARMOTSat'):
     sat = por_nombre[nombre]
     receptor, perfil = sat['perfil'].split('|')
     cfg = template['sdrs'][receptor]['profiles'][perfil]
@@ -41,4 +42,4 @@ with tempfile.TemporaryDirectory() as tmp, patch.object(sp.urllib.request, 'urlo
     solicitudes.clear()
     assert sp.descargar_omm([25544], cache) == datos and not solicitudes
     assert not sp.descargar_omm([12345], str(Path(tmp) / 'otro.json'), satnogs_ids={12345: 99999})
-print('OK: seis satelites, perfiles con margen Doppler, fallback validado y cache.')
+print('OK: siete satelites, perfiles con margen Doppler, fallback validado y cache.')

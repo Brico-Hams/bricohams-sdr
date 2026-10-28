@@ -49,6 +49,7 @@
   | SAKHACUBE-CHOLBON (RS18S) | 67290 | 437,350 | NFM (telemetría/SSTV en eventos) | sat70 |
   | TO-108 | 44881 | 145,925 | USB | sat2m |
   | IO-117 GreenCube | 53106 | 435,310 | USB | sat70 |
+  | MARMOTSat (CO-128) | 69912 | 145,875 | NFM (digipeater FSK 1200 AX.100 modo 5 y CW) | sat2m |
   | METEOR-M2-3 | 57166 | 137,900 | NFM / LRPT | meteor |
   | METEOR-M2-4 | 59051 | 137,900 | NFM / LRPT | meteor |
 
@@ -58,6 +59,10 @@
   identifica provisionalmente como 98267, pero sus TLE siguen el NORAD 69927;
   `satnogs_id` conserva esa correspondencia sin confundir las órbitas.
   El perfil `sat400` evita intentar recibir 400,500 MHz dentro de la ventana de 70 cm.
+  MARMOTSat (UVic CfAR) se sigue con el NORAD 69912 de CelesTrak; SatNOGS lo lista como 98272.
+  Su digipeater es FSK 1200 con tramas AX.100 modo 5 (como GreenCube), no AFSK AX.25: el
+  decodificador «packet» de OpenWebRX+ no lo lee y aquí solo se graba el audio. Sus emisiones
+  de HF (29,410 MHz) y de 436,125 MHz no caen en los perfiles de satélites.
   Grabar audio FM no equivale a decodificar GFSK/GMSK. FO-29 depende del horario
   del operador; que exista un pase no garantiza actividad. No se asignan códigos
   AMSAT no verificados a las nuevas entradas.
