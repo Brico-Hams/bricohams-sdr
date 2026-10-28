@@ -557,7 +557,7 @@ sudo bash install.sh --solo satelites,ft2
 ```
 
 En otro equipo con OpenWebRX+ nativo, solo satélites y su agenda (sin el resto del kit):
-`sudo bash install.sh --modulo satelites` ([manual 26, apartado 4 bis](manuales/26_SATELITES.md)).
+`sudo bash install.sh --modulo satelites` ([manual 48: instalar y configurar solo este módulo](manuales/48_MODULO_SATELITES.md)).
 
 **Configuración.** [Plantilla comentada](../bricohams.env.example).
 Variables referenciadas por estos pasos y sus ayudantes indicados (inventario estático, sin
@@ -587,7 +587,7 @@ del módulo. Un estado `inactive` en un periférico desactivado es esperable;
 `failed` exige revisar el journal. No borres configuraciones para hacer que pase
 una prueba. Para cambios de hardware vuelve a intervenir sin tensión.
 
-**Procedimiento detallado:** [26_SATELITES](manuales/26_SATELITES.md) · [28_FT2](manuales/28_FT2.md) · [42_CLIMA_RED_SATELITES_GRABACION](manuales/42_CLIMA_RED_SATELITES_GRABACION.md).
+**Procedimiento detallado:** [26_SATELITES](manuales/26_SATELITES.md) · [28_FT2](manuales/28_FT2.md) · [42_CLIMA_RED_SATELITES_GRABACION](manuales/42_CLIMA_RED_SATELITES_GRABACION.md) · [48_MODULO_SATELITES](manuales/48_MODULO_SATELITES.md).
 
 <a id="web"></a>
 
@@ -925,6 +925,7 @@ El manual 37 explica cambios históricos, no añade un paso de instalación.
 | [25_TAREAS_AUTOMATICAS](manuales/25_TAREAS_AUTOMATICAS.md) | [Tareas, backups, limpieza, actualización y clonado](#mantenimiento) |
 | [26_SATELITES](manuales/26_SATELITES.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
 | [42_CLIMA_RED_SATELITES_GRABACION](manuales/42_CLIMA_RED_SATELITES_GRABACION.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
+| [48_MODULO_SATELITES](manuales/48_MODULO_SATELITES.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
 | [27_PLUGINS_WEB_V4](manuales/27_PLUGINS_WEB_V4.md) | [Plugins, registro de oyentes, CTCSS y RepeaterBook](#plugins) |
 | [28_FT2](manuales/28_FT2.md) | [Satélites, Doppler y FT2 experimental](#satelites) |
 | [29_ACTUALIZAR](manuales/29_ACTUALIZAR.md) | [Tareas, backups, limpieza, actualización y clonado](#mantenimiento) |

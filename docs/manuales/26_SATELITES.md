@@ -79,6 +79,8 @@ ls -l /usr/local/lib/satdump                 # enlace a /usr/lib/satdump
 - **En la web:** pulsa **PASES** y después ▶ en un pase en curso. La frecuencia del receptor debe moverse sola unos pocos kHz durante el pase.
 
 ## 4 bis. Instalar solo este módulo en otro OpenWebRX+
+> Guía completa solo de instalación y configuración: [manual 48](48_MODULO_SATELITES.md).
+
 Para una Pi que ya tiene **OpenWebRX+ nativo** funcionando y no quiere el resto del kit:
 
 ```bash

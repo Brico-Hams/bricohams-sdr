@@ -6,6 +6,7 @@ Git `v5.4.3`, pero no hashes ni historial: solo se exporta código anonimizado.
 Toda publicación futura debe actualizar VERSION, el historial y la etiqueta en ambos.
 
 **Configurar cada módulo:** [paso a paso, URLs y credenciales](docs/manuales/47_CONFIGURACION_MODULOS.md).
+**Módulo de satélites** (próximos pases, ▶ con Doppler, grabación): [instalar y configurar solo este módulo](docs/manuales/48_MODULO_SATELITES.md).
 También dentro de cada panel privado, botón «Configuración paso a paso».
 Google, compatibilidad Entra ID y tokens de backup Drive/OneDrive, SMB/NFS/SFTP.
 

@@ -1,5 +1,12 @@
 # Historial
 
+## Sin publicar · 2026-10-28
+
+- Manual 48: instalar y configurar solo el módulo de satélites (panel «Próximos pases», ▶ con
+  Doppler, grabación y SatDump): cómo reconocerlo, las dos formas de instalarlo, variables de
+  `bricohams.env`, formato de `data/satelites.json`, comprobaciones y problemas habituales.
+  Enlazado desde el README, la guía visual de módulos y el manual 26.
+
 ## v5.4.3 · 2026-10-27
 
 - `install.sh --modulo satelites`: instala solo los pases de satélites, el aviso y el botón
