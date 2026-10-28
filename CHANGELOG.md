@@ -2,6 +2,9 @@
 
 ## Sin publicar · 2026-10-28
 
+- `bricohams-check`: la antigüedad de `pases`, `grabaciones.json`, `wx-red.json` y `meteo.json` se mide
+  en el dato y no en el enlace simbólico (`stat -L`). Con los datos web separados en
+  `/var/lib/bricohams/web` daba «viejo o ausente» aunque estuvieran al día.
 - Manual 48: instalar y configurar solo el módulo de satélites (panel «Próximos pases», ▶ con
   Doppler, grabación y SatDump): cómo reconocerlo, las dos formas de instalarlo, variables de
   `bricohams.env`, formato de `data/satelites.json`, comprobaciones y problemas habituales.

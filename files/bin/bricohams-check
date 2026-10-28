@@ -51,7 +51,8 @@ servicio_hw() {
     if ! systemctl is-active --quiet "$2" && pendiente "$1"; then aviso "servicio $2 parado · en camino (HARDWARE_PENDIENTE)"
     else servicio "$2"; fi
 }
-edad() { local f=$1; [ -e "$f" ] || { echo 999999; return; }; echo $(( $(date +%s) - $(stat -c %Y "$f") )); }
+# -L: the web data files are symlinks into /var/lib/bricohams/web; age is that of the data, not of the link.
+edad() { local f=$1; [ -e "$f" ] || { echo 999999; return; }; echo $(( $(date +%s) - $(stat -Lc %Y "$f") )); }
 
 [ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
 
