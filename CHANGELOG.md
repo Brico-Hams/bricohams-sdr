@@ -2,6 +2,10 @@
 
 ## Sin publicar · 2026-10-28
 
+- Nuevo `bricohams-rotor` (opcional, `ROTOR_ENABLE`): apunta el rotor AZ/EL PortableSatLite a los pases que
+  graba `bricohams-satrec` (preposición 2 min antes del AOS, az/el SGP4 cada 2 s por la Wi-Fi de casa con
+  clave), deja fuera los METEOR y aparca fuera de pase o con racha ≥ `ROTOR_VIENTO_MAX_KMH` (histéresis del
+  80 %; aparca también si `meteo.json` tiene más de 3 h). Manual 49 y `tests/test_rotor.py`.
 - `bricohams-satrec`: antes de pedir el perfil comprueba que OpenWebRX+ ofrece ese receptor. Si el SDR
   de satélites no está (desconectado, sobrecorriente USB), registra «receptor … no disponible» y no envía
   `selectprofile`, que en OpenWebRX+ 1.2.x provocaba un `KeyError` y dejaba un websocket colgado

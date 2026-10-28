@@ -2257,6 +2257,37 @@ EOF
     else
         systemctl disable --now bricohams-satrec >/dev/null 2>&1 || true
     fi
+    # v5.5 · rotor AZ/EL PortableSatLite (opcional): sigue los pases que graba satrec (manual 49)
+    install -m 755 "$FILES/bin/bricohams-rotor.py" /usr/local/bin/bricohams-rotor
+    cat >/etc/systemd/system/bricohams-rotor.service <<EOF
+[Unit]
+Description=BricoHams: apunta el rotor AZ/EL a los pases que graba bricohams-satrec
+After=network-online.target bricohams-satrec.service
+Wants=network-online.target
+
+[Service]
+User=openwebrx
+Environment="STATION_LAT=${STATION_LAT}" "STATION_LON=${STATION_LON}" "STATION_ASL=${STATION_ASL}"
+Environment="SAT_LIST=/opt/bricohams/kit/data/satelites.json" "SATPASS_PY=/usr/local/bin/bricohams-satpass" "SATREC_PY=/usr/local/bin/bricohams-satrec"
+Environment="SATREC_MIN_EL=${SATREC_MIN_EL:-20}" "SATREC_EXCLUIR=${SATREC_EXCLUIR:-}" "SATREC_METEOR=${SATREC_METEOR:-yes}"
+Environment="ROTOR_URL=${ROTOR_URL:-}" "ROTOR_VIENTO_MAX_KMH=${ROTOR_VIENTO_MAX_KMH:-36}"
+Environment="ROTOR_PARQUE_AZ=${ROTOR_PARQUE_AZ:-0}" "ROTOR_PARQUE_EL=${ROTOR_PARQUE_EL:-90}"
+ExecStart=/usr/local/bin/bricohams-rotor
+Restart=always
+RestartSec=60
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    if si "${ROTOR_ENABLE:-no}" && [ -n "${ROTOR_URL:-}" ]; then
+        [ -s /etc/bricohams/rotor.clave ] || aviso "falta /etc/bricohams/rotor.clave (la clave de /api/key del rotor, root:openwebrx 640)"
+        systemctl enable bricohams-rotor >/dev/null 2>&1; systemctl restart bricohams-rotor
+        bien "rotor AZ/EL en ${ROTOR_URL}: sigue los pases grabados y aparca con racha ≥ ${ROTOR_VIENTO_MAX_KMH:-36} km/h"
+    else
+        systemctl disable --now bricohams-rotor >/dev/null 2>&1 || true
+    fi
     if si "${SATDUMP_ENABLE:-yes}" && ! command -v satdump >/dev/null; then
         local url tmp
         url=$("${CURL[@]}" https://api.github.com/repos/SatDump/SatDump/releases/latest 2>/dev/null \

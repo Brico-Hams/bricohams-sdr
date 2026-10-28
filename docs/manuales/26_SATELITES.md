@@ -106,6 +106,9 @@ sudo bash install.sh --modulo satelites
 - **Requisitos:** OpenWebRX+ nativo (`OWRX_BACKEND=native`, no Docker), usuario `openwebrx` y
   QTH en `bricohams.env`. Si falta algo, el instalador se detiene sin cambiar nada.
 
+## 4 ter. Rotor AZ/EL (opcional)
+Con el rotor PortableSatLite, la yagi V/U sigue sola los pases que se graban y aparca con viento: [manual 49](49_ROTOR_AZEL.md).
+
 ## 5. Grabación automática, calendario e informe AMSAT (v5.0)
 Los pases de más de 20° se graban solos en MP3 y salen en **Files** y en la página «Clima en red» (`/bricohams/clima.html`), con su calendario `.ics` y el borrador del informe para AMSAT: [manual 42](42_CLIMA_RED_SATELITES_GRABACION.md).
 

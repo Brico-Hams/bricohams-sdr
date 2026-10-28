@@ -57,6 +57,7 @@ python3 tests/test_rak_aprs.py
 python3 tests/test_wx_red.py
 python3 tests/test_wspr.py
 python3 tests/test_satrec.py
+python3 tests/test_rotor.py
 python3 tests/test_archivo_files.py
 python3 tests/test_clima_web.py
 python3 tests/test_v45_dispositivos.py

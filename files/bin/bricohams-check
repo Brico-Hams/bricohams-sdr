@@ -357,6 +357,10 @@ if [ -e /etc/systemd/system/bricohams-satrec.service ]; then
         command -v lame >/dev/null && bien "lame instalado (MP3 de los pases)" || aviso "sin lame: los pases se quedan en WAV y no salen en Files (sudo apt install lame)"
     else aviso "grabación de pases desactivada (SATREC_ENABLE)"; fi
 fi
+if [ -e /etc/systemd/system/bricohams-rotor.service ] && systemctl is-enabled --quiet bricohams-rotor 2>/dev/null; then
+    servicio bricohams-rotor
+    [ -s /etc/bricohams/rotor.clave ] && bien "clave del rotor presente" || mal "falta /etc/bricohams/rotor.clave (manual 49)"
+fi
 if [ -e /etc/systemd/system/bricohams-wx-red.service ]; then
     if systemctl is-enabled --quiet bricohams-wx-red 2>/dev/null; then
         servicio bricohams-wx-red
