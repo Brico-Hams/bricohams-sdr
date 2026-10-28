@@ -65,6 +65,9 @@ def main(src, dst):
         '__HF_SDRPLAY__': as_bool(env('HF_SDRPLAY', 'no')),
         '__SAT_BIAS_TEE__': as_bool(env('SAT_BIAS_TEE', 'no')),
         '__SDRPLAY_ANTENNA__': env('SDRPLAY_ANTENNA'),
+        '__HF_HERMES__': as_bool(env('HF_HERMES', 'no')),
+        '__HERMES_IP__': env('HERMES_IP'),
+        '__HERMES_GAIN__': int(env('HERMES_GAIN', '20') or 20),
         '__MQTT_ENABLED__': as_bool(env('VISITAS_ENABLE', 'yes')) or as_bool(env('OWRX_MAPA_LORA', 'yes')),   # visitas (v4) y mapa LoRa/Meshtastic (v4.5)
     }
 
@@ -74,7 +77,7 @@ def main(src, dst):
                 v = o[k]
                 if isinstance(v, str) and v in vals:
                     nv = vals[v]
-                    if k == 'antenna' and nv == '':
+                    if k in ('antenna', 'remote') and nv == '':      # remote vacío: el HL2 se busca por difusión
                         del o[k]          # RSP1A/RSP1B: sin selector de antena
                         continue
                     o[k] = nv
@@ -91,10 +94,11 @@ def main(src, dst):
     data = walk(json.load(open(src, encoding='utf-8')))
     # HF: en el V3 (muestreo directo) hasta que llegue el SDRplay; con HF_SDRPLAY=yes pasa al SDRplay
     sdrplay = vals['__HF_SDRPLAY__']
+    hermes = vals['__HF_HERMES__']
     for sdr in data['sdrs'].values():
         for pid in list(sdr.get('profiles', {})):
             prof = sdr['profiles'][pid]
-            if prof.pop('_bh_hf_rtl', False) and sdrplay:
+            if prof.pop('_bh_hf_rtl', False) and (sdrplay or hermes):
                 del sdr['profiles'][pid]
     if not env('RECEIVERBOOK_KEY'):
         data['receiver_keys'] = []
@@ -105,7 +109,7 @@ def main(src, dst):
         json.dump(data, f, indent=4)
     print('settings.json: %d receptores (%d activos), %d perfiles; HF en %s' % (
         len(data['sdrs']), sum(1 for s in data['sdrs'].values() if s.get('enabled', True)),
-        sum(len(s.get('profiles', {})) for s in data['sdrs'].values()), 'SDRplay' if sdrplay else 'RTL-SDR V3'))
+        sum(len(s.get('profiles', {})) for s in data['sdrs'].values()), ' + '.join(n for n, x in (('SDRplay', sdrplay), ('Hermes Lite 2', hermes)) if x) or 'RTL-SDR V3'))
 
 
 if __name__ == '__main__':

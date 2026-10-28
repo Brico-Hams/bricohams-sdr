@@ -23,6 +23,7 @@ assert all(SERIE.get(k) for k in ('SERIAL_HAT', 'SERIAL_MINI', 'SERIAL_V3')), SE
 
 for sdrplay in (False, True):
     d = render(sdrplay)
+    assert d['sdrs']['hl2']['enabled'] is False and 'remote' not in d['sdrs']['hl2']
     s = d['sdrs']
     assert d['receiver_name'].startswith('N0CALL')
     assert d['receiver_location'] == 'Mi QTH, ES'
@@ -47,6 +48,19 @@ for sdrplay in (False, True):
     assert '_bh_hf_rtl' not in json.dumps(d) and '__' not in json.dumps(d)
     print('OK test_render_settings (HF en %s): %d perfiles' % ('SDRplay' if sdrplay else 'V3', sum(len(x['profiles']) for x in s.values())))
 
+# v5.5 · Hermes Lite 2: perfiles de 384 kHz como máximo, sin 6 m, banda de satélites de 10 m y HF fuera del V3
+h = render(False, {'HF_HERMES': 'yes', 'HERMES_IP': '10.0.0.9', 'HERMES_GAIN': '30'})['sdrs']
+hl = h['hl2']
+assert hl['enabled'] is True and hl['type'] == 'hpsdr' and hl['remote'] == '10.0.0.9' and hl['rf_gain'] == 30
+assert not [k for k in h['multi']['profiles'] if k.startswith('hf')], 'la HF del V3 debe quitarse con el HL2'
+for pid, p in hl['profiles'].items():
+    assert p['samp_rate'] in (48000, 96000, 192000, 384000) and p['center_freq'] + p['samp_rate'] / 2 < 38.4e6, pid
+    assert abs(p['start_freq'] - p['center_freq']) < p['samp_rate'] * 0.45, pid
+for pid, banda in (('hl160', '160'), ('hl80', '80'), ('hl60', '60'), ('hl40', '40'), ('hl30', '30'), ('hl20', '20'), ('hl17', '17'), ('hl12', '12')):
+    lo, hi = BANDAS[banda]; c, m = hl['profiles'][pid]['center_freq'], hl['profiles'][pid]['samp_rate'] * 0.46   # 20 m: 350 kHz en 384
+    assert c - m <= lo and c + m >= hi, pid
+assert abs(hl['profiles']['hl10sat']['center_freq'] - 29.41e6) < 0.1e6 and hl['scheduler']['schedule']['day'] in hl['profiles']
+print('OK test_render_settings (Hermes Lite 2): %d perfiles HF de 384 kHz, satélites de 10 m' % len(hl['profiles']))
 assert render(False, {'CALLSIGN': 'EA5ABC', 'APRS_PASSCODE': '12345'})['aprs_igate_enabled'] is True
 locator_settings = render(False, {'STATION_LOCATOR': 'IM98'})
 assert locator_settings['receiver_gps'] == {'lat': 38.5, 'lon': -1.0}

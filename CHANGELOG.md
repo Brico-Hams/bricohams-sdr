@@ -2,6 +2,9 @@
 
 ## Sin publicar · 2026-10-28
 
+- Hermes Lite 2 (`HF_HERMES`, manual 50): receptor HPSDR por Ethernet con perfiles de 384 kHz de 160 a 10 m y
+  «SAT 10m» en 29,4 MHz; quita la HF del V3. `hpsdrconnector` del repositorio o, en trixie, el paquete de bookworm
+  verificado por SHA256. Manual 50 con antenas de HF recomendadas (lazo activo, turnstile de 10 m, EFHW…).
 - MARMOTSat (CO-128, UVic CfAR) en la lista de satélites: NORAD 69912 (SatNOGS 98272), 145,875 MHz NFM en
   `sat|sat2m`. Avisos, PASES, grabación y rotor; el digipeater FSK AX.100 modo 5 se graba pero no se decodifica.
 - Nuevo `bricohams-rotor` (opcional, `ROTOR_ENABLE`): apunta el rotor AZ/EL PortableSatLite a los pases que

@@ -134,6 +134,12 @@ if [ "${HF_SDRPLAY:-no}" = yes ]; then
 else
     aviso "SDRplay aún no instalado: la HF va por el V3 con muestreo directo"
 fi
+if [ "${HF_HERMES:-no}" = yes ]; then
+    command -v hpsdrconnector >/dev/null && bien "hpsdrconnector instalado (Hermes Lite 2)" || mal "HF_HERMES=yes sin hpsdrconnector: sudo bash install.sh --solo openwebrx"
+    if [ -n "${HERMES_IP:-}" ]; then
+        ping -c1 -W2 "$HERMES_IP" >/dev/null 2>&1 && bien "Hermes Lite 2 responde en la red" || mal "Hermes Lite 2 no responde (¿encendido? ¿cable? ¿IP?)"
+    fi
+fi
 systemctl list-unit-files 2>/dev/null | grep -q '^sdrplay' && servicio sdrplay
 
 titulo "HAT HackerGadgets"

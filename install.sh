@@ -865,11 +865,34 @@ paso_openwebrx() {
     apt_update
     apt_i openwebrx
     apt_i soapysdr-module-sdrplay3 || aviso "No pude instalar soapysdr-module-sdrplay3"
+    if si "${HF_HERMES:-no}"; then instalar_hpsdrconnector; fi
     # v4.5 · modos «LoRa APRS» y «Meshtastic» del propio OpenWebRX+ (lorarx de dxlAPRS + librería meshtastic)
     apt_i dxlaprs-lora python3-meshtastic python3-pycryptodome \
         || aviso "No pude instalar dxlaprs-lora/python3-meshtastic: OpenWebRX+ no decodificará LoRa por SDR (el RAK y el LilyGO sí)"
     systemctl enable openwebrx
     bien "OpenWebRX+ $(dpkg-query -W -f='${Version}' openwebrx 2>/dev/null)"
+}
+
+# v5.5 · Hermes Lite 2: hpsdrconnector 0.11.0 (Go, estático). El repositorio de trixie no lo trae.
+instalar_hpsdrconnector() {
+    command -v hpsdrconnector >/dev/null && { bien "hpsdrconnector ya instalado"; return 0; }
+    apt_i hpsdrconnector 2>/dev/null && { bien "hpsdrconnector (repositorio OpenWebRX+)"; return 0; }
+    local arq suma tmp
+    arq=$(dpkg --print-architecture)
+    case "$arq" in
+        arm64) suma=b1b348d84abb855e28f16ef7341354891919f8bb8bec2c4cbf176d0d07d85d6b ;;
+        armhf) suma=3d1c8b0978426f40325e48b6345d302dc2ee5454f63aced1cce896a830b96ba4 ;;
+        amd64) suma=391fbe91185aea8a53c51557c6067bfc37203a5190364c6a219958930a9efa9e ;;
+        *) aviso "hpsdrconnector: arquitectura $arq sin paquete; el Hermes Lite 2 no funcionará"; return 0 ;;
+    esac
+    tmp=$(mktemp -d)
+    if curl -fsSL --retry 3 -o "$tmp/h.deb" "https://luarvique.github.io/ppa/bookworm/$arq/hpsdrconnector_0.11.0_$arq.deb" \
+        && echo "$suma  $tmp/h.deb" | sha256sum -c --quiet - && dpkg -i "$tmp/h.deb" >/dev/null; then
+        bien "hpsdrconnector 0.11.0 (paquete de bookworm verificado por SHA256)"
+    else
+        aviso "No pude instalar hpsdrconnector: el Hermes Lite 2 no funcionará (manual 50)"
+    fi
+    rm -rf "$tmp"
 }
 
 paso_sdrplay() {

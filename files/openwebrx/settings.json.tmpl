@@ -590,6 +590,112 @@
                     "tuning_step": 1000
                 }
             }
+        },
+        "hl2": {
+            "name": "\ud83d\udfe0 HF \u00b7 HERMES LITE 2 \u00b7 160-10 m",
+            "type": "hpsdr",
+            "enabled": "__HF_HERMES__",
+            "services": true,
+            "remote": "__HERMES_IP__",
+            "rf_gain": "__HERMES_GAIN__",
+            "scheduler": {
+                "type": "daylight",
+                "schedule": {
+                    "day": "hl20",
+                    "greyline": "hl40",
+                    "night": "hl80"
+                }
+            },
+            "profiles": {
+                "hl160": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf81,8 MHz ****** HAM 160m \ud83c\udf1c",
+                    "center_freq": 1900000,
+                    "samp_rate": 384000,
+                    "start_freq": 1840000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl80": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf83,5 MHz ***** HAM 80m \ud83c\udf1c",
+                    "center_freq": 3650000,
+                    "samp_rate": 384000,
+                    "start_freq": 3573000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl60": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf85,3 MHz ****** HAM 60m",
+                    "center_freq": 5360000,
+                    "samp_rate": 384000,
+                    "start_freq": 5357000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl40": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf87 MHz ******* HAM 40m",
+                    "center_freq": 7100000,
+                    "samp_rate": 384000,
+                    "start_freq": 7074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl30": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf810 MHz ****** HAM 30m",
+                    "center_freq": 10125000,
+                    "samp_rate": 384000,
+                    "start_freq": 10136000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl20": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf814 MHz ****** HAM 20m",
+                    "center_freq": 14175000,
+                    "samp_rate": 384000,
+                    "start_freq": 14074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl17": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf818 MHz ****** HAM 17m",
+                    "center_freq": 18118000,
+                    "samp_rate": 384000,
+                    "start_freq": 18100000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl15": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf821 MHz ****** HAM 15m (21,0-21,35)",
+                    "center_freq": 21170000,
+                    "samp_rate": 384000,
+                    "start_freq": 21074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl12": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf824 MHz ****** HAM 12m",
+                    "center_freq": 24940000,
+                    "samp_rate": 384000,
+                    "start_freq": 24915000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl10": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf828 MHz ****** HAM 10m (28,0-28,35)",
+                    "center_freq": 28180000,
+                    "samp_rate": 384000,
+                    "start_freq": 28074000,
+                    "start_mod": "ft8",
+                    "tuning_step": 1000
+                },
+                "hl10sat": {
+                    "name": "\ud83d\udfe0 \ud83c\uddea\ud83c\uddf829,4 MHz ** SAT 10m (MARMOTSat 29,410)",
+                    "center_freq": 29400000,
+                    "samp_rate": 384000,
+                    "start_freq": 29410000,
+                    "start_mod": "cw",
+                    "tuning_step": 1000
+                }
+            }
         }
     },
     "squelch_auto_margin": 10,
