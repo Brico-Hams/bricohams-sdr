@@ -1,0 +1,2730 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-mesh-admin · panel de Meshtastic SOLO para el administrador (v4.5)
+#
+#  Vive en https://<estación>/settings/bricohams/meshtastic, dentro de la zona
+#  de administración de OpenWebRX+: nginx lo fuerza a HTTPS (SSL_MODO=admin) y
+#  cada petición se valida con la sesión de OpenWebRX+ (la misma contraseña de
+#  /settings). La web pública NO enseña ni cambia nada de Meshtastic.
+#
+#  Desde aquí se corrige o configura:
+#    - Nodo 433 (LilyGO por USB, /dev/lilygo-mesh): nombre, rol, URL de canales.
+#    - Nodo 868 (HAT, meshtasticd): nombre, rol (MESH868_ROLE), URL de canales.
+#    - Nodo 868 (HAT, meshtasticd 127.0.0.1:4403): nombre, URL de canales y el
+#      canal privado de bricohams.env.
+#    - Qué sale en el mapa de OpenWebRX+ (MESH433_OWRX, MESH868_OWRX, MESH_OWRX_CHAT).
+#    - Lectura del estado real de los nodos y reinicio de los servicios.
+#    - /settings/bricohams/aprs: estado del RAK4631 LoRa APRS, registro de los
+#      paquetes oídos y reinicio de bricohams-rak-aprs (sin enseñar el passcode).
+#    - /settings/bricohams/auth: 204/401 para el auth_request de nginx que
+#      protege el cliente web de Meshtastic en :8443 (MESH_WEB=yes).
+#  Los cambios se guardan en bricohams.env (el del kit y la copia de /etc), así
+#  que un «install.sh --actualizar» no los deshace. Nunca enseña claves (PSK).
+#
+#  Uso: bricohams-mesh-admin servicio        (lo lanza systemd, 127.0.0.1:8076)
+#       bricohams-mesh-admin leer serie|tcp DESTINO   (JSON del nodo, sin claves)
+# =====================================================================
+import hashlib
+import hmac
+import html
+import http.client
+import http.cookies
+import http.server
+import importlib.machinery
+import importlib.util
+import ipaddress
+import json
+import os
+import re
+import secrets
+import socketserver
+import subprocess
+import sys
+import threading
+import time
+import tarfile
+import tempfile
+from urllib.parse import parse_qs, urlsplit
+
+PUERTO = int(os.environ.get('MESH_ADMIN_PORT', '8076'))
+OWRX = os.environ.get('MESH_ADMIN_OWRX', '127.0.0.1:8073')
+ENV_ETC = os.environ.get('BRICOHAMS_ENV', '/etc/bricohams/bricohams.env')
+ENV_KIT = os.environ.get('BRICOHAMS_KIT_ENV', '')
+BASE = '/settings/bricohams/meshtastic'
+APRS = '/settings/bricohams/aprs'
+AUTH = '/settings/bricohams/auth'
+TAK = '/settings/bricohams/tak'
+TAK_POSICIONES = '/settings/bricohams/tak/posiciones'
+MONITOR = '/settings/bricohams/monitorizacion'
+MAPFLIGHTS = '/settings/bricohams/mapflights'
+SEGURIDAD = '/settings/bricohams/seguridad'
+SATELITES = '/settings/bricohams/satelites'
+CLIMA = '/settings/bricohams/clima'
+AGENDA_LOCK = threading.RLock()
+AGENDA_BACKUPS = '/var/backups/bricohams'
+# mensajes Meshtastic: bricohams-mesh-owrx tiene la única conexión a cada nodo; el panel le pide
+# los envíos por su socket Unix (0600) y lee el historial que guarda (chat.json, 0600)
+MESH_CHAT = '/settings/bricohams/meshtastic/chat'
+MESH_RUN = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh')
+REDES_CHAT = (('433', 'mesh433', 'Red 433 MHz · LilyGO T3'), ('868', 'mesh868', 'Red 868 MHz · HAT (meshtasticd)'))
+# backup remoto: mismas rutas que /usr/local/sbin/bricohams-backup-remoto
+BR_CONF = os.environ.get('BACKUP_REMOTO_CONF', '/etc/bricohams/backup-remoto.json')
+BR_SECRETO = os.environ.get('BACKUP_REMOTO_SECRET', '/etc/bricohams/backup-remoto.secret')
+BR_ESTADO = os.path.join(os.environ.get('BACKUP_REMOTO_DIR', '/var/lib/bricohams-backup-remoto'), 'estado.json')
+BR_UNIDAD = 'bricohams-backup-remoto'
+BR_PROTOCOLOS = {'cifs': 'SMB / CIFS (Windows, NAS)', 'nfs': 'NFS', 'sftp': 'SFTP (SSH)',
+                 'gdrive': 'Google Drive', 'onedrive': 'OneDrive'}
+BR_ORDENES = ('probar', 'copiar', 'verificar', 'huella', 'confirmar')
+# bloqueo por IP / país: mismas rutas que /usr/local/sbin/bricohams-bloqueo
+BLOQUEO_CONF = os.environ.get('BRICOHAMS_BLOQUEO_CONF', '/etc/bricohams/bloqueo.json')
+BLOQUEO_VAR = os.environ.get('BRICOHAMS_BLOQUEO_VAR', '/var/lib/bricohams-bloqueo')
+BLOQUEO_UNIDAD = 'bricohams-bloqueo'
+BLOQUEO_MAX_IPS = 500
+BLOQUEO_MAX_PAISES = 60
+BLOQUEO_PROTEGIDAS = tuple(ipaddress.ip_network(r) for r in (
+    '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12',
+    '192.168.0.0/16', '224.0.0.0/3', '::/127', 'fc00::/7', 'fe80::/10', 'ff00::/8'))
+FW_UNIDADES = ('nftables', 'bricohams-cortafuegos', 'fail2ban', 'nginx', 'openwebrx', 'bricohams-bloqueo-arranque',
+               'bricohams-login-aviso')
+USUARIO_OWRX = re.compile(r'^[A-Za-z0-9._-]{1,32}$')
+# acceso de administradores: usuarios locales de OpenWebRX+ y/o Google (bricohams-google-auth)
+GOOGLE_DIR = os.environ.get('BRICOHAMS_GOOGLE_DIR', '/etc/bricohams/google')
+GOOGLE_APLICAR = 'bricohams-google-auth-aplicar.service'
+GOOGLE_AUTH_LOCAL = os.environ.get('BRICOHAMS_GOOGLE_AUTH_URL', 'http://127.0.0.1:8077/_bh_google/auth')
+GOOGLE_MODOS = (('local', 'Solo usuarios locales (base de datos de OpenWebRX+)'),
+                ('alternativa', 'Usuario local o cuenta de Google (cualquiera de los dos)'),
+                ('doble', 'Cuenta de Google y además usuario local (doble factor)'),
+                ('solo_google', 'Solo cuenta de Google'))
+GOOGLE_CLIENT_RE = re.compile(r'^[0-9]{6,30}-[a-z0-9]{10,64}\.apps\.googleusercontent\.com$')
+GOOGLE_SECRETO_RE = re.compile(r'^[A-Za-z0-9_-]{10,200}$')
+GOOGLE_ADMIN_RE = re.compile(r'^(@[a-z0-9-]+(\.[a-z0-9-]+)+|[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)+)$')
+GRAFANA = '/settings/bricohams/grafana/d/bricohams/bricohams?orgId=1&kiosk&refresh=30s'
+# v5.0 · únicas unidades que se pueden tocar desde los paneles TAK y Monitorización
+TAK_UNIDADES = ('postgresql', 'rabbitmq-server', 'bricohams-tak-ssl', 'bricohams-tak-cot', 'bricohams-tak')
+TAK_ACCESO = os.environ.get('TAK_ACCESS_FILE', '/etc/bricohams/tak-access.txt')
+TAK_HOME = '/var/lib/bricohams-tak'
+TAK_PYTHON = '/opt/bricohams-tak/venv312/bin/python'
+USUARIO_TAK = re.compile(r'^[A-Za-z0-9._@-]{1,64}$')
+CLAVE_TAK = re.compile(r'^[\x21-\x7e]{12,128}$')
+MON_UNIDADES = ('prometheus-node-exporter', 'node_exporter', 'openwebrx_exporter', 'prometheus', 'grafana-server')
+# nombres de instalaciones manuales anteriores al kit: solo se listan si existen en el sistema
+UNIDADES_OPCIONALES = frozenset(('node_exporter', 'openwebrx_exporter'))
+RAK_JSON = os.path.join(os.environ.get('RAK_RUN_DIR', '/run/bricohams-rak'), 'rak-aprs.json')
+SERVICIO_MAPA = 'bricohams-mesh-owrx'
+SERVICIO_RAK = 'bricohams-rak-aprs'
+SECRETO = secrets.token_bytes(32)
+ROLES = ('CLIENT', 'CLIENT_MUTE', 'CLIENT_HIDDEN', 'CLIENT_BASE', 'ROUTER', 'ROUTER_LATE',
+         'TRACKER', 'SENSOR', 'TAK', 'TAK_TRACKER', 'LOST_AND_FOUND')
+URL_RE = re.compile(r'^https://meshtastic\.org/e/#[A-Za-z0-9_-]{4,2000}$')
+PROHIBIDOS = re.compile(r'[\'"\\$`\r\n\x00-\x1f]')
+
+NODOS = {
+    '433': {'titulo': 'Nodo 433 · LilyGO T3 (USB)', 'region': 'EU_433', 'url': 'MESH433_CHANNEL_URL',
+            'largo': 'MESH433_LONG_NAME', 'corto': 'MESH433_SHORT_NAME', 'rol': 'MESH433_ROLE',
+            'def_largo': 'SDR BricoHams 433', 'def_corto': 'SB43', 'mapa': 'MESH433_OWRX'},
+    '868': {'titulo': 'Nodo 868 · HAT (meshtasticd)', 'region': 'EU_868', 'url': 'MESH_CHANNEL_URL',
+            'largo': 'MESH_LONG_NAME', 'corto': 'MESH_SHORT_NAME', 'rol': 'MESH868_ROLE',
+            'def_largo': 'SDR BricoHams 868', 'def_corto': 'SB86', 'mapa': 'MESH868_OWRX'},
+}
+
+
+# ---------------------------------------------------------------- bricohams.env
+def leer_env(ruta=None):
+    """{CLAVE: valor} con las mismas reglas que bricohams-mesh-owrx (sin ejecutar nada)."""
+    d = {}
+    try:
+        for l in open(ruta or ENV_ETC, encoding='utf-8'):
+            m = re.match(r'^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$', l)
+            if not m:
+                continue
+            v = m.group(2).strip()
+            fin = v.find(v[0], 1) if v[:1] in ('"', "'") else -1
+            v = v[1:fin] if fin > 0 else re.sub(r'\s+#.*$', '', v)
+            d[m.group(1)] = v
+    except OSError:
+        pass
+    return d
+
+
+def valor_seguro(v):
+    if PROHIBIDOS.search(v):
+        raise ValueError('el valor lleva comillas, «$», «\\» o saltos de línea')
+    return v
+
+
+def escribir_env(ruta, cambios, comilla='"'):
+    """Cambia o añade CLAVE=valor conservando el resto (y los comentarios de la línea).
+    Se escribe en el sitio: mismo dueño y permisos (bricohams.env es 600: lleva claves)."""
+    for v in cambios.values():
+        valor_seguro(v)
+    with open(ruta, 'r+', encoding='utf-8') as f:
+        lineas = f.read().splitlines(True)
+        hechos = set()
+        for i, l in enumerate(lineas):
+            m = re.match(r'^(\s*(?:export\s+)?)([A-Z][A-Z0-9_]*)=(.*?)(\r?\n)?$', l)
+            if not m or m.group(2) not in cambios:
+                continue
+            v, q, resto = m.group(3), comilla, ''
+            if v[:1] in ('"', "'"):
+                q = v[0]
+                fin = v.find(q, 1)
+                resto = v[fin + 1:] if fin > 0 else ''
+            else:
+                c = re.search(r'\s+#.*$', v)
+                resto = c.group(0) if c else ''
+            lineas[i] = '%s%s=%s%s%s%s%s' % (m.group(1), m.group(2), q, cambios[m.group(2)], q, resto, m.group(4) or '\n')
+            hechos.add(m.group(2))
+        if lineas and not lineas[-1].endswith('\n'):
+            lineas[-1] += '\n'
+        for k, v in cambios.items():
+            if k not in hechos:
+                lineas.append('%s=%s%s%s\n' % (k, comilla, v, comilla))
+        f.seek(0)
+        f.write(''.join(lineas))
+        f.truncate()
+
+
+def guardar(cambios):
+    """bricohams.env del kit (manda en la próxima instalación) y la copia de /etc (la leen los servicios)."""
+    with AGENDA_LOCK:
+        if ENV_KIT and os.path.isfile(ENV_KIT):
+            escribir_env(ENV_KIT, cambios, '"')
+        escribir_env(ENV_ETC, cambios, "'")
+
+
+def si(v, d='no'):
+    return (v or d).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
+
+
+# ---------------------------------------------------------------- URL de canales (sin claves)
+def _mesh_url():
+    for ruta in (os.environ.get('MESH_URL_CLI', '/usr/local/bin/bricohams-mesh-url'),
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bricohams-mesh-url')):
+        if os.path.isfile(ruta):
+            cargador = importlib.machinery.SourceFileLoader('bricohams_mesh_url', ruta)
+            spec = importlib.util.spec_from_loader('bricohams_mesh_url', cargador)
+            mod = importlib.util.module_from_spec(spec)
+            cargador.exec_module(mod)
+            return mod
+    return None
+
+
+def resumen_url(url):
+    """(canales, radio) de una URL de Meshtastic: nombres y TIPO de clave, nunca la clave."""
+    mod = _mesh_url()
+    if not url or mod is None:
+        return [], {}
+    return mod.leer(url)
+
+
+def validar_url(url, region):
+    if not URL_RE.match(url):
+        raise ValueError('la URL debe ser https://meshtastic.org/e/#…')
+    try:
+        canales, radio = resumen_url(url)
+    except Exception:
+        raise ValueError('la URL de Meshtastic no se puede leer (¿mal copiada?)')
+    if not canales:
+        raise ValueError('la URL no trae canales')
+    if radio.get('region') not in (None, '', region):
+        raise ValueError('la URL es de %s y este nodo es %s' % (radio.get('region'), region))
+    return url
+
+
+def validar_nombres(largo, corto):
+    largo, corto = largo.strip(), corto.strip()
+    if not largo or len(largo.encode('utf-8')) > 39:
+        raise ValueError('nombre largo: de 1 a 39 bytes')
+    if not corto or len(corto) > 4:
+        raise ValueError('nombre corto: de 1 a 4 caracteres')
+    return valor_seguro(largo), valor_seguro(corto)
+
+
+# ---------------------------------------------------------------- lectura del nodo (subproceso)
+def _enum(msg, campo):
+    try:
+        v = getattr(msg, campo)
+        return msg.DESCRIPTOR.fields_by_name[campo].enum_type.values_by_number[v].name
+    except Exception:
+        return None
+
+
+def leer_nodo(tipo, destino):
+    """Estado del nodo en un dict apto para la web: sin PSK ni URL."""
+    import meshtastic.serial_interface
+    import meshtastic.tcp_interface
+    if tipo == 'serie':
+        i = meshtastic.serial_interface.SerialInterface(devPath=destino)
+    else:
+        host, sep, port = destino.rpartition(':')
+        opciones = {'hostname': host, 'portNumber': int(port)} if sep and destino.count(':') == 1 else {'hostname': destino}
+        i = meshtastic.tcp_interface.TCPInterface(**opciones)
+    try:
+        num = i.myInfo.my_node_num if i.myInfo else None
+        yo = (i.nodesByNum or {}).get(num, {}) if num is not None else {}
+        u = yo.get('user', {})
+        ln = i.localNode
+        lc = ln.localConfig
+        canales = []
+        for c in (ln.channels or []):
+            rol = _enum(c, 'role')
+            if rol in (None, 'DISABLED'):
+                continue
+            psk = bytes(c.settings.psk or b'')
+            clave = 'sin cifrar' if not psk else ('pública (por defecto)' if len(psk) == 1 else 'propia AES-%d' % (len(psk) * 8))
+            canales.append({'indice': c.index, 'nombre': c.settings.name or '(principal)', 'rol': rol, 'clave': clave})
+        pos = yo.get('position', {})
+        meta = getattr(i, 'metadata', None)
+        return {
+            'ok': True, 'num': '!%08x' % num if num is not None else '',
+            'largo': u.get('longName', ''), 'corto': u.get('shortName', ''), 'hw': u.get('hwModel', ''),
+            'firmware': getattr(meta, 'firmware_version', '') if meta else '',
+            'rol': _enum(lc.device, 'role'), 'region': _enum(lc.lora, 'region'),
+            'preset': _enum(lc.lora, 'modem_preset'), 'potencia': lc.lora.tx_power, 'saltos': lc.lora.hop_limit,
+            'canales': canales, 'nodos_oidos': max(len(i.nodes or {}) - 1, 0),
+            'lat': round(pos['latitude'], 3) if 'latitude' in pos else None,
+            'lon': round(pos['longitude'], 3) if 'longitude' in pos else None,
+        }
+    finally:
+        i.close()
+
+
+# ---------------------------------------------------------------- trabajos (uno a la vez)
+class Trabajo:
+    def __init__(self):
+        self.cerrojo = threading.Lock()
+        self.activo = False
+        self.titulo = ''
+        self.log = []
+        self.fin = None
+        self.lecturas = {}
+
+    def apunta(self, texto):
+        for l in tapar(str(texto)).splitlines():
+            if l.strip():
+                self.log.append(time.strftime('%H:%M:%S ') + l.rstrip())
+        del self.log[:-200]
+
+    def lanzar(self, titulo, fn, soltar_mapa=True):
+        with self.cerrojo:
+            if self.activo:
+                return False
+            self.activo, self.titulo, self.log, self.fin = True, titulo, [], None
+        threading.Thread(target=self._correr, args=(fn, soltar_mapa), daemon=True).start()
+        return True
+
+    def _correr(self, fn, soltar_mapa):
+        mapa = soltar_mapa and systemctl('is-active', '--quiet', SERVICIO_MAPA) == 0
+        try:
+            if mapa:
+                self.apunta('Paro %s mientras tanto (el puerto es de uno solo)' % SERVICIO_MAPA)
+                systemctl('stop', SERVICIO_MAPA)
+                time.sleep(2)
+            fn(self)
+            self.apunta('✔ Terminado')
+        except Exception as e:
+            self.apunta('✘ %s' % e)
+        finally:
+            if mapa:
+                systemctl('start', SERVICIO_MAPA)
+                self.apunta('%s arrancado de nuevo' % SERVICIO_MAPA)
+            self.fin = time.time()
+            self.activo = False
+
+
+TRABAJO = Trabajo()
+
+
+def tapar(s):
+    """Nada de claves en el registro de la web."""
+    s = re.sub(r'(meshtastic\.org/e/#?)[A-Za-z0-9_-]+', r'\1…', s)
+    s = re.sub(r'(?i)(psk\S*\s*[:=]?\s*)(base64:)?[A-Za-z0-9+/=]{8,}', r'\1…', s)
+    s = re.sub(r'(?i)("?(?:access_token|refresh_token|token|pass(?:word)?|secret)"?\s*[:=]\s*)("[^"]*"|\S+)', r'\1…', s)
+    s = re.sub(r'eyJ[A-Za-z0-9_.-]{20,}', '…', s)
+    return re.sub(r'base64:[A-Za-z0-9+/=]+', 'base64:…', s)
+
+
+def systemctl(*a):
+    try:
+        return subprocess.run(['systemctl'] + list(a), capture_output=True, timeout=60).returncode
+    except Exception:
+        return 1
+
+
+def destino(nodo, env):
+    if nodo == '433':
+        if env.get('MESH433_WEB', 'no').lower() in ('yes', 'true', '1', 'si', 'sí', 'on'):
+            return 'tcp', '127.0.0.1:4404'
+        return 'serie', env.get('MESH433_PUERTO', '/dev/lilygo-mesh')
+    return 'tcp', env.get('MESH868_HOST', '127.0.0.1')
+
+
+def cli(t, nodo, env, args, espera=0):
+    tipo, dest = destino(nodo, env)
+    if tipo == 'serie' and not os.path.exists(dest):
+        raise RuntimeError('no existe %s: sudo bricohams-dispositivos identificar' % dest)
+    cmd = [sys.executable, '-m', 'meshtastic'] + (['--port', dest] if tipo == 'serie' else ['--host', dest]) + args
+    vista = [a if not a.startswith(('https://meshtastic.org', 'base64:')) else '…' for a in args]
+    t.apunta('meshtastic %s' % ' '.join(vista))
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=150)
+    t.apunta('\n'.join((r.stdout + r.stderr).splitlines()[-6:]))
+    if r.returncode != 0:
+        raise RuntimeError('meshtastic terminó con error %d' % r.returncode)
+    if espera:
+        time.sleep(espera)
+
+
+def tarea_leer(nodos):
+    def fn(t):
+        env = leer_env()
+        for n in nodos:
+            tipo, dest = destino(n, env)
+            if tipo == 'serie' and not os.path.exists(dest):
+                TRABAJO.lecturas[n] = {'ok': False, 'error': 'no existe %s' % dest, 'hora': time.time()}
+                t.apunta('%s: no existe %s' % (n, dest))
+                continue
+            t.apunta('Leyendo el nodo %s (%s)…' % (n, dest))
+            try:
+                r = subprocess.run([sys.executable, os.path.abspath(__file__), 'leer', tipo, dest],
+                                   capture_output=True, text=True, timeout=120)
+                datos = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+                if not datos.get('ok'):
+                    datos = {'ok': False, 'error': datos.get('error') or tapar(r.stderr.strip()[-300:]) or 'sin respuesta'}
+            except subprocess.TimeoutExpired:
+                datos = {'ok': False, 'error': 'el nodo no responde (120 s)'}
+            except ValueError:
+                datos = {'ok': False, 'error': 'respuesta ilegible'}
+            datos['hora'] = time.time()
+            TRABAJO.lecturas[n] = datos
+            t.apunta('%s: %s' % (n, 'leído' if datos.get('ok') else datos.get('error')))
+    return fn
+
+
+def tarea_aplicar(nodo):
+    def fn(t):
+        env = leer_env()
+        cfg = NODOS[nodo]
+        url = env.get(cfg['url'], '')
+        if nodo == '433':
+            if url:
+                cli(t, nodo, env, ['--seturl', url], 20)
+            elif si(env.get('MESH433_CHANNELS'), 'yes') and env.get('MESH_CHANNEL_URL'):
+                cli(t, nodo, env, ['--seturl', env['MESH_CHANNEL_URL']], 20)
+                cli(t, nodo, env, ['--set', 'lora.region', 'EU_433', '--set', 'lora.use_preset', 'true',
+                                   '--set', 'lora.override_frequency', '0', '--set', 'lora.tx_power', '0'], 15)
+                cli(t, nodo, env, ['--set', 'lora.modem_preset', 'LONG_FAST'], 10)
+            else:
+                cli(t, nodo, env, ['--set', 'lora.region', 'EU_433'], 15)
+        else:
+            if url:
+                cli(t, nodo, env, ['--seturl', url], 20)
+            else:
+                cli(t, nodo, env, ['--set', 'lora.region', env.get('MESH_REGION', 'EU_868')], 15)
+            psk = env.get('MESH868_PRIVATE_PSK', '')
+            if psk:
+                try:
+                    n = len(resumen_url(url)[0]) if url else 1
+                except Exception:
+                    n = 1
+                if n < 8:
+                    cli(t, nodo, env, ['--ch-add', env.get('MESH868_PRIVATE_NAME', 'BricoHams')], 10)
+                    cli(t, nodo, env, ['--ch-index', str(n), '--ch-set', 'psk', 'base64:' + psk], 10)
+                else:
+                    t.apunta('La URL ya trae 8 canales: no cabe el canal privado')
+        cli(t, nodo, env, ['--set-owner', env.get(cfg['largo'], cfg['def_largo']),
+                           '--set-owner-short', env.get(cfg['corto'], cfg['def_corto'])], 10)
+        if cfg['rol']:
+            cli(t, nodo, env, ['--set', 'device.role', env.get(cfg['rol'], 'CLIENT')], 10)
+        if env.get('STATION_LAT') and env.get('STATION_LON'):
+            cli(t, nodo, env, ['--setlat', env['STATION_LAT'], '--setlon', env['STATION_LON'],
+                               '--setalt', env.get('STATION_ASL', '0')], 5)
+        try:
+            cli(t, nodo, env, ['--set', 'position.gps_mode', 'NOT_PRESENT'])
+        except RuntimeError:
+            pass
+        tarea_leer([nodo])(t)
+    return fn
+
+
+def tarea_reiniciar(servicio):
+    def fn(t):
+        t.apunta('systemctl restart %s' % servicio)
+        rc = systemctl('restart', servicio)
+        time.sleep(3)
+        estado = 'activo' if systemctl('is-active', '--quiet', servicio) == 0 else 'NO arranca (journalctl -u %s)' % servicio
+        t.apunta('%s: %s' % (servicio, estado))
+        if rc != 0:
+            raise RuntimeError('no se pudo reiniciar %s' % servicio)
+    return fn
+
+
+def estado_unidad(u):
+    """(cargada, activa, texto) de una unidad systemd, sin lanzar nada."""
+    try:
+        r = subprocess.run(['systemctl', 'show', '-p', 'LoadState,ActiveState,SubState,UnitFileState', '--', u + '.service'],
+                           capture_output=True, text=True, timeout=10)
+        d = dict(l.split('=', 1) for l in r.stdout.splitlines() if '=' in l)
+    except (OSError, subprocess.TimeoutExpired):
+        d = {}
+    if d.get('LoadState') != 'loaded':
+        return False, False, 'no instalado'
+    activa = d.get('ActiveState') == 'active'
+    return True, activa, '%s (%s) · %s' % (d.get('ActiveState', '?'), d.get('SubState', '?'), d.get('UnitFileState', '?'))
+
+
+def registro(u, lineas=40):
+    """Últimas líneas del journal de una unidad, con secretos tapados."""
+    try:
+        r = subprocess.run(['journalctl', '-u', u + '.service', '-n', str(lineas), '--no-pager', '-o', 'short-iso'],
+                           capture_output=True, text=True, timeout=15)
+        t = r.stdout or r.stderr
+    except (OSError, subprocess.TimeoutExpired) as x:
+        t = str(x)
+    return re.sub(r'(?i)((?:pass(?:word)?|token|secret|key)\S*\s*[:=]\s*)\S+', r'\1…', tapar(t))
+
+
+def tarea_unidades(verbo, unidades):
+    """start/stop/restart en orden (parar: al revés, primero lo que depende de lo demás)."""
+    def fn(t):
+        orden = list(reversed(unidades)) if verbo == 'stop' else list(unidades)
+        fallos = []
+        for u in orden:
+            if not estado_unidad(u)[0]:
+                t.apunta('%s: no instalado, lo salto' % u)
+                continue
+            t.apunta('systemctl %s %s' % (verbo, u))
+            if systemctl(verbo, u + '.service') != 0:
+                fallos.append(u)
+        time.sleep(3)
+        for u in unidades:
+            t.apunta('%s: %s' % (u, estado_unidad(u)[2]))
+        if fallos:
+            raise RuntimeError('fallo en %s (mira journalctl -u …)' % ', '.join(fallos))
+    return fn
+
+
+VERBOS = {'arrancar': 'start', 'parar': 'stop', 'reiniciar': 'restart'}
+
+
+def accion_servicios(a):
+    """tak-<verbo>[-<unidad>] y mon-<verbo>[-<unidad>]; solo unidades de la lista blanca."""
+    grupo, _, resto = a.partition('-')
+    unidades = TAK_UNIDADES if grupo == 'tak' else MON_UNIDADES
+    verbo, _, unidad = resto.partition('-')
+    if verbo not in VERBOS:
+        raise ValueError('acción desconocida')
+    if unidad:
+        if unidad not in unidades:
+            raise ValueError('servicio no permitido')
+        unidades = (unidad,)
+    nombre = 'TAK' if grupo == 'tak' else 'monitorización'
+    if not TRABAJO.lanzar('%s %s: %s' % (verbo.capitalize(), nombre, ' '.join(unidades)),
+                          tarea_unidades(VERBOS[verbo], unidades), soltar_mapa=False):
+        return 'Hay otro trabajo en marcha; espera a que termine.'
+    return 'Orden enviada: %s %s…' % (verbo, ', '.join(unidades))
+
+
+# ---------------------------------------------------------------- credenciales TAK
+def leer_acceso_tak():
+    """[(usuario, clave)] de tak-access.txt (lo escribe instalar_tak.sh); el primero es el administrador."""
+    pares = []
+    try:
+        with open(TAK_ACCESO, encoding='utf-8') as f:
+            for linea in f:
+                u, sep, c = linea.strip().partition(':')
+                if sep and USUARIO_TAK.match(u.strip()):
+                    pares.append((u.strip(), c.strip()))
+    except OSError:
+        return []
+    return pares
+
+
+def escribir_acceso_tak(pares):
+    tmp = TAK_ACCESO + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(''.join('%s: %s\n' % p for p in pares))
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, TAK_ACCESO)
+
+
+# usuario y clave entran por stdin: nunca en la línea de órdenes (se verían en ps)
+SCRIPT_CLAVE_TAK = r'''
+import sys
+from datetime import datetime, timezone
+usuario, clave = sys.stdin.read().split('\n')[:2]
+from flask_security import hash_password
+from opentakserver.app import create_app
+from opentakserver.extensions import db
+app = create_app()
+with app.app_context():
+    u = app.security.datastore.find_user(username=usuario)
+    if u is None:
+        sys.exit(3)
+    u.password = hash_password(clave)
+    u.active = True
+    # una cuenta sin confirmar no puede entrar aunque la clave sea buena
+    if getattr(u, 'confirmed_at', 1) is None:
+        u.confirmed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.session.commit()
+print('ok')
+'''
+
+
+def tarea_clave_tak(usuario, clave):
+    def fn(t):
+        t.apunta('Cambiando la clave de %s en OpenTAKServer…' % usuario)
+        r = subprocess.run(['runuser', '-u', 'opentakserver', '--', 'env', 'HOME=' + TAK_HOME,
+                            'FLASK_APP=opentakserver.app', TAK_PYTHON, '-c', SCRIPT_CLAVE_TAK],
+                           input=usuario + '\n' + clave + '\n', capture_output=True, text=True,
+                           timeout=180, cwd=os.path.join(TAK_HOME, 'ots'))
+        if r.returncode == 3:
+            raise RuntimeError('el usuario %s no existe en OpenTAKServer' % usuario)
+        if r.returncode or 'ok' not in r.stdout.split():
+            raise RuntimeError('OpenTAKServer no aceptó el cambio (código %d)' % r.returncode)
+        escribir_acceso_tak([(u, clave if u == usuario else c) for u, c in leer_acceso_tak()])
+        t.apunta('Clave de %s cambiada y guardada en %s' % (usuario, TAK_ACCESO))
+    return fn
+
+
+def accion_clave_tak(campos):
+    usuario = campos.get('usuario', '')
+    if usuario not in [u for u, _ in leer_acceso_tak()]:
+        raise ValueError('usuario TAK no permitido')
+    if campos.get('generar') == 'yes':
+        clave = secrets.token_urlsafe(24)
+    else:
+        clave = campos.get('clave', '')
+        if clave != campos.get('clave2', ''):
+            raise ValueError('las dos claves no coinciden')
+        if not CLAVE_TAK.match(clave):
+            raise ValueError('la clave debe tener entre 12 y 128 caracteres ASCII visibles, sin espacios')
+    if not estado_unidad('bricohams-tak')[0]:
+        raise ValueError('el servidor TAK no está instalado')
+    if not TRABAJO.lanzar('Cambiar la clave TAK de %s' % usuario, tarea_clave_tak(usuario, clave), soltar_mapa=False):
+        return 'Hay otro trabajo en marcha; espera a que termine.'
+    return 'Cambiando la clave de %s… cuando termine pulsa «Mostrar credenciales».' % usuario
+
+
+# ---------------------------------------------------------------- backup remoto (página Seguridad)
+BR_USUARIO = re.compile(r'^[A-Za-z0-9._@-]{1,64}$')
+BR_DOMINIO = re.compile(r'^[A-Za-z0-9.-]{1,64}$')
+BR_SERVIDOR = re.compile(r'^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*'
+                         r'|\[?[0-9A-Fa-f:.]{2,45}\]?)$')
+BR_RUTA = re.compile(r'^[A-Za-z0-9 ._/@+-]{0,200}$')
+BR_UNC = re.compile(r'^(?:\\\\|//)[A-Za-z0-9.-]{1,253}[\\/][A-Za-z0-9 $._+-]{1,80}(?:[\\/][A-Za-z0-9 $._+-]{1,80}){0,10}[\\/]?$')
+BR_NFS = re.compile(r'^[A-Za-z0-9.-]{1,253}:/[A-Za-z0-9 ._/+-]{0,200}$')
+BR_DRIVE_ID = re.compile(r'^[A-Za-z0-9!._-]{1,128}$')
+
+
+def leer_json(ruta, defecto=None):
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else (defecto or {})
+    except (OSError, ValueError):
+        return defecto or {}
+
+
+def escribir_json_seguro(ruta, datos, modo=0o600):
+    """Escritura atómica: fichero temporal exclusivo con permisos ya restringidos y os.replace."""
+    tmp = '%s.%s.tmp' % (ruta, secrets.token_hex(6))
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, modo)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(datos, f, ensure_ascii=False, indent=1)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, modo)
+        os.replace(tmp, ruta)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def br_validar(campos, actual):
+    """Configuración sin secretos a partir del formulario; ValueError si algo no cuadra."""
+    p = campos.get('protocolo', '')
+    if p not in BR_PROTOCOLOS:
+        raise ValueError('protocolo de backup no válido')
+    c = {'protocolo': p}
+    usuario = campos.get('usuario', '').strip()
+    if '\\' in usuario:
+        dom, usuario = usuario.split('\\', 1)
+        campos = dict(campos, dominio=campos.get('dominio') or dom)
+    if usuario and not BR_USUARIO.match(usuario):
+        raise ValueError('usuario no válido (letras, números y . _ @ -; máximo 64)')
+    if p == 'cifs':
+        d = campos.get('destino', '').strip()
+        if not BR_UNC.match(d):
+            raise ValueError('ruta SMB no válida; usa \\\\servidor\\recurso\\carpeta')
+        dominio = campos.get('dominio', '').strip()
+        if dominio and not BR_DOMINIO.match(dominio):
+            raise ValueError('dominio no válido')
+        v = campos.get('smb_version', '3.0')
+        if v not in ('2.1', '3.0', '3.1.1'):
+            raise ValueError('versión SMB no válida')
+        if not usuario:
+            raise ValueError('SMB necesita usuario')
+        c.update(destino=d, usuario=usuario, dominio=dominio, smb_version=v)
+    elif p == 'nfs':
+        d = campos.get('destino', '').strip()
+        if not BR_NFS.match(d):
+            raise ValueError('export NFS no válido; usa servidor:/ruta')
+        v = campos.get('nfs_version', '4')
+        if v not in ('3', '4', '4.1', '4.2'):
+            raise ValueError('versión NFS no válida')
+        c.update(destino=d, nfs_version=v)
+    else:
+        ruta = campos.get('ruta', '').strip().strip('/') or 'bricohams-backup'
+        if not BR_RUTA.match(ruta) or '..' in ruta.split('/'):
+            raise ValueError('carpeta remota no válida')
+        c['ruta'] = ruta
+        if p == 'sftp':
+            servidor = campos.get('servidor', '').strip()
+            if not BR_SERVIDOR.match(servidor):
+                raise ValueError('servidor SFTP no válido')
+            try:
+                puerto = int(campos.get('puerto', '22') or '22')
+            except ValueError:
+                puerto = 0
+            if not 1 <= puerto <= 65535:
+                raise ValueError('puerto no válido')
+            if not usuario:
+                raise ValueError('SFTP necesita usuario')
+            if servidor != actual.get('servidor') or puerto != actual.get('puerto'):
+                c['huella_reset'] = True
+            c.update(servidor=servidor, puerto=puerto, usuario=usuario)
+        elif p == 'onedrive':
+            drive_id = campos.get('drive_id', '').strip()
+            if not BR_DRIVE_ID.match(drive_id):
+                raise ValueError('drive_id de OneDrive no válido o vacío (rclone config lo muestra)')
+            tipo = campos.get('drive_type', 'personal')
+            if tipo not in ('personal', 'business', 'documentLibrary'):
+                raise ValueError('tipo de OneDrive no válido')
+            c.update(drive_id=drive_id, drive_type=tipo)
+    try:
+        ret = int(campos.get('retencion', '14') or '14')
+    except ValueError:
+        ret = 0
+    if not 1 <= ret <= 365:
+        raise ValueError('la retención debe estar entre 1 y 365 copias')
+    c['retencion'] = ret
+    c['incluir_secretos'] = campos.get('incluir_secretos') == 'yes'
+    c['programado'] = campos.get('programado') == 'yes'
+    if p in ('gdrive', 'onedrive'):
+        client_id = campos.get('oauth_client_id', '').strip()
+        if len(client_id) > 200 or re.search(r'[^A-Za-z0-9._-]', client_id):
+            raise ValueError('ID de cliente OAuth no válido')
+        if client_id:
+            c['oauth_client_id'] = client_id
+    return c
+
+
+def br_secretos(campos, p, previo):
+    """Contraseña / token nuevos; un campo vacío conserva lo guardado (nunca se devuelve al navegador)."""
+    s = {k: v for k, v in previo.items() if k in ('password', 'token', 'oauth_client_secret')}
+    secreto = campos.get('oauth_client_secret', '')
+    if p in ('gdrive', 'onedrive') and secreto:
+        if len(secreto) > 512 or any(ch in secreto for ch in '\r\n\x00'):
+            raise ValueError('secreto OAuth no válido')
+        s['oauth_client_secret'] = secreto
+    clave = campos.get('password', '')
+    if clave:
+        if clave != campos.get('password2', ''):
+            raise ValueError('las dos contraseñas no coinciden')
+        if len(clave) > 256 or any(ch in clave for ch in '\r\n\x00'):
+            raise ValueError('contraseña no válida (máximo 256 caracteres, sin saltos de línea)')
+        s['password'] = clave
+    tok = campos.get('token', '').strip()
+    if tok:
+        if len(tok) > 8192:
+            raise ValueError('token demasiado largo')
+        try:
+            d = json.loads(tok)
+        except ValueError:
+            raise ValueError('el token debe ser el JSON que devuelve «rclone authorize»') from None
+        if not isinstance(d, dict) or not isinstance(d.get('access_token'), str):
+            raise ValueError('el token no contiene access_token')
+        s['token'] = json.dumps(d, separators=(',', ':'))
+    if p in ('cifs', 'sftp') and not s.get('password'):
+        raise ValueError('falta la contraseña')
+    if p in ('gdrive', 'onedrive') and not s.get('token'):
+        raise ValueError('falta el token OAuth (rclone authorize)')
+    return s
+
+
+def br_programar(si):
+    r = subprocess.run(['systemctl', 'enable' if si else 'disable', '--now', BR_UNIDAD + '.timer'],
+                       capture_output=True, text=True, timeout=60)
+    if r.returncode:
+        raise OSError('no se pudo %s la copia programada' % ('activar' if si else 'desactivar'))
+
+
+# ---------------------------------------------------------------- bloqueo por IP / país
+def bloqueo_red(texto):
+    """IP o red pública normalizada; ValueError si no lo es o toca la LAN (mismo criterio que el helper)."""
+    texto = (texto or '').strip()
+    if not texto or len(texto) > 49:
+        raise ValueError('dirección vacía o demasiado larga')
+    try:
+        red = ipaddress.ip_network(texto, strict=False)
+    except ValueError:
+        raise ValueError('%s no es una IP ni una red válida' % texto[:49])
+    if red.prefixlen < (8 if red.version == 4 else 16):
+        raise ValueError('%s: red demasiado grande' % texto)
+    for p in BLOQUEO_PROTEGIDAS:
+        if p.version == red.version and red.overlaps(p):
+            raise ValueError('%s es de la LAN, loopback o reservada; no se bloquea' % texto)
+    return str(red)
+
+
+def bloqueo_leer():
+    """{'ips': [{'red','nota','fecha'}], 'paises': [cc]} tolerante a ficheros viejos o rotos."""
+    try:
+        with open(BLOQUEO_CONF, encoding='utf-8') as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        d = {}
+    if not isinstance(d, dict):
+        d = {}
+    ips, vistas = [], set()
+    for x in d.get('ips') or []:
+        x = x if isinstance(x, dict) else {'red': x}
+        try:
+            red = bloqueo_red(str(x.get('red', '')))
+        except ValueError:
+            continue
+        if red not in vistas:
+            vistas.add(red)
+            ips.append({'red': red, 'nota': str(x.get('nota', ''))[:80], 'fecha': str(x.get('fecha', ''))[:20]})
+    paises = []
+    for x in d.get('paises') or []:
+        x = str(x).lower()
+        if re.match(r'^[a-z]{2}$', x) and x not in paises:
+            paises.append(x)
+    return {'ips': ips[:BLOQUEO_MAX_IPS], 'paises': paises[:BLOQUEO_MAX_PAISES]}
+
+
+def bloqueo_guardar(d):
+    os.makedirs(os.path.dirname(BLOQUEO_CONF), mode=0o750, exist_ok=True)
+    escribir_json_seguro(BLOQUEO_CONF, d, 0o600)
+
+
+def bloqueo_lanzar(orden):
+    r = subprocess.run(['systemctl', 'start', '--no-block', '%s@%s.service' % (BLOQUEO_UNIDAD, orden)],
+                       capture_output=True, text=True, timeout=30)
+    if r.returncode:
+        raise OSError('no se pudo lanzar el bloqueo (%s); ¿está instalado bricohams-bloqueo?' % orden)
+
+
+def bloqueo_paises(texto):
+    paises = [x for x in re.split(r'[\s,;]+', (texto or '').lower()) if x]
+    if not paises:
+        raise ValueError('escribe al menos un código de país (ej.: cn, ru)')
+    for x in paises:
+        if not re.match(r'^[a-z]{2}$', x):
+            raise ValueError('«%s» no es un código ISO de país de dos letras' % x[:10])
+    return paises
+
+
+def accion_bloqueo(a, campos):
+    """Acciones del bloqueo por IP/país; None si la acción no es de este bloque."""
+    if a == 'seg-bloquearip':
+        d = bloqueo_leer()
+        nuevas = [bloqueo_red(x) for x in re.split(r'[\s,;]+', campos.get('red', '')) if x]
+        if not nuevas:
+            raise ValueError('escribe una IP o red (ej.: 203.0.113.7 o 203.0.113.0/24)')
+        nota = re.sub(r'[\x00-\x1f]', '', campos.get('nota', '')).strip()[:80]
+        ya = {x['red'] for x in d['ips']}
+        for red in nuevas:
+            if red not in ya:
+                ya.add(red)
+                d['ips'].append({'red': red, 'nota': nota, 'fecha': time.strftime('%Y-%m-%d %H:%M')})
+        if len(d['ips']) > BLOQUEO_MAX_IPS:
+            raise ValueError('como mucho %d entradas en la lista de bloqueo' % BLOQUEO_MAX_IPS)
+        bloqueo_guardar(d)
+        bloqueo_lanzar('aplicar')
+        return 'Bloqueada(s): %s. Se aplica en unos segundos.' % ', '.join(nuevas)
+    if a == 'seg-desbloquearip':
+        red = bloqueo_red(campos.get('red', ''))
+        d = bloqueo_leer()
+        d['ips'] = [x for x in d['ips'] if x['red'] != red]
+        bloqueo_guardar(d)
+        bloqueo_lanzar('aplicar')
+        return 'Desbloqueada %s.' % red
+    if a == 'seg-bloquearpais':
+        d = bloqueo_leer()
+        for cc in bloqueo_paises(campos.get('paises', '')):
+            if cc not in d['paises']:
+                d['paises'].append(cc)
+        if len(d['paises']) > BLOQUEO_MAX_PAISES:
+            raise ValueError('como mucho %d países' % BLOQUEO_MAX_PAISES)
+        bloqueo_guardar(d)
+        bloqueo_lanzar('geo-actualizar')
+        return 'Descargando las redes de %s y aplicando el bloqueo; recarga en un minuto.' % ', '.join(
+            x.upper() for x in d['paises'])
+    if a == 'seg-desbloquearpais':
+        cc = bloqueo_paises(campos.get('pais', ''))[0]
+        d = bloqueo_leer()
+        d['paises'] = [x for x in d['paises'] if x != cc]
+        bloqueo_guardar(d)
+        bloqueo_lanzar('aplicar')
+        return 'Quitado el bloqueo de %s.' % cc.upper()
+    if a == 'seg-desbanear':
+        try:
+            ip = str(ipaddress.ip_address(campos.get('ip', '').strip()))
+        except ValueError:
+            raise ValueError('IP no válida')
+        os.makedirs(BLOQUEO_VAR, mode=0o755, exist_ok=True)
+        ruta = os.path.join(BLOQUEO_VAR, 'desbanear.json')
+        previas = []
+        try:
+            with open(ruta, encoding='utf-8') as f:
+                previas = [x for x in json.load(f) if isinstance(x, str)][:100]
+        except (OSError, ValueError, TypeError):
+            pass
+        escribir_json_seguro(ruta, sorted(set(previas + [ip])), 0o600)
+        bloqueo_lanzar('desbanear')
+        return 'Pedido a fail2ban que libere %s.' % ip
+    if a == 'seg-refrescar':
+        bloqueo_lanzar('estado')
+        return 'Actualizando el estado; recarga la página en unos segundos.'
+    if a == 'seg-recargarfw':
+        fallos = []
+        for verbo, u in (('restart', 'bricohams-cortafuegos'), ('restart', 'fail2ban'), ('reload', 'nginx')):
+            if not estado_unidad(u)[0]:
+                continue
+            r = subprocess.run(['systemctl', verbo, u + '.service'], capture_output=True, text=True, timeout=120)
+            if r.returncode:
+                fallos.append(u)
+        bloqueo_lanzar('aplicar')
+        if fallos:
+            raise OSError('no se pudo recargar: %s (mira su registro)' % ', '.join(fallos))
+        return 'Cortafuegos, fail2ban y nginx recargados; bloqueo reaplicado.'
+    return None
+
+
+# ---------------------------------------------------------------- métodos de acceso (local y/o Google)
+def google_cuenta_servicio(env=None):
+    env = env if env is not None else leer_env()
+    u = env.get('GOOGLE_OWRX_USUARIO') or 'bricohams-google'
+    return u if USUARIO_OWRX.match(u) else 'bricohams-google'
+
+
+def google_modo(env):
+    if not si(env.get('GOOGLE_AUTH')):
+        return 'local'
+    m = env.get('GOOGLE_AUTH_MODO') or 'alternativa'
+    return m if m in dict(GOOGLE_MODOS) else 'alternativa'
+
+
+def google_sesion_valida(cookie):
+    """True si la petición trae una sesión de Google de un administrador (la valida la propia pasarela)."""
+    import urllib.request
+    if not cookie or 'bh-google=' not in cookie:
+        return False
+    pet = urllib.request.Request(GOOGLE_AUTH_LOCAL, headers={'Cookie': cookie})
+    try:
+        with urllib.request.urlopen(pet, timeout=4) as r:
+            return r.status == 204
+    except (OSError, ValueError):
+        return False
+
+
+def google_admins(texto):
+    lista = []
+    for x in re.split(r'[\s,;]+', (texto or '').strip().lower()):
+        if not x:
+            continue
+        if not GOOGLE_ADMIN_RE.match(x):
+            raise ValueError('«%s» no es un correo ni un @dominio válido' % x[:60])
+        if x not in lista:
+            lista.append(x)
+    if not lista:
+        raise ValueError('pon al menos un correo de administrador (o @dominio de Google Workspace)')
+    if len(lista) > 50:
+        raise ValueError('como mucho 50 correos o dominios')
+    return lista
+
+
+def google_guardar_secreto(secreto):
+    os.makedirs(GOOGLE_DIR, mode=0o700, exist_ok=True)
+    os.chmod(GOOGLE_DIR, 0o700)
+    ruta = os.path.join(GOOGLE_DIR, 'client_secret')
+    tmp = ruta + '.tmp'
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        f.write(secreto + '\n')
+    os.replace(tmp, ruta)
+
+
+def accion_acceso(a, campos):
+    """Guarda el método de acceso y lanza la unidad que lo aplica (nginx y servicio); None si no es de este bloque."""
+    if a != 'seg-acceso':
+        return None
+    env = leer_env()
+    modo = campos.get('modo', '')
+    if modo not in dict(GOOGLE_MODOS):
+        raise ValueError('método de acceso no válido')
+    actual = google_modo(env)
+    servicio = google_cuenta_servicio(env)
+    locales = [u for u, activo in owrx_usuarios() if activo and u != servicio]
+    if modo in ('local', 'doble') and not locales:
+        raise ValueError('no hay ningún usuario local activo: créalo antes de usar este método')
+    if modo == 'local':
+        cambios = {'GOOGLE_AUTH': 'no'}
+    else:
+        if env.get('SSL_MODO', 'todo') == 'no' or not env.get('SSL_DOMAIN', '').strip():
+            raise ValueError('Google exige HTTPS con dominio: configura SSL_DOMAIN y SSL_MODO (admin o todo) antes')
+        cid = campos.get('client_id', '').strip() or env.get('GOOGLE_CLIENT_ID', '')
+        if not GOOGLE_CLIENT_RE.match(cid):
+            raise ValueError('el ID de cliente debe acabar en .apps.googleusercontent.com')
+        admins = google_admins(campos.get('admins', ''))
+        try:
+            horas = float(campos.get('horas', '') or '8')
+        except ValueError:
+            raise ValueError('horas de sesión no válidas')
+        if not 0.25 <= horas <= 168:
+            raise ValueError('las horas de sesión deben estar entre 0.25 y 168')
+        secreto = campos.get('secreto', '').strip()
+        if secreto and not GOOGLE_SECRETO_RE.match(secreto):
+            raise ValueError('el secreto del cliente tiene caracteres inesperados')
+        if not secreto and not os.path.exists(os.path.join(GOOGLE_DIR, 'client_secret')):
+            raise ValueError('falta el secreto del cliente de Google')
+        if modo in ('doble', 'solo_google') and actual not in ('doble', 'solo_google') \
+                and not google_sesion_valida(campos.get('_cookie', '')):
+            # antibloqueo: antes de exigir Google hay que haber entrado con Google al menos una vez
+            raise ValueError('para exigir Google primero activa «Usuario local o cuenta de Google», entra con '
+                             '«Entrar con Google» con un correo administrador y vuelve aquí')
+        if secreto:
+            google_guardar_secreto(secreto)
+        cambios = {'GOOGLE_AUTH': 'yes', 'GOOGLE_AUTH_MODO': modo, 'GOOGLE_CLIENT_ID': cid,
+                   'GOOGLE_ADMINS': ','.join(admins), 'GOOGLE_SESION_HORAS': '%g' % horas}
+        if modo == 'doble':
+            # al volver a alternativa o solo_google la pasarela genera otra clave para su cuenta de servicio
+            try:
+                os.unlink(os.path.join(GOOGLE_DIR, 'owrx_password'))
+            except OSError:
+                pass
+    guardar(cambios)
+    r = subprocess.run(['systemctl', 'start', '--no-block', GOOGLE_APLICAR], capture_output=True, text=True, timeout=30)
+    if r.returncode:
+        raise OSError('guardado, pero no se pudo lanzar %s; ¿está instalado bricohams-google-auth?' % GOOGLE_APLICAR)
+    return 'Guardado: %s. Aplicándolo (nginx y servicio); recarga la página en unos segundos.' % dict(GOOGLE_MODOS)[modo]
+
+# ---------------------------------------------------------------- usuarios de OpenWebRX
+def owrx_usuarios_ruta():
+    if os.environ.get('BRICOHAMS_OWRX_USUARIOS'):
+        return os.environ['BRICOHAMS_OWRX_USUARIOS']
+    env = leer_env()
+    if env.get('OWRX_BACKEND', 'native') == 'docker':
+        return os.path.join(env.get('OWRX_DOCKER_DIR', '/opt/owrx-docker'), 'var', 'users.json')
+    return '/var/lib/openwebrx/users.json'
+
+
+def owrx_usuarios():
+    """[(usuario, activo)] sin leer ni enseñar nunca los hashes."""
+    try:
+        with open(owrx_usuarios_ruta(), encoding='utf-8') as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return []
+    salida = []
+    for u in d if isinstance(d, list) else []:
+        if isinstance(u, dict) and isinstance(u.get('user'), str):
+            salida.append((u['user'], bool(u.get('enabled', True))))
+    return salida
+
+
+def owrx_admin(orden, usuario, clave=None):
+    """openwebrx admin --noninteractive ORDEN USUARIO (nativo o Docker); la clave va por entorno, nunca en argv."""
+    env = leer_env()
+    entorno = {k: v for k, v in os.environ.items() if k != 'OWRX_PASSWORD'}
+    if clave is not None:
+        entorno['OWRX_PASSWORD'] = clave
+    cli = ['openwebrx', 'admin', '--noninteractive', orden, usuario]
+    docker = env.get('OWRX_BACKEND', 'native') == 'docker'
+    if docker:
+        contenedor = env.get('OWRX_DOCKER_CONTAINER', 'owrx-mbe')
+        if not re.match(r'^[A-Za-z0-9_.-]{1,64}$', contenedor):
+            raise ValueError('OWRX_DOCKER_CONTAINER no válido')
+        cli = ['docker', 'exec'] + (['-e', 'OWRX_PASSWORD'] if clave is not None else []) + [contenedor] + cli
+    try:
+        r = subprocess.run(cli, capture_output=True, text=True, timeout=60, env=entorno)
+    except (OSError, subprocess.TimeoutExpired):
+        raise OSError('no se pudo ejecutar «openwebrx admin»')
+    if not docker:
+        ruta = owrx_usuarios_ruta()
+        try:
+            import shutil
+            shutil.chown(ruta, 'openwebrx', 'openwebrx')
+            os.chmod(ruta, 0o600)
+        except (OSError, LookupError):
+            pass
+    if r.returncode:
+        raise OSError('openwebrx admin %s falló: %s' % (orden, tapar((r.stderr or r.stdout).strip())[-200:]))
+
+
+def accion_usuarios(a, campos):
+    """Alta, baja, clave y activar/desactivar usuarios de OpenWebRX; None si no es de este bloque."""
+    if not a.startswith('seg-usuario'):
+        return None
+    usuario = campos.get('usuario', '').strip()
+    if not USUARIO_OWRX.match(usuario):
+        raise ValueError('usuario no válido (letras, números, punto, guion o guion bajo; máx. 32)')
+    lista = dict(owrx_usuarios())
+    servicio = google_cuenta_servicio()
+    if usuario == servicio:
+        raise ValueError('%s es la cuenta de servicio del acceso con Google; se gestiona en «Métodos de acceso»' % usuario)
+    activos = [u for u, si in lista.items() if si and u != servicio]
+
+    def clave():
+        c = campos.get('clave', '')
+        if c != campos.get('clave2', ''):
+            raise ValueError('las dos claves no coinciden')
+        if not CLAVE_TAK.match(c):
+            raise ValueError('la clave debe tener entre 12 y 128 caracteres visibles, sin espacios')
+        return c
+
+    if a == 'seg-usuarionuevo':
+        if usuario in lista:
+            raise ValueError('el usuario %s ya existe' % usuario)
+        owrx_admin('adduser', usuario, clave())
+        return 'Usuario %s creado.' % usuario
+    if usuario not in lista:
+        raise ValueError('el usuario %s no existe' % usuario)
+    if a == 'seg-usuarioclave':
+        owrx_admin('resetpassword', usuario, clave())
+        return 'Clave de %s cambiada.' % usuario
+    if a == 'seg-usuarioactivar':
+        owrx_admin('enableuser', usuario)
+        return 'Usuario %s activado.' % usuario
+    if a in ('seg-usuarioborrar', 'seg-usuariodesactivar'):
+        if activos == [usuario]:
+            raise ValueError('%s es el único usuario activo; crea otro antes para no quedarte sin acceso' % usuario)
+        if a == 'seg-usuarioborrar':
+            if campos.get('confirmar', '') != usuario:
+                raise ValueError('para borrar escribe el nombre del usuario en «confirmar»')
+            owrx_admin('removeuser', usuario)
+            return 'Usuario %s borrado.' % usuario
+        owrx_admin('disableuser', usuario)
+        return 'Usuario %s desactivado.' % usuario
+    raise ValueError('acción de usuario desconocida')
+
+
+def accion_seguridad(campos):
+    a = campos.get('accion', '')
+    for bloque in (accion_bloqueo, accion_usuarios, accion_acceso):
+        msg = bloque(a, campos)
+        if msg is not None:
+            return msg
+    if a == 'seg-guardar':
+        actual = leer_json(BR_CONF)
+        c = br_validar(campos, actual)
+        if (actual.get('oauth_client_id', '') != c.get('oauth_client_id', '')
+                and c.get('protocolo') in ('gdrive', 'onedrive') and not campos.get('token', '').strip()):
+            raise ValueError('al cambiar el cliente OAuth debes generar y pegar un token nuevo con ese cliente')
+        huella_reset = c.pop('huella_reset', False)
+        previo = leer_json(BR_SECRETO) if actual.get('protocolo') == c['protocolo'] else {}
+        s = br_secretos(campos, c['protocolo'], previo)
+        if (actual.get('oauth_client_id', '') != c.get('oauth_client_id', '')
+                and not campos.get('oauth_client_secret', '')):
+            s.pop('oauth_client_secret', None)
+        if s.get('oauth_client_secret') and not c.get('oauth_client_id'):
+            raise ValueError('el secreto OAuth necesita su ID de cliente')
+        os.makedirs(os.path.dirname(BR_CONF), mode=0o750, exist_ok=True)
+        escribir_json_seguro(BR_SECRETO, s, 0o600)
+        escribir_json_seguro(BR_CONF, c, 0o600)
+        if huella_reset:
+            kh = os.path.join(os.path.dirname(BR_ESTADO), 'known_hosts')
+            try:
+                os.unlink(kh)
+            except OSError:
+                pass
+        br_programar(c['programado'])
+        extra = ' Pulsa «Obtener huella» y confírmala antes de copiar.' if c['protocolo'] == 'sftp' else ''
+        return 'Configuración del backup remoto guardada.' + extra
+    if a == 'seg-olvidar':
+        for ruta in (BR_SECRETO, BR_CONF):
+            try:
+                os.unlink(ruta)
+            except FileNotFoundError:
+                pass
+        br_programar(False)
+        return 'Configuración y credenciales del backup remoto borradas.'
+    orden = a[4:]
+    if orden in BR_ORDENES:
+        if not os.path.exists(BR_CONF):
+            raise ValueError('primero guarda la configuración del backup remoto')
+        r = subprocess.run(['systemctl', 'start', '--no-block', '%s@%s.service' % (BR_UNIDAD, orden)],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode:
+            raise OSError('no se pudo lanzar %s; ¿está instalado el backup remoto?' % orden)
+        return 'Lanzado «%s» en segundo plano; recarga la página para ver el resultado.' % orden
+    raise ValueError('acción desconocida')
+
+
+# ---------------------------------------------------------------- acciones del formulario
+def accion(campos):
+    """Devuelve el mensaje para la web; ValueError = dato no válido."""
+    a = campos.get('accion', '')
+    if a.startswith(('sat-', 'wx-')):
+        return accion_agendas(campos)
+    env = leer_env()
+    m = re.match(r'^(guardar|aplicar)(433|868)$', a)
+    if m:
+        nodo = m.group(2)
+        cfg = NODOS[nodo]
+        largo, corto = validar_nombres(campos.get('largo', ''), campos.get('corto', ''))
+        cambios = {cfg['largo']: largo, cfg['corto']: corto}
+        if cfg['rol']:
+            rol = campos.get('rol', 'CLIENT')
+            if rol not in ROLES:
+                raise ValueError('rol no válido')
+            cambios[cfg['rol']] = rol
+        url = campos.get('url', '').strip()
+        if url:
+            cambios[cfg['url']] = validar_url(url, cfg['region'])
+        guardar(cambios)
+        if m.group(1) == 'guardar':
+            return 'Guardado en bricohams.env (nodo %s). Aplícalo al nodo cuando quieras.' % nodo
+        if not TRABAJO.lanzar('Aplicar la configuración al nodo %s' % nodo, tarea_aplicar(nodo)):
+            return 'Guardado, pero hay otro trabajo en marcha: aplícalo cuando termine.'
+        return 'Guardado. Aplicando al nodo %s (tarda 1-2 minutos)…' % nodo
+    if a == 'mapa':
+        cambios = {k: ('yes' if campos.get(k) == 'yes' else 'no') for k in ('MESH433_OWRX', 'MESH868_OWRX', 'MESH_OWRX_CHAT')}
+        guardar(cambios)
+        if si(env.get('OWRX_MAPA_LORA'), 'yes'):
+            TRABAJO.lanzar('Reiniciar el mapa de OpenWebRX+', tarea_reiniciar(SERVICIO_MAPA), soltar_mapa=False)
+        return 'Mapa de OpenWebRX+ actualizado.'
+    if a == 'leer':
+        if not TRABAJO.lanzar('Leer los nodos', tarea_leer(['433', '868'])):
+            return 'Hay otro trabajo en marcha.'
+        return 'Leyendo los nodos…'
+    if a in ('reiniciar868', 'reiniciarmapa'):
+        s = 'meshtasticd' if a == 'reiniciar868' else SERVICIO_MAPA
+        if not TRABAJO.lanzar('Reiniciar %s' % s, tarea_reiniciar(s), soltar_mapa=(a == 'reiniciar868')):
+            return 'Hay otro trabajo en marcha.'
+        return 'Reiniciando %s…' % s
+    if a == 'reiniciarrak':
+        if not TRABAJO.lanzar('Reiniciar %s' % SERVICIO_RAK, tarea_reiniciar(SERVICIO_RAK), soltar_mapa=False):
+            return 'Hay otro trabajo en marcha.'
+        return 'Reiniciando la pasarela APRS del RAK…'
+    if a == 'tak-clave':
+        return accion_clave_tak(campos)
+    if re.match(r'^(tak|mon)-[a-z]+(-[a-z0-9-]+)?$', a):
+        return accion_servicios(a)
+    if a.startswith('seg-'):
+        return accion_seguridad(campos)
+    if a == 'mesh-enviar':
+        return accion_chat(campos)
+    raise ValueError('acción desconocida')
+
+
+# ---------------------------------------------------------------- mensajes Meshtastic (433 / 868)
+def enviar_mesh(fuente, canal, texto):
+    """Pide a bricohams-mesh-owrx que mande el texto; ValueError con el motivo si no sale."""
+    import socket
+    ruta = os.path.join(MESH_RUN, 'enviar.sock')
+    try:
+        c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    except (AttributeError, OSError):
+        raise ValueError('este sistema no admite el socket de envío')
+    try:
+        c.settimeout(20)
+        c.connect(ruta)
+        c.sendall(json.dumps({'fuente': fuente, 'canal': canal, 'texto': texto}, ensure_ascii=False).encode('utf-8') + b'\n')
+        r = b''
+        while not r.endswith(b'\n') and len(r) < 4096:
+            t = c.recv(4096)
+            if not t:
+                break
+            r += t
+    except OSError:
+        raise ValueError('el servicio %s no está en marcha (¿mapa LoRa desactivado o leyendo los nodos?)' % SERVICIO_MAPA)
+    finally:
+        c.close()
+    try:
+        d = json.loads(r.decode('utf-8'))
+    except ValueError:
+        raise ValueError('respuesta no válida de %s' % SERVICIO_MAPA)
+    if not d.get('ok'):
+        raise ValueError(d.get('error') or 'no enviado')
+    return True
+
+
+def canal_equivalente(canales, nombre):
+    """Índice del canal con el mismo nombre en la otra red o, si no lo hay, el principal."""
+    for c in canales or []:
+        if c.get('nombre', '').lower() == (nombre or '').lower():
+            return c['indice']
+    for c in canales or []:
+        if c.get('primario'):
+            return c['indice']
+    return 0
+
+
+def accion_chat(campos):
+    redes = {k: (f, t) for k, f, t in REDES_CHAT}
+    red = campos.get('red', '')
+    if red not in redes:
+        raise ValueError('red no válida')
+    texto = re.sub(r'[\x00-\x1f\x7f]', ' ', campos.get('texto', '')).strip()
+    if not texto:
+        raise ValueError('escribe un mensaje')
+    if len(texto.encode('utf-8')) > 200:
+        raise ValueError('mensaje demasiado largo (máximo 200 bytes)')
+    try:
+        canal = int(campos.get('canal', ''))
+    except ValueError:
+        raise ValueError('canal no válido')
+    chat = (leer_json(os.path.join(MESH_RUN, 'chat.json')) or {}).get('redes') or {}
+    nombre_canal = next((c.get('nombre') for c in (chat.get(redes[red][0]) or {}).get('canales', []) if c.get('indice') == canal), '')
+    enviar_mesh(redes[red][0], canal, texto)
+    hecho = 'Mensaje enviado por la red %s (canal %s).' % (red, nombre_canal or canal)
+    if campos.get('ambas') == 'yes':
+        otra = '868' if red == '433' else '433'
+        oc = canal_equivalente((chat.get(redes[otra][0]) or {}).get('canales'), nombre_canal)
+        try:
+            enviar_mesh(redes[otra][0], oc, texto)
+            hecho += ' También por la red %s (canal %s).' % (otra, oc)
+        except ValueError as x:
+            hecho += ' No ha salido por la red %s: %s' % (otra, x)
+    return hecho
+
+
+def pagina_chat(sesion, aviso='', error='', auto=False, host=''):
+    """Enviar y recibir mensajes por los canales de los nodos 433 y 868 (sin JavaScript: CSP script-src 'none')."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    nombre_host = urlsplit('//' + host).hostname if host else ''
+    enlaces_web = ''
+    if nombre_host and re.fullmatch(r'[A-Za-z0-9.:-]+', nombre_host):
+        nombre_host = '[%s]' % nombre_host if ':' in nombre_host else nombre_host
+        enlaces_web = ('<p>Cliente oficial (solo LAN/VPN): <a href="https://%s:8443/">868</a> · '
+                       '<a href="https://%s:8444/">433 (requiere MESH433_WEB=yes)</a>. '
+                       'Elige New Connection → HTTP → Connect, conservando el host y puerto propuestos.</p>') % (
+                           e(nombre_host), e(nombre_host))
+    chat = (leer_json(os.path.join(MESH_RUN, 'chat.json')) or {}).get('redes') or {}
+    est = ((leer_json(os.path.join(MESH_RUN, 'mesh.json')) or {}).get('fuentes')) or {}
+    cols = []
+    for red, fuente, titulo in REDES_CHAT:
+        r = chat.get(fuente) or {}
+        es = est.get(fuente) or {}
+        canales = r.get('canales') or es.get('canales') or []
+        nombres = {c.get('indice'): c.get('nombre') for c in canales}
+        if es.get('conectado'):
+            estado = '<span class="badge badge-success">conectado</span>'
+        elif es:
+            estado = '<span class="badge badge-danger">sin conexión</span> <small class="text-muted">%s</small>' % e(es.get('error', ''))
+        else:
+            estado = '<span class="badge badge-secondary">servicio parado</span>'
+        if canales:
+            otra = '868' if red == '433' else '433'
+            form = ('<form method="post" action="%s" class="mb-3">%s<input type="hidden" name="red" value="%s">'
+                    '<div class="form-group"><label for="canal%s">Canal</label><select class="form-control" id="canal%s" name="canal">%s</select></div>'
+                    '<div class="form-group"><label for="texto%s">Mensaje (máx. 200 bytes)</label>'
+                    '<textarea class="form-control" id="texto%s" name="texto" rows="2" maxlength="200" required></textarea></div>'
+                    '<div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="ambas%s" name="ambas" value="yes">'
+                    '<label class="form-check-label" for="ambas%s">Enviar también por la red %s (mismo canal por nombre o el principal)</label></div>'
+                    '<button class="btn btn-primary" name="accion" value="mesh-enviar">Enviar por %s</button></form>') % (
+                MESH_CHAT, oculto, red, red, red,
+                ''.join('<option value="%d">%d · %s</option>' % (c['indice'], c['indice'], e(c.get('nombre'))) for c in canales),
+                red, red, red, red, otra, red)
+        else:
+            form = '<p class="text-warning">Sin canales todavía: el nodo %s no está conectado a bricohams-mesh-owrx.</p>' % red
+        filas = ''.join(
+            '<tr%s><td class="text-nowrap small">%s</td><td>%s</td><td>%s%s</td><td style="word-break:break-word">%s</td><td class="small text-nowrap">%s</td></tr>' % (
+                ' class="table-active"' if m.get('dir') == 'tx' else '',
+                e(time.strftime('%d/%m %H:%M', time.localtime(m.get('t') or 0))),
+                e(nombres.get(m.get('canal'), m.get('canal'))),
+                '<b>yo</b> ↑' if m.get('dir') == 'tx' else e(m.get('de')),
+                ' <span class="badge badge-info">directo</span>' if m.get('directo') else '',
+                e(m.get('texto')),
+                '' if m.get('snr') is None else e('%s dB · %s dBm' % (m.get('snr'), m.get('rssi'))))
+            for m in reversed((r.get('mensajes') or [])[-80:]))
+        cols.append(
+            '<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><div class="card-body">%s'
+            '<div style="max-height:32em;overflow:auto"><table class="table table-sm"><tr><th>Hora</th><th>Canal</th><th>De</th><th>Mensaje</th><th>Señal</th></tr>%s</table></div>'
+            '</div></div></div>' % (e(titulo), estado, form, filas or '<tr><td colspan="5" class="text-muted">Sin mensajes todavía.</td></tr>'))
+    refresco = '<meta http-equiv="refresh" content="20;url=%s?auto=1">' % MESH_CHAT if auto else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Mensajes Meshtastic · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container-fluid"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item"><a href="%(base)s">Meshtastic 433 / 868</a></li><li class="breadcrumb-item active">Mensajes</li></ol></nav>
+<h1>Meshtastic · mensajes</h1>
+%(enlaces_web)s
+<p class="text-muted">Envía y recibe por los canales de nuestros nodos: lo que mandes sale por radio a la red Meshtastic
+(y a los nodos conectados a ella). Se guardan los últimos 200 mensajes de cada red mientras el servicio esté en marcha
+(no se escriben en disco); los directos a otros nodos nunca se guardan.
+<a href="%(chat)s">Actualizar</a> · %(auto)s</p>
+%(aviso)s%(error)s</div></div>
+<div class="row">%(cols)s</div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'chat': MESH_CHAT, 'cols': ''.join(cols), 'enlaces_web': enlaces_web,
+        'auto': ('<a href="%s">parar la recarga automática</a>' % MESH_CHAT) if auto else (
+            '<a href="%s?auto=1">recargar cada 20 s</a> (pierde lo que estés escribiendo)' % MESH_CHAT),
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else ''}
+
+
+# ---------------------------------------------------------------- web
+def e(s):
+    return html.escape('' if s is None else str(s), quote=True)
+
+
+def token(sesion):
+    return hmac.new(SECRETO, sesion.encode('utf-8'), hashlib.sha256).hexdigest()[:40]
+
+
+def sesion_owrx(cabecera_cookie):
+    try:
+        c = http.cookies.SimpleCookie()
+        c.load(cabecera_cookie or '')
+        return c['owrx-session'].value if 'owrx-session' in c else ''
+    except http.cookies.CookieError:
+        return ''
+
+
+_VALIDAS = {}
+_VALIDAS_LOCK = threading.Lock()
+VALIDA_SEG = 30
+
+
+def autorizado_cache(sesion):
+    """Como autorizado(), recordando 30 s las sesiones buenas (el cliente web de :8443 sondea mucho)."""
+    ahora = time.monotonic()
+    with _VALIDAS_LOCK:
+        if _VALIDAS.get(sesion, 0) > ahora:
+            return True
+    if not autorizado(sesion):
+        return False
+    with _VALIDAS_LOCK:
+        if len(_VALIDAS) > 200:
+            for k in [k for k, v in _VALIDAS.items() if v <= ahora]:
+                del _VALIDAS[k]
+        _VALIDAS[sesion] = ahora + VALIDA_SEG
+    return True
+
+
+def autorizado(sesion):
+    """La sesión vale si OpenWebRX+ deja ver /settings con ella (AuthorizationMixin: 200 o 403)."""
+    if not sesion or not re.match(r'^[A-Za-z0-9_-]{8,128}$', sesion):
+        return False
+    host, _, puerto = OWRX.partition(':')
+    try:
+        c = http.client.HTTPConnection(host, int(puerto or 80), timeout=5)
+        c.request('GET', '/settings', headers={'Cookie': 'owrx-session=' + sesion, 'X-Requested-With': 'XMLHttpRequest'})
+        r = c.getresponse()
+        r.read()
+        c.close()
+        return r.status == 200
+    except (OSError, ValueError, http.client.HTTPException):
+        return False
+
+
+def hora(t):
+    return time.strftime('%d/%m %H:%M:%S', time.localtime(t)) if t else ''
+
+
+def html_lectura(n):
+    d = TRABAJO.lecturas.get(n)
+    if not d:
+        return '<p class="text-muted">Sin leer todavía (botón «Leer los nodos»).</p>'
+    if not d.get('ok'):
+        return '<p class="text-danger">Última lectura %s: %s</p>' % (e(hora(d.get('hora'))), e(d.get('error')))
+    filas = [('Nodo', '%s · %s (%s)' % (d.get('num'), d.get('largo'), d.get('corto'))), ('Hardware', d.get('hw')),
+             ('Firmware', d.get('firmware')), ('Rol', d.get('rol')),
+             ('Radio', '%s · %s · %s dBm · %s saltos' % (d.get('region'), d.get('preset'), d.get('potencia'), d.get('saltos'))),
+             ('Posición', '%s, %s' % (d.get('lat'), d.get('lon')) if d.get('lat') is not None else 'sin posición'),
+             ('Nodos oídos', d.get('nodos_oidos')),
+             ('Canales', ' · '.join('%s %s (%s)' % (c['indice'], c['nombre'], c['clave']) for c in d.get('canales', [])))]
+    return ('<p class="text-muted">Leído %s</p><table class="table table-sm">' % e(hora(d.get('hora')))
+            + ''.join('<tr><th>%s</th><td>%s</td></tr>' % (e(k), e(v)) for k, v in filas) + '</table>')
+
+
+def html_url(url, region):
+    if not url:
+        return 'sin URL propia'
+    try:
+        canales, radio = resumen_url(url)
+    except Exception:
+        return '<span class="text-danger">URL ilegible</span>'
+    nombres = ', '.join('%s (%s)' % (c['nombre'] or 'principal', c['clave']) for c in canales)
+    return e('%d canales: %s · radio %s %s' % (len(canales), nombres, radio.get('region', region), radio.get('modem', '')))
+
+
+def pagina(sesion, aviso='', error=''):
+    env = leer_env()
+    tk = token(sesion)
+    oculto = '<input type="hidden" name="csrf" value="%s">' % tk
+    partes = []
+    for n, cfg in NODOS.items():
+        sel = ''
+        if cfg['rol']:
+            actual = env.get(cfg['rol'], 'CLIENT')
+            sel = ('<div class="form-group"><label>Rol</label><select class="form-control" name="rol">'
+                   + ''.join('<option%s>%s</option>' % (' selected' if r == actual else '', r) for r in ROLES)
+                   + '</select></div>')
+        priv = ''
+        if n == '868':
+            priv = '<p class="small">Canal privado: %s</p>' % (
+                e(env.get('MESH868_PRIVATE_NAME', 'BricoHams')) + ' configurado (clave en bricohams.env)'
+                if env.get('MESH868_PRIVATE_PSK') else 'no')
+        partes.append('''
+<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>%(titulo)s</b></div><div class="card-body">
+%(lectura)s
+<form method="post" action="%(base)s" autocomplete="off">%(oculto)s
+<div class="form-group"><label>Nombre largo</label><input class="form-control" name="largo" maxlength="39" value="%(largo)s"></div>
+<div class="form-group"><label>Nombre corto</label><input class="form-control" name="corto" maxlength="4" value="%(corto)s"></div>
+%(sel)s
+<div class="form-group"><label>URL de canales (%(region)s)</label>
+<input class="form-control" name="url" type="password" placeholder="vacío = no cambiar" spellcheck="false">
+<small class="form-text text-muted">Actual: %(url)s</small></div>
+%(priv)s
+<button class="btn btn-secondary" name="accion" value="guardar%(n)s">Guardar</button>
+<button class="btn btn-primary" name="accion" value="aplicar%(n)s">Guardar y aplicar al nodo</button>
+</form></div></div></div>''' % {
+            'titulo': e(cfg['titulo']), 'lectura': html_lectura(n), 'base': BASE, 'oculto': oculto, 'n': n,
+            'largo': e(env.get(cfg['largo'], cfg['def_largo'])), 'corto': e(env.get(cfg['corto'], cfg['def_corto'])),
+            'sel': sel, 'region': cfg['region'], 'url': html_url(env.get(cfg['url'], ''), cfg['region']), 'priv': priv})
+
+    def caja(k, texto, d):
+        return ('<div class="form-check"><input class="form-check-input" type="checkbox" id="%s" name="%s" value="yes"%s>'
+                '<label class="form-check-label" for="%s">%s</label></div>' % (k, k, ' checked' if si(env.get(k), d) else '', k, e(texto)))
+    trabajo = ''
+    if TRABAJO.titulo:
+        trabajo = '<div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><pre class="card-body mb-0" style="max-height:20em;overflow:auto">%s</pre></div>' % (
+            e(TRABAJO.titulo), 'en marcha…' if TRABAJO.activo else 'terminado ' + e(hora(TRABAJO.fin)), e('\n'.join(TRABAJO.log)))
+    refresco = '<meta http-equiv="refresh" content="5;url=%s">' % BASE if TRABAJO.activo else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Meshtastic · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item active">Meshtastic 433 / 868</li><li class="breadcrumb-item"><a href="%(chat_url)s">Mensajes</a></li><li class="breadcrumb-item"><a href="%(aprs)s">APRS (RAK)</a></li></ol></nav>
+<h1>Meshtastic · administración</h1>
+<p class="text-muted">Solo para el administrador (sesión de OpenWebRX+). Los cambios se guardan en bricohams.env; las claves nunca se muestran.</p>
+<p><a class="btn btn-primary" href="%(chat_url)s">Mensajes: enviar y recibir por los canales 433 / 868</a></p>
+%(aviso)s%(error)s%(trabajo)s</div></div>
+<div class="row">%(nodos)s</div>
+<div class="row"><div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Mapa de OpenWebRX+</b></div><div class="card-body">
+<form method="post" action="%(base)s">%(oculto)s
+%(c433)s%(c868)s%(chat)s
+<button class="btn btn-primary mt-2" name="accion" value="mapa">Guardar</button></form></div></div></div>
+<div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Mantenimiento</b></div><div class="card-body">
+<form method="post" action="%(base)s">%(oculto)s
+<button class="btn btn-secondary mb-2" name="accion" value="leer">Leer los nodos</button>
+<button class="btn btn-secondary mb-2" name="accion" value="reiniciar868">Reiniciar meshtasticd (868)</button>
+<button class="btn btn-secondary mb-2" name="accion" value="reiniciarmapa">Reiniciar el servicio del mapa</button>
+</form></div></div></div></div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'chat_url': MESH_CHAT, 'oculto': oculto, 'nodos': ''.join(partes), 'trabajo': trabajo,
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else '',
+        'c433': caja('MESH433_OWRX', 'Nodo 433 en el mapa', 'yes'), 'c868': caja('MESH868_OWRX', 'Nodo 868 en el mapa', 'yes'),
+        'chat': caja('MESH_OWRX_CHAT', 'Mensajes de canales públicos en el chat de la web (nunca los directos)', 'no')}
+
+
+def leer_rak():
+    try:
+        with open(RAK_JSON, encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def pagina_aprs(sesion, aviso='', error=''):
+    """Estado del RAK4631 LoRa APRS (433.775) y su registro de paquetes, solo lectura + reinicio."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    d = leer_rak()
+    activo = systemctl('is-active', '--quiet', SERVICIO_RAK) == 0
+    if not d:
+        estado = '<p class="text-danger">Sin datos de %s (%s).</p>' % (e(RAK_JSON), 'servicio activo' if activo else 'servicio parado')
+        oidos = ''
+    else:
+        r = d.get('rak') or {}
+        gps = r.get('gps') or {}
+        ais = d.get('aprsis') or {}
+        mapa = d.get('mapa_owrx') or {}
+        filas = [
+            ('Servicio', '%s · actualizado %s' % ('activo' if activo else 'PARADO', d.get('actualizado', '?'))),
+            ('Puerto', d.get('puerto', '?')),
+            ('Firmware / indicativo', '%s · %s' % (r.get('fw', '?'), r.get('call', '?'))),
+            ('Radio', '%s · %.3f MHz · TX %s' % (r.get('radio', '?'), (r.get('freq') or 0) / 1e6, 'sí' if r.get('tx') else 'no')),
+            ('Contadores', 'RX %s · TX %s · digi %s · CRC err %s' % (r.get('rx', 0), r.get('txn', 0), r.get('digin', 0), r.get('crcerr', 0))),
+            ('Último RSSI / SNR', '%s dBm · %s dB' % (r.get('rssi', '?'), r.get('snr', '?'))),
+            ('Sensor', '%s · %s °C · %s %% · %s hPa' % (r.get('sensor', '-'), r.get('t', '-'), r.get('h', '-'), r.get('p', '-'))),
+            ('Batería', '%s V' % r['vbat'] if r.get('vbat') is not None else 'sin batería (alimentado por USB)'),
+            ('GPS', 'fix, %s satélites' % gps.get('sats', 0) if gps.get('fix') else ('sin fix' if gps.get('present') else 'no hay')),
+            ('APRS-IS', '%s · %s enviados' % ('conectado' if ais.get('conectado') else ('desconectado' if ais.get('activo') else 'desactivado'), ais.get('enviados', 0))),
+            ('Mapa OpenWebRX+', '%s · %s publicados' % ('sí' if mapa.get('activo') else 'no', mapa.get('publicados', 0))),
+            ('Uptime del RAK', '%s s' % r.get('up', '?')),
+        ]
+        estado = ('<table class="table table-sm mb-0">'
+                  + ''.join('<tr><th>%s</th><td>%s</td></tr>' % (e(k), e(v)) for k, v in filas) + '</table>')
+        oidos = ''.join('<tr><td>%s</td><td>%s</td><td>%s / %s</td><td>%s</td><td>%s</td><td class="small" style="word-break:break-all">%s</td></tr>' % (
+            e(o.get('hora')), e(o.get('de')), e(o.get('rssi')), e(o.get('snr')),
+            'sí' if o.get('aprsis') else '-', 'sí' if o.get('mapa') else '-', e(o.get('paquete')))
+            for o in (d.get('oidos') or []))
+    refresco = '<meta http-equiv="refresh" content="5;url=%s">' % APRS if TRABAJO.activo else ''
+    return '''<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%(refresco)s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>APRS (RAK) · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item"><a href="%(base)s">Meshtastic 433 / 868</a></li>
+<li class="breadcrumb-item active">APRS (RAK)</li></ol></nav>
+<h1>LoRa APRS · RAK4631</h1>
+<p class="text-muted">Solo para el administrador (sesión de OpenWebRX+). La configuración (indicativo, passcode, baliza) está en bricohams.env y no se muestra aquí.</p>
+%(aviso)s%(error)s%(trabajo)s</div></div>
+<div class="row"><div class="col-lg-6"><div class="card mb-4"><div class="card-header"><b>Estado</b></div><div class="card-body">%(estado)s
+<form method="post" action="%(aprs)s" class="mt-3">%(oculto)s
+<button class="btn btn-secondary" name="accion" value="reiniciarrak">Reiniciar la pasarela APRS</button></form>
+</div></div></div></div>
+<div class="row"><div class="col-12"><div class="card mb-4"><div class="card-header"><b>Registro · últimos paquetes oídos</b></div><div class="card-body">
+<table class="table table-sm"><tr><th>Hora</th><th>De</th><th>RSSI / SNR</th><th>APRS-IS</th><th>Mapa</th><th>Paquete</th></tr>%(oidos)s</table>
+</div></div></div></div></div></body></html>''' % {
+        'refresco': refresco, 'base': BASE, 'aprs': APRS, 'oculto': oculto, 'estado': estado,
+        'oidos': oidos or '<tr><td colspan="6" class="text-muted">Nada todavía.</td></tr>',
+        'trabajo': html_trabajo(),
+        'aviso': '<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+        'error': '<div class="alert alert-danger">%s</div>' % e(error) if error else ''}
+
+
+def html_trabajo():
+    if not TRABAJO.titulo:
+        return ''
+    return '<div class="card mb-4"><div class="card-header"><b>%s</b> · %s</div><pre class="card-body mb-0" style="max-height:20em;overflow:auto">%s</pre></div>' % (
+        e(TRABAJO.titulo), 'en marcha…' if TRABAJO.activo else 'terminado ' + e(hora(TRABAJO.fin)), e('\n'.join(TRABAJO.log)))
+
+
+def host_seguro(h):
+    """Nombre/IP de la cabecera Host sin puerto, solo si es un nombre válido (para los enlaces a :8445)."""
+    h = (h or '').strip()
+    if h.count(':') == 1:
+        h = h.rsplit(':', 1)[0]
+    elif h.startswith('[') and ']:' in h:
+        h = h[:h.index(']') + 1]
+    return h if re.match(r'^(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]{1,253})$', h) else ''
+
+
+def cabecera(titulo, ruta):
+    """Cabecera común de los paneles TAK y Monitorización (v5.0), con enlaces entre paneles."""
+    refresco = '<meta http-equiv="refresh" content="5;url=%s">' % ruta if TRABAJO.activo else ''
+    enlaces = ' · '.join('<a href="%s">%s</a>' % (r, n) for r, n in (
+        (BASE, 'Meshtastic'), (APRS, 'APRS (RAK)'), (TAK, 'TAK'), (MONITOR, 'Monitorización'),
+        (MAPFLIGHTS, 'map.flights'),
+        (SATELITES, 'Satélites y agendas'), (CLIMA, 'Clima'),
+        (SEGURIDAD, 'Seguridad')) if r != ruta)
+    return """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">%s
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>%s · administración BricoHams</title>
+<link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/admin.css"></head>
+<body><div class="container-fluid"><div class="row"><div class="col-12">
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="/settings">Settings</a></li>
+<li class="breadcrumb-item active">%s</li></ol></nav><p class="small">Otros paneles: %s</p>""" % (refresco, e(titulo), e(titulo), enlaces)
+
+
+def tabla_unidades(unidades, ruta, grupo, oculto):
+    filas = []
+    for u in unidades:
+        cargada, activa, txt = estado_unidad(u)
+        if not cargada and u in UNIDADES_OPCIONALES:
+            continue
+        botones = ''
+        if cargada:
+            otro = ('parar', 'Parar', 'danger') if activa else ('arrancar', 'Arrancar', 'success')
+            botones = ''.join('<button class="btn btn-sm btn-%s me-1" name="accion" value="%s-%s-%s">%s</button>' % (
+                c, grupo, v, u, n) for v, n, c in (('reiniciar', 'Reiniciar', 'secondary'), otro))
+        clase = 'text-success' if activa else ('text-danger' if cargada else 'text-muted')
+        filas.append('<tr><th>%s</th><td class="%s">%s</td><td><form method="post" action="%s" class="m-0">%s%s</form></td></tr>' % (
+            e(u), clase, e(txt), ruta, oculto, botones))
+    return '<table class="table table-sm"><tr><th>Servicio</th><th>Estado</th><th></th></tr>%s</table>' % ''.join(filas)
+
+
+def avisos(aviso, error):
+    return ''.join(['<div class="alert alert-success">%s</div>' % e(aviso) if aviso else '',
+                    '<div class="alert alert-danger">%s</div>' % e(error) if error else '', html_trabajo()])
+
+
+def tarjeta_credenciales_tak(oculto, mostrar):
+    """Las claves solo viajan en la respuesta a «Mostrar credenciales» (POST con CSRF, no-store)."""
+    pares = leer_acceso_tak()
+    if not pares:
+        return ('<div class="card mb-4"><div class="card-header"><b>Credenciales TAK</b></div><div class="card-body">'
+                '<p class="mb-0">No hay credenciales en <code>%s</code>.</p></div></div>' % e(TAK_ACCESO))
+    filas = ''.join('<tr><td><code>%s</code></td><td>%s</td><td>%s</td></tr>' % (
+        e(u), 'administrador' if i == 0 else 'usuario',
+        '<code>%s</code>' % e(c) if mostrar else '••••••••') for i, (u, c) in enumerate(pares))
+    opciones = ''.join('<option value="%s">%s</option>' % (e(u), e(u)) for u, _ in pares)
+    return """<div class="card mb-4"><div class="card-header"><b>Credenciales TAK (web :8445 y alta de certificados)</b></div><div class="card-body">
+<table class="table table-sm"><thead><tr><th>Usuario</th><th>Rol</th><th>Clave</th></tr></thead><tbody>%(filas)s</tbody></table>
+<form method="post" action="%(ruta)s" class="mb-3">%(oculto)s<button class="btn btn-outline-primary btn-sm" name="accion" value="tak-credenciales">Mostrar credenciales</button>
+<span class="small text-muted">Se guardan en <code>%(fichero)s</code> (root, 600). No las compartas.</span></form>
+<form method="post" action="%(ruta)s" autocomplete="off">%(oculto)s
+<div class="row g-2 align-items-end">
+<div class="col-md-3"><label class="form-label small">Usuario</label><select class="form-select form-select-sm" name="usuario">%(opciones)s</select></div>
+<div class="col-md-3"><label class="form-label small">Clave nueva</label><input class="form-control form-control-sm" type="password" name="clave" minlength="12" maxlength="128" autocomplete="new-password"></div>
+<div class="col-md-3"><label class="form-label small">Repite la clave</label><input class="form-control form-control-sm" type="password" name="clave2" minlength="12" maxlength="128" autocomplete="new-password"></div>
+<div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="generar" value="yes" id="tak-generar"><label class="form-check-label small" for="tak-generar">Generar una aleatoria</label></div>
+<button class="btn btn-warning btn-sm" name="accion" value="tak-clave">Cambiar clave</button></div></div>
+<p class="small text-muted mt-2 mb-0">12–128 caracteres ASCII visibles, sin espacios. Tras cambiarla, vuelve a iniciar sesión en ATAK/iTAK/WinTAK.</p>
+</form></div></div>""" % {'filas': filas, 'ruta': TAK, 'oculto': oculto, 'fichero': e(TAK_ACCESO), 'opciones': opciones}
+
+
+def pagina_tak(sesion, aviso='', error='', host='', mostrar=False):
+    """Control del servidor TAK local (OpenTAKServer): estado, arrancar/parar/reiniciar y registro."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    h = e(host_seguro(host)) or '&lt;IP-de-la-estación&gt;'
+    if estado_unidad('bricohams-tak')[0]:
+        cuerpo = """<div class="row"><div class="col-lg-7"><div class="card mb-4"><div class="card-header"><b>Servicios</b></div><div class="card-body">
+%(tabla)s
+<form method="post" action="%(ruta)s">%(oculto)s
+<button class="btn btn-success" name="accion" value="tak-arrancar">Arrancar todo</button>
+<button class="btn btn-secondary" name="accion" value="tak-reiniciar">Reiniciar todo</button>
+<button class="btn btn-danger" name="accion" value="tak-parar">Parar todo</button></form>
+</div></div></div>
+<div class="col-lg-5"><div class="card mb-4"><div class="card-header"><b>Accesos (solo LAN / VPN)</b></div><div class="card-body">
+<p><a class="btn btn-primary" href="https://%(h)s:8445/" target="_blank" rel="noopener">Abrir la web de OpenTAKServer</a></p>
+<ul class="mb-2"><li>Web de administración: <code>https://%(h)s:8445/</code></li>
+<li>CoT SSL (ATAK / iTAK / WinTAK): <code>%(h)s:8089</code></li>
+<li>Alta de certificados: <code>%(h)s:8446</code> y <code>%(h)s:8447</code></li></ul>
+<p class="small text-muted mb-0">Usuarios y claves: tarjeta «Credenciales TAK» (o <code>sudo cat /etc/bricohams/tak-access.txt</code>).
+Los contactos TAK salen en el mapa de OpenWebRX+ (capa TAK).</p>
+</div></div></div></div>
+<div class="row"><div class="col-12">%(cred)s</div></div>
+<div class="row"><div class="col-12"><div class="card mb-4"><div class="card-header"><b>Registro · bricohams-tak</b></div>
+<pre class="card-body mb-0 small" style="max-height:30em;overflow:auto">%(log)s</pre></div></div></div>""" % {
+            'tabla': tabla_unidades(TAK_UNIDADES, TAK, 'tak', oculto), 'ruta': TAK, 'oculto': oculto, 'h': h,
+            'log': e(registro('bricohams-tak')), 'cred': tarjeta_credenciales_tak(oculto, mostrar)}
+    else:
+        cuerpo = ('<div class="alert alert-warning">El servidor TAK no está instalado. Pon <code>TAK=yes</code> en '
+                  'bricohams.env y ejecuta <code>sudo ./install.sh --solo tak</code>.</div>')
+    return (cabecera('Servidor TAK', TAK) + '<h1>Servidor TAK local</h1>' + avisos(aviso, error)
+            + '</div></div>' + cuerpo + '</div></body></html>')
+
+
+def pagina_monitor(sesion, aviso='', error='', host=''):
+    """Solo el panel de Grafana (Prometheus + node_exporter) y el estado de sus servicios."""
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    if estado_unidad('grafana-server')[0]:
+        cuerpo = """<div class="row"><div class="col-12">
+<iframe src="%(gf)s" title="Grafana · BricoHams" style="width:100%%;height:78vh;border:0"></iframe>
+<p class="small"><a href="%(gf)s" target="_blank" rel="noopener">Abrir el panel a pantalla completa</a></p>
+<details class="mb-4"><summary>Servicios de monitorización</summary>%(tabla)s
+<form method="post" action="%(ruta)s">%(oculto)s<button class="btn btn-secondary" name="accion" value="mon-reiniciar">Reiniciar todo</button></form>
+</details></div></div>""" % {'gf': e(GRAFANA), 'tabla': tabla_unidades(MON_UNIDADES, MONITOR, 'mon', oculto),
+                              'ruta': MONITOR, 'oculto': oculto}
+    else:
+        cuerpo = ('<div class="alert alert-warning">La monitorización no está instalada. Pon <code>MONITORIZACION=yes</code> '
+                  'en bricohams.env y ejecuta <code>sudo ./install.sh --solo monitorizacion</code>.</div>')
+    return cabecera('Monitorización', MONITOR) + avisos(aviso, error) + '</div></div>' + cuerpo + '</div></body></html>'
+
+
+def br_tamano(n):
+    try:
+        n = float(n)
+    except (TypeError, ValueError):
+        return '?'
+    for u in ('B', 'KB', 'MB', 'GB'):
+        if n < 1024:
+            return '%.1f %s' % (n, u) if u != 'B' else '%d B' % n
+        n /= 1024
+    return '%.1f TB' % n
+
+
+def br_timer():
+    try:
+        r = subprocess.run(['systemctl', 'show', '-p', 'LoadState,ActiveState,NextElapseUSecRealtime', '--',
+                            BR_UNIDAD + '.timer'], capture_output=True, text=True, timeout=10)
+        d = dict(l.split('=', 1) for l in r.stdout.splitlines() if '=' in l)
+    except (OSError, subprocess.TimeoutExpired):
+        d = {}
+    if d.get('LoadState') != 'loaded':
+        return 'no instalado'
+    if d.get('ActiveState') != 'active':
+        return 'desactivada'
+    return 'activa · próxima: %s' % (d.get('NextElapseUSecRealtime') or '?')
+
+
+def tarjeta_backup_remoto(oculto):
+    c = leer_json(BR_CONF)
+    st = leer_json(BR_ESTADO)
+    hay = leer_json(BR_SECRETO) if c else {}
+    p = c.get('protocolo', 'cifs')
+    filas = []
+    for orden in BR_ORDENES:
+        r = st.get(orden)
+        if isinstance(r, dict):
+            ok = r.get('ok')
+            txt, clase = ('en marcha…', 'text-muted') if ok is None else (('correcto', 'text-success') if ok else ('error', 'text-danger'))
+            filas.append('<tr><th>%s</th><td>%s</td><td class="%s">%s</td><td><small>%s</small></td></tr>' % (
+                e(orden), e(r.get('fecha', '')), clase, txt, e(tapar(str(r.get('mensaje', '')))[:300])))
+    resumen = ''
+    if st.get('ultima_copia'):
+        resumen = ('<p class="mb-1">Última copia: <code>%s</code> · %s · %s<br><small>SHA-256 %s</small></p>' % (
+            e(st['ultima_copia']), e(st.get('ultima_fecha', '')), br_tamano(st.get('ultimo_tamano')),
+            e(st.get('ultima_suma', ''))))
+    huella = ''
+    if p == 'sftp':
+        if st.get('huella_pendiente'):
+            huella = ('<div class="alert alert-warning">Huella del servidor SFTP pendiente de confirmar. '
+                      'Compárala con la del servidor antes de aceptarla:<pre class="mb-2">%s</pre>'
+                      '<form method="post" action="%s" class="m-0">%s<button class="btn btn-sm btn-warning" '
+                      'name="accion" value="seg-confirmar">Confirmar huella</button></form></div>' % (
+                          e(st['huella_pendiente']), SEGURIDAD, oculto))
+        elif st.get('huella'):
+            huella = '<p class="small">Huella SFTP confirmada: <code>%s</code></p>' % e(st['huella'])
+
+    def sel(nombre, opciones, valor):
+        return '<select class="form-select" name="%s" id="br-%s">%s</select>' % (nombre, nombre, ''.join(
+            '<option value="%s"%s>%s</option>' % (e(k), ' selected' if k == valor else '', e(v)) for k, v in opciones))
+
+    def txt(nombre, valor, ph='', tipo='text'):
+        return '<input class="form-control" type="%s" name="%s" id="br-%s" value="%s" placeholder="%s" autocomplete="off">' % (
+            tipo, nombre, nombre, e(valor), e(ph))
+
+    usuario = c.get('usuario', '')
+    if c.get('dominio'):
+        usuario = '%s\\%s' % (c['dominio'], usuario)
+    guardada = ('<span class="text-success">guardada</span>' if hay.get('password') else '<span class="text-muted">sin guardar</span>')
+    tok = ('<span class="text-success">guardado</span>' if hay.get('token') else '<span class="text-muted">sin guardar</span>')
+    destino_ph = '\\\\192.168.1.10\\fw\\backup' if p != 'nfs' else 'nas.local:/export/backup'
+    v = {
+        'ruta': SEGURIDAD, 'oculto': oculto, 'timer': e(br_timer()), 'resumen': resumen, 'huella': huella,
+        'tabla': ('<table class="table table-sm"><tr><th>Orden</th><th>Fecha</th><th>Estado</th><th>Mensaje</th></tr>%s</table>' % ''.join(filas))
+        if filas else '<p class="text-muted">Todavía no se ha ejecutado ninguna orden.</p>',
+        'protocolo': sel('protocolo', list(BR_PROTOCOLOS.items()), p),
+        'destino': txt('destino', c.get('destino', ''), destino_ph),
+        'servidor': txt('servidor', c.get('servidor', ''), 'sftp.ejemplo.org'),
+        'puerto': txt('puerto', str(c.get('puerto', 22)), '22', 'number'),
+        'carpeta': txt('ruta', c.get('ruta', 'bricohams-backup'), 'bricohams-backup'),
+        'usuario': txt('usuario', usuario, 'usuario o DOMINIO\\usuario'),
+        'smb': sel('smb_version', [('3.1.1', 'SMB 3.1.1'), ('3.0', 'SMB 3.0'), ('2.1', 'SMB 2.1')], c.get('smb_version', '3.0')),
+        'nfs': sel('nfs_version', [('4.2', 'NFS 4.2'), ('4.1', 'NFS 4.1'), ('4', 'NFS 4'), ('3', 'NFS 3')], c.get('nfs_version', '4')),
+        'drive_id': txt('drive_id', c.get('drive_id', ''), 'b!abc… o 0123ABCD'),
+        'oauth_client_id': txt('oauth_client_id', c.get('oauth_client_id', '')),
+        'drive_type': sel('drive_type', [('personal', 'Personal'), ('business', 'Empresa / OneDrive for Business'),
+                                         ('documentLibrary', 'Biblioteca SharePoint')], c.get('drive_type', 'personal')),
+        'retencion': txt('retencion', str(c.get('retencion', 14)), '14', 'number'),
+        'prog': ' checked' if c.get('programado') else '',
+        'secr': ' checked' if c.get('incluir_secretos') else '',
+        'guardada': guardada, 'tok': tok,
+        'registro': e(registro('%s@copiar' % BR_UNIDAD, 30)),
+    }
+    return """<div class="card mb-4" id="backup-remoto"><div class="card-header"><b>Backup remoto</b> · copia programada: %(timer)s</div>
+<div class="card-body">%(resumen)s%(huella)s%(tabla)s
+<p><a href="%(ruta)s?ayuda=1#backup-remoto">Paso a paso: crear tokens, obtener drive_id y verificar la copia</a></p>
+<form method="post" action="%(ruta)s" class="mb-3">%(oculto)s
+<button class="btn btn-sm btn-secondary me-1" name="accion" value="seg-probar">Probar conexión</button>
+<button class="btn btn-sm btn-primary me-1" name="accion" value="seg-copiar">Copiar ahora</button>
+<button class="btn btn-sm btn-secondary me-1" name="accion" value="seg-verificar">Verificar última copia</button>
+<button class="btn btn-sm btn-secondary me-1" name="accion" value="seg-huella">Obtener huella SFTP</button></form>
+<form method="post" action="%(ruta)s" autocomplete="off">%(oculto)s
+<div class="row g-2">
+<div class="col-md-4"><label class="form-label" for="br-protocolo">Protocolo</label>%(protocolo)s</div>
+<div class="col-md-8"><label class="form-label" for="br-destino">Destino SMB (UNC) o NFS (servidor:/export)</label>%(destino)s</div>
+<div class="col-md-4"><label class="form-label" for="br-usuario">Usuario (SMB / SFTP)</label>%(usuario)s</div>
+<div class="col-md-4"><label class="form-label" for="br-password">Contraseña (%(guardada)s)</label>
+<input class="form-control" type="password" name="password" id="br-password" autocomplete="new-password" placeholder="vacío = no cambiar"></div>
+<div class="col-md-4"><label class="form-label" for="br-password2">Repetir contraseña</label>
+<input class="form-control" type="password" name="password2" id="br-password2" autocomplete="new-password"></div>
+<div class="col-md-3"><label class="form-label" for="br-smb_version">Versión SMB</label>%(smb)s</div>
+<div class="col-md-3"><label class="form-label" for="br-nfs_version">Versión NFS</label>%(nfs)s</div>
+<div class="col-md-4"><label class="form-label" for="br-servidor">Servidor SFTP</label>%(servidor)s</div>
+<div class="col-md-2"><label class="form-label" for="br-puerto">Puerto SFTP</label>%(puerto)s</div>
+<div class="col-md-4"><label class="form-label" for="br-ruta">Carpeta remota (SFTP / Drive / OneDrive)</label>%(carpeta)s</div>
+<div class="col-md-4"><label class="form-label" for="br-drive_id">OneDrive: drive_id</label>%(drive_id)s</div>
+<div class="col-md-4"><label class="form-label" for="br-drive_type">OneDrive: tipo</label>%(drive_type)s</div>
+<div class="col-12"><label class="form-label" for="br-token">Token OAuth de Google Drive / OneDrive (%(tok)s)</label>
+<textarea class="form-control font-monospace" name="token" id="br-token" rows="2" placeholder='{"access_token":"…","refresh_token":"…"} · vacío = no cambiar'></textarea></div>
+<div class="col-md-6"><label class="form-label" for="br-oauth_client_id">ID de cliente OAuth del backup (opcional)</label>%(oauth_client_id)s</div>
+<div class="col-md-6"><label class="form-label" for="br-oauth-secret">Secreto OAuth del backup</label>
+<input class="form-control" type="password" name="oauth_client_secret" id="br-oauth-secret" maxlength="512" autocomplete="new-password" placeholder="vacío = conservar; no es el secreto de acceso Google"></div>
+<div class="col-md-3"><label class="form-label" for="br-retencion">Copias a conservar</label>%(retencion)s</div>
+<div class="col-md-9 pt-4">
+<div class="form-check"><input class="form-check-input" type="checkbox" name="programado" value="yes" id="br-prog"%(prog)s>
+<label class="form-check-label" for="br-prog">Copia diaria automática (05:15, tras la copia local)</label></div>
+<div class="form-check"><input class="form-check-input" type="checkbox" name="incluir_secretos" value="yes" id="br-secr"%(secr)s>
+<label class="form-check-label" for="br-secr">Incluir secretos (bricohams.env, claves TLS…) — solo si el destino es de confianza</label></div></div>
+</div>
+<button class="btn btn-primary mt-3" name="accion" value="seg-guardar">Guardar configuración</button>
+<button class="btn btn-outline-danger mt-3 ms-2" name="accion" value="seg-olvidar">Borrar configuración y credenciales</button>
+</form>
+<details class="mt-3"><summary>Ayuda por protocolo</summary><ul class="small mt-2">
+<li><b>SMB / CIFS</b>: destino <code>\\\\servidor\\recurso\\carpeta</code>, usuario (o <code>DOMINIO\\usuario</code>) y contraseña. Se monta solo durante la copia.</li>
+<li><b>NFS</b>: destino <code>servidor:/export/ruta</code>; sin usuario (el servidor autoriza por IP).</li>
+<li><b>SFTP</b>: servidor, puerto, usuario y contraseña; antes de copiar pulsa «Obtener huella» y confirma la huella del servidor. No vale para servidores solo SCP.</li>
+<li><b>Google Drive / OneDrive</b>: en un PC con navegador ejecuta <code>rclone authorize "drive"</code> u <code>rclone authorize "onedrive"</code> y pega aquí el JSON del token. Para OneDrive indica también el <code>drive_id</code>.</li>
+</ul><p class="small mb-0">Las contraseñas y tokens se guardan solo en el servidor (esta página nunca los devuelve al navegador).</p></details>
+<details class="mt-2"><summary>Registro de la última copia</summary><pre class="small">%(registro)s</pre></details>
+</div></div>""" % v
+
+
+def boton_seg(oculto, accion, texto, clase='btn-outline-secondary', campos=None):
+    extra = ''.join('<input type="hidden" name="%s" value="%s">' % (e(k), e(v)) for k, v in (campos or {}).items())
+    return ('<form method="post" action="%s" class="d-inline m-0">%s%s<button class="btn btn-sm %s" name="accion" '
+            'value="%s">%s</button></form>' % (SEGURIDAD, oculto, extra, clase, accion, e(texto)))
+
+
+def tarjeta_bloqueo(oculto):
+    d = bloqueo_leer()
+    st = leer_json(os.path.join(BLOQUEO_VAR, 'estado.json'))
+    tabla = st.get('tabla') if isinstance(st.get('tabla'), dict) else None
+    zonas = st.get('zonas') if isinstance(st.get('zonas'), dict) else {}
+    contadores = ('<span class="text-success">activo</span> · paquetes descartados: %s' % ', '.join(
+        '%s %s' % (e(k), e(str(v))) for k, v in tabla.items()) if tabla is not None
+        else '<span class="text-muted">sin aplicar todavía</span>')
+    filas_ip = ''.join('<tr><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td></tr>' % (
+        e(x['red']), e(x['nota']), e(x['fecha']), boton_seg(oculto, 'seg-desbloquearip', 'Quitar', 'btn-outline-danger',
+                                                         {'red': x['red']})) for x in d['ips'])
+    filas_pais = ''.join('<tr><td><b>%s</b></td><td>%s</td><td>%s</td></tr>' % (
+        e(cc.upper()), e(time.strftime('%Y-%m-%d', time.localtime(zonas[cc]))) if isinstance(zonas.get(cc), (int, float)) and zonas[cc] > 0
+        else '<span class="text-warning">sin descargar</span>',
+        boton_seg(oculto, 'seg-desbloquearpais', 'Quitar', 'btn-outline-danger', {'pais': cc})) for cc in d['paises'])
+    baneos = []
+    for jaula, ips in sorted((st.get('baneados') or {}).items()) if isinstance(st.get('baneados'), dict) else []:
+        for ip in (ips if isinstance(ips, list) else [])[:200]:
+            baneos.append('<tr><td>%s</td><td><code>%s</code></td><td>%s</td></tr>' % (
+                e(jaula), e(str(ip)), boton_seg(oculto, 'seg-desbanear', 'Liberar', 'btn-outline-warning', {'ip': str(ip)})))
+    return """<div class="card mb-4"><div class="card-header"><b>Bloqueo por IP y por país</b> · %s
+<span class="float-end">%s</span></div>
+<div class="card-body">
+<p class="small text-muted">Las IP de la LAN, loopback y rangos reservados nunca se bloquean. Estado a %s.</p>
+<h6>IP y redes bloqueadas (%d)</h6>
+%s
+<form method="post" action="%s" class="row g-2 mb-4" autocomplete="off">%s
+<div class="col-md-5"><input class="form-control form-control-sm" name="red" maxlength="400" placeholder="203.0.113.7, 198.51.100.0/24…" spellcheck="false"></div>
+<div class="col-md-4"><input class="form-control form-control-sm" name="nota" maxlength="80" placeholder="Motivo (opcional)"></div>
+<div class="col-md-3"><button class="btn btn-sm btn-danger w-100" name="accion" value="seg-bloquearip">Bloquear IP / red</button></div></form>
+<h6>Países bloqueados (%d)</h6>
+<p class="small text-muted">Bloquea todo el tráfico entrante desde las redes asignadas a cada país (listas de ipdeny.com, se renuevan cada semana). Cuidado: no bloquees el país desde el que administras.</p>
+%s
+<form method="post" action="%s" class="row g-2 mb-4" autocomplete="off">%s
+<div class="col-md-9"><input class="form-control form-control-sm" name="paises" maxlength="200" placeholder="Códigos ISO: cn, ru, kp…" spellcheck="false"></div>
+<div class="col-md-3"><button class="btn btn-sm btn-danger w-100" name="accion" value="seg-bloquearpais">Bloquear país</button></div></form>
+<h6>Baneadas por fail2ban (intentos de inicio de sesión)</h6>
+%s
+</div></div>""" % (
+        contadores, boton_seg(oculto, 'seg-refrescar', 'Actualizar estado'),
+        e(time.strftime('%Y-%m-%d %H:%M', time.localtime(st['fecha'])))
+        if isinstance(st.get('fecha'), (int, float)) and st['fecha'] > 0 else '—', len(d['ips']),
+        '<table class="table table-sm"><tr><th>Red</th><th>Motivo</th><th>Fecha</th><th></th></tr>%s</table>' % filas_ip
+        if filas_ip else '<p class="text-muted">Ninguna.</p>', SEGURIDAD, oculto, len(d['paises']),
+        '<table class="table table-sm"><tr><th>País</th><th>Lista descargada</th><th></th></tr>%s</table>' % filas_pais
+        if filas_pais else '<p class="text-muted">Ninguno.</p>', SEGURIDAD, oculto,
+        '<table class="table table-sm"><tr><th>Jaula</th><th>IP</th><th></th></tr>%s</table>' % ''.join(baneos)
+        if baneos else '<p class="text-muted">Ninguna IP baneada ahora mismo.</p>')
+
+
+def tarjeta_cortafuegos(oculto):
+    filas = []
+    for u in FW_UNIDADES:
+        cargada, activa, texto = estado_unidad(u)
+        if not cargada:
+            clase, texto = 'text-muted', 'no instalado'
+        else:
+            clase = 'text-success' if activa else 'text-danger'
+        filas.append('<tr><th>%s</th><td class="%s">%s</td></tr>' % (e(u), clase, e(texto)))
+    return """<div class="card mb-4"><div class="card-header"><b>Cortafuegos y nginx</b>
+<span class="float-end">%s</span></div><div class="card-body">
+<table class="table table-sm">%s</table>
+<p class="small text-muted mb-0">«Recargar» reinicia el cortafuegos nftables y fail2ban, recarga nginx (sin cortar sesiones) y vuelve a aplicar el bloqueo por IP/país.</p>
+<details class="mt-2"><summary>Registro del cortafuegos</summary><pre class="small">%s</pre></details>
+<details class="mt-2"><summary>Registro de fail2ban</summary><pre class="small">%s</pre></details>
+</div></div>""" % (boton_seg(oculto, 'seg-recargarfw', 'Recargar cortafuegos', 'btn-warning'), ''.join(filas),
+                   e(registro('bricohams-cortafuegos', 20)), e(registro('fail2ban', 20)))
+
+
+def tarjeta_usuarios(oculto):
+    lista = owrx_usuarios()
+    servicio = google_cuenta_servicio()
+    activos = sum(1 for u, si in lista if si and u != servicio)
+    filas = []
+    for u, si in lista:
+        if u == servicio:
+            filas.append('<tr><td><b>%s</b></td><td class="text-info">Google (cuenta de servicio)</td>'
+                         '<td class="small text-muted">la usa «Entrar con Google»; clave aleatoria que nadie conoce</td></tr>' % e(u))
+            continue
+        ultimo = si and activos == 1
+        acciones = (boton_seg(oculto, 'seg-usuariodesactivar', 'Desactivar', 'btn-outline-warning', {'usuario': u})
+                    if si and not ultimo else '' if si else
+                    boton_seg(oculto, 'seg-usuarioactivar', 'Activar', 'btn-outline-success', {'usuario': u}))
+        filas.append('<tr><td><b>%s</b></td><td class="%s">%s</td><td>%s</td></tr>' % (
+            e(u), 'text-success' if si else 'text-muted', 'activo' if si else 'desactivado', acciones))
+    opciones = ''.join('<option value="%s">%s</option>' % (e(u), e(u)) for u, _ in lista if u != servicio)
+    clave = ('<div class="col-md-3"><input class="form-control form-control-sm" type="password" name="clave" minlength="12" '
+             'maxlength="128" autocomplete="new-password" placeholder="Clave (12+)"></div>'
+             '<div class="col-md-3"><input class="form-control form-control-sm" type="password" name="clave2" minlength="12" '
+             'maxlength="128" autocomplete="new-password" placeholder="Repite la clave"></div>')
+    return """<div class="card mb-4"><div class="card-header"><b>Usuarios de la web (OpenWebRX+)</b> · usuarios locales, rol administrador</div><div class="card-body">
+<p class="small text-muted mb-2">Para que los administradores entren también (o solo) con una cuenta de Google, configúralo en <a href="#acceso">Métodos de acceso de administradores</a>.</p>
+%s
+<h6 class="mt-3">Crear usuario</h6>
+<form method="post" action="%s" class="row g-2 mb-3" autocomplete="off">%s
+<div class="col-md-4"><input class="form-control form-control-sm" name="usuario" maxlength="32" pattern="[A-Za-z0-9._-]{1,32}" placeholder="Usuario" autocomplete="off"></div>
+%s<div class="col-md-2"><button class="btn btn-sm btn-primary w-100" name="accion" value="seg-usuarionuevo">Crear</button></div></form>
+<h6>Cambiar clave</h6>
+<form method="post" action="%s" class="row g-2 mb-3" autocomplete="off">%s
+<div class="col-md-4"><select class="form-select form-select-sm" name="usuario">%s</select></div>
+%s<div class="col-md-2"><button class="btn btn-sm btn-secondary w-100" name="accion" value="seg-usuarioclave">Cambiar</button></div></form>
+<h6>Borrar usuario</h6>
+<form method="post" action="%s" class="row g-2" autocomplete="off">%s
+<div class="col-md-4"><select class="form-select form-select-sm" name="usuario">%s</select></div>
+<div class="col-md-6"><input class="form-control form-control-sm" name="confirmar" maxlength="32" placeholder="Escribe el nombre para confirmar" autocomplete="off"></div>
+<div class="col-md-2"><button class="btn btn-sm btn-danger w-100" name="accion" value="seg-usuarioborrar">Borrar</button></div></form>
+<p class="small text-muted mt-3 mb-0">Nunca se muestran las claves. No se puede borrar ni desactivar el último usuario activo.</p>
+</div></div>""" % (
+        '<table class="table table-sm"><tr><th>Usuario</th><th>Estado</th><th></th></tr>%s</table>' % ''.join(filas)
+        if filas else '<p class="text-warning">No se ha podido leer la lista de usuarios (%s).</p>' % e(owrx_usuarios_ruta()),
+        SEGURIDAD, oculto, clave, SEGURIDAD, oculto, opciones, clave, SEGURIDAD, oculto, opciones)
+
+
+def tarjeta_acceso(oculto):
+    env = leer_env()
+    modo = google_modo(env)
+    dominio = env.get('SSL_DOMAIN', '').strip().lower()
+    st = leer_json(os.path.join(GOOGLE_DIR, 'estado.json'))
+    if st.get('hora'):
+        estado = '<span class="%s">%s</span> <span class="small text-muted">(%s)</span>' % (
+            'text-success' if st.get('ok') else 'text-danger', e(str(st.get('mensaje', ''))[:400]),
+            e(time.strftime('%Y-%m-%d %H:%M', time.localtime(st['hora']))) if isinstance(st['hora'], (int, float)) else '')
+    else:
+        estado = '<span class="text-muted">sin aplicar desde el panel</span>'
+    cargada, activa, texto = estado_unidad('bricohams-google-auth')
+    pasarela = ('<span class="text-muted">no instalada</span>' if not cargada else
+                '<span class="%s">%s</span>' % ('text-success' if activa else 'text-warning', e(texto)))
+    opciones = ''.join('<div class="form-check"><input class="form-check-input" type="radio" name="modo" id="m-%s" value="%s"%s>'
+                       '<label class="form-check-label" for="m-%s">%s</label></div>' % (
+                           k, k, ' checked' if k == modo else '', k, e(v)) for k, v in GOOGLE_MODOS)
+    hay_secreto = os.path.exists(os.path.join(GOOGLE_DIR, 'client_secret'))
+    servicio = google_cuenta_servicio(env)
+    origen = 'https://%s' % dominio if dominio else '(configura SSL_DOMAIN)'
+    entrar = ('<a class="btn btn-sm btn-outline-primary" href="/_bh_google/login?rd=%s">Entrar con Google ahora</a>' % SEGURIDAD
+              if modo != 'local' and activa else '')
+    return """<div class="card mb-4" id="acceso"><div class="card-header"><b>Métodos de acceso de administradores</b> · usuarios locales y Google
+<span class="float-end">%s</span></div><div class="card-body">
+<p class="small mb-1">Estado: %s · pasarela Google: %s</p>
+<p><a href="?ayuda=1#google">Guía completa de Google: ID, secreto y prueba</a> ·
+<a href="?ayuda=1#entra">Microsoft Entra ID: compatibilidad y credenciales</a></p>
+<form method="post" action="%s" autocomplete="off">%s
+<div class="mb-3">%s</div>
+<div class="row g-2">
+<div class="col-md-6"><label class="form-label small">ID de cliente OAuth (Google Cloud Console)</label>
+<input class="form-control form-control-sm" name="client_id" maxlength="120" value="%s" placeholder="123456789012-xxxx.apps.googleusercontent.com" spellcheck="false"></div>
+<div class="col-md-6"><label class="form-label small">Secreto del cliente %s</label>
+<input class="form-control form-control-sm" type="password" name="secreto" maxlength="200" autocomplete="new-password" placeholder="%s"></div>
+<div class="col-md-9"><label class="form-label small">Correos de Google administradores (o @dominio de Workspace), separados por comas</label>
+<input class="form-control form-control-sm" name="admins" maxlength="2000" value="%s" placeholder="tu.correo@gmail.com" spellcheck="false"></div>
+<div class="col-md-3"><label class="form-label small">Horas de sesión de Google</label>
+<input class="form-control form-control-sm" name="horas" maxlength="6" value="%s"></div>
+</div>
+<button class="btn btn-primary mt-3" name="accion" value="seg-acceso">Guardar y aplicar</button></form>
+<details class="mt-3"><summary>Cómo crear el cliente de Google</summary><ol class="small">
+<li>Abre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console → Credenciales</a> y crea o elige un proyecto.</li>
+<li>APIs y servicios → Pantalla de consentimiento de OAuth (tipo Externo; ámbitos <code>openid</code> y <code>email</code>; mientras esté «en pruebas», añade tus correos como usuarios de prueba).</li>
+<li>Credenciales → Crear credenciales → ID de cliente de OAuth → «Aplicación web».</li>
+<li>Orígenes de JavaScript autorizados: <code>%s</code></li>
+<li>URI de redirección autorizados: <code>%s/_bh_google/callback</code></li>
+<li>Copia aquí el ID y el secreto, pon tus correos y elige «Usuario local o cuenta de Google».</li>
+<li>Pulsa «Guardar y aplicar», recarga para ver el <b>Estado</b>, cierra la sesión y prueba «Entrar con Google» en <code>/login</code>.</li></ol></details>
+<details class="mt-2"><summary>Dónde se configura cada cosa</summary><ul class="small">
+<li><b>Método de acceso, cliente de Google y correos</b>: esta tarjeta (se guarda en <code>bricohams.env</code>, claves <code>GOOGLE_*</code>; el secreto en <code>/etc/bricohams/google/client_secret</code>, 0600).</li>
+<li><b>Usuarios locales</b> (base de datos de OpenWebRX+): tarjeta «Usuarios de la web» de esta página.</li>
+<li><b>Consola</b>: <code>sudo bricohams-google-auth configurar --kit-env …</code>, <code>… aplicar --kit-env …</code>, <code>… comprobar --kit-env …</code> y <code>bricohams-google-auth --help</code>.</li>
+<li><b>Registros</b>: <code>journalctl -u bricohams-google-auth</code> (accesos y denegaciones) y <code>journalctl -u bricohams-google-auth-aplicar</code> (aplicar).</li>
+<li><b>Documentación</b>: manual 46 del kit (<code>docs/manuales/46_ACCESO_GOOGLE.md</code>) y manual 34, apartado 5 bis.</li></ul></details>
+<ul class="small text-muted mt-2 mb-0">
+<li>Los usuarios locales son los de la tabla de abajo (base de datos de OpenWebRX+). Todos son administradores; con Google entran los correos de la lista.</li>
+<li>«Entrar con Google» usa la cuenta de servicio <code>%s</code> (clave aleatoria guardada solo en el servidor).</li>
+<li>Antibloqueo: para exigir Google (doble o solo Google) primero hay que entrar con Google en el modo «usuario local o Google». No se puede volver a «solo locales» ni a «doble» sin un usuario local activo.</li>
+<li>El secreto nunca se devuelve al navegador. Si te quedas fuera: <code>sudo bricohams-google-auth configurar --kit-env … --desactivar</code> y <code>sudo bricohams-google-auth aplicar --kit-env …</code></li></ul>
+</div></div>""" % (
+        entrar, estado, pasarela, SEGURIDAD, oculto, opciones, e(env.get('GOOGLE_CLIENT_ID', '')),
+        '(guardado)' if hay_secreto else '(obligatorio)', 'déjalo vacío para conservar el actual' if hay_secreto else 'GOCSPX-…',
+        e(env.get('GOOGLE_ADMINS', '').replace(',', ', ')), e(env.get('GOOGLE_SESION_HORAS') or '8'),
+        e(origen), e(origen), e(servicio))
+
+
+def pagina_seguridad(sesion, aviso='', error=''):
+    oculto = '<input type="hidden" name="csrf" value="%s">' % token(sesion)
+    return (cabecera('Seguridad', SEGURIDAD) + '<h1>Seguridad</h1>' + avisos(aviso, error) + '</div></div>'
+            + tarjeta_bloqueo(oculto) + tarjeta_cortafuegos(oculto) + tarjeta_acceso(oculto) + tarjeta_usuarios(oculto)
+            + tarjeta_backup_remoto(oculto) + '</div></body></html>')
+
+
+def pagina_mapflights(s, aviso='', error=''):
+    """Integración adicional ADS-B: diagnóstico privado, sin exponer UUID ni ejecutar cambios."""
+    try:
+        with open(ENV_ETC, encoding='utf-8') as f:
+            f.read()
+        env = leer_env()
+    except OSError as x:
+        error = 'No se puede leer la configuración de la integración: %s' % x
+        env = {}
+    habilitado = env.get('MAPFLIGHTS_FEED', 'no').lower() in ('yes', 'si', 'sí', 'true', '1')
+    uuid = env.get('MAPFLIGHTS_UUID', '').strip().replace('-', '')
+    uuid_ok = bool(re.fullmatch(r'[0-9a-fA-F]{32}', uuid))
+    filas = []
+    for unidad in ('readsb', 'rbfeeder', 'bricohams-mapflights-mlat'):
+        _, _, estado = estado_unidad(unidad)
+        filas.append('<tr><th>%s</th><td>%s</td></tr>' % (e(unidad), e(estado)))
+    return (cabecera('map.flights', MAPFLIGHTS) + '<h1>map.flights · integración ADS-B</h1>'
+            + avisos(aviso, error)
+            + '<p>Destino adicional a RadarBox. El envío lo realiza readsb, no el navegador; '
+              'continúa aunque cierres esta página.</p>'
+            + '<h2>Configuración guardada</h2><ul><li>Envío solicitado: <b>%s</b></li>'
+              '<li>UUID: %s (valor privado, no se muestra)</li></ul>' % (
+                  'activado' if habilitado else 'desactivado',
+                  'formato válido' if uuid_ok else 'ausente o formato no válido')
+            + '<table class="table"><tr><th>Servicio</th><th>Estado local</th></tr>%s</table>' % ''.join(filas)
+            + '<p>Un servicio activo no confirma que map.flights esté recibiendo posiciones. '
+              'La configuración guardada tampoco confirma que se haya aplicado el conector.</p>'
+            + '<h2>Activar con seguridad</h2><ol>'
+              '<li>Crear y verificar una copia de los archivos, configuración y datos afectados; '
+              'guardar su ubicación y el procedimiento de restauración. Si falla, detenerse.</li>'
+              '<li>En el <code>bricohams.env</code> del kit, establecer '
+              '<code>MAPFLIGHTS_FEED="yes"</code> y el UUID propio en '
+              '<code>MAPFLIGHTS_UUID</code>. No usar la clave <code>mf_feed_</code>.</li>'
+              '<li>Conservar <code>RADARBOX_KEY</code>. Aplicar desde la carpeta del kit:</li></ol>'
+              '<pre>sudo bash install.sh --solo adsb\nsudo bricohams-check</pre>'
+              '<p>Aplicar ADS-B reinicia brevemente readsb y rbfeeder. No elimina RadarBox. '
+              'MLAT map.flights es independiente y usa el mismo UUID; no reinyecta resultados.</p>'
+            + '<h2>Comprobar ambos destinos</h2><pre>'
+              'systemctl status readsb rbfeeder --no-pager\n'
+              'systemctl status bricohams-mapflights-mlat --no-pager</pre>'
+              '<p>El servicio MLAT solo se espera si está habilitado. Revisar su journal '
+              'localmente (puede contener el UUID) y confirmar posiciones en ambos portales.</p>'
+              '<p>Destinos predeterminados: <code>feed.map.flights:30004</code> (Beast), '
+              '<code>mlat.map.flights:31090</code> (MLAT).</p>'
+              '<p><a href="https://map.flights/es/stations/build" rel="noreferrer noopener">'
+              'Procedimiento oficial de map.flights</a></p>'
+            + '<h2>Desactivar solo map.flights</h2><p>Con copia verificada, cambiar '
+              '<code>MAPFLIGHTS_FEED="no"</code> en el kit y repetir el paso ADS-B. '
+              'Para recuperar el estado anterior, seguir la restauración de la copia.</p>'
+              '<p>Panel de solo lectura: no guarda claves, no reinicia servicios y no '
+              'envía datos a terceros desde el navegador.</p></div></div></div></body></html>')
+
+
+def agenda_json(ruta):
+    with open(ruta, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def rutas_agenda(env):
+    base = '/usr/lib/python3/dist-packages/htdocs/plugins/receiver'
+    return (env.get('SAT_LIST', '/opt/bricohams/kit/data/satelites.json'),
+            env.get('SATREC_PASES', base + '/satelites/pases.json'),
+            env.get('SATREC_OUT', base + '/satelites/grabaciones.json'),
+            env.get('WXRED_OUT', base + '/meteo/wx-red.json'))
+
+
+def backup_agendas():
+    """Verifica todos los bytes antes de guardar; los entornos contienen secretos."""
+    os.makedirs(AGENDA_BACKUPS, mode=0o700, exist_ok=True)
+    carpeta = tempfile.mkdtemp(prefix='settings-agendas-', dir=AGENDA_BACKUPS)
+    rutas = list(dict.fromkeys([ENV_ETC] + ([ENV_KIT] if ENV_KIT else [])))
+    archivo = os.path.join(carpeta, 'previo.tar.gz')
+    nombres = {ruta: os.path.splitdrive(ruta)[1].replace(os.sep, '/').lstrip('/') for ruta in rutas}
+    with tarfile.open(archivo, 'w:gz') as t:
+        for ruta in rutas:
+            if os.path.islink(ruta) or not os.path.isfile(ruta):
+                raise OSError('No se puede respaldar el entorno: ' + ruta)
+            t.add(ruta, arcname=nombres[ruta], recursive=False)
+    os.chmod(archivo, 0o600)
+    with tarfile.open(archivo, 'r:gz') as t:
+        for ruta in rutas:
+            with open(ruta, 'rb') as f:
+                if t.extractfile(nombres[ruta]).read() != f.read():
+                    raise OSError('Fallo al verificar el backup: ' + ruta)
+    with open(archivo, 'rb') as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    with open(archivo + '.sha256', 'w', encoding='utf-8') as f:
+        f.write(digest + '  previo.tar.gz\n')
+    restaurar = os.path.join(carpeta, 'RESTAURAR.sh')
+    with open(restaurar, 'w', encoding='utf-8', newline='\n') as f:
+        f.write('#!/bin/bash\nset -euo pipefail\ncd -- "$(dirname -- "$0")"\n'
+                'sha256sum -c previo.tar.gz.sha256\n'
+                'tar -xzf previo.tar.gz -C /\n'
+                'systemctl restart bricohams-satrec bricohams-wx-red\n')
+    os.chmod(restaurar, 0o700)
+    return carpeta
+
+
+def numero_agenda(campos, clave, minimo, maximo):
+    texto = campos.get(clave, '')
+    if not re.fullmatch(r'[0-9]+', texto) or not minimo <= int(texto) <= maximo:
+        raise ValueError('%s debe estar entre %s y %s' % (clave, minimo, maximo))
+    return texto
+
+
+def accion_agendas(campos):
+    with AGENDA_LOCK:
+        env = leer_env()
+        lista, pases_f, estado_f, _ = rutas_agenda(env)
+        a = campos.get('accion')
+        if a == 'wx-guardar':
+            cambios = {'WXRED_RADIO_KM': numero_agenda(campos, 'WXRED_RADIO_KM', 5, 500),
+                       'WXRED_HORAS': numero_agenda(campos, 'WXRED_HORAS', 1, 24),
+                       'WXRED_SATELITES': 'yes' if campos.get('WXRED_SATELITES') == 'yes' else 'no'}
+            unidad = 'bricohams-wx-red'
+        elif a in ('sat-guardar', 'sat-omitir', 'sat-incluir'):
+            pases = agenda_json(pases_f)['pases']
+            estado = agenda_json(estado_f)
+            ahora = time.time()
+            if any(p['aos'] - 60 <= ahora <= p['los'] + 60
+                   for p in pases + estado.get('plan', [])):
+                raise ValueError('Hay un pase en curso o inminente. Guarda al terminar para no interrumpirlo.')
+            if a == 'sat-guardar':
+                catalogo = agenda_json(lista)['satelites']
+                nombres = {s['nombre'].upper() for s in catalogo}
+                excluir = {x.strip().upper() for x in env.get('SATREC_EXCLUIR', '').split(',') if x.strip()}
+                excluir -= nombres
+                excluir.update(s['nombre'].upper() for s in catalogo
+                               if campos.get('sat_' + str(s['norad'])) != 'yes')
+                cambios = {'SATREC_MIN_EL': numero_agenda(campos, 'SATREC_MIN_EL', 0, 90),
+                           'SATREC_ENABLE': 'yes' if campos.get('SATREC_ENABLE') == 'yes' else 'no',
+                           'SATREC_METEOR': 'yes' if campos.get('SATREC_METEOR') == 'yes' else 'no',
+                           'SATREC_EXCLUIR': ','.join(sorted(excluir))}
+            else:
+                ident = campos.get('pase', '')
+                validos = {'%s:%s' % (p['norad'], int(p['aos'])) for p in pases if p['aos'] > ahora + 60}
+                if ident not in validos:
+                    raise ValueError('Pase caducado o desconocido; recarga la agenda.')
+                omitir = {x for x in env.get('SATREC_OMITIR_PASES', '').split(',') if x in validos}
+                if a == 'sat-omitir':
+                    omitir.add(ident)
+                else:
+                    omitir.discard(ident)
+                cambios = {'SATREC_OMITIR_PASES': ','.join(sorted(omitir))}
+            unidad = 'bricohams-satrec'
+        else:
+            raise ValueError('Acción de agenda desconocida')
+        copia = backup_agendas()
+        try:
+            guardar(cambios)
+            r = subprocess.run(['systemctl', 'restart', unidad], capture_output=True, text=True, timeout=30)
+            if r.returncode:
+                raise OSError('No se pudo reiniciar %s; revisa su journal local.' % unidad)
+            r = subprocess.run(['systemctl', 'is-active', '--quiet', unidad], timeout=10)
+            if r.returncode:
+                raise OSError('El servicio %s no está activo.' % unidad)
+        except (OSError, subprocess.TimeoutExpired) as x:
+            raise OSError('Cambios sin confirmar: %s. Backup: %s; restaura con sudo bash %s/RESTAURAR.sh'
+                          % (x, copia, copia)) from x
+        return 'Guardado y servicio activo. Backup verificado: %s. Restauración: sudo bash %s/RESTAURAR.sh' % (copia, copia)
+
+
+def campo_agenda(nombre, titulo, valor, minimo, maximo):
+    return ('<label class="d-block">%s <input class="form-control" type="number" name="%s" '
+            'min="%s" max="%s" value="%s" required></label>' % (
+                e(titulo), e(nombre), minimo, maximo, e(valor)))
+
+
+def check_agenda(nombre, titulo, activo):
+    return '<label class="d-block"><input type="checkbox" name="%s" value="yes"%s> %s</label>' % (
+        e(nombre), ' checked' if activo else '', e(titulo))
+
+
+def informes_capturas(capturas, catalogo, env):
+    ruta = os.environ.get('SATREC_PY', '/usr/local/bin/bricohams-satrec')
+    if not os.path.isfile(ruta):
+        ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bricohams-satrec.py')
+    loader = importlib.machinery.SourceFileLoader('bh_satrec_informes', ruta)
+    mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(mod)
+    cfg = mod.cfg_desde_env(env)
+    asociaciones = {x['norad']: x['amsat'] for x in catalogo if x.get('amsat')}
+    filas = []
+    for c in capturas[:60]:
+        datos = dict(c)
+        datos['amsat'] = datos.get('amsat') or asociaciones.get(c['norad'], '')
+        f = mod.informe_amsat(datos, cfg)
+        fecha = time.strftime('%d/%m/%Y %H:%M UTC', time.gmtime(c['aos']))
+        informe = '<span>No disponible: requiere captura grabada, asociación AMSAT e indicativo configurado.</span>'
+        if c.get('amsat_enviado'):
+            informe = '<span>Informe ya enviado automáticamente a AMSAT.</span>'
+        elif f:
+            ocultos = ''.join('<input type="hidden" name="%s" value="%s">' % (e(k), e(v))
+                              for k, v in f.items() if k != 'SatReport')
+            opciones = '<option value="" disabled%s>Selecciona el resultado observado</option>' % (
+                ' selected' if not f['SatReport'] else '')
+            opciones += ''.join('<option value="%s"%s>%s</option>' % (
+                v, ' selected' if v == f['SatReport'] else '', titulo)
+                for v, titulo in (('Heard', 'Oído (Heard)'), ('Telemetry Only', 'Solo telemetría'),
+                                  ('Not Heard', 'No oído (Not Heard)')))
+            informe = ('<form method="post" action="https://www.amsat.org/status/submit.php" '
+                       'target="_blank" rel="noopener noreferrer">' + ocultos
+                       + '<p>%s · %s · %s</p>' % (e(f['SatName']), e(f['SatCall']), e(f['SatGridSquare']))
+                       + '<label>Resultado <select name="SatReport" required class="form-control">'
+                       + opciones + '</select></label>'
+                       '<p><label><input type="checkbox" required> He revisado el resultado y autorizo enviar '
+                       'indicativo, locator y fecha a AMSAT.</label></p>'
+                       '<button class="btn btn-primary" name="SatSubmit" value="Submit Data">'
+                       'Enviar reporte a AMSAT.org</button></form>')
+        filas.append('<tr><td>%s<br>%s</td><td>%s</td><td>%s</td></tr>' % (
+            e(c.get('nombre')), fecha, e(c.get('estado')), informe))
+    return ('<h2>Capturas y reportes AMSAT.org</h2><p>El botón envía el informe al sitio oficial en otra pestaña; '
+            'no es una vista previa. Revisa su respuesta: este panel no confirma la aceptación ni impide '
+            'duplicados manuales. No se envían informes por abrir esta página. En SSB elige tú el resultado.</p>'
+            '<div class="table-responsive"><table class="table"><tr><th>Captura (UTC)</th>'
+            '<th>Resultado de captura</th><th>Informe manual</th></tr>' + ''.join(filas) + '</table></div>')
+
+
+def filtro_satelites(parametros):
+    banda = parametros.get('banda', '')
+    limites = {'': (0, 100000), '2m': (144, 148), '70cm': (430, 440),
+               '137': (137, 138), '400': (400, 401)}
+    if banda not in limites:
+        raise ValueError('Banda no válida.')
+    valores = []
+    for clave in ('desde_mhz', 'hasta_mhz'):
+        texto = parametros.get(clave, '').strip().replace(',', '.')
+        if texto and (not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,6})?', texto)
+                      or not 0 < float(texto) <= 100000):
+            raise ValueError('Frecuencia no válida: usa MHz positivos (máximo 100000).')
+        valores.append(float(texto) if texto else None)
+    desde, hasta = valores
+    if desde is not None and hasta is not None and desde > hasta:
+        raise ValueError('La frecuencia inicial no puede superar la final.')
+    minimo, maximo = limites[banda]
+    return max(minimo, desde if desde is not None else minimo), min(maximo, hasta if hasta is not None else maximo)
+
+
+def pagina_satelites(s, aviso='', error='', filtros=None):
+    inicio = cabecera('Satélites y agendas de captura', SATELITES)
+    try:
+        env = leer_env()
+        lista, pases_f, estado_f, _ = rutas_agenda(env)
+        catalogo = agenda_json(lista)['satelites']
+        filtros = filtros or {}
+        minimo, maximo = filtro_satelites(filtros)
+        frecuencias = {x['norad']: x.get('mhz') for x in catalogo}
+        pases = agenda_json(pases_f)['pases']
+        estado = agenda_json(estado_f)
+        excluir = {x.strip().upper() for x in env.get('SATREC_EXCLUIR', '').split(',')}
+        omitidos = set(env.get('SATREC_OMITIR_PASES', '').split(','))
+        planificados = {'%s:%s' % (p['norad'], int(p['aos'])) for p in estado['plan']}
+        oculto = '<input type="hidden" name="csrf" value="%s">' % token(s)
+        formulario = ('<form method="post" action="%s">%s' % (SATELITES, oculto)
+                      + check_agenda('SATREC_ENABLE', 'Captura automática habilitada', si(env.get('SATREC_ENABLE'), 'yes'))
+                      + check_agenda('SATREC_METEOR', 'Preparar perfil METEOR / SatDump', si(env.get('SATREC_METEOR'), 'yes'))
+                      + campo_agenda('SATREC_MIN_EL', 'Elevación mínima (grados)', env.get('SATREC_MIN_EL', '20'), 0, 90)
+                      + '<h2>Agendas por satélite</h2><p>Desmarca un satélite para excluir todos sus pases.</p>'
+                      + ''.join(check_agenda('sat_' + str(x['norad']), x['nombre'], x['nombre'].upper() not in excluir)
+                                for x in catalogo)
+                      + '<button class="btn btn-primary" name="accion" value="sat-guardar">Guardar agendas</button></form>')
+        filas = []
+        for p in sorted(pases, key=lambda x: x['aos']):
+            if p['los'] <= time.time():
+                continue
+            mhz = p['hz'] / 1e6 if p.get('hz') else frecuencias.get(p['norad'])
+            if (filtros.get('banda') or filtros.get('desde_mhz') or filtros.get('hasta_mhz')) and (
+                    mhz is None or not minimo <= mhz <= maximo):
+                continue
+            bajada = 'Sin frecuencia' if mhz is None else '%.6f MHz' % mhz
+            ident = '%s:%s' % (p['norad'], int(p['aos']))
+            omitido = ident in omitidos
+            estado_p = 'Omitido' if omitido else ('Programado' if ident in planificados else 'No programado (filtros, solape o ya capturado)')
+            fecha = time.strftime('%d/%m %H:%M', time.localtime(p['aos']))
+            filas.append('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s°</td><td>%s</td><td>'
+                         '<form method="post" action="%s">%s<input type="hidden" name="pase" value="%s">'
+                         '<button class="btn btn-sm btn-secondary" name="accion" value="%s">%s</button></form></td></tr>' % (
+                             e(p['nombre']), e(bajada), fecha, e(p['max_el']), estado_p, SATELITES, oculto, e(ident),
+                             'sat-incluir' if omitido else 'sat-omitir', 'Reconsiderar' if omitido else 'Omitir este pase'))
+        capturas = informes_capturas(estado.get('capturas', []), catalogo, env)
+        selector = '<form method="get" action="%s"><label>Banda de bajada <select name="banda">' % SATELITES
+        selector += ''.join('<option value="%s"%s>%s</option>' % (
+            valor, ' selected' if filtros.get('banda', '') == valor else '', titulo)
+            for valor, titulo in (('', 'Todas'), ('2m', '2 m (144–148 MHz)'),
+                                  ('70cm', '70 cm (430–440 MHz)'), ('137', '137–138 MHz'),
+                                  ('400', '400–401 MHz (telemetría)')))
+        selector += '</select></label>'
+        selector += ''.join('<label>%s <input type="text" inputmode="decimal" name="%s" value="%s"></label>' % (
+            titulo, clave, e(filtros.get(clave, '')))
+            for clave, titulo in (('desde_mhz', 'Desde MHz'), ('hasta_mhz', 'Hasta MHz')))
+        selector += ('<button class="btn btn-secondary">Filtrar pases</button> '
+                     '<a href="%s">Quitar filtros</a></form>'
+                     '<p>Filtros de consulta, inclusivos y combinables: no cambian las capturas programadas '
+                     'ni la selección de satélites. Para una frecuencia exacta, usa el mismo valor en ambos campos.</p>') % SATELITES
+        return (inicio + avisos(aviso, error) + '<h1>Satélites y agendas de captura</h1>'
+                '<p>Un solo receptor: los pases solapados se priorizan por inicio. Reconsiderar un pase no evita '
+                'los filtros ni garantiza recepción. Horas locales del servidor. Los cambios no se aplican durante un pase.</p>'
+                + formulario + '<h2>Próximos pases</h2><p><a href="/static/plugins/receiver/satelites/pases.ics">'
+                'Descargar agenda de capturas (ICS)</a> · <a href="/files">Grabaciones e imágenes (Files)</a></p>'
+                + selector + '<div class="table-responsive"><table class="table"><tr><th>Satélite</th><th>Bajada</th><th>Inicio</th>'
+                '<th>Máxima</th><th>Estado</th><th>Agenda</th></tr>' + ''.join(filas[:100]) + '</table></div>'
+                + capturas + '</div></div></div></body></html>')
+    except (OSError, ValueError, KeyError, TypeError) as x:
+        return inicio + avisos(aviso, error or 'No se puede cargar la agenda: %s' % x) + '</div></div></div></body></html>'
+
+
+def pagina_clima(s, aviso='', error=''):
+    inicio = cabecera('Clima en red', CLIMA)
+    try:
+        env = leer_env()
+        datos = agenda_json(rutas_agenda(env)[3])
+        oculto = '<input type="hidden" name="csrf" value="%s">' % token(s)
+        return (inicio + avisos(aviso, error) + '<h1>Clima en red</h1>'
+                '<p>Recepción APRS-IS de solo lectura. No cambia el sensor local ni transmite por radio.</p>'
+                '<form method="post" action="%s">%s' % (CLIMA, oculto)
+                + campo_agenda('WXRED_RADIO_KM', 'Radio de búsqueda (km)', env.get('WXRED_RADIO_KM', '100'), 5, 500)
+                + campo_agenda('WXRED_HORAS', 'Antigüedad máxima de datos (horas)', env.get('WXRED_HORAS', '3'), 1, 24)
+                + check_agenda('WXRED_SATELITES', 'Incluir paquetes recibidos por satélite', si(env.get('WXRED_SATELITES'), 'yes'))
+                + '<button class="btn btn-primary" name="accion" value="wx-guardar">Guardar y aplicar clima</button></form>'
+                '<h2>Estado recibido</h2><pre>' + e(json.dumps(
+                    {k: datos[k] for k in ('actualizado', 'conexion', 'conectado', 'error') if k in datos},
+                    ensure_ascii=False, indent=2)) + '</pre><p><a href="/bricohams/clima.html">'
+                'Abrir estaciones, mapa y datos meteorológicos</a></p></div></div></div></body></html>')
+    except (OSError, ValueError, KeyError, TypeError) as x:
+        return inicio + avisos(aviso, error or 'No se puede cargar el clima: %s' % x) + '</div></div></div></body></html>'
+
+
+PAGINAS = {BASE: pagina, APRS: pagina_aprs, TAK: pagina_tak, MONITOR: pagina_monitor,
+           SEGURIDAD: pagina_seguridad, MAPFLIGHTS: pagina_mapflights, MESH_CHAT: pagina_chat,
+           SATELITES: pagina_satelites, CLIMA: pagina_clima}
+
+# Igual que en bricohams-owrx-botones (el test comprueba que coinciden): los paneles
+# salen oscuros y legibles aunque admin.css de OpenWebRX+ aún no esté parcheado.
+TEMA_OSCURO = (
+    'html,body{background-color:#1e1e1e!important;background-image:none!important;color:#f1f1f1}'
+    '.form-control,.custom-select,select,textarea{background-color:#2b2b2b!important;color:#f1f1f1!important;border:1px solid #6c6c6c!important}'
+    '.form-control:focus,.custom-select:focus,select:focus,textarea:focus{background-color:#333!important;color:#fff!important;'
+    'border-color:#f26b21!important;box-shadow:0 0 0 .2rem rgba(242,107,33,.35)!important}'
+    '.form-control::placeholder,textarea::placeholder{color:#a8a8a8!important;opacity:1}'
+    '.form-control:disabled,.form-control[readonly]{background-color:#1a1a1a!important;color:#bdbdbd!important}'
+    'select option,select optgroup{background-color:#2b2b2b;color:#f1f1f1}'
+    '.input-group-text{background-color:#3a3a3a;color:#eee;border-color:#6c6c6c}'
+    '.form-check-input,.custom-control-label::before{background-color:#2b2b2b;border-color:#8a8a8a}'
+    '.card,.list-group-item,.modal-content,.dropdown-menu,.popover,.toast{background-color:#2d2d2d;color:#f1f1f1;border-color:#555}'
+    '.card-header,.card-footer,.modal-header,.modal-footer{background-color:#3a3a3a;color:#fff;border-color:#555}'
+    '.dropdown-item{color:#f1f1f1}.dropdown-item:hover,.dropdown-item:focus{background-color:#f26b21;color:#111}'
+    '.table,.table th,.table td{color:#eee;border-color:#555}'
+    '.table-striped tbody tr:nth-of-type(odd){background-color:rgba(255,255,255,.06)}'
+    '.table-hover tbody tr:hover{background-color:rgba(242,107,33,.15);color:#fff}'
+    '.text-muted,.form-text,.small.text-muted{color:#c8c8c8!important}'
+    'label,.col-form-label,legend,h1,h2,h3,h4,h5,h6{color:#f5f5f5}'
+    'pre,code,kbd{background-color:#161616;color:#e8e8e8}'
+    'pre{padding:.6em;border:1px solid #444;border-radius:.25rem}'
+    '.breadcrumb{background-color:#333}.breadcrumb-item.active,.breadcrumb-item+.breadcrumb-item::before{color:#d0d0d0}'
+    'a:not(.btn){color:#8cc8ff}a:not(.btn):hover{color:#c2e2ff}'
+    '.nav-tabs .nav-link{color:#ddd}.nav-tabs .nav-link.active{background-color:#2d2d2d;color:#fff;border-color:#555 #555 #2d2d2d}'
+    '.tab-body{background-color:#262626}'
+    '.bg-white,.bg-light{background-color:#2d2d2d!important;color:#f1f1f1!important}'
+    '.btn-light,.btn-outline-light{background-color:#444;color:#fff;border-color:#666}'
+)
+
+
+def con_tema(html):
+    """Mete el tema oscuro antes de </head> (una sola vez)."""
+    if 'id="bricohams-tema"' in html:
+        return html
+    return html.replace('</head>', '<style id="bricohams-tema">' + TEMA_OSCURO + '</style></head>', 1)
+
+
+def pagina_ayuda(ruta):
+    """Guía local sin secretos, bajo la misma sesión de administrador que el panel."""
+    return cabecera('Configuración paso a paso', ruta) + """
+<h1>Configuración de los módulos</h1>
+<p>Usa estos enlaces en el dominio de tu estación. No pegues secretos en Git, chats ni comandos.
+Los enlaces externos abren los portales oficiales; sus menús pueden cambiar.</p>
+<p><a href="#google">Google</a> · <a href="#entra">Entra ID</a> · <a href="#backup-remoto">Backup externo</a> ·
+<a href="#modulos">Todos los módulos</a> · <a href="#validacion">Validación y recuperación</a></p>
+<h2 id="google">Acceso con Google</h2>
+<p><a href="/settings/bricohams/seguridad#acceso">Abrir la configuración de acceso</a>.
+Necesitas un dominio HTTPS y un administrador local de recuperación.</p>
+<ol><li>Abre <a href="https://console.cloud.google.com/">Google Cloud Console</a>, crea o selecciona un proyecto.</li>
+<li>En <a href="https://console.cloud.google.com/auth/branding">Google Auth Platform: Branding</a> configura nombre y correo.
+En <a href="https://console.cloud.google.com/auth/audience">Audience</a> elige la audiencia; si es externa y está en pruebas, añade tus usuarios de prueba.</li>
+<li>En <a href="https://console.cloud.google.com/auth/clients">Clients</a> crea un cliente de tipo <b>Aplicación web</b>.
+Origen: el origen HTTPS de esta estación. Redirección exacta: ese origen seguido de <code>/_bh_google/callback</code>.
+La tarjeta de acceso muestra los valores calculados con SSL_DOMAIN.</li>
+<li>Copia el ID y el <b>valor del secreto</b> en la tarjeta de acceso. No es una API key ni un access_token.
+Si ya no puedes ver el secreto, crea uno nuevo en el cliente y rota el anterior después de probar.</li>
+<li>Añade correos administradores exactos; usa @dominio solo si quieres autorizar todo ese dominio.
+Elige «Usuario local o cuenta de Google», guarda y aplica.</li>
+<li>Sin cerrar tu sesión de recuperación, abre otra ventana privada e inicia sesión con Google.
+Solo después considera «doble» o «solo Google». Comprueba también que una cuenta no autorizada es rechazada.</li></ol>
+<p><code>redirect_uri_mismatch</code>: revisa HTTPS, dominio y ruta exacta. «Cuenta sin permiso»:
+revisa usuarios de prueba y lista de administradores. Un secreto vacío conserva el actual.</p>
+<h2 id="entra">Microsoft Entra ID</h2>
+<p><b>El inicio de sesión con Entra ID no está implementado en esta versión.</b> La pasarela valida exclusivamente
+emisores y clientes Google. No pegues un secreto Microsoft en el formulario Google ni inventes una URL de callback Entra.
+OneDrive para backups sí está soportado y no habilita inicio de sesión Microsoft en la web.</p>
+<p>Para localizar credenciales Microsoft: <a href="https://entra.microsoft.com/">Centro de administración Entra</a>
+→ Identidad → Aplicaciones → Registros de aplicaciones → tu aplicación. «Información general» muestra
+Application (client) ID y Directory (tenant) ID. «Certificados y secretos» → Nuevo secreto de cliente:
+el dato utilizable es <b>Valor</b>, no «Id. del secreto»; copia el valor una sola vez a un almacén seguro
+y registra su caducidad. No crees permisos ni redirecciones para un login que aún no existe.</p>
+<p><a href="https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app">Registro oficial de aplicaciones</a>.
+Para OneDrive usa la guía siguiente y las políticas de consentimiento de tu organización.</p>
+<h2 id="backup-remoto">Backup externo: credenciales y tokens</h2>
+<p><a href="/settings/bricohams/seguridad#backup-remoto">Abrir Backup remoto</a>.
+Usa una cuenta dedicada y una carpeta vacía. La retención elimina copias antiguas: empieza sin programación
+y revisa su valor antes de activarla. Un token OAuth equivale a una contraseña.</p>
+<h3>Google Drive</h3><ol>
+<li>En un PC de confianza con navegador instala <a href="https://rclone.org/downloads/">rclone oficial</a>.
+Usa una versión compatible con la del servidor (<code>rclone version</code>).</li>
+<li>Para un cliente propio (recomendado), habilita <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</a>
+en tu proyecto; configura Branding/Audience y crea un cliente OAuth de <b>Aplicación de escritorio</b>.
+Es distinto del cliente web de acceso Google. Sigue <a href="https://rclone.org/drive/#making-your-own-client-id">la guía oficial de rclone</a>.</li>
+<li>Ejecuta <code>rclone config</code>, crea un remoto de nombre <code>bhbackup</code> y tipo <code>drive</code>.
+Introduce ID y secreto en los prompts interactivos, no como argumentos de terminal. Selecciona permisos
+de escritura adecuados para la carpeta dedicada y autoriza tu cuenta en el navegador.
+No uses un cliente propio solo en el PC: el servidor necesita el mismo ID y secreto para renovar el token.</li>
+<li>En <code>rclone config file</code> localiza el fichero privado. Abre su sección [bhbackup] en un editor local:
+copia únicamente el JSON completo de <code>token = {...}</code>, sin «token =», al campo Token del panel.
+Copia ID y secreto a los campos OAuth del <b>backup</b>. No uses config show en una terminal registrada.</li>
+<li>Selecciona Google Drive, carpeta remota y retención. Guarda, prueba conexión, copia y verifica.
+Con un cliente externo en pruebas Google puede limitar la duración del refresh_token; revisa el estado de publicación y consentimiento.</li></ol>
+<p>La alternativa <code>rclone authorize "drive"</code> sirve solo si PC y servidor usan el mismo cliente
+compartido. Su disponibilidad depende de rclone/Google; el cliente compartido se está retirando.
+No confundas el JSON del token con el JSON descargado del cliente OAuth.</p>
+<h3>OneDrive / Microsoft 365 / SharePoint</h3><ol>
+<li>En el PC ejecuta <code>rclone config</code>, crea bhbackup y selecciona <code>onedrive</code>.
+Normalmente deja Client ID y Client Secret vacíos para usar el cliente compartido, si tu tenant lo permite.</li>
+<li>Autoriza en el navegador y selecciona OneDrive Personal/Business o la biblioteca SharePoint correcta.
+El asistente muestra el drive. Si requiere aprobación, solicita consentimiento al administrador del tenant;
+un token personal no evita las políticas de Microsoft 365.</li>
+<li>Con <code>rclone config file</code> abre el fichero local privado y copia de [bhbackup] el JSON de
+<code>token</code>, <code>drive_id</code> y <code>drive_type</code> al panel. El drive_id no es el tenant ID.
+Tipo: personal, business o documentLibrary según el asistente.</li>
+<li>Si tu organización exige cliente propio, sigue <a href="https://rclone.org/onedrive/#getting-your-own-client-id-and-key">la guía oficial</a>
+para registrar la app y su redirección de rclone, no la de BricoHams.
+Usa permisos delegados mínimos necesarios y la misma pareja ID/secreto en PC y campos OAuth del backup.
+Copia el <b>Valor</b> del secreto de Entra, no su identificador. Guarda la caducidad y rota antes de vencer.</li>
+<li>Guarda, prueba conexión, copia ahora y verifica última copia. Solo después habilita programación.
+<code>invalid_grant</code>: autoriza de nuevo y pega un token nuevo; cambiar de cliente exige token nuevo.</li></ol>
+<h3>SMB, NFS y SFTP</h3><ol>
+<li><b>SMB/CIFS:</b> crea usuario y carpeta compartida en el NAS con permiso de escritura. Pon
+<code>\\\\nas.ejemplo\\copias\\bricohams</code>, usuario o DOMINIO\\usuario y contraseña repetida.
+Usa SMB 3 si está disponible; no necesita token OAuth.</li>
+<li><b>NFS:</b> crea un export y autoriza la IP de la estación en el NAS. Pon <code>nas.ejemplo:/export/copias</code>
+y versión NFS. Comprueba permisos UID/GID y root-squash; no desactives protecciones globales para resolver un error.
+No necesita usuario ni token en el panel.</li>
+<li><b>SFTP:</b> crea una cuenta con contraseña y carpeta escribible, indica servidor, puerto, usuario y contraseña.
+Esta implementación no configura claves privadas SFTP. Pulsa Obtener huella; compárala por otro canal con
+<code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code> en el servidor destino y confirma solo si coincide.</li>
+<li>En todos: Guardar → Probar conexión → Copiar ahora → Verificar última copia. Revisa estado y fecha.
+El destino contiene datos sensibles si marcas Incluir secretos: no es cifrado de extremo a extremo.
+La prueba crea y elimina un fichero temporal; verificar una copia no sustituye ensayar restauración aislada.</li></ol>
+<h2 id="modulos">Configuración de cada módulo</h2>
+<p>Los módulos opcionales deben estar instalados. Un enlace no instala hardware ni servicios.
+Si no hay formulario web dedicado se indica consola; no existe una URL secreta de configuración.</p>
+<table class="table table-sm"><thead><tr><th>Módulo</th><th>Abrir configuración</th><th>Pasos y comprobación</th></tr></thead><tbody>
+<tr><td>Instalador / actualización / red / hardware</td><td>Consola</td><td>Revisa bricohams.env con bricohams-env.py; simula con install.sh --actualizar --simular, respalda, aplica solo los pasos necesarios. No cambies red en una sesión sin recuperación.</td></tr>
+<tr><td>OpenWebRX+ nativo o Docker</td><td><a href="/settings">Settings</a></td><td>Configura receptor y dispositivos; guarda y comprueba audio y waterfall. No ejecutes simultáneamente dos procesos sobre el mismo SDR.</td></tr>
+<tr><td>owrx-clone</td><td>Consola</td><td>Consulta owrx-clone --help, exporta antes de importar, revisa el contenido sin publicar claves y prueba la restauración en otra instalación.</td></tr>
+<tr><td>Plugins web / audio</td><td><a href="/settings">Settings</a></td><td>Revisa preferencias del receptor y activa el plugin instalado; comprueba en el navegador el control correspondiente. Los valores persistentes se gestionan en el kit/env, no todos tienen formulario.</td></tr>
+<tr><td>Bookmarks / CTCSS / RepeaterBook / locator</td><td><a href="/settings">Settings</a></td><td>General Settings: configura API RepeaterBook si procede; importa primero una zona pequeña, valida frecuencias y tonos. Locator y catálogos: consola del kit. Exporta bookmarks antes de sustituirlos.</td></tr>
+<tr><td>Meshtastic 433/868</td><td><a href="/settings/bricohams/meshtastic">Meshtastic</a></td><td>Selecciona radio y región legal, nombres y canal; guarda y lee nodos. No publiques PSK/URL de canal. Prueba cada radio por separado.</td></tr>
+<tr><td>Mensajería Meshtastic</td><td><a href="/settings/bricohams/meshtastic/chat">Mensajes</a></td><td>Selecciona red/canal, envía un mensaje de prueba y comprueba recepción y límites de uso.</td></tr>
+<tr><td>RAK LoRa APRS</td><td><a href="/settings/bricohams/aprs">APRS</a></td><td>Revisa estado y registro. Indicativo, passcode, puerto serie y región se configuran en el env del kit; consulta manual 35. Reinicia solo tras guardar y verifica paquetes.</td></tr>
+<tr><td>ADS-B / RadarBox / AIS / mapa local</td><td><a href="/settings">Settings</a></td><td>Configura serial SDR, feeds y AIS en el env; consulta manuales 04 y 40. Comprueba mapa y recepción antes de habilitar envíos externos.</td></tr>
+<tr><td>map.flights (feed y plugin)</td><td><a href="/settings/bricohams/mapflights">map.flights</a></td><td>Registra estación en <a href="https://map.flights/es/stations/build">map.flights</a>, guarda identificadores solo en la estación y revisa diagnóstico. Conserva el feed RadarBox.</td></tr>
+<tr><td>Meteo / sensores / Pico I/O / ventilación</td><td><a href="/settings/bricohams/clima">Clima</a></td><td>Selecciona fuente y revisa lecturas. Cableado, GPIO, puertos y ventiladores: env/manuales 06, 07 y 09; verifica valores plausibles antes de automatizar.</td></tr>
+<tr><td>Cámara</td><td>Consola</td><td>Configura fuente y credenciales mediante env/secretos, instala paso camara y comprueba imagen sin hacer pública la URL con contraseña.</td></tr>
+<tr><td>Satélites / agendas / grabación</td><td><a href="/settings/bricohams/satelites">Satélites</a></td><td>Revisa estación, agenda, filtros y capturas; guarda y comprueba próximo pase y espacio disponible. FT2 es experimental; consulta su manual antes de transmitir.</td></tr>
+<tr><td>Web / HTTPS / API / privacidad / idioma / logo</td><td><a href="/settings">Settings</a></td><td>Configura dominio HTTPS, identidad y datos de contacto en el kit; respalda antes de aplicar web/configuracion. Comprueba HTTPS, políticas y ausencia de secretos públicos.</td></tr>
+<tr><td>Visitas / Telegram / chat / registro oyentes</td><td><a href="/settings">Settings</a></td><td>Crea bot con <a href="https://t.me/BotFather">BotFather oficial</a> → /newbot; guarda su token solo en el campo secreto/asistente previsto. Obtén chat_id con la herramienta del kit, prueba aviso y revisa consentimiento y retención del registro.</td></tr>
+<tr><td>TAK</td><td><a href="/settings/bricohams/tak">TAK</a></td><td>Comprueba servicios y acceso, cambia credenciales iniciales mediante el panel, configura cliente y certificados y valida posición en el mapa. No publiques paquetes de enrolamiento.</td></tr>
+<tr><td>Monitorización / Grafana</td><td><a href="/settings/bricohams/monitorizacion">Monitorización</a></td><td>Comprueba servicios, abre Grafana desde este panel, revisa CPU, temperatura, RAM y disco; no expongas exporters ni bases de datos.</td></tr>
+<tr><td>Seguridad / usuarios / Google</td><td><a href="/settings/bricohams/seguridad#acceso">Seguridad</a></td><td>Mantén administrador de recuperación; configura acceso con la guía anterior, prueba desde otra sesión y aplica restricciones progresivamente.</td></tr>
+<tr><td>Copias / copia externa / limpieza</td><td><a href="/settings/bricohams/seguridad#backup-remoto">Backup</a></td><td>Elige destino, genera credenciales según protocolo, prueba y verifica. Conserva una copia externa y no borres logs durante investigación.</td></tr>
+<tr><td>Hardware / diseños / documentación</td><td>Consola y documentación del kit</td><td>Consulta COMPONENTES, HARDWARE_Y_GPIO y manuales de laboratorio antes de conectar; no tienen formulario web de configuración.</td></tr>
+</tbody></table>
+<h2 id="validacion">Validación y recuperación</h2>
+<ol><li>Antes de cambiar: copia verificada, ruta anotada y procedimiento de restauración.</li>
+<li>Cambia un módulo cada vez. Guarda y revisa su estado, journal del servicio y resultado funcional.</li>
+<li>No consideres guardado = conectado: prueba el login en ventana privada o copia/verificación en el destino.</li>
+<li>Si pierdes acceso Google: por SSH ejecuta bricohams-google-auth configurar --kit-env RUTA --desactivar
+y después aplicar --kit-env RUTA con sudo. No desactives el usuario local de recuperación.</li></ol>
+<p>Documentación ampliada en el kit: docs/manuales/47_CONFIGURACION_MODULOS.md, manual 46 (Google),
+manual 34 (seguridad) y docs/DESARROLLO_MODULOS.md.</p>
+</div></div></div></body></html>"""
+
+# acciones que acepta cada página; la de Meshtastic no puede tocar TAK, monitorización ni seguridad
+ACCIONES = {APRS: re.compile(r'^reiniciarrak$'), TAK: re.compile(r'^tak-'), MONITOR: re.compile(r'^mon-'),
+            SEGURIDAD: re.compile(r'^seg-[a-z]+$'), BASE: re.compile(r'^(?!tak-|mon-|seg-|mesh-|sat-|wx-)'),
+            SATELITES: re.compile(r'^sat-(guardar|omitir|incluir)$'), CLIMA: re.compile(r'^wx-guardar$'),
+            MESH_CHAT: re.compile(r'^mesh-enviar$')}
+
+
+def posiciones_tak():
+    """Consulta local de solo lectura bajo la identidad PostgreSQL del servicio TAK."""
+    sql = """
+        SELECT COALESCE(json_agg(n), '[]'::json) FROM (
+            SELECT DISTINCT ON (p.device_uid)
+                p.device_uid AS uid, COALESCE(e.callsign, p.device_uid) AS callsign,
+                p.latitude AS lat, p.longitude AS lon,
+                EXTRACT(EPOCH FROM p.timestamp AT TIME ZONE 'UTC') * 1000 AS timestamp
+            FROM points p JOIN euds e ON e.uid = p.device_uid
+            JOIN cot c ON c.id = p.cot_id
+            WHERE p.latitude BETWEEN -90 AND 90 AND p.longitude BETWEEN -180 AND 180
+                AND c.stale > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+            ORDER BY p.device_uid, p.timestamp DESC, p.id DESC LIMIT 1000
+        ) n
+    """
+    r = subprocess.run(['runuser', '-u', 'opentakserver', '--', 'psql', '-X', '-q', '-A', '-t',
+                        '--set=ON_ERROR_STOP=1', '--host=/var/run/postgresql',
+                        '--dbname=bricohams_tak', '--command', sql],
+                       capture_output=True, text=True, timeout=5,
+                       env={**os.environ, 'PGOPTIONS': '-c statement_timeout=3000 -c default_transaction_read_only=on'})
+    if r.returncode:
+        raise RuntimeError('PostgreSQL TAK no disponible')
+    datos = json.loads(r.stdout)
+    if not isinstance(datos, list):
+        raise ValueError('respuesta TAK no valida')
+    return {'nodes': datos}
+
+
+class Manejador(http.server.BaseHTTPRequestHandler):
+    server_version = 'bricohams-mesh-admin'
+    sys_version = ''
+
+    def log_message(self, fmt, *a):
+        pass
+
+    def _enviar(self, codigo, cuerpo=b'', tipo='text/html; charset=utf-8', cabeceras=()):
+        self.send_response(codigo)
+        self.send_header('Content-Type', tipo)
+        self.send_header('Content-Length', str(len(cuerpo)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Robots-Tag', 'noindex')
+        formularios = "'self' https://www.amsat.org/status/submit.php" if self._ruta() == SATELITES else "'self'"
+        self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action %s; frame-ancestors 'self'" % formularios)
+        for k, v in cabeceras:
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != 'HEAD':
+            self.wfile.write(cuerpo)
+
+    def _sesion(self):
+        s = sesion_owrx(self.headers.get('Cookie'))
+        return s if autorizado(s) else None
+
+    def _ruta(self):
+        return urlsplit(self.path).path.rstrip('/')
+
+    def do_GET(self):
+        ruta = self._ruta()
+        if ruta == AUTH:
+            # auth_request de nginx para el cliente web de Meshtastic (:8443): 204 admin, 401 el resto
+            ok = autorizado_cache(sesion_owrx(self.headers.get('Cookie')))
+            return self._enviar(204 if ok else 401, tipo='text/plain; charset=utf-8')
+        if ruta == TAK_POSICIONES:
+            if not self._sesion():
+                return self._enviar(401, b'{"error":"sesion de administrador necesaria"}', 'application/json')
+            try:
+                datos = posiciones_tak()
+            except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as e:
+                print('mapa TAK: %s' % e, file=sys.stderr, flush=True)
+                return self._enviar(503, b'{"error":"TAK no disponible"}', 'application/json')
+            return self._enviar(200, json.dumps(datos).encode(), 'application/json')
+        if ruta not in PAGINAS and ruta != '/settings/bricohams':
+            return self._enviar(404, b'no encontrado', 'text/plain; charset=utf-8')
+        s = self._sesion()
+        if not s:
+            destino = ruta if ruta in PAGINAS else BASE
+            return self._enviar(302, cabeceras=[('Location', '/login?ref=' + destino.lstrip('/'))])
+        if ruta not in PAGINAS:
+            return self._enviar(302, cabeceras=[('Location', BASE)])
+        return self._enviar(200, self._pagina(ruta, s).encode('utf-8'))
+
+    def _pagina(self, ruta, s, aviso='', error='', mostrar=False):
+        if parse_qs(urlsplit(self.path).query).get('ayuda') == ['1'] and self.command in ('GET', 'HEAD'):
+            return con_tema(pagina_ayuda(ruta))
+        cuerpo = self._pagina_cruda(ruta, s, aviso, error, mostrar)
+        ayuda = ('<p class="m-3"><a class="btn btn-outline-primary" href="%s?ayuda=1">'
+                 'Configuración paso a paso y enlaces directos de los módulos</a></p>') % ruta
+        return con_tema(cuerpo.replace('<body>', '<body>' + ayuda, 1))
+
+    def _pagina_cruda(self, ruta, s, aviso='', error='', mostrar=False):
+        if ruta == TAK:
+            return pagina_tak(s, aviso, error, host=self.headers.get('Host', ''), mostrar=mostrar)
+        if ruta == MONITOR:
+            return PAGINAS[ruta](s, aviso, error, host=self.headers.get('Host', ''))
+        if ruta == MESH_CHAT:
+            return pagina_chat(s, aviso, error, auto=parse_qs(urlsplit(self.path).query).get('auto') == ['1'],
+                               host=self.headers.get('Host', ''))
+        if ruta == SATELITES:
+            filtros = {k: v[0] for k, v in parse_qs(urlsplit(self.path).query).items()}
+            return pagina_satelites(s, aviso, error, filtros=filtros)
+        return PAGINAS[ruta](s, aviso, error)
+
+    do_HEAD = do_GET
+
+    def _mismo_origen(self):
+        host = (self.headers.get('Host') or '').split(':')[0].lower()
+        for cab in ('Origin', 'Referer'):
+            v = self.headers.get(cab)
+            if v:
+                return (urlsplit(v).hostname or '').lower() == host and bool(host)
+        return False
+
+    def do_POST(self):
+        ruta = self._ruta()
+        if ruta == MAPFLIGHTS:
+            if not self._sesion():
+                return self._enviar(403, b'sesion de administrador necesaria', 'text/plain; charset=utf-8')
+            return self._enviar(405, b'panel de solo lectura', 'text/plain; charset=utf-8',
+                                [('Allow', 'GET, HEAD')])
+        if ruta not in PAGINAS:
+            return self._enviar(404, b'no encontrado', 'text/plain; charset=utf-8')
+        s = self._sesion()
+        if not s:
+            return self._enviar(403, b'sesion de administrador necesaria', 'text/plain; charset=utf-8')
+        try:
+            largo = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            largo = 0
+        if largo <= 0 or largo > 16384:
+            return self._enviar(400, b'peticion no valida', 'text/plain; charset=utf-8')
+        campos = {k: v[0] for k, v in parse_qs(self.rfile.read(largo).decode('utf-8', 'replace')).items()
+                  if not k.startswith('_')}
+        if ruta == SEGURIDAD:
+            campos['_cookie'] = self.headers.get('Cookie', '')
+        if not (self._mismo_origen() and hmac.compare_digest(campos.get('csrf', ''), token(s))):
+            return self._enviar(403, b'origen no valido', 'text/plain; charset=utf-8')
+        aviso = error = ''
+        mostrar = False
+        try:
+            if not ACCIONES[ruta].match(campos.get('accion', '')):
+                raise ValueError('acción desconocida')
+            if ruta == TAK and campos.get('accion') == 'tak-credenciales':
+                mostrar = True
+                aviso = 'Credenciales visibles solo en esta respuesta; recarga la página para ocultarlas.'
+            else:
+                aviso = accion(campos)
+        except (ValueError, OSError) as x:
+            error = str(x)
+        return self._enviar(200, self._pagina(ruta, s, aviso, error, mostrar).encode('utf-8'))
+
+
+class Servidor(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+
+
+def main(a):
+    if len(a) >= 4 and a[1] == 'leer':
+        try:
+            print(json.dumps(leer_nodo(a[2], a[3]), ensure_ascii=False))
+        except Exception as x:
+            print(json.dumps({'ok': False, 'error': tapar(str(x))[:300]}, ensure_ascii=False))
+        return 0
+    if len(a) >= 2 and a[1] == 'servicio':
+        Servidor(('127.0.0.1', PUERTO), Manejador).serve_forever()
+        return 0
+    print(open(__file__, encoding='utf-8').read().split('# =====')[1].replace('\n#  ', '\n').strip('#=\n '))
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

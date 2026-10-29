@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-mesh-owrx · BricoHams (v4.5)
+#  Nodos Meshtastic de la estación -> MAPA de OpenWebRX+ (integración directa).
+#    - LilyGO T3 433 por USB (/dev/lilygo-mesh) y nodo 868 del HAT (meshtasticd,
+#      127.0.0.1:4403, cuando llegue el HAT): cada uno con la API de Meshtastic.
+#    - Lo que oyen (posiciones, nombres, telemetría) se publica en el MQTT local
+#      como «mesh433/Meshtastic» y «mesh868/Meshtastic»: OpenWebRX+ (1.2.122+,
+#      mqtt_meshtastic) lo pinta en su mapa igual que si lo hubiera decodificado él.
+#    - Opcional (MESH_OWRX_CHAT=yes): los mensajes de texto de los canales públicos
+#      salen en el chat de la web de OpenWebRX+.
+#    - v5.0 (MESH_TELEGRAM=yes): los mensajes de canal recibidos se avisan por Telegram
+#      (nunca los directos/privados).
+#    - Estado en /run/bricohams-mesh/mesh.json (bricohams-check y banner SSH).
+#  Uso: bricohams-mesh-owrx servicio | estado | prueba
+#  Necesita la librería «meshtastic» (la de /opt/pipx/venvs/meshtastic).
+# =====================================================================
+import json
+import os
+import re
+import sys
+import threading
+import time
+
+sys.path[:0] = [os.path.dirname(os.path.realpath(__file__)), '/usr/local/lib/bricohams']
+from bricohams_mqtt import Publicador, simbolo   # noqa: E402
+try:
+    import bricohams_telegram                    # noqa: E402
+except ImportError:                              # sin el módulo: sin avisos a Telegram, lo demás sigue
+    bricohams_telegram = None
+
+_CRED = os.path.join(os.environ.get('CREDENTIALS_DIRECTORY', '/nonexistent'), 'env')
+ENV_FILE = os.environ.get('BRICOHAMS_ENV', _CRED if os.path.exists(_CRED) else '/etc/bricohams/bricohams.env')
+RUN_DIR = os.environ.get('MESH_RUN_DIR', '/run/bricohams-mesh')
+BROADCAST = 0xFFFFFFFF
+
+
+def cargar_env():
+    try:
+        for l in open(ENV_FILE, encoding='utf-8'):
+            m = re.match(r'^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$', l)
+            if not m:
+                continue
+            v = m.group(2).strip()
+            fin = v.find(v[0], 1) if v[:1] in ('"', "'") else -1
+            v = v[1:fin] if fin > 0 else re.sub(r'\s+#.*$', '', v)
+            os.environ.setdefault(m.group(1), v)
+    except OSError:
+        pass
+
+
+def env(k, d=''):
+    v = os.environ.get(k, '')
+    return v if v != '' else d
+
+
+def si(k, d='no'):
+    return env(k, d).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
+
+
+def fuentes():
+    """[(nombre, tipo, destino, frecuencia Hz)] según bricohams.env."""
+    out = []
+    if si('MESH433_OWRX', 'yes'):
+        tipo, dest = ('tcp', '127.0.0.1:4404') if si('MESH433_WEB') else ('serie', env('MESH433_PUERTO', '/dev/lilygo-mesh'))
+        out.append(('mesh433', tipo, dest, int(env('MESH433_FREQ', '433875000'))))
+    if si('MESH868_OWRX', 'yes'):
+        out.append(('mesh868', 'tcp', env('MESH868_HOST', '127.0.0.1'), int(env('MESH868_FREQ', '869618000'))))
+    return out
+
+
+# ------------------------------------------------------------------ conversión al formato de OpenWebRX+
+def _g(d, *claves):
+    for k in claves:
+        if isinstance(d, dict) and k in d:
+            return d[k]
+    return None
+
+
+def nodo_a_owrx(num, nodo, fuente, freq, decimales=None, extra=None):
+    """Mensaje «Meshtastic» para OpenWebRX+ (owrx/meshtastic.py, MeshtasticParser.updateMap) o None si
+    el nodo no tiene posición. decimales: redondeo de la posición (nuestro propio nodo, manual 34)."""
+    pos = _g(nodo, 'position') or {}
+    lat, lon = _g(pos, 'latitude'), _g(pos, 'longitude')
+    if lat is None and _g(pos, 'latitudeI', 'latitude_i') is not None:
+        lat = _g(pos, 'latitudeI', 'latitude_i') / 1e7
+        lon = _g(pos, 'longitudeI', 'longitude_i') / 1e7
+    if lat is None or lon is None or (lat == 0 and lon == 0) or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    if decimales is not None:
+        lat, lon = round(lat, decimales), round(lon, decimales)
+    u = _g(nodo, 'user') or {}
+    d = {'mode': 'Meshtastic', 'src': int(num), 'lat': lat, 'lon': lon, 'freq': freq,
+         'timestamp': int(time.time() * 1000), 'symbol': simbolo(',', 'M')}
+    if _g(pos, 'altitude') is not None:
+        d['altitude'] = int(_g(pos, 'altitude'))
+    for k_owrx, k_mesh in (('nickName', 'shortName'), ('longName', 'longName'), ('device', 'hwModel'), ('role', 'role')):
+        if _g(u, k_mesh):
+            d[k_owrx] = _g(u, k_mesh)
+    m = _g(nodo, 'deviceMetrics') or {}
+    for k_owrx, k_mesh in (('battery', 'voltage'), ('channelUse', 'channelUtilization'), ('airtimeUse', 'airUtilTx'),
+                           ('uptime', 'uptimeSeconds')):
+        if _g(m, k_mesh) is not None:
+            d[k_owrx] = _g(m, k_mesh)
+    e = _g(nodo, 'environmentMetrics') or {}
+    w = {k: _g(e, km) for k, km in (('temperature', 'temperature'), ('humidity', 'relativeHumidity'),
+                                    ('barometricpressure', 'barometricPressure')) if _g(e, km) is not None}
+    if w:
+        d['weather'] = w
+    d['comment'] = 'vía %s' % fuente + (' · ' + extra if extra else '')
+    return d
+
+
+def paquete(nodos, pkt, fuente):
+    """Actualiza la base de nodos con un paquete recibido; devuelve (num, texto o None, extra)."""
+    num = pkt.get('from')
+    if num is None:
+        return None, None, ''
+    n = nodos.setdefault(num, {})
+    dec = pkt.get('decoded') or {}
+    port = dec.get('portnum')
+    if port == 'POSITION_APP' and isinstance(dec.get('position'), dict):
+        n['position'] = dec['position']
+    elif port == 'NODEINFO_APP' and isinstance(dec.get('user'), dict):
+        n['user'] = dec['user']
+    elif port == 'TELEMETRY_APP' and isinstance(dec.get('telemetry'), dict):
+        t = dec['telemetry']
+        if 'deviceMetrics' in t:
+            n['deviceMetrics'] = t['deviceMetrics']
+        if 'environmentMetrics' in t:
+            n['environmentMetrics'] = t['environmentMetrics']
+    extra = []
+    if pkt.get('rxSnr') is not None:
+        extra.append('SNR %s dB' % pkt['rxSnr'])
+    if pkt.get('rxRssi') is not None:
+        extra.append('%s dBm' % pkt['rxRssi'])
+    if pkt.get('hopStart') is not None and pkt.get('hopLimit') is not None:
+        extra.append('saltos %d/%d' % (pkt['hopStart'] - pkt['hopLimit'], pkt['hopStart']))
+    texto = dec.get('text') if port == 'TEXT_MESSAGE_APP' and pkt.get('to') == BROADCAST else None
+    return num, texto, ' · '.join(extra)
+
+
+def nombre(nodos, num):
+    u = (nodos.get(num) or {}).get('user') or {}
+    return u.get('shortName') or u.get('longName') or '!%08x' % num
+
+
+# ------------------------------------------------------------------ mensajes (panel /settings/bricohams/meshtastic/chat)
+CHAT_MAX = 200          # mensajes guardados por red
+TEXTO_MAX = 200         # bytes UTF-8 por mensaje (Meshtastic admite ~228)
+CONTROL = re.compile(r'[\x00-\x08\x0b-\x1f\x7f]')
+
+
+def mensaje(nodos, pkt, mio):
+    """Entrada del historial para un texto recibido (canal público o directo a nosotros) o None."""
+    dec = pkt.get('decoded') or {}
+    if dec.get('portnum') != 'TEXT_MESSAGE_APP' or not isinstance(dec.get('text'), str) or pkt.get('from') is None:
+        return None
+    to = pkt.get('to')
+    if to != BROADCAST and (mio is None or to != mio):
+        return None
+    num = pkt['from']
+    return {'t': int(time.time()), 'dir': 'rx', 'canal': int(pkt.get('channel') or 0), 'de': nombre(nodos, num),
+            'id': '!%08x' % num, 'texto': CONTROL.sub(' ', dec['text'])[:500], 'directo': to != BROADCAST,
+            'snr': pkt.get('rxSnr'), 'rssi': pkt.get('rxRssi')}
+
+
+def canales(iface):
+    """[{indice, nombre, primario}] de los canales activos del nodo (sin claves)."""
+    out = []
+    try:
+        lista = iface.localNode.channels or []
+    except AttributeError:
+        return out
+    for c in lista:
+        rol = getattr(c, 'role', 0)
+        if rol in (0, 'DISABLED'):
+            continue
+        nom = getattr(getattr(c, 'settings', None), 'name', '') or ''
+        out.append({'indice': int(getattr(c, 'index', len(out))), 'nombre': nom or ('principal' if rol in (1, 'PRIMARY') else 'canal %d' % len(out)),
+                    'primario': rol in (1, 'PRIMARY')})
+    return out
+
+
+def validar_envio(d, fuentes):
+    """(Fuente, canal, texto) de una petición del panel; ValueError si no vale."""
+    if not isinstance(d, dict):
+        raise ValueError('petición no válida')
+    f = fuentes.get(d.get('fuente'))
+    if f is None:
+        raise ValueError('red desconocida')
+    if not f.estado['conectado'] or f.iface is None:
+        raise ValueError('el nodo %s no está conectado' % f.nom)
+    try:
+        canal = int(d.get('canal'))
+    except (TypeError, ValueError):
+        raise ValueError('canal no válido')
+    if canal not in [c['indice'] for c in f.estado.get('canales', [])]:
+        raise ValueError('el canal %d no está activo en %s' % (canal, f.nom))
+    texto = d.get('texto')
+    if not isinstance(texto, str):
+        raise ValueError('texto no válido')
+    texto = CONTROL.sub(' ', texto).strip()
+    if not texto:
+        raise ValueError('mensaje vacío')
+    if len(texto.encode('utf-8')) > TEXTO_MAX:
+        raise ValueError('mensaje demasiado largo (máximo %d bytes)' % TEXTO_MAX)
+    return f, canal, texto
+
+
+def aviso_telegram(red, entrada, canales_red):
+    """Texto HTML para Telegram de un mensaje de CANAL recibido; None para directos (privados) o enviados."""
+    if not entrada or entrada.get('dir') != 'rx' or entrada.get('directo'):
+        return None
+    tg = bricohams_telegram
+    nom = next((c['nombre'] for c in canales_red or [] if c.get('indice') == entrada.get('canal')),
+               'canal %s' % entrada.get('canal'))
+    banda = re.sub(r'\D', '', red) or red
+    senal = ' · SNR %s dB' % entrada['snr'] if entrada.get('snr') is not None else ''
+    return '📻 <b>Meshtastic %s</b> · #%s\n<b>%s</b> <code>%s</code>: %s%s' % (
+        tg.esc(banda), tg.esc(nom), tg.esc(entrada.get('de')), tg.esc(entrada.get('id')),
+        tg.esc(tg.limpio(entrada.get('texto'), 400)), tg.esc(senal))
+
+
+class Chat:
+    """Historial de mensajes por red en RUN_DIR/chat.json (0600: solo el servicio y root)."""
+
+    def __init__(self, ruta):
+        self.ruta, self.lock, self.redes = ruta, threading.Lock(), {}
+
+    def anotar(self, red, entrada, canales_red=None):
+        with self.lock:
+            r = self.redes.setdefault(red, {'canales': [], 'mensajes': []})
+            if canales_red is not None:
+                r['canales'] = canales_red
+            if entrada:
+                r['mensajes'] = (r['mensajes'] + [entrada])[-CHAT_MAX:]
+            self._guardar()
+
+    def _guardar(self):
+        try:
+            os.makedirs(os.path.dirname(self.ruta), exist_ok=True)
+            tmp = self.ruta + '.tmp'
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, 'w', encoding='utf-8') as fh:
+                json.dump({'actualizado': int(time.time()), 'redes': self.redes}, fh, ensure_ascii=False)
+            os.replace(tmp, self.ruta)
+        except OSError as x:
+            print('chat: no puedo guardar %s: %s' % (self.ruta, x), file=sys.stderr, flush=True)
+
+
+def servidor_envio(ruta, fuentes, chat):
+    """Socket Unix (0600) para que el panel de administración (root) mande mensajes por los nodos.
+    Una línea JSON {"fuente":"mesh868","canal":0,"texto":"..."} -> {"ok":true} o {"ok":false,"error":"..."}."""
+    import socket
+    try:
+        os.unlink(ruta)
+    except OSError:
+        pass
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    viejo = os.umask(0o177)
+    try:
+        s.bind(ruta)
+    finally:
+        os.umask(viejo)
+    os.chmod(ruta, 0o600)
+    s.listen(4)
+
+    def atender(c):
+        with c:
+            c.settimeout(10)
+            datos = b''
+            try:
+                while b'\n' not in datos and len(datos) < 4096:
+                    trozo = c.recv(4096)
+                    if not trozo:
+                        break
+                    datos += trozo
+                f, canal, texto = validar_envio(json.loads(datos.decode('utf-8')), fuentes)
+                f.iface.sendText(texto, channelIndex=canal)
+                chat.anotar(f.nom, {'t': int(time.time()), 'dir': 'tx', 'canal': canal, 'de': 'yo', 'id': '',
+                                    'texto': texto, 'directo': False, 'snr': None, 'rssi': None})
+                r = {'ok': True}
+            except (ValueError, UnicodeDecodeError) as x:
+                r = {'ok': False, 'error': str(x)[:200]}
+            except Exception as x:               # noqa: BLE001 — la librería de Meshtastic lanza de todo
+                r = {'ok': False, 'error': 'el nodo no ha aceptado el mensaje: %s' % str(x)[:150]}
+            try:
+                c.sendall(json.dumps(r, ensure_ascii=False).encode('utf-8') + b'\n')
+            except OSError:
+                pass
+
+    def bucle():
+        while True:
+            c, _ = s.accept()
+            threading.Thread(target=atender, args=(c,), daemon=True).start()
+
+    threading.Thread(target=bucle, daemon=True).start()
+    return s
+
+
+# ------------------------------------------------------------------ servicio
+class Fuente:
+    def __init__(self, nom, tipo, destino, freq, mqtt, decimales, chat, historial=None, telegram=None):
+        self.nom, self.tipo, self.destino, self.freq = nom, tipo, destino, freq
+        self.mqtt, self.decimales, self.chat, self.historial = mqtt, decimales, chat, historial
+        self.telegram = telegram
+        self.iface, self.mio, self.nodos = None, None, {}
+        self.estado = {'conectado': False, 'nodos': 0, 'en_mapa': 0, 'mensajes': 0, 'ultimo': None, 'error': '',
+                       'canales': []}
+        self.lock = threading.Lock()
+
+    def publicar_nodo(self, num, extra=None):
+        d = nodo_a_owrx(num, self.nodos.get(num) or {}, self.nom, self.freq,
+                        self.decimales if num == self.mio else None, extra)
+        if d and self.mqtt.publicar('%s/Meshtastic' % self.nom, d):
+            self.estado['en_mapa'] += 1
+
+    def volcar(self):
+        """Todos los nodos que conoce el aparato (al conectar y cada 10 min, para que no caduquen en el mapa)."""
+        with self.lock:
+            for num in list(self.nodos):
+                self.publicar_nodo(num)
+
+    def recibido(self, pkt):
+        with self.lock:
+            num, texto, extra = paquete(self.nodos, pkt, self.nom)
+            if num is None:
+                return
+            self.estado['ultimo'] = time.strftime('%H:%M:%S') + ' ' + nombre(self.nodos, num)
+            self.publicar_nodo(num, extra)
+            m = mensaje(self.nodos, pkt, self.mio)
+            if m and self.historial:
+                self.historial.anotar(self.nom, m)
+            if m and self.telegram:
+                aviso = aviso_telegram(self.nom, m, self.estado.get('canales'))
+                if aviso:
+                    self.telegram.avisar(aviso)
+            if texto:
+                self.estado['mensajes'] += 1
+                if self.chat:
+                    self.mqtt.publicar('%s/CLIENT' % self.nom, {'state': 'ChatMessage', 'name': nombre(self.nodos, num),
+                                                               'message': texto[:200]})
+
+    def conectar(self):
+        import meshtastic.serial_interface
+        import meshtastic.tcp_interface
+        if self.tipo == 'serie':
+            if not os.path.exists(self.destino):
+                raise OSError('no existe %s' % self.destino)
+            self.iface = meshtastic.serial_interface.SerialInterface(devPath=self.destino)
+        else:
+            host, sep, port = self.destino.rpartition(':')
+            opciones = {'hostname': host, 'portNumber': int(port)} if sep and self.destino.count(':') == 1 else {'hostname': self.destino}
+            self.iface = meshtastic.tcp_interface.TCPInterface(**opciones)
+        with self.lock:
+            self.mio = getattr(getattr(self.iface, 'myInfo', None), 'my_node_num', None)
+            for n in (self.iface.nodes or {}).values():
+                if 'num' in n:
+                    self.nodos[n['num']] = dict(n)
+            self.estado.update({'conectado': True, 'nodos': len(self.nodos), 'error': '', 'canales': canales(self.iface)})
+        if self.historial:
+            self.historial.anotar(self.nom, None, self.estado['canales'])
+        self.volcar()
+
+
+def servicio():
+    cargar_env()
+    from pubsub import pub
+    h, _, pt = env('BRICOHAMS_MQTT', '127.0.0.1:1883').partition(':')
+    mqtt = Publicador(h, int(pt or 1883), 'bricohams-mesh-owrx')
+    dec = int(env('OWRX_GPS_DECIMALES', '2')) if env('OWRX_GPS_DECIMALES', '2').isdigit() else None
+    os.makedirs(RUN_DIR, exist_ok=True)
+    historial = Chat(os.path.join(RUN_DIR, 'chat.json'))
+    tg = None
+    if bricohams_telegram and si('MESH_TELEGRAM', 'yes'):
+        tg = bricohams_telegram.Avisador(nombre='mesh-owrx')
+        print('telegram: %s' % ('mensajes de canal -> Telegram' if tg.configurado else 'sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID'),
+              flush=True)
+        tg = tg if tg.configurado else None
+    fs = [Fuente(n, t, d, f, mqtt, dec, si('MESH_OWRX_CHAT', 'no'), historial, tg) for n, t, d, f in fuentes()]
+    if si('MESH_CHAT', 'yes'):
+        try:
+            servidor_envio(os.path.join(RUN_DIR, 'enviar.sock'), {f.nom: f for f in fs}, historial)
+        except (OSError, AttributeError) as x:
+            print('chat: sin socket de envío: %s' % x, file=sys.stderr, flush=True)
+    por_iface = {}
+
+    def al_recibir(packet, interface):
+        f = por_iface.get(id(interface))
+        if f:
+            f.recibido(packet)
+
+    def al_perder(interface, **_):
+        f = por_iface.get(id(interface))
+        if f:
+            f.estado['conectado'] = False
+
+    pub.subscribe(al_recibir, 'meshtastic.receive')
+    pub.subscribe(al_perder, 'meshtastic.connection.lost')
+    t_volcado = time.time()
+    while True:
+        for f in fs:
+            if f.estado['conectado']:
+                continue
+            try:
+                if f.iface:
+                    try:
+                        f.iface.close()
+                    except Exception:            # noqa: BLE001 — la librería lanza de todo al cerrar
+                        pass
+                f.conectar()
+                por_iface[id(f.iface)] = f
+                print('%s: conectado (%s) · %d nodos' % (f.nom, f.destino, f.estado['nodos']), flush=True)
+            except Exception as e:               # noqa: BLE001 — sin HAT, sin LilyGO o puerto ocupado: se reintenta
+                f.estado.update({'conectado': False, 'error': str(e)[:120]})
+        if time.time() - t_volcado > 600:
+            t_volcado = time.time()
+            for f in fs:
+                if f.estado['conectado']:
+                    f.volcar()
+        mqtt.latido()
+        os.makedirs(RUN_DIR, exist_ok=True)
+        tmp = os.path.join(RUN_DIR, '.mesh.json')
+        json.dump({'actualizado': time.strftime('%Y-%m-%dT%H:%M:%S'), 'mqtt': mqtt.sock is not None,
+                   'fuentes': {f.nom: dict(f.estado, destino=f.destino, freq=f.freq) for f in fs}},
+                  open(tmp, 'w'), ensure_ascii=False, indent=1)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, os.path.join(RUN_DIR, 'mesh.json'))
+        time.sleep(30)
+
+
+def main(a):
+    o = a[1] if len(a) > 1 else ''
+    if o == 'servicio':
+        return servicio()
+    if o == 'estado':
+        try:
+            print(open(os.path.join(RUN_DIR, 'mesh.json'), encoding='utf-8').read())
+            return 0
+        except OSError:
+            print('Sin estado (systemctl status bricohams-mesh-owrx)')
+            return 1
+    if o == 'prueba':
+        cargar_env()
+        for n, t, d, f in fuentes():
+            print('%s: %s %s · %.3f MHz · %s' % (n, t, d, f / 1e6,
+                  'existe' if t == 'tcp' or os.path.exists(d) else 'NO está conectado'))
+        return 0
+    for l in open(__file__, encoding='utf-8').read().splitlines()[2:18]:
+        print(l.lstrip('# '))
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

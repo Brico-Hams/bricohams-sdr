@@ -1,0 +1,2 @@
+instrumento_id;tipo;fabricante;modelo;serie_o_etiqueta;revision_HW;firmware_software;manual_fuente;banda_min_Hz;banda_max_Hz;RF_entrada_max_dBm;DC_entrada_max_V;RF_salida_max_dBm;certificado_archivo;fecha_calibracion_externa;proxima_revision;incertidumbre_fuente;estado;observaciones
+;;;;;;;;;;;;;;;;;NO_ENSAYADO;

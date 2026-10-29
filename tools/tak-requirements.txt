@@ -1,0 +1,2 @@
+opentakserver==1.7.13
+uv==0.13.0

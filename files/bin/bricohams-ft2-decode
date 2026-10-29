@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-ft2-decode · BricoHams  (v4, experimental)
+#  Decodifica un trozo WAV de 3,75 s (12 kHz, 16 bits, mono) en modo FT2 con
+#  «decodium-rx» (Decodium 4.0 Core Shannon, IU8LMC, GPLv3) y escribe cada
+#  mensaje en el MISMO formato que «jt9», para que OpenWebRX+ lo lea con su
+#  analizador de FT8/FT4 sin cambios:
+#     decodium-rx:  "  12:00:15.00   -9  0.1  1234  CQ N0CALL IM98"
+#     salida:       "120015  -9  0.1 1234 ~  CQ N0CALL IM98"
+#  Uso (lo llama OpenWebRX+ con el modo FT2): bricohams-ft2-decode [-d N] fichero.wav
+# =====================================================================
+import os
+import re
+import subprocess
+import sys
+
+LINEA = re.compile(r'^\s+(\d\d):(\d\d):(\d\d)\.\d\d\s+(-?\d+)\s+(-?\d+(?:\.\d+)?)\s+(\d+)\s+(.+?)\s*$')
+NOMBRE_TS = re.compile(r'(\d{6})_(\d{6})\.wav$')
+BIN = os.environ.get('DECODIUM_RX', 'decodium-rx')
+
+
+def convertir(linea, hhmmss_fichero=''):
+    m = LINEA.match(linea)
+    if not m:
+        return None
+    hh, mi, ss, snr, dt, hz, msg = m.groups()
+    ts = hh + mi + ss
+    if ts == '000000' and hhmmss_fichero:
+        ts = hhmmss_fichero
+    return '%s %3d %4.1f %4d ~  %s' % (ts, int(snr), float(dt), int(hz), msg)
+
+
+def main(argv):
+    prof = '3'
+    args = argv[1:]
+    if len(args) >= 2 and args[0] == '-d':
+        prof, args = args[1], args[2:]
+    if not args:
+        print('uso: bricohams-ft2-decode [-d 1-3] fichero.wav', file=sys.stderr)
+        return 2
+    wav = args[0]
+    m = NOMBRE_TS.search(os.path.basename(wav))
+    hhmmss = m.group(2) if m else ''
+    try:
+        p = subprocess.run([BIN, '-m', 'ft2', '--wav', '--no-log', '--no-color', '--depth', str(prof), wav],
+                           capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print('ft2: %s' % e, file=sys.stderr)
+        return 1
+    for ln in p.stdout.splitlines():
+        out = convertir(ln, hhmmss)
+        if out:
+            print(out, flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

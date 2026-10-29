@@ -1,0 +1,278 @@
+1
+00:00:00,250 --> 00:00:07,881
+Bienvenida a esta demostración de BricoHams con Open Web RX Plus, un receptor de radio definido
+por software que se utiliza desde el navegador.
+
+2
+00:00:08,101 --> 00:00:16,465
+El panel permite iniciar la escucha, elegir frecuencia y observar el espectro. La cascada
+representa las señales y su evolución en el tiempo.
+
+3
+00:00:18,250 --> 00:00:26,058
+Los controles de la derecha permiten ajustar el volumen, el silenciador y el ancho de banda. El
+modo debe corresponder al tipo de señal.
+
+4
+00:00:26,278 --> 00:00:34,396
+En frecuencia modulada se puede elegir un subtono. No es un sistema de privacidad: sirve para
+abrir el audio cuando coincide el tono esperado.
+
+5
+00:00:36,250 --> 00:00:43,352
+El chat permite comunicarse con otros usuarios. Antes de participar, revisa las normas y el aviso
+de privacidad.
+
+6
+00:00:43,572 --> 00:00:47,424
+Los mensajes y los datos de conexión se han ocultado en esta edición.
+
+7
+00:00:48,250 --> 00:00:57,640
+Durante esta parte se muestran los diálogos de identificación y bienvenida. La grabación original
+contiene un indicativo real, por lo que se sustituye por esta tarjeta.
+
+8
+00:00:57,860 --> 00:01:06,733
+El acceso al receptor y la identificación para el chat son pasos distintos. El formulario explica
+qué información se solicita y cómo se conserva en el navegador.
+
+9
+00:01:06,953 --> 00:01:16,303
+Para una demostración es preferible utilizar un alias de prueba y evitar nombres personales.
+También deben revisarse las direcciones visibles y las notificaciones del navegador.
+
+10
+00:01:16,523 --> 00:01:23,803
+Esta edición conserva el orden y la duración de la demostración, pero no reproduce los
+identificadores ni las conversaciones originales.
+
+11
+00:01:37,250 --> 00:01:45,128
+El selector reúne distintos receptores y perfiles: satélites, radioafición, un equipo multiperfil
+y recepción de onda corta.
+
+12
+00:01:45,348 --> 00:01:53,955
+Cada perfil define una banda y unos ajustes de partida. Cambiar de perfil permite pasar a otra
+zona del espectro sin introducir todos los parámetros de nuevo.
+
+13
+00:01:58,250 --> 00:02:06,530
+Ahora se selecciona la banda de radiodifusión y se sintoniza una emisora en FM ancha. Las franjas
+más intensas señalan señales de mayor nivel.
+
+14
+00:02:06,750 --> 00:02:15,840
+Las etiquetas ayudan a localizar frecuencias conocidas. El panel también puede mostrar información
+RDS, cuando la recepción permite decodificarla.
+
+15
+00:02:19,250 --> 00:02:28,258
+El panel DX Cluster presenta avisos de actividad, frecuencias y modos. Sus filtros ayudan a
+encontrar señales de interés en las bandas de radioafición.
+
+16
+00:02:28,478 --> 00:02:36,642
+Los avisos no garantizan que una señal pueda recibirse desde este equipo. Se ocultan los
+indicativos y las ubicaciones que aparecen en la grabación.
+
+17
+00:02:42,250 --> 00:02:50,818
+El panel solar reúne gráficos e imágenes para consultar las condiciones del Sol. Esta información
+ayuda a interpretar posibles cambios en la propagación.
+
+18
+00:02:51,038 --> 00:02:56,238
+Es una referencia complementaria: no sustituye la observación de las señales recibidas.
+
+19
+00:02:57,250 --> 00:03:06,266
+La vista meteorológica permite consultar sensores de la red. Se han omitido los nombres de las
+estaciones para no relacionar las mediciones con ubicaciones personales.
+
+20
+00:03:08,250 --> 00:03:16,211
+El filtro de audio ofrece perfiles de paso de banda y filtros para atenuar pitidos. Se puede
+activar el filtro automático o ajustar el manual.
+
+21
+00:03:16,431 --> 00:03:20,759
+Estos cambios afectan a la escucha local, no al audio original grabado.
+
+22
+00:03:22,250 --> 00:03:28,255
+El panel de procesamiento digital permite elegir perfiles de escucha y ajustar graves, medios y
+agudos.
+
+23
+00:03:28,475 --> 00:03:37,231
+También dispone de puerta de ruido y control automático de ganancia. Conviene comparar los ajustes
+con el audio sin procesar y evitar una compresión excesiva.
+
+24
+00:03:37,451 --> 00:03:41,348
+Esta edición solo incluye la narración, sin audio original.
+
+25
+00:03:42,250 --> 00:03:50,866
+La herramienta de satélites incluye categorías de radioafición y meteorología. El mapa orbital
+ayuda a seleccionar un objetivo y a preparar su recepción.
+
+26
+00:03:51,086 --> 00:03:58,998
+En la grabación se ve la carga de órbitas y la consulta del panel. Eso no demuestra por sí solo
+que se haya recibido una transmisión del satélite.
+
+27
+00:03:59,218 --> 00:04:06,293
+Los pases dependen de la posición de la estación y de la hora. Se han retirado las referencias
+locales para proteger su ubicación.
+
+28
+00:04:16,250 --> 00:04:26,263
+La sección de archivos reúne resultados de recepción y decodificación. Antes de compartirlos, hay
+que revisar sus nombres, su contenido y cualquier dato que puedan identificar.
+
+29
+00:04:27,250 --> 00:04:35,094
+El mapa permite combinar capas y consultar información asociada a las señales. En esta parte se
+abren marcadores y una ficha de aeronave.
+
+30
+00:04:35,314 --> 00:04:41,709
+La presencia de un marcador no implica necesariamente recepción directa: depende de la capa y de
+la fuente configurada.
+
+31
+00:04:41,929 --> 00:04:49,096
+Para no revelar la posición del receptor ni los detalles de las fichas, la imagen se ha sustituido
+por una explicación de sus funciones.
+
+32
+00:05:00,250 --> 00:05:10,416
+Los ajustes generales reúnen la información del receptor y opciones de presentación, compresión y
+mapa. Algunos campos contienen correo, coordenadas y enlaces de la estación.
+
+33
+00:05:10,636 --> 00:05:19,078
+Esos valores no se muestran en esta edición. La visita al formulario permite conocer sus opciones,
+pero no acredita que se hayan guardado cambios.
+
+34
+00:05:19,298 --> 00:05:24,987
+Modificar la configuración debe reservarse a personal autorizado y acompañarse de una copia de
+seguridad.
+
+35
+00:05:29,250 --> 00:05:35,879
+La lista muestra receptores, perfiles y estado: equipos en ejecución, detenidos o deshabilitados.
+
+36
+00:05:37,250 --> 00:05:45,202
+Los marcadores guardan frecuencias, modulación y otros parámetros. Facilitan volver a canales
+habituales sin repetir la sintonía.
+
+37
+00:05:45,422 --> 00:05:51,865
+El editor permite organizar, importar y exportar la lista. Revisa los datos antes de compartirla.
+
+38
+00:05:52,250 --> 00:05:59,314
+La configuración de demodulación y decodificación reúne opciones para los distintos tipos de señal
+y para los decodificadores disponibles.
+
+39
+00:05:59,534 --> 00:06:08,424
+En la sección de modos digitales se ajustan los procesos de trabajo y los intervalos de
+decodificación. Más procesos también pueden aumentar el consumo de recursos.
+
+40
+00:06:08,644 --> 00:06:14,082
+Aquí se recorren los formularios; no se demuestra la decodificación correcta de todos los modos.
+
+41
+00:06:18,250 --> 00:06:25,464
+Las opciones de informes conectan con redes externas. Los identificadores y los campos de acceso
+se han retirado de la imagen.
+
+42
+00:06:26,250 --> 00:06:30,893
+El panel ADS B muestra la integración con map flights y el estado de sus servicios.
+
+43
+00:06:31,250 --> 00:06:37,406
+La administración de Meshtastic separa los nodos de cuatrocientos treinta y tres y ochocientos
+sesenta y ocho megahercios.
+
+44
+00:06:37,626 --> 00:06:45,142
+Desde estos paneles se consulta su estado y se preparan mensajes. Los nombres de nodo y cualquier
+contenido real permanecen ocultos.
+
+45
+00:06:48,250 --> 00:06:57,334
+La pasarela LoRa APRS presenta el estado de radio, los contadores y los sensores. La información
+del dispositivo y su indicativo se han anonimizado.
+
+46
+00:06:58,250 --> 00:07:06,828
+En este punto, el navegador muestra un error de conexión. Por tanto, la grabación no permite dar
+por verificado el acceso a esa interfaz.
+
+47
+00:07:07,048 --> 00:07:14,618
+Sería necesario comprobar la red, el servicio y los permisos. Se ha ocultado la dirección y el
+historial desplegado del navegador.
+
+48
+00:07:17,250 --> 00:07:21,375
+El recorrido vuelve al menú para abrir los siguientes módulos de administración.
+
+49
+00:07:22,250 --> 00:07:30,346
+El panel TAK reúne el estado de los servicios y acciones de administración. El acceso debe
+limitarse a la red local o a una conexión autorizada.
+
+50
+00:07:30,566 --> 00:07:36,894
+Se ha sustituido la pantalla completa para no exponer usuarios, credenciales, direcciones ni
+registros.
+
+51
+00:07:37,250 --> 00:07:46,321
+La monitorización muestra gráficos de uso de procesador, memoria, carga del sistema y temperatura.
+El selector temporal permite comparar periodos.
+
+52
+00:07:46,541 --> 00:07:54,023
+Estas métricas ayudan a detectar sobrecarga y cambios de comportamiento, pero una captura aislada
+no garantiza la estabilidad del conjunto.
+
+53
+00:07:57,250 --> 00:08:01,367
+WiFi, procesos en segundo plano y seguridad no se prueban aquí.
+
+54
+00:08:02,250 --> 00:08:11,483
+El cliente web de Meshtastic ofrece conexiones favoritas para los dos nodos. La interfaz reúne
+mensajería, mapa, configuración y listado de nodos.
+
+55
+00:08:11,703 --> 00:08:18,977
+El recorrido cambia de conexión y de canal. Esa navegación no demuestra por sí sola que un mensaje
+haya llegado a su destinatario.
+
+56
+00:08:19,197 --> 00:08:23,319
+Los canales y los nombres de los participantes se han retirado de esta edición.
+
+57
+00:08:28,250 --> 00:08:34,495
+El vídeo termina mostrando avisos de mensajería. Se omiten las conversaciones y los datos de
+terceros.
+
+58
+00:08:34,715 --> 00:08:41,814
+Hasta aquí el recorrido por BricoHams SDR. Esta versión conserva el original y añade una narración
+femenina en español.

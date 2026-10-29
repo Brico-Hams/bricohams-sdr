@@ -1,0 +1,2 @@
+ensayo_id;punto_id;componente_id;revision;requisito_id;calibracion_id;fecha_hora_zona;operador;generador_referencia_id;instrumento_lectura_id;montaje_archivo;frecuencia_Hz;nivel_plano_RX_dBm;ganancia_RX;AGC;bias_tee;sample_rate_Sps;ancho_RF_Hz;ancho_demod_Hz;modo_modulacion;software_version;magnitud;unidad;lectura;repeticion;alimentacion_V;corriente_A;temperatura_C;configuracion_archivo;evidencia_archivo;captura_archivo;limitaciones;observaciones
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

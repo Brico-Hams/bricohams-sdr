@@ -1,0 +1,22 @@
+#!/bin/bash
+# bricohams-telegram "texto"  ·  manda un aviso al grupo/canal de Telegram de la estación.
+# Lo usan las tareas automáticas (copias, actualizaciones, reinicios) y bricohams-check.
+# Credenciales en /etc/bricohams/telegram.env (TELEGRAM_TOKEN y TELEGRAM_CHAT_ID, sacadas de bricohams.env).
+set -u
+[ -r /etc/bricohams/telegram.env ] && . /etc/bricohams/telegram.env
+[ -n "${TELEGRAM_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] || { echo "Telegram sin configurar (TELEGRAM_TOKEN/TELEGRAM_CHAT_ID)" >&2; exit 1; }
+texto="${*:-(sin texto)}"
+export TELEGRAM_TOKEN TELEGRAM_CHAT_ID
+export BRICOHAMS_TEXTO="📡 $(hostname) · ${texto}"
+exec python3 - <<'PY'
+import os
+import sys
+sys.path.insert(0, '/usr/local/bin')
+from bricohams_telegram import enviar_mensaje
+try:
+    enviar_mensaje(os.environ['TELEGRAM_TOKEN'], os.environ['TELEGRAM_CHAT_ID'],
+                   os.environ['BRICOHAMS_TEXTO'], formato_html=False)
+except (ValueError, RuntimeError) as ex:
+    print(str(ex), file=sys.stderr)
+    sys.exit(1)
+PY

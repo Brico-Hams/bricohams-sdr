@@ -1,0 +1,259 @@
+#!/bin/bash
+# =====================================================================
+#  bricohams-lilygo · BricoHams
+#  Los dos LilyGO T3 V1.6.1 (LoRa32 V2.1_1.6, ESP32 + SX1278 433 MHz)
+#  van por USB a la Raspberry: les da corriente y permite configurarlos.
+#
+#   identificar   Crea /dev/lilygo-mesh y /dev/lilygo-igate (regla udev)
+#                 pidiéndote conectarlos de uno en uno.
+#   meshtastic    Configura el nodo Meshtastic EU_433 (el firmware se
+#                 graba antes con https://flasher.meshtastic.org). v4.5: con
+#                 MESH433_CHANNEL_URL aplica la URL de la red 433 tal cual.
+#   igate         ALTERNATIVA: compila y graba el iGate WiFi de CA2RXU en un
+#                 LilyGO. Desde la v4.5 el iGate es el RAK4631 (bricohams-rak-aprs).
+#   firmware      v4.5: actualiza el Meshtastic del LilyGO al último estable
+#                 oficial (esptool, conserva la configuración) y lo vuelve a
+#                 configurar. Para un borrado total: flasher.meshtastic.org.
+#   wxstation [puerto]  ALTERNATIVA (v3): graba un TERCER LilyGO con la estación
+#                 meteo LoRa de CA2RXU (richonguzman/LoRa_APRS_Wx_Station),
+#                 con su BME280, viento RS485 y pluviómetro propios. Emite
+#                 por LoRa en 433,775 y lo recoge el iGate. Puerto por defecto:
+#                 /dev/ttyUSB0 (enchúfalo solo, sin los otros dos).
+#   estado        Muestra qué hay conectado.
+#  Uso: sudo bricohams-lilygo <orden>
+# =====================================================================
+set -euo pipefail
+ENV=/etc/bricohams/bricohams.env
+# shellcheck source=/dev/null
+[ -r "$ENV" ] && . "$ENV"
+RULES=/etc/udev/rules.d/99-bricohams-lilygo.rules
+IGATE_REPO=https://github.com/richonguzman/LoRa_APRS_iGate.git
+IGATE_DIR=/opt/bricohams/LoRa_APRS_iGate
+IGATE_ENV=ttgo-lora32-v21           # placa del iGate en platformio.ini
+WX_REPO=https://github.com/richonguzman/LoRa_APRS_Wx_Station.git
+WX_DIR=/opt/bricohams/LoRa_APRS_Wx_Station
+export PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin
+
+[ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
+
+puertos() { ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || true; }
+
+# identificador estable de un puerto: número de serie del chip USB-serie,
+# o la posición física en el USB si el chip no tiene serie (CH340)
+ident() {
+    local props
+    props=$(udevadm info -q property -n "$1")
+    local sn path
+    sn=$(sed -n 's/^ID_SERIAL_SHORT=//p' <<<"$props")
+    path=$(sed -n 's/^ID_PATH=//p' <<<"$props")
+    if [ -n "$sn" ] && [ "$sn" != 0001 ]; then echo "ENV{ID_SERIAL_SHORT}==\"$sn\""; else echo "ENV{ID_PATH}==\"$path\""; fi
+}
+
+esperar_nuevo() {  # lista_anterior
+    local antes=$1 p
+    for _ in $(seq 1 20); do
+        for p in $(puertos); do
+            grep -qx "$p" <<<"$antes" || { echo "$p"; return 0; }
+        done
+        sleep 1
+    done
+    return 1
+}
+
+identificar() {
+    echo "Desenchufa los DOS LilyGO de la Raspberry."
+    read -r -p "Pulsa Intro cuando estén desenchufados… " _
+    local base m g
+    base=$(puertos)
+    echo "Enchufa ahora SOLO el LilyGO de MESHTASTIC."
+    m=$(esperar_nuevo "$base") || { echo "✘ No aparece ningún puerto serie nuevo."; exit 1; }
+    echo "  -> Meshtastic en $m"
+    base=$(puertos)
+    echo "Enchufa ahora el LilyGO del iGATE."
+    g=$(esperar_nuevo "$base") || { echo "✘ No aparece ningún puerto serie nuevo."; exit 1; }
+    echo "  -> iGate en $g"
+    {
+        echo "# BricoHams: nombres fijos para los LilyGO (bricohams-lilygo identificar)"
+        echo "SUBSYSTEM==\"tty\", $(ident "$m"), SYMLINK+=\"lilygo-mesh\", GROUP=\"dialout\", MODE=\"0660\""
+        echo "SUBSYSTEM==\"tty\", $(ident "$g"), SYMLINK+=\"lilygo-igate\", GROUP=\"dialout\", MODE=\"0660\""
+    } >"$RULES"
+    udevadm control --reload-rules && udevadm trigger --subsystem-match=tty
+    sleep 2
+    ls -l /dev/lilygo-* || true
+    echo "Hecho: $RULES"
+}
+
+meshtastic_cli() {
+    command -v meshtastic >/dev/null || pipx install meshtastic >/dev/null
+    timeout 90 meshtastic --port /dev/lilygo-mesh "$@"
+}
+
+# v4.5 · el puerto serie es de uno solo: el servicio del mapa de OpenWebRX+ lo suelta mientras tanto
+soltar_puerto() {
+    if systemctl is-active --quiet bricohams-mesh-owrx 2>/dev/null; then
+        systemctl stop bricohams-mesh-owrx
+        trap 'systemctl start bricohams-mesh-owrx 2>/dev/null || true' EXIT
+        sleep 2
+    fi
+}
+
+conf_meshtastic() {
+    [ -e /dev/lilygo-mesh ] || { echo "✘ No existe /dev/lilygo-mesh: sudo bricohams-dispositivos identificar"; exit 1; }
+    soltar_puerto
+    echo "Configurando el nodo Meshtastic 433 en /dev/lilygo-mesh…"
+    meshtastic_cli --info >/dev/null || { echo "✘ No responde. ¿Tiene grabado el firmware Meshtastic (flasher.meshtastic.org, placa 'LILYGO T3 V1.6.1')?"; exit 1; }
+    if [ -n "${MESH433_CHANNEL_URL:-}" ]; then
+        # v4.5 · URL propia de la red 433 (canales y radio EU_433 LONG_FAST, 10 dBm): se aplica tal cual
+        local region
+        region=$(bricohams-mesh-url json "$MESH433_CHANNEL_URL" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["radio"].get("region",""))' 2>/dev/null || true)
+        case "$region" in
+            EU_433|"") ;;
+            *) echo "✘ MESH433_CHANNEL_URL es de $region, no de EU_433: el LilyGO es de 433 MHz"; exit 1 ;;
+        esac
+        bricohams-mesh-url ver "$MESH433_CHANNEL_URL" 2>/dev/null || true
+        meshtastic_cli --seturl "$MESH433_CHANNEL_URL"; sleep 20
+    elif [ "${MESH433_CHANNELS:-yes}" = yes ] && [ -n "${MESH_CHANNEL_URL:-}" ]; then
+        # mismos canales que el nodo 868…
+        meshtastic_cli --seturl "$MESH_CHANNEL_URL"; sleep 20
+        # …pero la radio en 433: el QR trae EU_868 a 869,618 MHz, que aquí no vale
+        meshtastic_cli --set lora.region EU_433 --set lora.use_preset true --set lora.override_frequency 0 \
+            --set lora.tx_power 0; sleep 15
+        meshtastic_cli --set lora.modem_preset LONG_FAST; sleep 10
+    else
+        meshtastic_cli --set lora.region EU_433; sleep 15
+    fi
+    meshtastic_cli --set-owner "${MESH433_LONG_NAME:-SDR BricoHams 433}" --set-owner-short "${MESH433_SHORT_NAME:-SB43}"; sleep 10
+    meshtastic_cli --set device.role "${MESH433_ROLE:-CLIENT}"; sleep 10
+    meshtastic_cli --setlat "${STATION_LAT}" --setlon "${STATION_LON}" --setalt "${STATION_ASL}"; sleep 5
+    meshtastic_cli --set position.gps_mode NOT_PRESENT || true
+    echo "✔ Meshtastic EU_433: ${MESH433_LONG_NAME:-SDR BricoHams 433} (${MESH433_SHORT_NAME:-SB43}), posición fija"
+}
+
+conf_igate_json() {  # base.json salida.json
+    python3 - "$1" "$2" <<'PY'
+import json, os, sys
+c = json.load(open(sys.argv[1]))
+e = os.environ.get
+c['callsign'] = e('IGATE_CALLSIGN', 'N0CALL-10')
+if e('LILYGO_WIFI_SSID'):
+    c['wifi']['AP'] = [{'ssid': e('LILYGO_WIFI_SSID'), 'password': e('LILYGO_WIFI_PASS', '')}]
+b = c['beacon']
+b.update({'latitude': float(e('STATION_LAT')), 'longitude': float(e('STATION_LON')),
+          'comment': e('IGATE_COMMENT', 'LoRa APRS iGate'), 'interval': 15, 'overlay': 'L', 'symbol': 'a',
+          'sendViaAPRSIS': True, 'sendViaRF': False})
+c['aprs_is'].update({'active': True, 'server': e('IGATE_APRSIS_SERVER', 'euro.aprs2.net'),
+                     'passcode': e('APRS_PASSCODE', ''), 'port': 14580, 'filter': 'm/10',
+                     'messagesToRF': False, 'objectsToRF': False})
+c['digi'].update({'mode': 0})                                   # sin digipeater
+c['lora'].update({'rxActive': True, 'rxFreq': 433775000, 'rxSpreadingFactor': 12, 'rxCodingRate4': 5,
+                  'rxSignalBandwidth': 125000, 'txActive': False})  # solo recepción (no molesta a los SDR)
+c['webadmin'].update({'username': 'admin', 'password': e('IGATE_WEB_PASS', '')})
+c['ntp'].update({'server': 'pool.ntp.org', 'gmtCorrection': 1.0})
+json.dump(c, open(sys.argv[2], 'w'), indent=4, ensure_ascii=False)
+print('igate_conf.json: %s, %s, APRS-IS %s' % (c['callsign'], 'WiFi ' + (e('LILYGO_WIFI_SSID') or '¡SIN WIFI!'), c['aprs_is']['server']))
+PY
+}
+
+igate() {
+    [ -e /dev/lilygo-igate ] || { echo "✘ No existe /dev/lilygo-igate: sudo $0 identificar"; exit 1; }
+    [ -n "${LILYGO_WIFI_SSID:-}" ] || echo "! LILYGO_WIFI_SSID está vacío: el iGate no tendrá Internet (pon tu WiFi en bricohams.env)"
+    command -v pio >/dev/null || pipx install platformio
+    if [ -d "$IGATE_DIR/.git" ]; then git -C "$IGATE_DIR" pull --ff-only; else git clone --depth 1 "$IGATE_REPO" "$IGATE_DIR"; fi
+    set -a
+    # shellcheck source=/dev/null
+    . "$ENV"
+    set +a
+    conf_igate_json "$IGATE_DIR/data/igate_conf.json" "$IGATE_DIR/data/igate_conf.json.bricohams"
+    cp "$IGATE_DIR/data/igate_conf.json.bricohams" "$IGATE_DIR/data/igate_conf.json"
+    echo "Compilando y grabando el iGate (la primera vez tarda 10-15 min en la Pi)…"
+    (cd "$IGATE_DIR" && pio run -e "$IGATE_ENV" -t upload --upload-port /dev/lilygo-igate)
+    (cd "$IGATE_DIR" && pio run -e "$IGATE_ENV" -t uploadfs --upload-port /dev/lilygo-igate)
+    git -C "$IGATE_DIR" checkout -- data/igate_conf.json
+    echo "✔ iGate ${IGATE_CALLSIGN:-} grabado. Su web: http://<IP del iGate>/ (mira la IP en su pantalla)"
+}
+
+conf_wx_json() {  # base.json salida.json
+    python3 - "$1" "$2" <<'PY'
+import json, os, sys
+c = json.load(open(sys.argv[1]))
+e = os.environ.get
+si = lambda k, d='no': e(k, d).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
+c['callsign'] = e('WXLORA_CALLSIGN', 'N0CALL-14')
+c['beacon'].update({'latitude': float(e('STATION_LAT')), 'longitude': float(e('STATION_LON')),
+                    'comment': e('WXLORA_COMMENT', 'WX LoRa BricoHams'), 'interval': 10, 'path': 'WIDE1-1'})
+c['lora'].update({'txFreq': 433775000, 'spreadingFactor': 12, 'signalBandwidth': 125000, 'codingRate4': 5,
+                  'power': int(e('WXLORA_POWER', '17'))})
+c['sensors'].update({'bme280Active': si('WXLORA_BME280', 'yes'), 'bh1750Active': si('WXLORA_BH1750'),
+                     'windDirectionActive': si('WXLORA_WIND'), 'windSpeedActive': si('WXLORA_WIND'),
+                     'rainActive': si('WXLORA_RAIN'), 'bme280HeightCorrection': int(float(e('STATION_ASL', '0')))})
+json.dump(c, open(sys.argv[2], 'w'), indent=4, ensure_ascii=False)
+print('wxStation_conf.json: %s, %d dBm, sensores %s' % (c['callsign'], c['lora']['power'],
+      ', '.join(k for k, v in c['sensors'].items() if v is True)))
+PY
+}
+
+wxstation() {
+    local port=${1:-/dev/ttyUSB0}
+    [ -e "$port" ] || { echo "✘ No existe $port. Enchufa SOLO el LilyGO de la estación WX y mira: sudo $0 estado"; exit 1; }
+    case "$port" in /dev/lilygo-mesh|/dev/lilygo-igate) echo "✘ $port es otro LilyGO"; exit 1 ;; esac
+    command -v pio >/dev/null || pipx install platformio
+    if [ -d "$WX_DIR/.git" ]; then git -C "$WX_DIR" pull --ff-only; else git clone --depth 1 "$WX_REPO" "$WX_DIR"; fi
+    set -a
+    # shellcheck source=/dev/null
+    . "$ENV"
+    set +a
+    conf_wx_json "$WX_DIR/data/wxStation_conf.json" "$WX_DIR/data/wxStation_conf.json.bricohams"
+    cp "$WX_DIR/data/wxStation_conf.json.bricohams" "$WX_DIR/data/wxStation_conf.json"
+    echo "Compilando y grabando la estación WX LoRa (entorno ttgo-lora32-v21)…"
+    (cd "$WX_DIR" && pio run -e ttgo-lora32-v21 -t upload --upload-port "$port")
+    (cd "$WX_DIR" && pio run -e ttgo-lora32-v21 -t uploadfs --upload-port "$port")
+    git -C "$WX_DIR" checkout -- data/wxStation_conf.json
+    echo "✔ Estación WX LoRa ${WXLORA_CALLSIGN:-N0CALL-14} grabada. Cambia antes la dirección de la veleta a 0x02 (manual 19)."
+}
+
+firmware_meshtastic() {
+    [ -e /dev/lilygo-mesh ] || { echo "✘ No existe /dev/lilygo-mesh: sudo bricohams-dispositivos identificar"; exit 1; }
+    local esptool tmp zip bin
+    esptool=$(command -v esptool || command -v esptool.py || true)
+    [ -n "$esptool" ] || { pipx install esptool >/dev/null && esptool=$(command -v esptool || command -v esptool.py); }
+    soltar_puerto
+    tmp=$(mktemp -d)
+    echo "Buscando el último Meshtastic estable para LilyGO T3 V1.6.1 (tlora-v2-1-1_6)…"
+    zip=$(curl -fsSL https://api.github.com/repos/meshtastic/firmware/releases/latest | python3 -c '
+import json, sys
+r = json.load(sys.stdin)
+print(next(a["browser_download_url"] for a in r["assets"] if a["name"].startswith("firmware-esp32-") and a["name"].endswith(".zip")))')
+    [ -n "$zip" ] || { echo "✘ No encuentro el firmware (sin Internet o cambió la publicación): usa flasher.meshtastic.org"; exit 1; }
+    echo "  -> $zip"
+    curl -fsSL -o "$tmp/fw.zip" "$zip"
+    python3 - "$tmp/fw.zip" "$tmp" <<'PY'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+n = [x for x in z.namelist() if 'tlora-v2-1-1_6' in x and x.endswith('.bin') and 'factory' not in x and 'ota' not in x]
+if not n:
+    sys.exit('✘ el paquete no trae tlora-v2-1-1_6')
+z.extract(n[0], sys.argv[2])
+open(sys.argv[2] + '/nombre', 'w').write(n[0])
+PY
+    bin="$tmp/$(cat "$tmp/nombre")"
+    echo "Grabando $(basename "$bin") (actualización: conserva canales y nombre)…"
+    "$esptool" --chip esp32 --port /dev/lilygo-mesh --baud 921600 write_flash 0x10000 "$bin"
+    rm -rf "$tmp"
+    sleep 8
+    conf_meshtastic
+}
+
+estado() {
+    echo "Puertos serie:"; puertos | sed 's/^/   /'
+    ls -l /dev/lilygo-* 2>/dev/null | sed 's/^/   /' || echo "   (sin nombres fijos: sudo $0 identificar)"
+}
+
+case "${1:-}" in
+    identificar) identificar ;;
+    meshtastic)  conf_meshtastic ;;
+    firmware)    firmware_meshtastic ;;
+    igate)       igate ;;
+    wxstation)   wxstation "${2:-}" ;;
+    estado)      estado ;;
+    *) sed -n '2,26p' "$0"; exit 1 ;;
+esac

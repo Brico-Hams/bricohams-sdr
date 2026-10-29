@@ -1,0 +1,9 @@
+// Plugin loader.
+
+// Plugins._enable_debug = true;
+
+const mp_url = 'https://0xaf.github.io/openwebrxplus-plugins/map';
+
+// Maidenhead (QTH) grid layer (OWRX+ v1.2.43 has this integrated, so we are not loading it)
+// Plugins.load(mp_url + '/layer_qth_maidenhead/layer_qth_maidenhead.js');
+

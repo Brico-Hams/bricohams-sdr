@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  bricohams-owrx-ctcss · subtono CTCSS («Subtono FM») en los bookmarks
+#  de OpenWebRX+ y squelch por subtono en el demodulador FM
+#
+#  Los repetidores FM analógicos solo abren con su subtono CTCSS; un
+#  receptor que no lo filtra oye también la portadora/ruido de otros
+#  equipos en la misma frecuencia. Este parche:
+#
+#   1) owrx/bookmarks.py: el bookmark admite el campo opcional "ctcss"
+#      (Hz, 0 = sin subtono), se guarda en bookmarks.json y llega al
+#      cliente con el resto del bookmark.
+#   2) owrx/controllers/settings/bookmarks.py: columna «Subtono FM» en el
+#      editor de /settings/bookmarks (protegido por contraseña); valida
+#      el tono (60–260 Hz) y lo anula si la modulación no es FM.
+#   3) htdocs/lib/settings/BookmarkTable.js: editor desplegable con los
+#      tonos EIA en la tabla y en la importación desde el navegador.
+#   4) htdocs/index.html: carga lib/bricohams-ctcss.js (al sintonizar un
+#      bookmark con subtono el squelch CTCSS se activa automáticamente;
+#      selector «Subtono FM» de escucha, solo de sesión, en el panel).
+#   5) owrx/dsp.py: propiedad "ctcss" del cliente -> inserta/retira el
+#      módulo CtcssSquelch (owrx/bricohams_ctcss.py) en la cadena NFm.
+#
+#  En la interfaz se llama siempre «FM» (internamente la modulación de
+#  OpenWebRX+ es "nfm"). La configuración solo se edita desde /settings.
+#
+#  Líneas añadidas marcadas con  #@BH-CTCSS@  (Python/JS) o
+#  <!--#@BH-CTCSS@-->  (HTML); idempotente y reversible.
+#  Un «apt upgrade» de openwebrx reescribe los ficheros: el gancho
+#  /etc/apt/apt.conf.d/99bricohams-owrx-ctcss lo vuelve a aplicar.
+#
+#  Uso: bricohams-owrx-ctcss [-q]      aplica los parches
+#       bricohams-owrx-ctcss --quitar  deja los ficheros originales
+#  Variables (pruebas): OWRX_CTCSS_BOOKMARKS_PY, OWRX_CTCSS_CTRL_PY,
+#       OWRX_CTCSS_TABLE_JS, OWRX_CTCSS_INDEX_HTML, OWRX_CTCSS_DSP_PY,
+#       OWRX_CTCSS_MOD_DST, OWRX_CTCSS_JS_DST, BH_CTCSS_SRC
+# =====================================================================
+import os
+import re
+import shutil
+import sys
+
+MARCA = '#@BH-CTCSS@'
+PY = '  ' + MARCA                 # sufijo en líneas de código Python
+HT = '<!--' + MARCA + '-->'       # sufijo en líneas HTML (también dentro de cadenas Python)
+JS = ' // ' + MARCA               # sufijo en líneas JS
+
+
+def paquete(nombre, rel):
+    try:
+        m = __import__(nombre)
+        base = os.path.dirname(m.__file__) if getattr(m, '__file__', None) else list(m.__path__)[0]
+        return os.path.join(base, rel)
+    except (ImportError, AttributeError, IndexError):
+        return os.path.join('/usr/lib/python3/dist-packages', nombre, rel)
+
+
+def ruta(var, nombre, rel):
+    return os.environ.get(var) or paquete(nombre, rel)
+
+
+def quitar(t):
+    return ''.join(l for l in t.splitlines(True) if MARCA not in l)
+
+
+def _bloque(sangria, lineas, sufijo):
+    return ''.join('%s%s%s\n' % (sangria, l, sufijo) for l in lineas)
+
+
+def insertar(t, ancla, lineas, sufijo, despues=True, desde=None, extra=''):
+    """Inserta 'lineas' junto a la primera línea que case con 'ancla' (tras 'desde'),
+    con la sangría de esa línea (+ 'extra')."""
+    ini = 0
+    if desde is not None:
+        md = re.compile(desde, re.M).search(t)
+        if not md:
+            raise ValueError('ancla de inicio no encontrada: %s' % desde)
+        ini = md.start()
+    m = re.compile(r'^([ \t]*)' + ancla + r'[^\n]*\n', re.M).search(t, ini)
+    if not m:
+        raise ValueError('ancla no encontrada: %s' % ancla)
+    b = _bloque(m.group(1) + extra, lineas, sufijo)
+    pos = m.end() if despues else m.start()
+    return t[:pos] + b + t[pos:]
+
+
+# ---------------------------------------------------------------- 1) bookmarks.py
+def p_bookmarks(t):
+    t = insertar(t, r'class Bookmark\(object\):', [
+        'def _bh_ctcss_valor(v):',
+        '    try:',
+        '        from owrx.bricohams_ctcss import normalizar_tono',
+        '        return normalizar_tono(v)',
+        '    except Exception:',
+        '        return 0.0',
+        '',
+        '',
+    ], PY, despues=False)
+    t = insertar(t, re.escape('self.srcFile = srcFile'), [
+        'self.ctcss = _bh_ctcss_valor(j.get("ctcss"))',
+    ], PY)
+    t = insertar(t, re.escape('"scannable": self.isScannable(),'), [
+        '**({"ctcss": self.ctcss} if getattr(self, "ctcss", 0) else {}),',
+    ], PY)
+    return t
+
+
+# ---------------------------------------------------------------- 2) controlador /settings/bookmarks
+def p_ctrl(t):
+    t = insertar(t, re.escape('<th>Underlying</th>'), ['<th>Subtono FM</th>'], HT)
+    t = insertar(t, re.escape('<td data-editor="underlying"'), [
+        '<td data-editor="ctcss" data-value="{bh_ctcss}">{bh_ctcss_txt}</td>',
+    ], HT)
+    t = insertar(t, re.escape('scannable_check="&check;" if scan else "",'), [
+        'bh_ctcss="{:g}".format(getattr(bookmark, "ctcss", 0) or 0),',
+        'bh_ctcss_txt=("%g Hz" % bookmark.ctcss) if getattr(bookmark, "ctcss", 0) else "&mdash;",',
+    ], PY)
+    # _sanitizeBookmark: validar el tono y anularlo si no es FM
+    t = insertar(t, r'except Exception as e:', [
+        '    if "ctcss" in data:',
+        '        from owrx.bricohams_ctcss import normalizar_tono',
+        '        try:',
+        '            data["ctcss"] = normalizar_tono(data["ctcss"])',
+        '        except ValueError as e2:',
+        '            return str(e2)',
+        '        if data.get("modulation") != "nfm":',
+        '            data["ctcss"] = 0.0',
+    ], PY, despues=False, desde=r'def _sanitizeBookmark')
+    # update(): conservar/aplicar el tono
+    t = insertar(t, re.escape('# Make sure everything is correct'), [
+        'newd["ctcss"] = data["ctcss"] if "ctcss" in data else getattr(bookmark, "ctcss", 0)',
+    ], PY, despues=False, desde=r'def update\(self\)')
+    # new()/create(): aceptar el tono
+    t = insertar(t, re.escape('error = self._sanitizeBookmark(data)'), [
+        'if "ctcss" in bookmark_data:',
+        '    data["ctcss"] = bookmark_data["ctcss"]',
+    ], PY, despues=False, desde=r'def create\(')
+    return t
+
+
+# ---------------------------------------------------------------- 3) BookmarkTable.js
+EDITOR_JS = r'''function CtcssEditor(table) {
+    Editor.call(this, table);
+}
+
+CtcssEditor.prototype = new Editor();
+
+CtcssEditor.TONOS = [67.0, 69.3, 71.9, 74.4, 77.0, 79.7, 82.5, 85.4, 88.5, 91.5, 94.8, 97.4, 100.0, 103.5, 107.2, 110.9, 114.8, 118.8, 123.0, 127.3, 131.8, 136.5, 141.3, 146.2, 150.0, 151.4, 156.7, 159.8, 162.2, 165.5, 167.9, 171.3, 173.8, 177.3, 179.9, 183.5, 186.2, 189.9, 192.8, 196.6, 199.5, 203.5, 206.5, 210.7, 218.1, 225.7, 229.1, 233.6, 241.8, 250.3, 254.1];
+
+CtcssEditor.prototype.getInputHtml = function() {
+    return '<select class="form-control form-control-sm" title="Subtono CTCSS (solo FM)">' +
+        '<option value="0">Ninguno</option>' +
+        CtcssEditor.TONOS.map(function(t) { return '<option value="' + t + '">' + t.toFixed(1) + ' Hz</option>'; }).join('') +
+        '</select>';
+};
+
+CtcssEditor.prototype.setValue = function(value) {
+    var v = Number(value) || 0;
+    if (v && !this.input.find('option[value="' + v + '"]').length) {
+        this.input.append('<option value="' + v + '">' + v.toFixed(1) + ' Hz</option>');
+    }
+    this.input.val(String(v));
+};
+
+CtcssEditor.prototype.getValue = function() {
+    return Number(this.input.val()) || 0;
+};
+
+CtcssEditor.prototype.getHtml = function() {
+    var v = this.getValue();
+    return v ? v + ' Hz' : '\u2014';
+};
+'''
+
+
+def p_table(t):
+    lineas = EDITOR_JS.rstrip('\n').split('\n') + ['']
+    t = insertar(t, re.escape('var renderModulation = function(m, modes) {'), lineas, JS, despues=False)
+    t = insertar(t, re.escape('underlying: UnderlyingEditor,'), ['ctcss: CtcssEditor,'], JS)
+    t = insertar(t, re.escape('\'<td data-editor="underlying"'), [
+        '\'<td data-editor="ctcss" data-value="\' + (Number(b.ctcss) || 0) + \'">\' + '
+        '(Number(b.ctcss) ? b.ctcss + \' Hz\' : \'\\u2014\') + \'</td>\' +',
+    ], JS)
+    return t
+
+
+# ---------------------------------------------------------------- 4) index.html
+def p_index(t):
+    return insertar(t, re.escape('<script src="static/plugins.js"></script>'), [
+        '<script src="static/lib/bricohams-ctcss.js"></script>',
+    ], HT)
+
+
+# ---------------------------------------------------------------- 5) dsp.py
+def p_dsp(t):
+    t = insertar(t, re.escape('self.rdsRbds = False'), ['self.ctcss = 0'], PY)
+    t = insertar(t, re.escape('self._updateDialFrequency()'), [
+        'try:',
+        '    from owrx import bricohams_ctcss',
+        '    bricohams_ctcss.aplicar(self.demodulator, self.ctcss)',
+        'except Exception:',
+        '    logger.exception("bricohams ctcss: no se pudo aplicar el subtono")',
+    ], PY, despues=False, desde=r'def setDemodulator\(self, demodulator')
+    t = insertar(t, r'class ModulationValidator\b', [
+        '    def setCtcss(self, v):',
+        '        try:',
+        '            from owrx import bricohams_ctcss',
+        '            try:',
+        '                self.ctcss = bricohams_ctcss.normalizar_tono(v)',
+        '            except ValueError:',
+        '                self.ctcss = 0.0',
+        '            if self.demodulator is not None:',
+        '                bricohams_ctcss.aplicar(self.demodulator, self.ctcss)',
+        '        except Exception:',
+        '            logger.exception("bricohams ctcss: no se pudo aplicar el subtono")',
+        '',
+    ], PY, despues=False)
+    t = insertar(t, re.escape('"squelch_level": "num",'), ['"ctcss": "num",'], PY)
+    t = insertar(t, re.escape('self.props.wireProperty("squelch_level", self.chain.setSquelchLevel),'), [
+        'self.props.wireProperty("ctcss", self.chain.setCtcss),',
+    ], PY)
+    return t
+
+
+def objetivos():
+    return (
+        (ruta('OWRX_CTCSS_BOOKMARKS_PY', 'owrx', 'bookmarks.py'), p_bookmarks),
+        (ruta('OWRX_CTCSS_CTRL_PY', 'owrx', os.path.join('controllers', 'settings', 'bookmarks.py')), p_ctrl),
+        (ruta('OWRX_CTCSS_TABLE_JS', 'htdocs', os.path.join('lib', 'settings', 'BookmarkTable.js')), p_table),
+        (ruta('OWRX_CTCSS_INDEX_HTML', 'htdocs', 'index.html'), p_index),
+        (ruta('OWRX_CTCSS_DSP_PY', 'owrx', 'dsp.py'), p_dsp),
+    )
+
+
+def copias():
+    src = os.environ.get('BH_CTCSS_SRC') or '/usr/local/share/bricohams-ctcss'
+    return (
+        (os.path.join(src, 'bricohams_ctcss.py'), ruta('OWRX_CTCSS_MOD_DST', 'owrx', 'bricohams_ctcss.py')),
+        (os.path.join(src, 'bricohams-ctcss.js'), ruta('OWRX_CTCSS_JS_DST', 'htdocs', os.path.join('lib', 'bricohams-ctcss.js'))),
+    )
+
+
+def leer(r):
+    with open(r, encoding='utf-8', newline='') as f:
+        return f.read()
+
+
+def escribir(r, original, nuevo):
+    if nuevo == original:
+        return False
+    tmp = r + '.bricohams-tmp'
+    with open(tmp, 'w', encoding='utf-8', newline='') as f:
+        f.write(nuevo)
+    os.chmod(tmp, os.stat(r).st_mode & 0o777)
+    os.replace(tmp, r)
+    return True
+
+
+def main(a):
+    callado = '-q' in a
+    sacar = '--quitar' in a
+    rc = 0
+
+    def fallo(r, x):
+        nonlocal rc
+        if not callado:
+            print('%s: %s' % (r, x), file=sys.stderr)
+            rc = 1
+
+    # Primero los módulos (los parches de Python los importan)
+    for org, dst in copias():
+        try:
+            if sacar:
+                if os.path.exists(dst):
+                    os.remove(dst)
+                    if not callado:
+                        print('%s: eliminado' % dst)
+            else:
+                if os.path.exists(dst) and leer(dst) == leer(org):
+                    continue
+                shutil.copyfile(org, dst + '.bricohams-tmp')
+                os.chmod(dst + '.bricohams-tmp', 0o644)
+                os.replace(dst + '.bricohams-tmp', dst)
+                if not callado:
+                    print('%s: instalado' % dst)
+        except OSError as x:
+            fallo(dst, x)
+            if not sacar:
+                return rc  # sin módulo no se parchea nada
+
+    for r, poner in objetivos():
+        try:
+            original = leer(r)
+            nuevo = quitar(original)
+            if not sacar:
+                nuevo = poner(nuevo)
+            if r.endswith('.py'):
+                compile(nuevo, r, 'exec')
+            cambiado = escribir(r, original, nuevo)
+        except (OSError, ValueError, SyntaxError) as x:
+            fallo(r, x)
+            continue
+        if not callado:
+            print('%s: %s%s' % (r, 'parche quitado' if sacar else 'parche aplicado',
+                                '' if cambiado else ' (sin cambios)'))
+    return rc
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

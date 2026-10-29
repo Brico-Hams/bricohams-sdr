@@ -1,0 +1,702 @@
+#!/bin/bash
+# =====================================================================
+#  bricohams-blindaje · auditoría y blindaje de seguridad de la estación (v4.4)
+#
+#  sudo bricohams-blindaje auditar [--resumen]   informe SIN cambiar nada: qué está expuesto,
+#                                                qué puede filtrar información y cómo arreglarlo
+#  sudo bricohams-blindaje aplicar [opciones]    aplica las medidas (con copia de lo que cambia):
+#       --sin-cortafuegos    no toca el cortafuegos del host
+#       --sin-ssh            no toca la configuración de SSH
+#       --ssh-solo-clave     SSH sin contraseña aunque no encuentre claves (¡cuidado!)
+#       --sudo-con-clave     quita el «sudo sin contraseña» del usuario de la Pi
+#  sudo bricohams-blindaje confirmar             deja fijo el cortafuegos nuevo. Si no se confirma
+#                                                en 3 minutos, se quita solo (por si te deja fuera)
+#  sudo bricohams-blindaje deshacer [COPIA]      vuelve a como estaba antes del último «aplicar»
+#
+#  Ajustes en /etc/bricohams/bricohams.env (manual 34):
+#    BLINDAJE_8073="cerrado"     publico = el 8073 abierto a todos (lo abre tu router) · lan = solo la LAN
+#                                · cerrado = nadie desde fuera de la Pi (v5.0: todo por el 443 de nginx)
+#    BLINDAJE_SSH="lan"          lan = SSH solo desde la red de casa · todos
+#    BLINDAJE_LAN=""             redes de casa (vacío = la de la interfaz, p. ej. 192.168.1.0/24)
+#    BLINDAJE_PUERTOS_LAN="4403 8443 8554"   otros puertos TCP solo para la LAN (Meshtastic API/web admin, RTSP)
+#  Lo que se abre a todo el mundo en el host: 80, 443 y (si «publico») 8073 («cerrado»: el 8073 ni en la LAN).
+# =====================================================================
+set -u
+umask 077
+RAIZ=${BH_RAIZ:-}                      # pruebas: todo cuelga de aquí
+ENV=$RAIZ/etc/bricohams/bricohams.env
+COPIAS=$RAIZ/var/backups/bricohams-blindaje
+NFT=$RAIZ/etc/bricohams/cortafuegos.nft
+UNIDAD=$RAIZ/etc/systemd/system/bricohams-cortafuegos.service
+SSHD_D=$RAIZ/etc/ssh/sshd_config.d/90-bricohams.conf
+SYSCTL=$RAIZ/etc/sysctl.d/90-bricohams.conf
+F2B=$RAIZ/etc/fail2ban/jail.d/bricohams.conf
+F2B_FILTER=$RAIZ/etc/fail2ban/filter.d/bricohams-login.conf
+NGINX_LOGIN_LOG=$RAIZ/etc/nginx/conf.d/bricohams-login-log.conf
+NGINX_ROUTES=$RAIZ/etc/nginx/snippets/bricohams-sdr-rutas.conf
+OWRX_UMASK=$RAIZ/etc/systemd/system/openwebrx.service.d/bricohams-umask.conf
+VUELTA_SEG=${BH_VUELTA_SEG:-180}
+
+ALTO=0; MEDIO=0; BAJO=0; OKS=0; RESUMEN=0
+c_ok=$'\e[32m'; c_ko=$'\e[31m'; c_av=$'\e[33m'; c_b=$'\e[1m'; c_g=$'\e[90m'; c_0=$'\e[0m'
+[ -t 1 ] || { c_ok=""; c_ko=""; c_av=""; c_b=""; c_g=""; c_0=""; }
+titulo() { [ "$RESUMEN" = 1 ] || printf '\n%s%s%s\n' "$c_b" "$*" "$c_0"; }
+bien()   { OKS=$((OKS + 1)); [ "$RESUMEN" = 1 ] || printf '  %s✔%s %s\n' "$c_ok" "$c_0" "$*"; }
+# hallazgo NIVEL "qué pasa" "cómo se arregla"
+hallazgo() {
+    case "$1" in ALTO) ALTO=$((ALTO + 1)); c=$c_ko; s='✘' ;; MEDIO) MEDIO=$((MEDIO + 1)); c=$c_av; s='!' ;; *) BAJO=$((BAJO + 1)); c=$c_g; s='·' ;; esac
+    [ "$RESUMEN" = 1 ] && return 0
+    printf '  %s%s %-5s%s %s\n' "$c" "$s" "$1" "$c_0" "$2"
+    [ -z "${3:-}" ] || printf '          %s→ %s%s\n' "$c_g" "$3" "$c_0"
+}
+info()  { printf '%s==>%s %s\n' "$c_b" "$c_0" "$*"; }
+nota()  { [ "$RESUMEN" = 1 ] || printf '    %s%s%s\n' "$c_g" "$*" "$c_0"; }
+fallo() { printf '%s✘ %s%s\n' "$c_ko" "$*" "$c_0" >&2; exit 1; }
+existe() { command -v "$1" >/dev/null 2>&1; }
+
+# valores de bricohams.env (sin ejecutarlo: lo lee bricohams-env.py si está; si no, NOMBRE='valor')
+leer_env() {
+    local l k v
+    [ -r "$ENV" ] || return 0
+    while IFS= read -r l; do
+        [[ "$l" =~ ^(export[[:space:]]+)?([A-Z][A-Z0-9_]*)=(.*)$ ]] || continue
+        k=${BASH_REMATCH[2]}; v=${BASH_REMATCH[3]}
+        if [[ "$v" =~ ^\'(.*)\'$ ]]; then v=${BASH_REMATCH[1]//\'\\\'\'/\'}
+        elif [[ "$v" =~ ^\"(.*)\"[[:space:]]*(#.*)?$ ]]; then v=${BASH_REMATCH[1]}
+        else v=${v%%[[:space:]]#*}; fi
+        printf -v "E_$k" '%s' "$v"
+    done <"$ENV"
+}
+env_de() { local n="E_$1"; printf '%s' "${!n:-${2:-}}"; }
+puertos_lan() { local n=E_BLINDAJE_PUERTOS_LAN; printf '%s' "${!n-4403 8443 8554}"; }   # vacío = ninguno
+
+# --------------------------------------------------------------------- red de casa
+# redes IPv4 conectadas (las de las interfaces, sin docker ni lo), p. ej. 192.168.1.0/24
+redes_lan() {
+    local r
+    r=$(env_de BLINDAJE_LAN)
+    if [ -n "$r" ]; then echo "$r" | tr ', ' '\n\n' | grep -v '^$'; return 0; fi
+    ip -4 -o route show scope link 2>/dev/null | awk '$1 ~ /\// && $3 !~ /^(docker|br-|veth|lo)/ {print $1}' | sort -u
+}
+
+# --------------------------------------------------------------------- cortafuegos (nftables)
+# genera_nft PUERTO8073(publico|lan|cerrado) SSH(lan|todos) "PUERTOS_LAN" "REDES" → ruleset en stdout
+genera_nft() {
+    local p8073=$1 ssh=$2 plan=$3 redes=$4 lan4 pub lanp
+    lan4=$(echo "$redes" | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+    [ -n "$lan4" ] || lan4="192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12"
+    pub="80, 443"; lanp="$plan"
+    case "$p8073" in publico) pub="$pub, 8073" ;; cerrado) ;; *) lanp="$lanp 8073" ;; esac
+    if [ "$ssh" = todos ]; then pub="$pub, 22"; else lanp="$lanp 22"; fi
+    lanp=$(echo "$lanp" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -nu | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+    cat <<EOF
+# Generado por bricohams-blindaje (v4.4). No lo edites: cambia BLINDAJE_* en bricohams.env
+# y vuelve a lanzar «sudo bricohams-blindaje aplicar».
+# Solo filtra lo que ENTRA en la Pi (cadena input); lo que sale y Docker no se tocan.
+table inet bricohams
+delete table inet bricohams
+table inet bricohams {
+    set lan4 { type ipv4_addr; flags interval; elements = { $lan4 } }
+    chain input {
+        type filter hook input priority 0; policy drop;
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+        meta l4proto icmp accept
+        meta l4proto ipv6-icmp accept
+        udp sport 67 udp dport 68 accept                 # DHCP (la IP de la Pi)
+        tcp dport { $pub } ct state new accept           # público: lo que abre el router
+EOF
+    if [ -n "$lanp" ]; then
+        echo "        ip saddr @lan4 tcp dport { $lanp } ct state new accept   # solo la red de casa"
+        echo "        ip6 saddr { fe80::/10, fc00::/7 } tcp dport { $lanp } ct state new accept   # la LAN por IPv6 (enlace local y ULA)"
+    fi
+    cat <<'EOF'
+        ip saddr @lan4 udp dport 5353 accept             # mDNS (sdr.local) en la LAN
+        ip6 saddr fe80::/10 udp dport 5353 accept
+        limit rate 10/minute log prefix "bricohams-cortafuegos: " level info
+    }
+}
+EOF
+}
+
+# --------------------------------------------------------------------- utilidades de auditoría
+modo_de() { stat -c '%a' "$1" 2>/dev/null; }
+dueno_de() { stat -c '%U:%G' "$1" 2>/dev/null; }
+# permiso FICHERO MAX_OCTAL NIVEL "para qué"
+permiso() {
+    local f=$1 max=$2 nivel=$3 que=$4 m
+    [ -e "$f" ] || return 0
+    m=$(modo_de "$f")
+    if (( 8#$m & ~8#$max & 8#777 )); then
+        hallazgo "$nivel" "$que: ${f#"$RAIZ"} tiene permisos $m (más abiertos que $max)" "sudo chmod $max ${f#"$RAIZ"}  (lo hace «aplicar»)"
+    else
+        bien "$que: ${f#"$RAIZ"} ($m $(dueno_de "$f"))"
+    fi
+}
+
+# Busca los VALORES de las claves de bricohams.env en ficheros que lee cualquiera (web, kit,
+# copias…). No imprime nunca el valor: solo el nombre de la variable y el fichero.
+SECRETO_RE='(PASS|PSK|KEY|PASSCODE|TOKEN|SECRET|RTSP_URL)'
+PUBLICAS_RE='^(LISTENERS_SUPABASE_KEY)$'     # clave «anon» pensada para ir al navegador
+buscar_fugas() {
+    local v n val d f hits=0 dirs=()
+    for d in "$@"; do [ -d "$d" ] && dirs+=("$d"); done
+    [ "${#dirs[@]}" -gt 0 ] || return 0
+    for v in $(compgen -v E_ | sort); do
+        n=${v#E_}
+        [[ "$n" =~ $SECRETO_RE ]] || continue
+        [[ "$n" =~ $PUBLICAS_RE ]] && continue
+        val=${!v}
+        [ "${#val}" -ge 6 ] || continue
+        while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            # solo cuenta si lo puede leer cualquiera (o está en una carpeta web)
+            if (( 8#$(modo_de "$f") & 8#004 )) || [[ "$f" == *htdocs* || "$f" == */var/www/* || "$f" == */owrx-docker/plugins/* ]]; then
+                hallazgo ALTO "la clave $n aparece en ${f#"$RAIZ"}, que puede leer cualquiera" "quítala de ese fichero o: sudo chmod 600 ${f#"$RAIZ"}"
+                hits=$((hits + 1))
+            fi
+        done < <(grep -rlF --exclude-dir=.git --exclude='*.antes-*' -- "$val" "${dirs[@]}" 2>/dev/null | grep -v -e '/etc/bricohams/' -e '/bricohams.env$' -e '/var/backups/' || true)
+    done
+    [ "$hits" -gt 0 ] || bien "ninguna clave de bricohams.env en ficheros que pueda leer cualquiera"
+}
+
+# --------------------------------------------------------------------- AUDITAR
+auditar() {
+    local d f u n l m kit htdocs data p v
+    leer_env
+    data=$(env_de OWRX_DATA /var/lib/openwebrx); htdocs=$(env_de OWRX_HTDOCS /usr/lib/python3/dist-packages/htdocs)
+    [ "$RESUMEN" = 1 ] || info "Auditoría de seguridad de $(hostname) · $(date '+%F %T') · $(env_de CALLSIGN)"
+
+    titulo "1. Sistema y actualizaciones"
+    if [ -r "$RAIZ/etc/os-release" ]; then bien "$(. "$RAIZ/etc/os-release"; echo "$PRETTY_NAME") · núcleo $(uname -r)"; fi
+    if existe apt-get && [ -z "$RAIZ" ]; then
+        n=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | grep -c '^Inst ' || true)
+        if [ "$n" -gt 20 ]; then hallazgo MEDIO "$n paquetes sin actualizar" "sudo apt update && sudo apt full-upgrade"
+        elif [ "$n" -gt 0 ]; then hallazgo BAJO "$n paquetes sin actualizar" "sudo apt update && sudo apt full-upgrade"
+        else bien "sistema al día (según la última «apt update»)"; fi
+    fi
+    if [ -e "$RAIZ/etc/apt/apt.conf.d/20auto-upgrades" ] && grep -qs 'Unattended-Upgrade "1"' "$RAIZ/etc/apt/apt.conf.d/20auto-upgrades"; then
+        bien "actualizaciones de seguridad automáticas (unattended-upgrades)"
+    else hallazgo MEDIO "sin actualizaciones de seguridad automáticas" "las activa «aplicar» (unattended-upgrades, solo seguridad)"; fi
+    [ ! -e "$RAIZ/var/run/reboot-required" ] || hallazgo BAJO "el sistema pide reiniciar tras una actualización" "sudo reboot"
+
+    titulo "2. Cuentas y sudo"
+    if [ -r "$RAIZ/etc/shadow" ]; then
+        u=$(awk -F: '$2=="" {print $1}' "$RAIZ/etc/shadow")
+        if [ -n "$u" ]; then hallazgo ALTO "cuentas SIN contraseña: $u" "sudo passwd -l CUENTA"; else bien "ninguna cuenta sin contraseña"; fi
+    fi
+    if getent passwd pi >/dev/null 2>&1 && [ -z "$RAIZ" ]; then
+        hallazgo MEDIO "existe el usuario «pi» (el de siempre en las Raspberry: el primero que se prueba)" "si no lo usas: sudo deluser --remove-home pi"
+    fi
+    u=$(grep -rhsE '^[^#].*NOPASSWD' "$RAIZ/etc/sudoers" "$RAIZ"/etc/sudoers.d/ 2>/dev/null | grep -v 'bricohams-tarea' || true)
+    if [ -n "$u" ]; then
+        hallazgo MEDIO "sudo sin contraseña: $(echo "$u" | awk '{print $1}' | sort -u | tr '\n' ' ')(quien entre con tu usuario es root sin más)" \
+            "sudo bricohams-blindaje aplicar --sudo-con-clave (antes, asegúrate de saber tu contraseña)"
+    else bien "sudo pide contraseña (salvo la cuenta de servicio, solo para bricohams-tarea)"; fi
+
+    titulo "3. SSH"
+    if [ -z "$RAIZ" ] && existe sshd; then
+        l=$(sshd -T 2>/dev/null || true)
+        if [ -z "$l" ]; then nota "no puedo leer la configuración de sshd (¿no está instalado?)"
+        else
+            [[ "$l" =~ permitrootlogin\ (no|prohibit-password) ]] && bien "root no entra por SSH con contraseña" \
+                || hallazgo ALTO "root puede entrar por SSH con contraseña" "lo arregla «aplicar» (PermitRootLogin no)"
+            n=0
+            for d in /root /home/*; do [ -s "$d/.ssh/authorized_keys" ] && n=$((n + 1)); done
+            if [[ "$l" =~ passwordauthentication\ yes ]]; then
+                if [ "$n" -gt 0 ]; then hallazgo MEDIO "SSH acepta contraseñas aunque ya tienes claves" "lo cierra «aplicar» (solo clave)"
+                else hallazgo MEDIO "SSH solo con contraseña: un robo o un ataque de diccionario basta" "crea una clave (manual 34, ssh-copy-id) y luego «aplicar»"; fi
+            else bien "SSH solo con clave"; fi
+            [[ "$l" =~ maxauthtries\ ([0-9]+) ]] && [ "${BASH_REMATCH[1]}" -le 4 ] && bien "MaxAuthTries ${BASH_REMATCH[1]}" \
+                || hallazgo BAJO "SSH permite muchos intentos por conexión" "«aplicar» lo baja a 3"
+            [[ "$l" =~ x11forwarding\ no ]] || hallazgo BAJO "SSH con X11Forwarding" "«aplicar» lo quita"
+            [[ "$l" =~ banner\ /etc/issue\.net ]] && bien "aviso legal antes de entrar por SSH (Banner)" \
+                || hallazgo BAJO "SSH sin aviso legal antes de entrar" "sudo bricohams-banner instalar (v4.5)"
+        fi
+    fi
+    # v4.5 · el aviso previo al login no debe dar pistas (versiones, IP, sistema)
+    if { [ -n "$RAIZ" ] || [[ "${l:-}" =~ banner\ /etc/issue\.net ]]; } && [ -r "$RAIZ/etc/issue.net" ] && grep -qiE 'debian|raspbian|ubuntu|kernel|\\[rvsnm]|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$RAIZ/etc/issue.net"; then
+        hallazgo BAJO "/etc/issue.net enseña el sistema, la versión o una IP antes de entrar" "sudo bricohams-banner instalar"
+    fi
+
+    titulo "4. Puertos abiertos en la Pi"
+    if existe ss && [ -z "$RAIZ" ]; then
+        local publicos="80 443 8073 22" fuera=()
+        while read -r p v; do
+            [ -n "$p" ] || continue
+            case " $publicos " in *" $p "*) continue ;; esac
+            fuera+=("$p${v:+($v)}")
+        done < <(ss -Hltnp 2>/dev/null | awk '{split($4,a,":"); port=a[length(a)]; addr=substr($4,1,length($4)-length(port)-1);
+                 if (addr !~ /^(127\.|\[::1\]|::1)/) {match($0,/users:\(\("[^"]+"/); prog=substr($0,RSTART+9,RLENGTH-10); print port, prog}}' | sort -un)
+        if [ "${#fuera[@]}" -gt 0 ]; then
+            if nft list table inet bricohams >/dev/null 2>&1; then
+                bien "escuchan en la red pero el cortafuegos los limita a la LAN o los cierra: ${fuera[*]}"
+            else
+                hallazgo ALTO "escuchan en toda la red SIN cortafuegos: ${fuera[*]}" "«aplicar» pone el cortafuegos: solo 80/443/8073 abiertos, SSH y el resto solo en la LAN"
+            fi
+        else bien "solo escuchan en la red 80, 443, 8073 y SSH"; fi
+        for p in 1883 8075 8504; do
+            if ss -Hltn "sport = :$p" 2>/dev/null | awk '{print $4}' | grep -qvE '^(127\.|\[::1\])'; then
+                hallazgo MEDIO "el puerto $p (servicio interno) escucha fuera de 127.0.0.1" "sudo bash install.sh --solo web,visitas"
+            fi
+        done
+    fi
+    if nft list table inet bricohams >/dev/null 2>&1; then
+        bien "cortafuegos del host activo (tabla inet bricohams)"
+        systemctl is-enabled --quiet bricohams-cortafuegos 2>/dev/null || hallazgo MEDIO "el cortafuegos no está confirmado: se quitará solo o al reiniciar" "sudo bricohams-blindaje confirmar"
+    elif [ -z "$RAIZ" ] && { existe ufw && ufw status 2>/dev/null | grep -q 'Status: active'; }; then
+        bien "cortafuegos ufw activo (revisa sus reglas: «sudo ufw status»)"
+    else
+        hallazgo ALTO "sin cortafuegos en la Pi: cualquier servicio que escuche queda a la vista de la LAN (y de Internet si el router reenvía)" "sudo bricohams-blindaje aplicar"
+    fi
+
+    titulo "5. OpenWebRX+ (lo que ve el público)"
+    if [ "$(env_de BLINDAJE_8073 cerrado)" = publico ]; then
+        if [ "$(env_de SSL_MODO admin)" != no ]; then
+            hallazgo ALTO "el router abre el 8073 a Internet: por ahí /login y /settings van SIN cifrar y sin pasar por nginx ni el bloqueo web de Fail2ban (la contraseña de admin viaja en claro)" \
+                "cierra el 8073 en el router (el receptor ya va por el 80/443 de nginx) y pon BLINDAJE_8073=\"lan\"; o entra a /settings solo por https://"
+        fi
+    elif [ "$(env_de BLINDAJE_8073 cerrado)" = cerrado ]; then
+        if [ -z "$RAIZ" ] && existe ss && ss -Hltn "sport = :8073" 2>/dev/null | awk '{print $4}' | grep -qvE '^(127\.|\[::1\])'; then
+            hallazgo MEDIO "BLINDAJE_8073=cerrado pero OpenWebRX+ escucha en toda la red (el cortafuegos lo tapa)" "OWRX_SOLO_LOCAL=\"yes\" y sudo bash install.sh --solo configuracion"
+        else bien "8073 cerrado: OpenWebRX+ solo se ve a través de nginx (443)"; fi
+    else bien "8073 solo en la LAN (el público entra por nginx)"; fi
+    if [ -s "$data/settings.json" ] || [ -s "$RAIZ$data/settings.json" ]; then
+        f=$RAIZ$data/settings.json
+        permiso "$f" 640 MEDIO "settings.json (lleva passcode APRS y claves)"
+        permiso "$RAIZ$data/users.json" 600 ALTO "users.json (contraseñas de admin)"
+        v=$(python3 -c 'import json,sys
+g=json.load(open(sys.argv[1])).get("receiver_gps") or {}
+lat=str(g.get("lat","")); print(max(len(lat.split(".")[1]) if "." in lat else 0, 0))' "$f" 2>/dev/null || echo 0)
+        if [ "${v:-0}" -gt 3 ]; then
+            hallazgo MEDIO "receiver_gps publica la posición exacta de tu casa ($v decimales, ~10 m) en el mapa, /status.json y los directorios de receptores" \
+                "redondea en bricohams.env STATION_LAT/LON a 2 decimales (~1 km) y: sudo bash install.sh --solo configuracion"
+        else bien "posición publicada redondeada"; fi
+        if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("receiver_admin") else 1)' "$f" 2>/dev/null; then
+            nota "receiver_admin publica tu correo en /status.json (es el contacto del receptor; déjalo vacío si no lo quieres)"
+        fi
+    else nota "sin settings.json en $data"; fi
+    f=$RAIZ$htdocs/plugins/receiver/init.js
+    if [ -r "$f" ] && grep -qE 'solar_config *= *\{ *lat: *-?[0-9]+\.[0-9]{4,}' "$f"; then
+        hallazgo MEDIO "init.js (lo descarga cualquiera) lleva la posición exacta de la estación" "sudo bash install.sh --solo plugins (v4.4 la redondea)"
+    fi
+    for f in "$RAIZ$htdocs/plugins/receiver/meteo/meteo.json" "$RAIZ$htdocs/plugins/receiver/satelites/pases.json"; do
+        [ -r "$f" ] && grep -qE '"qth": *\{ *"lat": *-?[0-9]+\.[0-9]{4,}' "$f" \
+            && hallazgo MEDIO "$(basename "$f") (público) lleva la posición exacta" "se corrige solo con la v4.4 (sudo bash install.sh --actualizar)"
+    done
+    permiso "$RAIZ/etc/systemd/system/openwebrx.service.d" 755 BAJO "drop-ins de openwebrx"
+    if [ "$(env_de OWRX_BACKEND native)" = native ] && [ ! -e "$OWRX_UMASK" ]; then
+        hallazgo BAJO "OpenWebRX+ crea sus ficheros legibles por todos (settings.json al guardar en /settings)" "«aplicar» le pone UMask=0027"
+    fi
+
+    titulo "6. Web (nginx)"
+    if [ -e "$RAIZ/etc/nginx/sites-available/bricohams-sdr" ]; then
+        grep -qs 'server_tokens off' "$RAIZ/etc/nginx/sites-available/bricohams-sdr" "$RAIZ/etc/nginx/nginx.conf" "$RAIZ"/etc/nginx/conf.d/*.conf \
+            && bien "nginx no dice su versión" || hallazgo BAJO "nginx enseña su versión en errores y cabeceras" "sudo bash install.sh --actualizar (v4.4: server_tokens off)"
+        grep -qs 'limit_req zone=bh_login' "$RAIZ/etc/nginx/snippets/bricohams-sdr-rutas.conf" \
+            && bien "intentos de /login limitados (12 por minuto y IP)" || hallazgo MEDIO "/login sin límite de intentos (fuerza bruta de la contraseña de admin)" "sudo bash install.sh --actualizar (v4.4)"
+        if [ -z "$RAIZ" ] && existe curl; then
+            l=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 5 http://127.0.0.1/settings || true)
+            case "$(env_de SSL_MODO admin):$l" in
+                admin:301\ https*|todo:301\ https*) bien "http://…/settings redirige a HTTPS" ;;
+                no:*) hallazgo MEDIO "SSL_MODO=no: la contraseña de /settings viaja sin cifrar" "SSL_MODO=\"admin\" (manual 23)" ;;
+                *) hallazgo ALTO "http://…/settings NO redirige a HTTPS ($l)" "sudo bash install.sh --solo web" ;;
+            esac
+            if [ -r /etc/bricohams/web.env ] && existe openssl; then
+                d=$(. /etc/bricohams/web.env; echo "${SSL_DOMAIN:-}")
+                if [ -n "$d" ]; then
+                    f=/etc/letsencrypt/live/$d/fullchain.pem
+                    if [ -r "$f" ] && ! openssl x509 -checkend 1209600 -noout -in "$f" >/dev/null 2>&1; then
+                        hallazgo MEDIO "el certificado de $d caduca en menos de 14 días" "sudo certbot renew"
+                    elif [ -r "$f" ]; then bien "certificado de $d válido más de 14 días"; fi
+                fi
+            fi
+        fi
+    else nota "nginx de BricoHams sin instalar (paso «web»)"; fi
+
+    titulo "7. Claves y copias (fugas de información)"
+    permiso "$ENV" 600 ALTO "copia de bricohams.env en /etc"
+    for f in "$RAIZ"/etc/bricohams/*.env; do
+        [ -e "$f" ] || continue
+        case "$f" in */bricohams.env) ;; */zona.env) permiso "$f" 644 BAJO "zona.env (sin claves)" ;; *) permiso "$f" 640 MEDIO "$(basename "$f")" ;; esac
+    done
+    kit=""
+    for d in "$RAIZ"/home/*/bricohams-sdr "$RAIZ"/root/bricohams-sdr; do [ -e "$d/bricohams.env" ] && kit=$d; done
+    if [ -n "$kit" ]; then
+        permiso "$kit/bricohams.env" 600 ALTO "bricohams.env del kit (todas tus claves)"
+        if [ -d "$kit/.git" ] && existe git; then
+            if git -C "$kit" ls-files --error-unmatch bricohams.env >/dev/null 2>&1; then
+                hallazgo ALTO "bricohams.env está DENTRO del git: con un push se publicarían tus claves" "git -C $kit rm --cached bricohams.env (y cambia las claves)"
+            else bien "bricohams.env fuera del git (.gitignore)"; fi
+        fi
+    fi
+    for d in "$RAIZ/var/backups/bricohams" "$RAIZ/var/backups/owrx-clone"; do
+        [ -d "$d" ] || continue
+        permiso "$d" 700 MEDIO "copias de seguridad (llevan claves y usuarios)"
+        f=$(find "$d" -maxdepth 1 -type f -perm /044 2>/dev/null | head -3 | tr '\n' ' ')
+        [ -z "$f" ] || hallazgo MEDIO "copias legibles por otros: ${f//$RAIZ/}" "lo arregla «aplicar» (chmod 600)"
+    done
+    permiso "$RAIZ/etc/mediamtx/mediamtx.yml" 640 MEDIO "mediamtx.yml (puede llevar la URL RTSP con clave)"
+    permiso "$RAIZ/etc/rbfeeder.ini" 640 BAJO "rbfeeder.ini (clave de RadarBox)"
+    permiso "$RAIZ/etc/bricohams/cortafuegos.nft" 644 BAJO "reglas del cortafuegos"
+    buscar_fugas "$RAIZ$htdocs/plugins" "$RAIZ/var/www" "$RAIZ/opt/bricohams/kit" "$RAIZ/etc" "$kit"
+    if [ -r "$RAIZ/etc/mosquitto/conf.d/bricohams.conf" ]; then
+        grep -qE '^listener 1883 127\.0\.0\.1' "$RAIZ/etc/mosquitto/conf.d/bricohams.conf" && bien "MQTT (visitas) solo en 127.0.0.1" \
+            || hallazgo MEDIO "MQTT escucha fuera de 127.0.0.1: las visitas (IPs) podrían leerse desde la red" "sudo bash install.sh --solo visitas"
+    fi
+
+    titulo "8. Servicios que sobran"
+    if [ -r "$F2B" ] && grep -Fqs '[bricohams-login]' "$F2B" \
+        && [ -r "$F2B_FILTER" ] && grep -Eqs 'HTTP/.*" 303 .*login' "$F2B_FILTER" \
+        && [ -r "$NGINX_LOGIN_LOG" ] && grep -Fqs 'log_format bricohams_login' "$NGINX_LOGIN_LOG" \
+        && [ -r "$NGINX_ROUTES" ] && grep -Fqs 'bricohams-sdr-login.access.log bricohams_login' "$NGINX_ROUTES"; then
+        bien "Fail2ban configurado para bloquear intentos fallidos de /login"
+    else
+        hallazgo MEDIO "sin bloqueo Fail2ban para intentos fallidos en /login" "sudo bricohams-blindaje aplicar"
+    fi
+    if [ -z "$RAIZ" ]; then
+        for s in telnet.socket vsftpd smbd nmbd rpcbind cups cups-browsed xrdp vncserver-x11-serviced; do
+            systemctl is-active --quiet "$s" 2>/dev/null && hallazgo MEDIO "servicio $s activo (no lo usa la estación)" "sudo systemctl disable --now $s"
+        done
+        systemctl is-active --quiet bluetooth 2>/dev/null && hallazgo BAJO "Bluetooth activo (la estación no lo usa)" "«aplicar» lo apaga"
+        systemctl is-active --quiet avahi-daemon 2>/dev/null && nota "avahi anuncia «$(hostname).local» en la LAN (cómodo; el cortafuegos lo deja solo en la LAN)"
+        if existe fail2ban-client && systemctl is-active --quiet fail2ban; then
+            fail2ban-client status bricohams-login >/dev/null 2>&1 \
+                && bien "jail Fail2ban bricohams-login activo" \
+                || hallazgo MEDIO "Fail2ban activo, pero el jail bricohams-login no está cargado" "sudo bricohams-blindaje aplicar"
+        else
+            hallazgo MEDIO "sin fail2ban activo (bloqueo de IPs que prueban contraseñas)" "lo instala «aplicar»"
+        fi
+    fi
+
+    titulo "9. Núcleo (sysctl)"
+    if [ -z "$RAIZ" ] && existe sysctl; then
+        n=0
+        while IFS='=' read -r k v; do
+            [ -n "$k" ] || continue
+            [ "$(sysctl -n "$k" 2>/dev/null)" = "$v" ] || n=$((n + 1))
+        done < <(sysctl_deseado)
+        [ "$n" -eq 0 ] && bien "ajustes de red y del núcleo endurecidos" || hallazgo BAJO "$n ajustes del núcleo sin endurecer (redirecciones ICMP, rp_filter, kptr/dmesg…)" "«aplicar» (/etc/sysctl.d/90-bricohams.conf)"
+    fi
+
+    titulo "10. Hardware pendiente"
+    nota "HAT HackerGadgets y Mini RTL-SDR: en camino · SDRplay: sin comprar. Hasta entonces es normal que"
+    nota "meshtasticd, gpsd/chrony con PPS y los receptores SATÉLITES/RADIOAFICIONADOS den error: no es un fallo de seguridad."
+    if [ -z "$RAIZ" ]; then
+        f=$(systemctl --failed --no-legend 2>/dev/null | awk '{print $2}' | tr '\n' ' ')
+        [ -z "$f" ] || nota "servicios en fallo ahora: $f"
+    fi
+
+    local nota_f=$(( 100 - ALTO * 15 - MEDIO * 5 - BAJO * 1 )); [ "$nota_f" -ge 0 ] || nota_f=0
+    printf '\n%sResultado: %d alto · %d medio · %d bajo · %d bien · nota %d/100%s\n' "$c_b" "$ALTO" "$MEDIO" "$BAJO" "$OKS" "$nota_f" "$c_0"
+    [ "$RESUMEN" = 1 ] || { [ "$ALTO$MEDIO" = 00 ] || echo "Para arreglar lo que se puede solo: sudo bricohams-blindaje aplicar   (manual 34)"; }
+    # v4.5 · resumen para el banner SSH (20-bricohams)
+    { install -d -m 755 "$RAIZ/var/lib/bricohams" && printf '%d alto · %d medio · nota %d/100 (%s)\n' "$ALTO" "$MEDIO" "$nota_f" \
+        "$(date +%d/%m)" >"$RAIZ/var/lib/bricohams/blindaje-nota"; } 2>/dev/null || true
+    [ "$ALTO" -eq 0 ]
+}
+
+sysctl_deseado() {
+    cat <<'EOF'
+net.ipv4.conf.all.rp_filter=2
+net.ipv4.conf.all.accept_redirects=0
+net.ipv4.conf.default.accept_redirects=0
+net.ipv6.conf.all.accept_redirects=0
+net.ipv4.conf.all.send_redirects=0
+net.ipv4.conf.all.accept_source_route=0
+net.ipv4.conf.all.log_martians=1
+net.ipv4.icmp_echo_ignore_broadcasts=1
+net.ipv4.tcp_syncookies=1
+kernel.kptr_restrict=2
+kernel.dmesg_restrict=1
+fs.protected_symlinks=1
+fs.protected_hardlinks=1
+EOF
+}
+
+# --------------------------------------------------------------------- APLICAR
+COPIA=""
+guardar() {   # guardar FICHERO… : a la copia antes de cambiarlo (los que no existían se apuntan)
+    local f
+    for f in "$@"; do
+        if [ -e "$f" ]; then
+            install -d "$COPIA/ficheros$(dirname "${f#"$RAIZ"}")"
+            cp -a "$f" "$COPIA/ficheros${f#"$RAIZ"}"
+        else
+            echo "${f#"$RAIZ"}" >>"$COPIA/creados.txt"
+        fi
+    done
+}
+
+aplicar() {
+    local sin_fw=0 sin_ssh=0 ssh_clave=0 sudo_clave=0 a n d f u
+    for a in "$@"; do
+        case "$a" in
+            --sin-cortafuegos) sin_fw=1 ;; --sin-ssh) sin_ssh=1 ;;
+            --ssh-solo-clave) ssh_clave=1 ;; --sudo-con-clave) sudo_clave=1 ;;
+            *) fallo "opción desconocida: $a" ;;
+        esac
+    done
+    leer_env
+    COPIA=$COPIAS/$(date +%Y%m%d-%H%M%S)
+    install -d -m 700 "$COPIA"
+    # para «deshacer»: si ya había un cortafuegos confirmado, se vuelve a poner el de antes
+    if [ -z "$RAIZ" ] && systemctl is-enabled --quiet bricohams-cortafuegos 2>/dev/null; then
+        echo "systemctl enable bricohams-cortafuegos; systemctl restart bricohams-cortafuegos" >>"$COPIA/servicios.txt"
+    fi
+    info "Blindaje de $(hostname) · copia de lo que se cambia en ${COPIA#"$RAIZ"}"
+
+    # 1. paquetes
+    if [ -z "$RAIZ" ]; then
+        local falta=()
+        existe nft || falta+=(nftables)
+        existe fail2ban-client || falta+=(fail2ban)
+        dpkg -s unattended-upgrades >/dev/null 2>&1 || falta+=(unattended-upgrades)
+        dpkg -s python3-systemd >/dev/null 2>&1 || falta+=(python3-systemd)     # fail2ban lee el journal (sin auth.log)
+        if [ "${#falta[@]}" -gt 0 ]; then
+            info "Instalo ${falta[*]}"
+            apt-get update -q >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends "${falta[@]}" >/dev/null \
+                || fallo "no pude instalar ${falta[*]} (¿hay red?)"
+        fi
+    fi
+
+    # 2. actualizaciones de seguridad automáticas
+    f=$RAIZ/etc/apt/apt.conf.d/20auto-upgrades
+    guardar "$f"; install -d "$(dirname "$f")"
+    printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >"$f"; chmod 644 "$f"
+    echo "  ✔ actualizaciones de seguridad automáticas"
+
+    # 3. permisos de lo que lleva claves
+    for f in "$ENV" "$RAIZ"/home/*/bricohams-sdr/bricohams.env "$RAIZ"/root/bricohams-sdr/bricohams.env; do
+        [ -e "$f" ] && chmod 600 "$f"
+    done
+    for f in "$RAIZ"/etc/bricohams/*.env; do
+        case "$f" in */bricohams.env|*/zona.env) ;; *) [ -e "$f" ] && chmod o-rwx "$f" ;; esac
+    done
+    for d in "$RAIZ/var/backups/bricohams" "$RAIZ/var/backups/owrx-clone" "$COPIAS"; do
+        [ -d "$d" ] || continue
+        chmod 700 "$d"; find "$d" -maxdepth 1 -type f -exec chmod go-rwx {} +
+    done
+    for f in "$RAIZ/etc/mediamtx/mediamtx.yml" "$RAIZ/etc/rbfeeder.ini"; do [ -e "$f" ] && chmod o-rwx "$f"; done
+    d=$RAIZ$(env_de OWRX_DATA /var/lib/openwebrx)
+    [ -e "$d/settings.json" ] && chmod o-rwx "$d/settings.json"
+    [ -e "$d/users.json" ] && chmod 600 "$d/users.json"
+    echo "  ✔ permisos de bricohams.env, .env de servicios, copias, settings.json y users.json"
+
+    # 4. OpenWebRX+ nativo: lo que guarda desde /settings no sale legible por todos
+    if [ "$(env_de OWRX_BACKEND native)" = native ]; then
+        guardar "$OWRX_UMASK"; install -d "$(dirname "$OWRX_UMASK")"
+        printf '# bricohams-blindaje (v4.4): settings.json y users.json no legibles por otros usuarios\n[Service]\nUMask=0027\n' >"$OWRX_UMASK"
+        echo "  ✔ OpenWebRX+ con UMask=0027 (se aplica al reiniciarlo)"
+    fi
+
+    # 5. núcleo
+    guardar "$SYSCTL"; install -d "$(dirname "$SYSCTL")"
+    { echo "# bricohams-blindaje (v4.4)"; sysctl_deseado; } >"$SYSCTL"; chmod 644 "$SYSCTL"
+    [ -n "$RAIZ" ] || sysctl -q --system >/dev/null 2>&1 || true
+    echo "  ✔ ajustes del núcleo (/etc/sysctl.d/90-bricohams.conf)"
+
+    # 6. SSH
+    if [ "$sin_ssh" = 0 ]; then
+        n=0
+        for d in "$RAIZ"/root "$RAIZ"/home/*; do [ -s "$d/.ssh/authorized_keys" ] && n=$((n + 1)); done
+        guardar "$SSHD_D"; install -d "$(dirname "$SSHD_D")"
+        {
+            echo "# bricohams-blindaje (v4.4) · deshacer: sudo bricohams-blindaje deshacer"
+            echo "PermitRootLogin no"
+            echo "MaxAuthTries 3"
+            echo "LoginGraceTime 30"
+            echo "PermitEmptyPasswords no"
+            echo "X11Forwarding no"
+            echo "AllowAgentForwarding no"
+            echo "ClientAliveInterval 300"
+            echo "ClientAliveCountMax 2"
+            if [ "$n" -gt 0 ] || [ "$ssh_clave" = 1 ]; then
+                echo "PasswordAuthentication no"
+                echo "KbdInteractiveAuthentication no"
+            fi
+        } >"$SSHD_D"
+        chmod 644 "$SSHD_D"
+        if [ -z "$RAIZ" ]; then
+            if sshd -t 2>/dev/null; then systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+            else cp -a "$COPIA/ficheros/etc/ssh/sshd_config.d/90-bricohams.conf" "$SSHD_D" 2>/dev/null || rm -f "$SSHD_D"
+                 fallo "sshd no acepta la configuración: la he quitado. Mira «sudo sshd -t»"; fi
+        fi
+        if [ "$n" -gt 0 ] || [ "$ssh_clave" = 1 ]; then echo "  ✔ SSH: sin root, 3 intentos, SOLO con clave (las sesiones abiertas siguen)"
+        else echo "  ! SSH: sin root y 3 intentos; sigue aceptando contraseña porque no hay claves (manual 34: ssh-copy-id)"; fi
+    fi
+
+    # 7. sudo sin contraseña (solo si se pide: hay que saberse la contraseña)
+    if [ "$sudo_clave" = 1 ]; then
+        for f in "$RAIZ"/etc/sudoers.d/*; do
+            [ -f "$f" ] || continue
+            case "$(basename "$f")" in bricohams) continue ;; esac
+            if grep -qE '^[^#].*NOPASSWD' "$f"; then
+                guardar "$f"; sed -i -E '/^[^#].*NOPASSWD/s/^/# bricohams-blindaje: /' "$f"
+                if [ -z "$RAIZ" ] && ! visudo -c >/dev/null 2>&1; then cp -a "$COPIA/ficheros${f#"$RAIZ"}" "$f"; fallo "visudo no acepta $f: restaurado"; fi
+                echo "  ✔ $(basename "$f"): sudo vuelve a pedir contraseña"
+            fi
+        done
+    fi
+
+    # 8. fail2ban
+    guardar "$F2B" "$F2B_FILTER"
+    install -d "$(dirname "$F2B")" "$(dirname "$F2B_FILTER")"
+    cat >"$F2B" <<'EOF'
+# bricohams-blindaje: 5 fallos en 10 min → 1 h fuera; reincidentes, 1 semana
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+
+[bricohams-login]
+enabled = true
+filter = bricohams-login
+logpath = /var/log/nginx/bricohams-sdr-login.access.log
+backend = auto
+port = http,https,8073
+
+[recidive]
+enabled = true
+backend = auto
+logpath = /var/log/fail2ban.log
+bantime = 1w
+findtime = 1d
+EOF
+    cat >"$F2B_FILTER" <<'EOF'
+# OpenWebRX redirige el login fallido (303) al propio formulario; el correcto va a /settings.
+[Definition]
+failregex = ^<HOST> - \[[^\]]*\] "POST /login(?:\?[^ ]*)? HTTP/[^"]+" 303 "(?:\.\./)*login\?[^"]*"\s*$
+ignoreregex =
+EOF
+    chmod 644 "$F2B"
+    chmod 644 "$F2B_FILTER"
+    if [ -z "$RAIZ" ]; then
+        fail2ban-client -t || fallo "Fail2ban rechazó la configuración; revisa $F2B y $F2B_FILTER"
+        systemctl enable --now fail2ban >/dev/null 2>&1 || fallo "no pude activar fail2ban (journalctl -u fail2ban)"
+        systemctl restart fail2ban 2>/dev/null || fallo "fail2ban no pudo cargar la nueva regla (journalctl -u fail2ban)"
+    fi
+    echo "  ✔ fail2ban (SSH, login web y reincidentes)"
+
+    # 9. Bluetooth (la estación no lo usa)
+    if [ -z "$RAIZ" ] && systemctl is-active --quiet bluetooth 2>/dev/null; then
+        echo "systemctl enable bluetooth; systemctl start bluetooth" >>"$COPIA/servicios.txt"
+        systemctl disable --now bluetooth hciuart >/dev/null 2>&1 || true
+        echo "  ✔ Bluetooth apagado"
+    fi
+
+    # 10. cortafuegos (al final: si te deja fuera, se quita solo en 3 minutos)
+    if [ "$sin_fw" = 0 ]; then
+        local redes; redes=$(redes_lan)
+        guardar "$NFT" "$UNIDAD"; install -d "$(dirname "$NFT")"
+        genera_nft "$(env_de BLINDAJE_8073 cerrado)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$redes" >"$NFT.nuevo"
+        chmod 644 "$NFT.nuevo"
+        if [ -z "$RAIZ" ]; then
+            nft -c -f "$NFT.nuevo" || { rm -f "$NFT.nuevo"; fallo "nft no acepta las reglas (arriba): no he tocado el cortafuegos"; }
+        fi
+        mv -f "$NFT.nuevo" "$NFT"
+        cat >"$UNIDAD" <<'EOF'
+[Unit]
+Description=BricoHams: cortafuegos del host (bricohams-blindaje)
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/bricohams/cortafuegos.nft
+ExecStop=/usr/sbin/nft delete table inet bricohams
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        echo "$COPIA" >"$COPIAS/pendiente"
+        if [ -z "$RAIZ" ]; then
+            systemctl daemon-reload
+            nft -f "$NFT" || fallo "no pude cargar el cortafuegos"
+            systemctl stop bricohams-cortafuegos-vuelta.timer bricohams-cortafuegos-vuelta.service 2>/dev/null || true
+            systemctl reset-failed bricohams-cortafuegos-vuelta.timer bricohams-cortafuegos-vuelta.service 2>/dev/null || true
+            systemd-run --unit=bricohams-cortafuegos-vuelta --on-active="${VUELTA_SEG}s" /usr/local/sbin/bricohams-blindaje quitar-cortafuegos-pendiente >/dev/null 2>&1 \
+                || echo "  ! no pude programar la vuelta atrás automática: confirma o deshaz tú"
+        fi
+        echo "  ✔ cortafuegos cargado · público: 80, 443$([ "$(env_de BLINDAJE_8073 cerrado)" = publico ] && echo ', 8073') · LAN ($(echo "$redes" | tr '\n' ' ')): SSH$([ "$(env_de BLINDAJE_8073 cerrado)" = lan ] && echo ', 8073') y $(puertos_lan)"
+        echo
+        echo "  ⚠ Comprueba AHORA, desde OTRA ventana, que sigues entrando (ssh y la web). Si todo va:"
+        echo "      sudo bricohams-blindaje confirmar"
+        echo "    Si no confirmas en $((VUELTA_SEG / 60)) minutos, el cortafuegos se quita solo."
+    fi
+    echo
+    info "Hecho. Vuelve a mirar: sudo bricohams-blindaje auditar"
+}
+
+confirmar() {
+    [ -e "$COPIAS/pendiente" ] || { echo "No hay ningún cortafuegos pendiente de confirmar."; return 0; }
+    if [ -z "$RAIZ" ]; then
+        systemctl stop bricohams-cortafuegos-vuelta.timer bricohams-cortafuegos-vuelta.service 2>/dev/null || true
+        systemctl enable bricohams-cortafuegos >/dev/null 2>&1
+        systemctl start bricohams-cortafuegos 2>/dev/null || true
+    fi
+    rm -f "$COPIAS/pendiente"
+    echo "✔ Cortafuegos confirmado: se carga en cada arranque (bricohams-cortafuegos.service)."
+}
+
+quitar_pendiente() {
+    [ -e "$COPIAS/pendiente" ] || return 0
+    [ -n "$RAIZ" ] || nft delete table inet bricohams 2>/dev/null || true
+    rm -f "$COPIAS/pendiente"
+    logger -t bricohams-blindaje "cortafuegos sin confirmar: quitado (vuelta atrás automática)" 2>/dev/null || true
+}
+
+deshacer() {
+    local c=${1:-} f
+    if [ -z "$c" ]; then c=$(find "$COPIAS" -mindepth 1 -maxdepth 1 -type d ! -name '*.usada' 2>/dev/null | sort | tail -1); fi
+    [ -n "$c" ] || fallo "no hay copias en ${COPIAS#"$RAIZ"}"
+    [[ "$c" = /* ]] || c=$COPIAS/$c
+    [ -d "$c" ] || fallo "no existe la copia $c"
+    info "Deshaciendo con ${c#"$RAIZ"}"
+    if [ -z "$RAIZ" ]; then
+        systemctl disable --now bricohams-cortafuegos >/dev/null 2>&1 || true
+        systemctl stop bricohams-cortafuegos-vuelta.timer 2>/dev/null || true
+        nft delete table inet bricohams 2>/dev/null || true
+    fi
+    if [ -d "$c/ficheros" ]; then
+        (cd "$c/ficheros" && find . -type f) | while read -r f; do
+            install -d "$(dirname "$RAIZ${f#.}")"; cp -a --remove-destination "$c/ficheros/${f#./}" "$RAIZ${f#.}"
+        done
+    fi
+    if [ -f "$c/creados.txt" ]; then
+        while read -r f; do [ -n "$f" ] && rm -f "$RAIZ$f"; done <"$c/creados.txt"
+    fi
+    if [ -z "$RAIZ" ]; then
+        systemctl daemon-reload; sysctl -q --system >/dev/null 2>&1 || true
+        [ ! -f "$c/servicios.txt" ] || bash "$c/servicios.txt" >/dev/null 2>&1 || true
+        sshd -t 2>/dev/null && { systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true; }
+        systemctl restart fail2ban 2>/dev/null || true
+    fi
+    rm -f "$COPIAS/pendiente"
+    mv "$c" "$c.usada"
+    echo "✔ Hecho: configuración de antes de «aplicar» (los paquetes instalados se quedan; los permisos endurecidos, también)."
+}
+
+ayuda() { sed -n '3,24p' "$0" | sed 's/^#  \{0,1\}//'; }
+
+orden=${1:-auditar}; shift 2>/dev/null || true
+case "$orden" in
+    -h|--help|ayuda) ayuda; exit 0 ;;
+    genera-nft) leer_env; genera_nft "$(env_de BLINDAJE_8073 cerrado)" "$(env_de BLINDAJE_SSH lan)" "$(puertos_lan)" "$(redes_lan)"; exit 0 ;;
+esac
+[ "$(id -u)" -eq 0 ] || [ -n "$RAIZ" ] || fallo "Ejecútalo con sudo: sudo bricohams-blindaje $orden"
+case "$orden" in
+    auditar) [ "${1:-}" = --resumen ] && RESUMEN=1; auditar ;;
+    aplicar) aplicar "$@" ;;
+    confirmar) confirmar ;;
+    deshacer) deshacer "${1:-}" ;;
+    quitar-cortafuegos-pendiente) quitar_pendiente ;;
+    *) ayuda; exit 2 ;;
+esac

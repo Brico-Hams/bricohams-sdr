@@ -1,0 +1,441 @@
+#!/bin/bash
+# =====================================================================
+#  bricohams-check · BricoHams
+#  Comprueba de un vistazo que toda la estación funciona:
+#  OpenWebRX+, los 4 SDR, HAT (RTC, GPS, PPS, LoRa/Meshtastic),
+#  hora por GPS, cámara, meteo y plugins.
+#  Uso: sudo bricohams-check
+# =====================================================================
+set -u
+ENV=/etc/bricohams/bricohams.env
+# shellcheck source=/dev/null
+[ -r "$ENV" ] && . "$ENV"
+if [ "${OWRX_BACKEND:-native}" = docker ]; then
+    OWRX_DOCKER_DIR=${OWRX_DOCKER_DIR:-/opt/owrx-docker}
+    OWRX_DATA=$OWRX_DOCKER_DIR/var
+    HTDOCS=$OWRX_DOCKER_DIR
+else
+    OWRX_DATA=/var/lib/openwebrx
+    HTDOCS=/usr/lib/python3/dist-packages/htdocs
+fi
+OK=0; KO=0; AV=0
+bien()  { printf '  \e[32m✔\e[0m %s\n' "$*"; OK=$((OK + 1)); }
+mal()   { printf '  \e[31m✘\e[0m %s\n' "$*"; KO=$((KO + 1)); }
+aviso() { printf '  \e[33m!\e[0m %s\n' "$*"; AV=$((AV + 1)); }
+titulo() { printf '\n\e[1m%s\e[0m\n' "$*"; }
+servicio() {
+    if [ "$1" = openwebrx ] && [ "${OWRX_BACKEND:-native}" = docker ]; then
+        if docker inspect --format '{{.State.Running}}' "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" 2>/dev/null | grep -qx true; then
+            bien "contenedor OpenWebRX+ ${OWRX_DOCKER_CONTAINER:-owrx-mbe} activo"
+        else
+            mal "contenedor OpenWebRX+ ${OWRX_DOCKER_CONTAINER:-owrx-mbe} no está activo"
+        fi
+    elif systemctl is-active --quiet "$1"; then
+        bien "servicio $1 activo"
+    else
+        mal "servicio $1 NO activo (journalctl -u $1 -n 50)"
+    fi
+}
+# Hardware declarado «en camino» en HARDWARE_PENDIENTE (p. ej. "BME280, cámara, Pico"): sus fallos son avisos
+pendiente() {
+    local p k n
+    IFS=',' read -ra p <<<"${HARDWARE_PENDIENTE:-}"
+    for k in "${p[@]}"; do
+        k=$(printf '%s' "$k" | sed 's/^ *//;s/ *$//'); [ -n "$k" ] || continue
+        for n in "$@"; do [[ "${n,,}" == *"${k,,}"* ]] && return 0; done
+    done
+    return 1
+}
+mal_hw() { local q=$1; shift; if pendiente "$q"; then aviso "$* · en camino (HARDWARE_PENDIENTE)"; else mal "$*"; fi; }
+servicio_hw() {
+    if ! systemctl is-active --quiet "$2" && pendiente "$1"; then aviso "servicio $2 parado · en camino (HARDWARE_PENDIENTE)"
+    else servicio "$2"; fi
+}
+# -L: the web data files are symlinks into /var/lib/bricohams/web; age is that of the data, not of the link.
+edad() { local f=$1; [ -e "$f" ] || { echo 999999; return; }; echo $(( $(date +%s) - $(stat -Lc %Y "$f") )); }
+
+[ "$(id -u)" -eq 0 ] || { echo "Ejecútalo con sudo."; exit 1; }
+
+titulo "Sistema"
+. /etc/os-release
+case "${VERSION_CODENAME:-}" in
+    trixie|bookworm) bien "Raspberry Pi OS $VERSION_CODENAME ($(uname -m))" ;;
+    *) aviso "Sistema $PRETTY_NAME: el kit funciona en Trixie o Bookworm" ;;
+esac
+if [ "${OWRX_BACKEND:-native}" = docker ]; then
+    command -v docker >/dev/null && bien "backend Docker" || mal "OWRX_BACKEND=docker pero falta Docker CLI"
+else
+    grep -qs "ppa/${VERSION_CODENAME:-x} " /etc/apt/sources.list.d/openwebrx-plus.list && bien "repositorio OpenWebRX+ de $VERSION_CODENAME" \
+        || { [ -f /etc/apt/sources.list.d/openwebrx-plus.list ] && mal "el repositorio de OpenWebRX+ no es el de $VERSION_CODENAME: sudo bash install.sh --solo openwebrx"; }
+fi
+grep -q 'Raspberry Pi 5' /proc/device-tree/model 2>/dev/null && bien "$(tr -d '\0' </proc/device-tree/model)" || aviso "No es una Raspberry Pi 5"
+t=$(vcgencmd measure_temp 2>/dev/null | cut -d= -f2); [ -n "$t" ] && bien "temperatura CPU $t"
+th=$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)
+[ "$th" = 0x0 ] && bien "alimentación correcta (sin bajadas de tensión)" || aviso "get_throttled=$th: revisa la fuente (los 4 SDR piden mucha corriente USB)"
+if [ -s /var/lib/bricohams/actualizaciones.log ]; then
+    bien "última actualización: $(tail -1 /var/lib/bricohams/actualizaciones.log)"
+elif [ -s /var/lib/bricohams/kit-estado ]; then
+    bien "instalado con huellas de pasos (listo para: sudo bash install.sh --actualizar)"
+else
+    aviso "sin huellas de pasos: la primera «sudo bash install.sh --actualizar» aplicará todos los pasos"
+fi
+
+titulo "Red"
+if command -v nmcli >/dev/null; then
+    act=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | grep -v ':lo$' | tr '\n' ' ')
+    [ -n "$act" ] && bien "conexiones activas: $act" || mal "sin ninguna conexión de red activa"
+    w=$(nmcli -t -f IN-USE,SSID,CHAN,SIGNAL dev wifi 2>/dev/null | grep '^\*' | head -1)
+    if [ -n "$w" ]; then
+        IFS=: read -r _ ssid chan sig <<<"$w"
+        if [ "${sig:-0}" -ge 50 ]; then bien "WiFi '$ssid' (canal $chan, señal $sig %)"
+        else aviso "WiFi '$ssid' con señal baja ($sig %): orienta la caja hacia el punto de acceso o usa cable"; fi
+    else
+        nmcli -t -f NAME connection show 2>/dev/null | grep -q '^bricohams-wifi-' && aviso "WiFi configurado pero sin conectar (¿cable de red o fuera de cobertura?)"
+    fi
+else
+    aviso "sin NetworkManager: no se comprueba el WiFi"
+fi
+getent hosts opendata.aemet.es >/dev/null && bien "DNS e Internet" || mal "sin DNS: la meteo, APRS-IS y RadarBox no funcionarán"
+
+titulo "OpenWebRX+"
+servicio openwebrx
+if curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8073/; then bien "OpenWebRX+ responde en 127.0.0.1:8073 (al público por nginx: https://$(hostname -I | awk '{print $1}')/)"; else mal "la web no responde en el puerto 8073"; fi
+[ -s "$OWRX_DATA/settings.json" ] && bien "settings.json ($(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(len(d["sdrs"]),"receptores,",sum(len(s["profiles"]) for s in d["sdrs"].values()),"perfiles")' "$OWRX_DATA/settings.json"))" || mal "falta $OWRX_DATA/settings.json"
+[ -s "$OWRX_DATA/users.json" ] && bien "usuario administrador creado" || mal "no hay usuario admin: $([ "${OWRX_BACKEND:-native}" = docker ] && echo "sudo docker exec -it ${OWRX_DOCKER_CONTAINER:-owrx-mbe} openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}" || echo "sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}")"
+if [ "${OWRX_BACKEND:-native}" = docker ]; then     # v4.3
+    img=$(docker inspect --format '{{.Config.Image}}' "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" 2>/dev/null) && bien "imagen $img" || mal "no encuentro el contenedor ${OWRX_DOCKER_CONTAINER:-owrx-mbe}: sudo bash install.sh --solo openwebrx"
+    systemctl is-active --quiet openwebrx 2>/dev/null && mal "el OpenWebRX+ nativo también está en marcha (choca con el de Docker): sudo systemctl disable --now openwebrx"
+fi
+# v4.3 · zona del locator
+if [ -n "${STATION_QTH_LOCATOR:-}" ]; then
+    n=$(python3 -c 'import json,sys;print(sum("[AUTO-LOCATOR]" in (b.get("description") or "") for b in json.load(open(sys.argv[1]))))' "$OWRX_DATA/bookmarks.json" 2>/dev/null || echo 0)
+    [ "$n" -gt 0 ] && bien "zona $STATION_QTH_LOCATOR: $n marcadores de la zona · bricohams-locator info" || aviso "zona $STATION_QTH_LOCATOR sin marcadores de zona: sudo bricohams-locator marcadores --aplicar"
+fi
+
+titulo "SDR"
+lsmod | grep -q dvb_usb_rtl28xxu && mal "el módulo DVB dvb_usb_rtl28xxu está cargado (bloquea los RTL-SDR)" || bien "módulo DVB bloqueado"
+vr=$(dpkg-query -W -f='${Version}' librtlsdr0 2>/dev/null)
+vt=$(dpkg-query -W -f='${Version}' rtl-sdr 2>/dev/null)
+if [ "${VERSION_CODENAME:-}" = trixie ]; then
+    [ -n "$vr" ] && [ "$vr" = "$vt" ] && [[ "$vr" != *rtlsdrblog* ]] && bien "rtl-sdr $vr de Debian (Trixie)" \
+        || mal "rtl-sdr mezclado (librtlsdr0 $vr / rtl-sdr $vt): sudo bash install.sh --solo rtlsdr"
+else
+    apt-mark showhold 2>/dev/null | grep -q librtlsdr0 && bien "driver rtl-sdr-blog $vr fijado (apt-mark hold)" || aviso "librtlsdr0 no está retenido: una actualización podría cambiar el driver rtl-sdr-blog"
+fi
+rtl=$(rtl_test -t 2>&1)
+for par in "HAT:${SERIAL_HAT:-00000101}" "MINI:${SERIAL_MINI:-00000102}" "V3:${SERIAL_V3:-00000103}" "ADS-B:${SERIAL_ADSB:-00001090}"; do
+    n=${par%%:*}; s=${par#*:}
+    if printf '%s' "$rtl" | grep -q "SN: $s"; then bien "RTL-SDR $n (serie $s) conectado"
+    elif systemctl is-active --quiet openwebrx; then aviso "RTL-SDR $n (serie $s) no aparece (si OpenWebRX lo está usando es normal; si no: sudo bricohams-sdr-serials)"
+    else mal "RTL-SDR $n (serie $s) no aparece: sudo bricohams-sdr-serials"; fi
+done
+if [ "${HF_SDRPLAY:-no}" = yes ]; then
+    if command -v SoapySDRUtil >/dev/null && timeout 20 SoapySDRUtil --find="driver=sdrplay" 2>/dev/null | grep -qi sdrplay; then bien "SDRplay detectado (HF)"; else mal "HF_SDRPLAY=yes pero no veo el SDRplay (¿enchufado? ¿API instalada?)"; fi
+else
+    aviso "SDRplay aún no instalado: la HF va por el V3 con muestreo directo"
+fi
+if [ "${HF_HERMES:-no}" = yes ]; then
+    command -v hpsdrconnector >/dev/null && bien "hpsdrconnector instalado (Hermes Lite 2)" || mal "HF_HERMES=yes sin hpsdrconnector: sudo bash install.sh --solo openwebrx"
+    if [ -n "${HERMES_IP:-}" ]; then
+        ping -c1 -W2 "$HERMES_IP" >/dev/null 2>&1 && bien "Hermes Lite 2 responde en la red" || mal "Hermes Lite 2 no responde (¿encendido? ¿cable? ¿IP?)"
+    fi
+fi
+systemctl list-unit-files 2>/dev/null | grep -q '^sdrplay' && servicio sdrplay
+
+titulo "HAT HackerGadgets"
+if i2cdetect -y 1 2>/dev/null | grep -Eq ' (51|UU) ' || grep -qs pcf85063 /sys/class/rtc/rtc0/name; then bien "RTC PCF85063A en I2C 0x51"; else mal "no veo el RTC en I2C-1 0x51"; fi
+# Trixie no trae hwclock (paquete util-linux-extra): sin él la hora se lee de /sys
+if hw=$(hwclock -r 2>/dev/null); then bien "hora del RTC: $hw"
+elif [ -r /sys/class/rtc/rtc0/time ]; then bien "hora del RTC: $(cat /sys/class/rtc/rtc0/date /sys/class/rtc/rtc0/time | tr '\n' ' ')UTC (leída de /sys)"
+else mal "no puedo leer el RTC (ni hwclock ni /sys/class/rtc/rtc0)"; fi
+servicio gpsd
+if gp=$(timeout 12 gpspipe -w -n 12 2>/dev/null); then
+    if printf '%s' "$gp" | grep -q '"mode":3'; then bien "GPS con posición 3D"
+    elif printf '%s' "$gp" | grep -q '"mode":2'; then aviso "GPS con posición 2D"
+    elif printf '%s' "$gp" | grep -q '"class":"TPV"'; then aviso "GPS sin posición todavía (antena al cielo, puede tardar minutos)"
+    else mal "gpsd no recibe datos del GPS (${HAT_GPS_DEV:-/dev/ttyAMA0})"; fi
+fi
+if [ -e /dev/pps0 ]; then
+    if timeout 4 ppstest /dev/pps0 2>/dev/null | grep -q 'assert'; then bien "PPS recibido en /dev/pps0 (GPIO ${HAT_PPS_GPIO:-6})"; else aviso "/dev/pps0 sin pulsos (normal sin posición GPS)"; fi
+else mal "no existe /dev/pps0"; fi
+servicio chrony
+src=$(chronyc -n sources 2>/dev/null)
+printf '%s' "$src" | grep -q '^#\* PPS' && bien "hora sincronizada con el PPS del GPS" || {
+    printf '%s' "$src" | grep -q '^\^\*' && aviso "hora por Internet (NTP); el PPS aún no manda" || mal "chrony sin fuente de hora"; }
+[ -e /dev/${HAT_LORA_SPIDEV:-spidev1.0} ] && bien "SPI del LoRa: /dev/${HAT_LORA_SPIDEV:-spidev1.0}" || mal "no existe /dev/${HAT_LORA_SPIDEV:-spidev1.0}"
+
+titulo "ADS-B (FlightStick RadarBox)"
+if [ "${ADSB_ENABLE:-yes}" = yes ]; then
+    servicio readsb
+    servicio rbfeeder
+    ss -ltn 2>/dev/null | grep -q ':30005 ' && bien "readsb sirve Beast en el puerto 30005" || mal "readsb no escucha en 30005"
+    if [ -r /run/readsb/aircraft.json ]; then
+        n=$(python3 -c "import json;print(len(json.load(open('/run/readsb/aircraft.json')).get('aircraft',[])))" 2>/dev/null || echo 0)
+        bien "aviones a la vista ahora: $n"
+    fi
+    pgrep -f mlat-client >/dev/null && bien "MLAT en marcha" || aviso "MLAT no está en marcha todavía (rbfeeder lo arranca al sincronizar)"
+    [ -d /usr/local/share/tar1090 ] && bien "mapa tar1090 en http://$(hostname -I | awk '{print $1}')/tar1090/"
+    if [ "${MAPFLIGHTS_FEED:-no}" = yes ]; then
+        if grep -q 'net-connector=feed.map.flights' /etc/default/readsb 2>/dev/null; then
+            ss -Htn state established '( dport = :30004 )' 2>/dev/null | grep -q . && bien "map.flights: readsb conectado a feed.map.flights:30004" \
+                || mal "map.flights: readsb no está conectado a feed.map.flights:30004 (journalctl -u readsb)"
+        else mal "map.flights: falta el conector en /etc/default/readsb (MAPFLIGHTS_UUID y sudo bash install.sh --solo adsb)"; fi
+        if [ "${MAPFLIGHTS_MLAT:-yes}" = yes ]; then
+            systemctl is-active --quiet bricohams-mapflights-mlat 2>/dev/null && bien "map.flights: MLAT en marcha" \
+                || aviso "map.flights: MLAT parado (journalctl -u bricohams-mapflights-mlat)"
+        fi
+    fi
+fi
+
+titulo "Meshtastic"
+servicio meshtasticd
+if journalctl -u meshtasticd -b --no-pager 2>/dev/null | grep -qiE 'SX126x init (result|success) 0|Radio init succeeded|SX1262 init success'; then bien "radio SX1262 iniciada"
+elif journalctl -u meshtasticd -b --no-pager 2>/dev/null | grep -qiE 'radio init failed|No.*radio|SX126x.*fail'; then mal "la radio LoRa no arranca: revisa los pines en /etc/meshtasticd/config.d/hackergadgets-hat.yaml"
+else aviso "no encuentro en el registro si la radio arrancó (journalctl -u meshtasticd -b)"; fi
+ss -ltn 2>/dev/null | grep -q ':4403 ' && bien "API Meshtastic en el puerto 4403" || aviso "API Meshtastic (4403) no escucha"
+ss -ltn 2>/dev/null | grep -q ':9443 ' && aviso "meshtasticd sirve su web sin contraseña en 9443: quita «Webserver:» de /etc/meshtasticd/config.d/ (v4.5: sudo bash install.sh --solo meshtastic)" || bien "sin web de meshtasticd sin contraseña (9443 cerrado)"
+if systemctl is-active --quiet bricohams-mesh-admin 2>/dev/null; then bien "panel Meshtastic 433/868 solo en /settings/bricohams/meshtastic (sesión de administrador)"
+else aviso "panel Meshtastic parado: systemctl status bricohams-mesh-admin"; fi
+
+# v5.0 · TAK y monitorización: solo si están activados en bricohams.env
+if [ "${TAK:-no}" = yes ] || [ -e /etc/systemd/system/bricohams-tak.service ]; then
+    titulo "Servidor TAK (OpenTAKServer)"
+    for u in postgresql rabbitmq-server bricohams-tak; do servicio "$u"; done
+    for p in 8081 8089 8445; do ss -ltn 2>/dev/null | grep -q ":$p " && bien "TAK escucha en $p" || aviso "TAK no escucha en $p"; done
+    bien "gestión en /settings/bricohams/tak (sesión de administrador)"
+fi
+if [ "${MONITORIZACION:-no}" = yes ]; then
+    titulo "Monitorización (Prometheus + Grafana)"
+    # node_exporter instalado a mano (binario oficial) en vez del paquete de Debian: install.sh lo adopta
+    nu=prometheus-node-exporter; systemctl cat node_exporter >/dev/null 2>&1 && nu=node_exporter
+    for u in "$nu" prometheus grafana-server; do servicio "$u"; done
+    curl -fsS --max-time 4 http://127.0.0.1:9100/metrics 2>/dev/null | grep -q '^node_' && bien "node-exporter da métricas (127.0.0.1:9100)" || mal "node-exporter no responde en 127.0.0.1:9100"
+    curl -fsS --max-time 4 http://127.0.0.1:9090/-/ready >/dev/null 2>&1 && bien "Prometheus listo (127.0.0.1:9090)" || mal "Prometheus no responde en 127.0.0.1:9090"
+    curl -fsS --max-time 4 http://127.0.0.1:3000/api/health 2>/dev/null | grep -q '"ok"' && bien "Grafana sano · panel en /settings/bricohams/monitorizacion" || mal "Grafana no responde en 127.0.0.1:3000"
+fi
+
+titulo "Cámara del mástil"
+CAM="cámara camara CSI"
+if command -v rpicam-hello >/dev/null && rpicam-hello --list-cameras 2>&1 | grep -q '^[0-9] :'; then bien "cámara CSI detectada"; else aviso "no veo la cámara CSI (rpicam-hello --list-cameras); si MediaMTX la está usando es normal"; fi
+servicio mediamtx
+if curl -fsS --max-time 4 http://127.0.0.1:9997/v3/paths/get/mastil 2>/dev/null | grep -q '"ready":true'; then bien "vídeo 'mastil' en marcha (RTSP 8554 · WebRTC 8889 · HLS 8888)"; else mal_hw "$CAM" "el vídeo 'mastil' no está listo en MediaMTX"; fi
+servicio bricohams-camsnap
+e=$(edad "$HTDOCS/plugins/receiver/camara/snap/mastil.jpg")
+[ "$e" -lt $(( ${CAM_SNAPSHOT_SECONDS:-60} * 3 )) ] && bien "foto de la cámara al día (hace ${e}s)" || mal_hw "$CAM" "foto de la cámara vieja o ausente"
+
+titulo "LilyGO 433 (USB) · Meshtastic"
+[ -e /dev/lilygo-mesh ] && bien "/dev/lilygo-mesh conectado (Meshtastic 433)" || aviso "/dev/lilygo-mesh no aparece (sudo bricohams-dispositivos identificar)"
+[ -e /dev/lilygo-igate ] && bien "/dev/lilygo-igate conectado (iGate WiFi alternativo)"
+for u in MESH433_CHANNEL_URL MESH_CHANNEL_URL; do
+    [ -n "${!u:-}" ] || continue
+    if r=$(bricohams-mesh-url json "${!u}" 2>/dev/null) && [ -n "$r" ]; then
+        bien "$u: $(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print("%d canales · %s" % (len(d["canales"]), d["radio"].get("region","?")))' "$r")"
+    else mal "$u no es una URL de Meshtastic válida"; fi
+done
+
+titulo "RAK4631 · iGate LoRa APRS 433,775 (v4.5)"
+if [ "${RAK_ENABLE:-yes}" = yes ]; then
+    servicio bricohams-rak-aprs
+    [ -e /dev/rak-aprs ] && bien "/dev/rak-aprs conectado" || aviso "/dev/rak-aprs no aparece (enchufa el RAK y: sudo bricohams-dispositivos identificar)"
+    rj=/run/bricohams-rak/rak-aprs.json
+    e=$(edad "$rj")
+    if [ "$e" -lt 300 ]; then
+        bien "$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("rak") or {}; g=r.get("gps") or {}
+print("firmware %s · radio %s · %s paquetes · caja %s °C (%s) · GPS %s · APRS-IS %s" % (r.get("fw","?"), r.get("radio","?"),
+      r.get("rx",0), r.get("t","?"), r.get("sensor","?"), ("fix %s sat" % g.get("sats")) if g.get("fix") else
+      ("sin fix" if g.get("present") else "no"), "conectado" if (d.get("aprsis") or {}).get("conectado") else "sin conexión"))' "$rj" 2>/dev/null)"
+    else aviso "el RAK no ha dado estado en 5 min (sudo bricohams-rak-aprs prueba)"; fi
+else aviso "RAK_ENABLE=no"; fi
+
+titulo "Mapa de OpenWebRX+: LoRa APRS y Meshtastic (v4.5)"
+if [ "${OWRX_MAPA_LORA:-yes}" = yes ]; then
+    systemctl is-active --quiet mosquitto && bien "MQTT local (mosquitto) activo" || mal "mosquitto parado: el mapa no recibe LoRa ni Meshtastic"
+    servicio bricohams-mesh-owrx
+    mj=/run/bricohams-mesh/mesh.json
+    if [ "$(edad "$mj")" -lt 120 ]; then
+        while IFS='|' read -r n c t; do
+            [ -n "$n" ] || continue
+            if [ "$c" = True ]; then bien "$n: $t"; else aviso "$n: $t"; fi
+        done < <(python3 -c 'import json,sys
+for n, f in json.load(open(sys.argv[1]))["fuentes"].items():
+    print("%s|%s|%s" % (n, f["conectado"], ("%d nodos · %d en el mapa · último %s" % (f["nodos"], f["en_mapa"], f["ultimo"] or "-")) if f["conectado"] else "sin conexión (%s)" % (f["error"] or "?")))' "$mj" 2>/dev/null)
+    else aviso "bricohams-mesh-owrx no ha dejado estado (journalctl -u bricohams-mesh-owrx)"; fi
+    s=$OWRX_DATA/settings.json
+    if [ -r "$s" ] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("mqtt_enabled") and d.get("mqtt_aprs") and d.get("mqtt_meshtastic") else 1)' "$s"; then
+        bien "OpenWebRX+ escucha APRS y Meshtastic por MQTT (mqtt_aprs, mqtt_meshtastic)"
+    else aviso "OpenWebRX+ no escucha el MQTT de APRS/Meshtastic: sudo bash install.sh --solo configuracion"; fi
+fi
+
+titulo "Dispositivos (v4.5)"
+if command -v bricohams-dispositivos >/dev/null; then
+    while IFS='|' read -r q p; do
+        [ -n "$q" ] || continue
+        if [ "$p" = True ]; then bien "$q: en camino (HARDWARE_PENDIENTE), no es un fallo"; else aviso "$q: no aparece"; fi
+    done < <(bricohams-dispositivos json 2>/dev/null | python3 -c 'import json,sys
+for f in json.load(sys.stdin)["faltan"]: print("%s|%s" % (f["que"], f["pendiente"]))' 2>/dev/null)
+    bien "inventario completo: sudo bricohams-dispositivos"
+fi
+
+titulo "Sensor BME280/BMP280, viento y lluvia"
+if [ "${WX_ENABLE:-yes}" = yes ]; then
+    servicio_hw "BME280 BMP280 sensor" bricohams-wx
+    sj=$HTDOCS/plugins/receiver/meteo/sensor.json
+    e=$(edad "$sj")
+    [ "$e" -lt 300 ] && bien "sensor: $(python3 -c "import json;d=json.load(open('$sj'));print(d['chip'],d.get('addr'),d['ta'],'°C',d.get('hr'),'%',d.get('pres_nmar') or '—','hPa','pos:',(d.get('pos') or {}).get('fuente','fija'))")" || mal_hw "BME280 BMP280 sensor" "sensor.json viejo o ausente (journalctl -u bricohams-wx)"
+    [ "${WX_APRS:-no}" = yes ] && bien "WX APRS como ${WX_APRS_CALLSIGN:-N0CALL-13}: https://aprs.fi/#!call=${WX_APRS_CALLSIGN:-N0CALL-13}"
+fi
+
+sj="$HTDOCS/plugins/receiver/meteo/sensor.json"
+if [ -s "$sj" ]; then
+    vl=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));v=d.get("viento");l=d.get("lluvia");print(("viento %s m/s de %s°, racha %s" % (v["vel_ms"], v["dir"], v["racha_ms"])) if v else "sin viento", "·", ("lluvia 1 h %s mm, hoy %s mm" % (l["1h"], l["hoy"])) if l else "sin pluviómetro")' "$sj")
+    bien "$vl"
+fi
+[ -e /dev/rs485 ] && bien "adaptador RS485 en /dev/rs485" || { grep -q '^WIND_ENABLE=yes' /etc/bricohams/wx.env 2>/dev/null && aviso "falta /dev/rs485 (adaptador USB-RS485 del viento): RS485_VID/PID en bricohams.env"; }
+
+titulo "Ventilación de la caja"
+if systemctl is-enabled --quiet bricohams-fan 2>/dev/null; then
+    servicio bricohams-fan
+    if [ -s /run/bricohams/caja.json ]; then
+        est=$(python3 -c 'import json;d=json.load(open("/run/bricohams/caja.json"));print("CPU %s °C · caja %s °C · ciclo %s %% · rpm %s · %s" % (d.get("t_cpu"), d.get("t_caja"), d.get("ciclo"), d.get("rpm"), d.get("modo")))')
+        bien "$est"
+        grep -q '"alarma": null' /run/bricohams/caja.json || mal_hw "Pico ventilador" "ventilador parado: $(python3 -c 'import json;print(json.load(open("/run/bricohams/caja.json"))["alarma"])') (revisa conector y tacómetro)"
+    else
+        aviso "bricohams-fan sin estado todavía"
+    fi
+    if grep -qs '^IO_MODE=pico' /etc/bricohams/fan.env; then
+        python3 -c 'import json,sys;d=json.load(open("/run/bricohams/io.json"));sys.exit(0 if d.get("ds") else 1)' 2>/dev/null \
+            && bien "DS18B20 de la caja en la Pico" || aviso "la Pico no ve el DS18B20 (GP22 + 4,7 kΩ): los ventiladores se guían solo por la CPU"
+    else
+        ls /sys/bus/w1/devices/28-* >/dev/null 2>&1 && bien "DS18B20 de la caja detectado" || aviso "no veo el DS18B20 (1-Wire GPIO4): los ventiladores se guían solo por la CPU"
+    fi
+else
+    aviso "ventiladores no instalados (FAN_ENABLE=no)"
+fi
+
+titulo "Pico bricohams-io (sensores y ventiladores por USB)"
+if systemctl is-enabled --quiet bricohams-io 2>/dev/null; then
+    servicio_hw Pico bricohams-io
+    [ -e /dev/bricohams-io ] && bien "/dev/bricohams-io presente" || mal_hw Pico "no veo la Pico (/dev/bricohams-io): ¿cable USB? ¿MicroPython grabado? (manual 20)"
+    e=$(edad /run/bricohams/io.json)
+    if [ "$e" -lt 30 ]; then
+        bien "datos de la Pico al día: $(python3 -c 'import json;d=json.load(open("/run/bricohams/io.json"));b=d.get("bme") or {};f=d.get("fan") or {};print("BME %s °C %s hPa · lluvia %s vuelcos · rpm %s%s" % (b.get("t"), round(b["p"]/100,1) if b.get("p") else "?", d.get("rain"), f.get("rpm"), " · ¡ventiladores en modo seguridad!" if f.get("auto") else ""))')"
+    else
+        mal_hw Pico "la Pico no manda datos (hace ${e}s): sudo bricohams-io ping"
+    fi
+else
+    aviso "bricohams-io no instalado (IO_MODE=gpio)"
+fi
+
+titulo "Web, SSL y visitas"
+servicio nginx
+servicio bricohams-api
+if [ -r /etc/bricohams/web.env ]; then . /etc/bricohams/web.env; fi
+if [ -n "${SSL_DOMAIN:-}" ] && [ -s "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" ]; then
+    fin=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$SSL_DOMAIN/fullchain.pem" | cut -d= -f2)
+    dias=$(( ( $(date -d "$fin" +%s) - $(date +%s) ) / 86400 ))
+    [ "$dias" -gt 14 ] && bien "certificado Let's Encrypt de $SSL_DOMAIN: $dias días" || mal "el certificado de $SSL_DOMAIN caduca en $dias días: sudo certbot renew"
+elif [ "${SSL_MODO:-admin}" != no ]; then
+    aviso "certificado autofirmado (pon SSL_DOMAIN para Let's Encrypt)"
+fi
+case "${SSL_MODO:-admin}" in
+    admin) bien "SSL_MODO=admin: receptor por HTTP, /login y /settings forzados a HTTPS" ;;
+    todo)  bien "SSL_MODO=todo: todo por HTTPS" ;;
+    no)    aviso "SSL_MODO=no: la contraseña de administración viaja sin cifrar" ;;
+    *)     mal "SSL_MODO=${SSL_MODO} no vale (admin, todo o no)" ;;
+esac
+if [ "${SSL_MODO:-admin}" = admin ] && command -v curl >/dev/null && systemctl is-active --quiet nginx; then
+    c=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1/settings)
+    case "$c" in 301\ https://*) bien "http://…/settings redirige a HTTPS" ;; *) mal "http://…/settings no redirige a HTTPS ($c): sudo bash install.sh --solo web" ;; esac
+fi
+servicio mosquitto
+servicio bricohams-visitas
+[ -s /var/lib/bricohams/dbip-city-lite.mmdb ] && bien "base GeoIP local presente" || aviso "sin base GeoIP: sudo -u openwebrx bricohams-visitas --geoip"
+[ -s /etc/bricohams/telegram.env ] && grep -q 'TELEGRAM_TOKEN=.\+' /etc/bricohams/telegram.env && bien "Telegram configurado" || aviso "Telegram sin configurar (TELEGRAM_TOKEN)"
+systemctl is-active --quiet bricohams-satpass.timer && bien "pases de satélites cada 15 min" || aviso "bricohams-satpass.timer parado"
+# v5.0 · grabación automática de pases, «Clima en red» (APRS-IS) y resumen WSPR
+if [ -e /etc/systemd/system/bricohams-satrec.service ]; then
+    if systemctl is-enabled --quiet bricohams-satrec 2>/dev/null; then
+        servicio bricohams-satrec
+        gj=$HTDOCS/plugins/receiver/satelites/grabaciones.json
+        [ "$(edad "$gj")" -lt 1800 ] && bien "plan de grabación al día: $(python3 -c "import json;d=json.load(open('$gj'));print(len(d['plan']),'pases planificados,',len(d['capturas']),'capturas')" 2>/dev/null)" \
+            || mal "grabaciones.json viejo o ausente: journalctl -u bricohams-satrec -n 30"
+        command -v lame >/dev/null && bien "lame instalado (MP3 de los pases)" || aviso "sin lame: los pases se quedan en WAV y no salen en Files (sudo apt install lame)"
+    else aviso "grabación de pases desactivada (SATREC_ENABLE)"; fi
+fi
+if [ -e /etc/systemd/system/bricohams-rotor.service ] && systemctl is-enabled --quiet bricohams-rotor 2>/dev/null; then
+    servicio bricohams-rotor
+    [ -s /etc/bricohams/rotor.clave ] && bien "clave del rotor presente" || mal "falta /etc/bricohams/rotor.clave (manual 49)"
+fi
+if [ -e /etc/systemd/system/bricohams-wx-red.service ]; then
+    if systemctl is-enabled --quiet bricohams-wx-red 2>/dev/null; then
+        servicio bricohams-wx-red
+        wj=$HTDOCS/plugins/receiver/meteo/wx-red.json
+        [ "$(edad "$wj")" -lt 600 ] && bien "Clima en red: $(python3 -c "import json;d=json.load(open('$wj'));print(len(d['estaciones']),'estaciones WX ·','conectado' if d['conectado'] else 'SIN conexión','a APRS-IS')" 2>/dev/null)" \
+            || mal "wx-red.json viejo o ausente: journalctl -u bricohams-wx-red -n 30"
+    else aviso "Clima en red desactivado (WXRED_ENABLE)"; fi
+fi
+if [ -e /etc/systemd/system/bricohams-wspr.timer ]; then
+    systemctl is-active --quiet bricohams-wspr.timer && bien "resumen WSPR cada 15 min" || aviso "bricohams-wspr.timer parado"
+    systemctl is-failed --quiet bricohams-wspr.service && aviso "resumen WSPR falló (¿sin indicativo WSPRnet?): journalctl -u bricohams-wspr -n 10"
+fi
+if command -v satdump >/dev/null; then
+    if [ -d /usr/lib/satdump/plugins ] && [ ! -e /usr/local/lib/satdump ] && strings "$(ldd "$(command -v satdump)" | awk '/satdump_core/{print $3}')" 2>/dev/null | grep -qx /usr/local/lib/satdump/; then
+        mal "SatDump no encuentra sus plugins (METEOR LRPT se salta): sudo ln -s /usr/lib/satdump /usr/local/lib/satdump"
+    else bien "SatDump instalado (imágenes METEOR)"; fi
+else aviso "sin SatDump: no se decodifican las imágenes METEOR"; fi
+if grep -qs BRICOHAMS-FT2 /usr/lib/python3/dist-packages/owrx/modes.py; then bien "modo FT2 activo (experimental)"
+elif command -v decodium-rx >/dev/null; then aviso "decodium-rx instalado pero el modo FT2 no está activo: sudo bricohams-ft2 activar"
+else aviso "FT2 no instalado (FT2_ENABLE)"; fi
+
+if command -v owrx-clone >/dev/null; then
+    bien "owrx-clone $(owrx-clone --version 2>/dev/null | awk '{print $2}') (perfiles de OpenWebRX+: man owrx-clone)"
+    ultimo=$(ls -1t /var/backups/bricohams/perfil-owrx-*.owrx.tar.gz 2>/dev/null | head -1)
+    [ -n "$ultimo" ] && bien "último perfil de la copia diaria: $(basename "$ultimo")"
+else
+    aviso "owrx-clone no está instalado: sudo bash install.sh --solo herramientas"
+fi
+if [ -f /etc/bricohams/perfil-importado ]; then
+    aviso "configuración importada con owrx-clone ($(grep -m1 '^PERFIL=' /etc/bricohams/perfil-importado | cut -d= -f2-)): el instalador no regenera settings.json"
+fi
+
+titulo "Tareas automáticas"
+[ -s /etc/cron.d/bricohams ] && bien "cron: $(grep -c 'bricohams-tarea' /etc/cron.d/bricohams) tareas en /etc/cron.d/bricohams" || mal "falta /etc/cron.d/bricohams (sudo bash install.sh --solo tareas)"
+id bricohams >/dev/null 2>&1 && bien "cuenta de servicio «bricohams»" || mal "falta la cuenta de servicio bricohams"
+[ -s /etc/sudoers.d/bricohams ] && bien "sudoers limitado a bricohams-tarea" || mal "falta /etc/sudoers.d/bricohams"
+u=$(ls -1t /var/backups/bricohams/backup-openwebrx-*.tar.gz 2>/dev/null | head -1)
+[ -n "$u" ] && [ "$(edad "$u")" -lt 172800 ] && bien "última copia: $(basename "$u")" || aviso "no hay copia de las últimas 48 h"
+
+titulo "Meteo y plugins"
+systemctl is-active --quiet bricohams-meteo.timer && bien "temporizador de meteo activo" || mal "bricohams-meteo.timer parado"
+mj=$HTDOCS/plugins/receiver/meteo/meteo.json
+e=$(edad "$mj")
+if [ "$e" -lt 1800 ]; then
+    bien "meteo.json al día (hace ${e}s): $(python3 -c "import json;d=json.load(open('$mj'));print(sum(1 for s in d['stations'] if 'ta' in s),'de',len(d['stations']),'estaciones AEMET, modelo','sí' if d.get('model') else 'no')")"
+else mal "meteo.json viejo o ausente: sudo systemctl start bricohams-meteo"; fi
+[ -n "${AEMET_API_KEY:-}" ] || aviso "sin AEMET_API_KEY: solo verás el modelo de Open-Meteo"
+# v5.0 · la clave tiene que haber llegado a meteo.env (el servicio solo lee ese); sin mostrarla
+if [ -r /etc/bricohams/meteo.env ]; then
+    if grep -q "^AEMET_API_KEY='..*'$" /etc/bricohams/meteo.env; then bien "meteo.env tiene la clave de AEMET"
+    elif [ -n "${AEMET_API_KEY:-}" ]; then mal "meteo.env SIN clave de AEMET (bricohams.env sí la tiene): sudo bash install.sh --solo meteo"; fi
+    [ -f "$mj" ] && [ -n "${AEMET_API_KEY:-}" ] && python3 -c "import json,sys;d=json.load(open('$mj'));sys.exit(0 if not d['stations'] or any('ta' in s for s in d['stations']) else 1)" 2>/dev/null \
+        || { [ -n "${AEMET_API_KEY:-}" ] && aviso "ninguna estación AEMET con datos ahora (journalctl -u bricohams-meteo -n 20)"; }
+fi
+systemctl is-failed --quiet bricohams-meteo.service && mal "la última lectura de meteo falló: journalctl -u bricohams-meteo -n 20"
+for p in solar meteo camara bricohams banderas dvficha satelites visitas; do
+    [ -s "$HTDOCS/plugins/receiver/$p/$p.js" ] && bien "plugin $p instalado" || mal "falta el plugin $p"
+done
+grep -q "Plugins.load(name)" "$HTDOCS/plugins/receiver/init.js" 2>/dev/null && bien "init.js de BricoHams" || mal "init.js no es el de BricoHams"
+
+titulo "Seguridad (v4.4)"
+if [ -x /usr/local/sbin/bricohams-blindaje ]; then
+    r=$(/usr/local/sbin/bricohams-blindaje auditar --resumen 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -o '[0-9]* alto · [0-9]* medio.*')
+    case "$r" in
+        "0 alto · 0 medio"*) bien "blindaje: $r" ;;
+        "") aviso "no pude ejecutar bricohams-blindaje auditar" ;;
+        *) aviso "blindaje: $r · detalle: sudo bricohams-blindaje auditar" ;;
+    esac
+else aviso "sin bricohams-blindaje (v4.4): sudo bash install.sh --solo herramientas"; fi
+
+printf '\n\e[1mResumen:\e[0m %d bien · %d avisos · %d fallos\n' "$OK" "$AV" "$KO"
+[ "$KO" -eq 0 ]

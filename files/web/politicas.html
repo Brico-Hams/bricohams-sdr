@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Políticas de seguridad, datos y cookies · BricoHams SDR __OPERADOR__</title>
+<style>body{font:16px/1.55 system-ui,sans-serif;max-width:860px;margin:2em auto;padding:0 16px;color:#222;background:#fafafa}
+h1{color:#A6192E}h2{color:#F26B21;font-size:1.15em;margin-top:1.6em}code{background:#eee;padding:0 4px;border-radius:3px}
+table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.95em}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f0f0f0}nav a{margin-right:12px}.nota{opacity:.75;font-size:.92em}
+button{font:600 15px system-ui,sans-serif;padding:8px 14px;border:0;border-radius:6px;background:#2868d7;color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){body{background:#17181b;color:#ddd}code{background:#333}th{background:#25272b}th,td{border-color:#444}a{color:#8ab4f8}}</style></head><body>
+<h1>🛡️ Políticas de seguridad, compartición de datos y cookies</h1>
+<nav><a href="#seguridad">Seguridad</a><a href="#datos">Datos compartidos</a><a href="#cookies">Cookies</a><a href="#mapa">Mapa local</a><a href="/bricohams/privacidad.html">Aviso de privacidad</a></nav>
+<p>Este receptor SDR lo mantiene <b>__OPERADOR__</b> (BricoHams, __QTH__) como servicio gratuito para la comunidad de
+radioaficionados. Contacto: <b>__CONTACTO__</b>. Este documento completa el
+<a href="/bricohams/privacidad.html">aviso de privacidad</a>.</p>
+
+<h2 id="seguridad">1. Política de seguridad</h2>
+<ul>
+<li>Toda la web se sirve por <b>HTTPS</b> (puerto 443); el puerto 80 solo redirige a HTTPS y el servidor envía HSTS
+para que el navegador no vuelva a HTTP.</li>
+<li>OpenWebRX+ no se publica directamente: su puerto interno (8073) solo escucha en la propia máquina y se accede a
+través del proxy web cifrado.</li>
+<li>Los <b>ajustes</b> de OpenWebRX+ (<code>/settings</code>) y los paneles de administración solo son accesibles para el operador.</li>
+<li>Los servicios internos (MQTT, APIs locales, decodificadores) escuchan solo en la propia máquina (<code>127.0.0.1</code>)
+y salen al exterior únicamente a través del proxy web.</li>
+<li>El servidor aplica cortafuegos, límites de peticiones y cabeceras de seguridad (<code>X-Frame-Options</code>,
+<code>X-Content-Type-Options</code>, <code>Referrer-Policy</code>, <code>Permissions-Policy</code>).</li>
+<li>Las credenciales de servicios externos se guardan en el servidor con permisos restringidos y nunca se envían al navegador.</li>
+<li>Si detectas un fallo de seguridad, comunícalo de forma privada a <b>__CONTACTO__</b> antes de publicarlo.</li>
+</ul>
+
+<h2 id="datos">2. Política de compartición de datos</h2>
+<p>No vendemos ni cedemos datos personales. Solo se comparte lo imprescindible para que cada función opere:</p>
+<table>
+<tr><th>Destino</th><th>Qué se envía</th><th>Cuándo</th></tr>
+<tr><td>Operadores (Telegram)</td><td>Aviso de conexión con ciudad, país e IP truncada; mensajes del chat; indicativo o nombre del registro voluntario</td><td>Al conectar, usar el chat o registrarte</td></tr>
+<tr><td>map.flights</td><td>Dirección ICAO del avión consultado (desde el servidor); nunca la IP del oyente ni la posición del receptor</td><td>Al abrir la ficha de un avión, si el operador lo activó</td></tr>
+<tr><td>map.flights / Planespotters (fotos)</td><td>Datos técnicos de la petición de la foto desde tu navegador (IP, navegador)</td><td>Solo si aceptas el contenido de terceros; si no, la foto queda como enlace</td></tr>
+<tr><td>HamQTH / QRZ / RadioID</td><td>Indicativo decodificado para mostrar su ficha</td><td>Al recibir un indicativo digital</td></tr>
+<tr><td>Redes de seguimiento (RadarBox, map.flights, APRS-IS…)</td><td>Datos de radio recibidos por la estación (ADS-B, APRS), no datos de oyentes</td><td>Continuo, si el operador los activó</td></tr>
+<tr><td>Proveedores de mapas, logotipos y plugins (OpenStreetMap, GitHub, map.flights)</td><td>Datos técnicos de cualquier petición web (IP, navegador)</td><td>Al cargar la web o el mapa (teselas y logotipo «Powered by MAP.FLIGHTS»)</td></tr>
+</table>
+<p class="nota">El registro voluntario de indicativo y el registro de visitas quedan en la estación; no se publican ni se comparten (solo se avisa al grupo privado de Telegram de los operadores).</p>
+
+<h2 id="cookies">3. Política de cookies y almacenamiento local</h2>
+<p>La web usa solo cookies y almacenamiento <b>propios</b>. No hay cookies publicitarias ni de analítica de terceros.</p>
+<table>
+<tr><th>Nombre</th><th>Tipo</th><th>Finalidad</th><th>Duración</th></tr>
+<tr><td><code>bh_consent</code></td><td>Cookie propia, necesaria</td><td>Recordar tu elección sobre cookies y contenido de terceros (fotos de aviones)</td><td>180 días</td></tr>
+<tr><td><code>owrx-session</code></td><td>Cookie propia, necesaria</td><td>Sesión del operador en los ajustes (solo administradores)</td><td>Sesión</td></tr>
+<tr><td><code>bh_idioma</code></td><td>Almacenamiento local</td><td>Idioma elegido (español o inglés)</td><td>Hasta que lo borres</td></tr>
+<tr><td><code>bh_identificacion_*</code></td><td>Almacenamiento local</td><td>Recordar tu decisión sobre el registro voluntario</td><td>Hasta 180 días</td></tr>
+<tr><td>Preferencias de la interfaz</td><td>Almacenamiento local</td><td>Tema, ventanas abiertas, filtros de audio…</td><td>Hasta que lo borres</td></tr>
+</table>
+<p>Si aceptas el contenido de terceros, los servidores de las fotos de aviones (map.flights, Planespotters) reciben la petición de tu navegador y pueden aplicar sus propias políticas.</p>
+<p><button type="button" id="bh-cambiar-cookies">Cambiar mis preferencias de cookies</button></p>
+
+<h2 id="mapa">4. Aviones y barcos en el mapa</h2>
+<p>Los aviones (ADS-B, 1090 MHz) y los barcos (AIS, 162 MHz) que ves en el <a href="/map">mapa</a> y en
+<a href="/tar1090/">tar1090</a> los recibe <b>esta estación con sus propias antenas</b>; no se cargan de webs de terceros.
+Son emisiones públicas de aeronaves y buques, no datos de los oyentes. Solo las fotos de los aviones dependen de un
+servicio externo y se cargan únicamente con tu consentimiento.</p>
+
+<h2>5. Tus derechos</h2>
+<p>Puedes retirar o cambiar tu consentimiento en cualquier momento con el botón anterior o borrando los datos del sitio en tu
+navegador. Para acceso o supresión de registros escribe a <b>__CONTACTO__</b>; también puedes reclamar ante la
+<a href="https://www.aepd.es">Agencia Española de Protección de Datos</a>. Los registros de visitas se borran a los
+<b>__DIAS__ días</b>.</p>
+<p><a href="/">← Volver al receptor</a></p>
+<script>
+document.getElementById('bh-cambiar-cookies').addEventListener('click', function () {
+    document.cookie = 'bh_consent=; Path=/; Max-Age=0; SameSite=Lax';
+    try { localStorage.removeItem('bh_consent'); } catch (e) { /* sin almacenamiento */ }
+    location.href = '/#cookies';
+});
+</script>
+</body></html>

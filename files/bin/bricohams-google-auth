@@ -1,0 +1,1107 @@
+#!/usr/bin/env python3
+# =====================================================================
+#  BricoHams · acceso de administradores con Google (OpenID Connect)
+#
+#  Acceso a la administración (/settings, paneles /settings/bricohams/, Grafana y el
+#  cliente Meshtastic 8443/8444) con los usuarios locales de OpenWebRX+ (users.json),
+#  con Google o con ambos. Solo entran las cuentas de Google de GOOGLE_ADMINS
+#  (correo exacto o «@dominio» de Google Workspace).
+#
+#  GOOGLE_AUTH=no  solo usuarios locales (contraseña de OpenWebRX+), como siempre.
+#  GOOGLE_AUTH_MODO (con GOOGLE_AUTH=yes)
+#    alternativa  usuario local O Google: /login de OpenWebRX+ con el botón «Entrar con
+#                 Google»; Google abre la sesión con la cuenta de servicio.
+#    doble        Google y DESPUÉS la contraseña local (dos factores, nginx auth_request).
+#    solo_google  solo Google: la pasarela abre la sesión de OpenWebRX+ con una
+#                 cuenta de servicio (GOOGLE_OWRX_USUARIO) de clave aleatoria.
+#
+#  Secretos (nunca en el código ni en bricohams.env), en /etc/bricohams/google (700),
+#  entregados al servicio con LoadCredential de systemd:
+#    client_secret   secreto del cliente OAuth de Google
+#    cookie_key      clave HMAC de las cookies de sesión (se genera sola)
+#    owrx_password   clave de la cuenta de servicio (alternativa y solo_google; se genera sola)
+#
+#  Dónde se configura (manual 46: docs/manuales/46_ACCESO_GOOGLE.md del kit):
+#    1. Google Cloud Console → APIs y servicios → Credenciales → ID de cliente de OAuth
+#       («Aplicación web»). Origen: https://SSL_DOMAIN · Redirección: https://SSL_DOMAIN/_bh_google/callback
+#    2. Web: /settings/bricohams/seguridad → «Métodos de acceso de administradores»: modo,
+#       ID de cliente, secreto, correos y horas → «Guardar y aplicar» (lanza «aplicar» como root).
+#    3. Consola (alternativa): sudo bricohams-google-auth configurar --kit-env RUTA y después aplicar.
+#    Emergencia: sudo bricohams-google-auth configurar --kit-env RUTA --desactivar && sudo … aplicar --kit-env RUTA
+#
+#  Uso:
+#    bricohams-google-auth servicio                       (systemd, 127.0.0.1:8077)
+#    sudo bricohams-google-auth configurar --kit-env RUTA  (asistente; pide el secreto sin mostrarlo)
+#    sudo bricohams-google-auth preparar --kit-env RUTA    (install.sh: 0 listo, 3 desactivado, 4 incompleto)
+#    sudo bricohams-google-auth nginx --aplicar|--quitar [--modo M] [--rutas F] [--sitio F]
+#    sudo bricohams-google-auth aplicar --kit-env RUTA     (panel Seguridad: preparar + servicio + nginx, con marcha atrás)
+#    bricohams-google-auth comprobar --kit-env RUTA
+# =====================================================================
+import argparse
+import base64
+import getpass
+import hashlib
+import hmac
+import html
+import http.client
+import http.cookies
+import http.server
+import json
+import os
+import re
+import secrets
+import socketserver
+import ssl
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
+
+PREFIJO = '/_bh_google'
+COOKIE = 'bh-google'
+COOKIE_ESTADO = 'bh-google-est'
+ESTADO_SEG = 600
+ISS_GOOGLE = ('https://accounts.google.com', 'accounts.google.com')
+AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+TOKEN_URL = 'https://oauth2.googleapis.com/token'
+MODOS = ('alternativa', 'doble', 'solo_google')
+MODO_DEFECTO = 'alternativa'
+CON_CUENTA = ('alternativa', 'solo_google')        # modos que usan la cuenta de servicio de OpenWebRX+
+CLIENT_ID_RE = re.compile(r'^[0-9]{6,}-[a-z0-9]{8,}\.apps\.googleusercontent\.com$')
+CORREO_RE = re.compile(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$')
+DOMINIO_RE = re.compile(r'^@[a-z0-9.-]+\.[a-z]{2,}$')
+USUARIO_OWRX_RE = re.compile(r'^[A-Za-z0-9_.-]{1,32}$')
+SESION_OWRX_RE = re.compile(r'^[A-Za-z0-9_-]{8,128}$')
+
+ETC = os.environ.get('BRICOHAMS_ETC', '/etc/bricohams')
+CRED_DIR_ETC = os.path.join(ETC, 'google')
+ENV_SERVICIO = os.path.join(ETC, 'google-auth.env')
+UNIDAD = os.environ.get('GOOGLE_AUTH_UNIDAD', '/etc/systemd/system/bricohams-google-auth.service')
+RUTAS_NGINX = '/etc/nginx/snippets/bricohams-sdr-rutas.conf'
+SITIO_NGINX = '/etc/nginx/sites-available/bricohams-sdr'
+
+
+def log(*a):
+    print('google-auth:', *a, flush=True)
+
+
+# ---------------------------------------------------------------- utilidades
+def b64u(b):
+    return base64.urlsafe_b64encode(b).rstrip(b'=').decode('ascii')
+
+
+def b64u_dec(s):
+    return base64.urlsafe_b64decode(s + '=' * (-len(s) % 4))
+
+
+def si(v, d='no'):
+    return (v or d).strip().lower() in ('1', 'yes', 'si', 'sí', 'true', 'on')
+
+
+def leer_env(ruta):
+    """{CLAVE: valor} de un fichero KEY=valor (con o sin comillas), sin ejecutar nada."""
+    d = {}
+    try:
+        for l in open(ruta, encoding='utf-8'):
+            m = re.match(r'^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$', l)
+            if not m:
+                continue
+            v = m.group(2).strip()
+            fin = v.find(v[0], 1) if v[:1] in ('"', "'") else -1
+            v = v[1:fin] if fin > 0 else re.sub(r'\s+#.*$', '', v)
+            d[m.group(1)] = v
+    except OSError:
+        pass
+    return d
+
+
+def escribir_env(ruta, cambios, comilla='"'):
+    """Cambia o añade CLAVE=valor conservando el resto; mismo dueño y permisos."""
+    for v in cambios.values():
+        if re.search(r'["\'$`\\\n\r]', v):
+            raise ValueError('valor con comillas, «$», «`», «\\» o saltos de línea')
+    with open(ruta, 'r+', encoding='utf-8') as f:
+        lineas = f.read().splitlines(True)
+        hechos = set()
+        for i, l in enumerate(lineas):
+            m = re.match(r'^(\s*(?:export\s+)?)([A-Z][A-Z0-9_]*)=(.*?)(\r?\n)?$', l)
+            if m and m.group(2) in cambios:
+                lineas[i] = '%s%s=%s%s%s%s' % (m.group(1), m.group(2), comilla, cambios[m.group(2)], comilla, m.group(4) or '\n')
+                hechos.add(m.group(2))
+        if lineas and not lineas[-1].endswith('\n'):
+            lineas[-1] += '\n'
+        nuevos = [k for k in cambios if k not in hechos]
+        if nuevos:
+            lineas.append('# Acceso de administradores con Google (bricohams-google-auth)\n')
+        for k in nuevos:
+            lineas.append('%s=%s%s%s\n' % (k, comilla, cambios[k], comilla))
+        f.seek(0)
+        f.write(''.join(lineas))
+        f.truncate()
+
+
+def escribir_atomico(ruta, texto, modo=0o600):
+    tmp = '%s.tmp-%d' % (ruta, os.getpid())
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, modo)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.write(texto)
+        os.chmod(tmp, modo)
+        os.replace(tmp, ruta)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def lista_admins(texto):
+    """'a@b.es, @empresa.es' → ['a@b.es', '@empresa.es'] en minúsculas; ValueError si hay algo raro."""
+    salida = []
+    for x in re.split(r'[\s,;]+', (texto or '').strip().lower()):
+        if not x:
+            continue
+        if not (CORREO_RE.match(x) or DOMINIO_RE.match(x)):
+            raise ValueError('«%s» no es un correo ni un @dominio válido' % x)
+        if x not in salida:
+            salida.append(x)
+    return salida
+
+
+def permitido(correo, hd, admins):
+    """Correo exacto de la lista, o «@dominio» con la cuenta de ese Google Workspace (claim hd)."""
+    correo = (correo or '').strip().lower()
+    if not CORREO_RE.match(correo):
+        return False
+    if correo in admins:
+        return True
+    dominio = correo.rsplit('@', 1)[1]
+    return ('@' + dominio) in admins and (hd or '').lower() == dominio
+
+
+def ruta_segura(rd, defecto='/settings'):
+    """Solo rutas locales: «/algo», nunca «//host», «/\\host» ni esquemas."""
+    if not isinstance(rd, str) or not rd.startswith('/') or rd.startswith('//') or '\\' in rd:
+        return defecto
+    if any(ord(c) < 0x21 or ord(c) == 0x7f for c in rd) or len(rd) > 2000:
+        return defecto
+    return rd
+
+
+# ---------------------------------------------------------------- cookies firmadas
+def firmar(clave, tipo, datos):
+    cuerpo = b64u(json.dumps(datos, separators=(',', ':'), sort_keys=True).encode('utf-8'))
+    firma = b64u(hmac.new(clave, (tipo + '.' + cuerpo).encode('ascii'), hashlib.sha256).digest())
+    return cuerpo + '.' + firma
+
+
+def verificar(clave, tipo, valor, ahora=None):
+    """Datos de la cookie si la firma es buena y no ha caducado (campo x); si no, None."""
+    try:
+        cuerpo, firma = (valor or '').split('.')
+        bueno = b64u(hmac.new(clave, (tipo + '.' + cuerpo).encode('ascii'), hashlib.sha256).digest())
+        if not hmac.compare_digest(bueno, firma):
+            return None
+        datos = json.loads(b64u_dec(cuerpo))
+        if not isinstance(datos, dict) or float(datos.get('x', 0)) <= (ahora or time.time()):
+            return None
+        return datos
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return None
+
+
+def galleta(nombre, valor, ruta='/', max_age=None):
+    partes = ['%s=%s' % (nombre, valor), 'Path=' + ruta, 'Secure', 'HttpOnly', 'SameSite=Lax']
+    if max_age is not None:
+        partes.append('Max-Age=%d' % max_age)
+    return '; '.join(partes)
+
+
+def leer_galletas(cabecera):
+    c = http.cookies.SimpleCookie()
+    try:
+        c.load(cabecera or '')
+    except http.cookies.CookieError:
+        return {}
+    return {k: m.value for k, m in c.items()}
+
+
+# ---------------------------------------------------------------- id_token de Google
+def validar_id_token(id_token, client_id, nonce, ahora=None):
+    """Claims del id_token. Viene directamente del endpoint de tokens por TLS verificado,
+    así que basta con validar emisor, audiencia, fechas, nonce y correo verificado
+    (OpenID Connect Core 1.0 §3.1.3.7, punto 6)."""
+    ahora = ahora or time.time()
+    try:
+        partes = id_token.split('.')
+        if len(partes) != 3:
+            raise ValueError
+        claims = json.loads(b64u_dec(partes[1]))
+    except (ValueError, AttributeError, UnicodeDecodeError):
+        raise ValueError('id_token ilegible')
+    if not isinstance(claims, dict):
+        raise ValueError('id_token ilegible')
+    if claims.get('iss') not in ISS_GOOGLE:
+        raise ValueError('emisor inesperado')
+    aud = claims.get('aud')
+    if isinstance(aud, list):
+        if client_id not in aud or claims.get('azp') != client_id:
+            raise ValueError('audiencia inesperada')
+    elif aud != client_id:
+        raise ValueError('audiencia inesperada')
+    try:
+        exp, iat = float(claims.get('exp')), float(claims.get('iat'))
+    except (TypeError, ValueError):
+        raise ValueError('id_token sin fechas')
+    if exp < ahora - 60 or iat > ahora + 300:
+        raise ValueError('id_token caducado o con fecha futura')
+    if not nonce or not hmac.compare_digest(str(claims.get('nonce', '')), nonce):
+        raise ValueError('nonce distinto')
+    if claims.get('email_verified') not in (True, 'true'):
+        raise ValueError('correo de Google sin verificar')
+    if not claims.get('email'):
+        raise ValueError('id_token sin correo')
+    return claims
+
+
+# ---------------------------------------------------------------- configuración del servicio
+class Config:
+    def __init__(self, env=None):
+        env = dict(os.environ if env is None else env)
+        self.problemas = []
+        self.modo = (env.get('GOOGLE_AUTH_MODO') or MODO_DEFECTO).strip()
+        self.client_id = env.get('GOOGLE_CLIENT_ID', '').strip()
+        try:
+            self.admins = lista_admins(env.get('GOOGLE_ADMINS', ''))
+        except ValueError as ex:
+            self.admins = []
+            self.problemas.append('GOOGLE_ADMINS: %s' % ex)
+        try:
+            self.horas = float(env.get('GOOGLE_SESION_HORAS', '8') or 8)
+        except ValueError:
+            self.horas = 0
+            self.problemas.append('GOOGLE_SESION_HORAS no es un número')
+        try:
+            self.puerto = int(env.get('GOOGLE_AUTH_PORT') or '8077')
+        except ValueError:
+            self.puerto = 8077
+            self.problemas.append('GOOGLE_AUTH_PORT no es un número')
+        self.dominio = env.get('GOOGLE_DOMINIO', '').strip().lower()
+        self.redirect_uri = env.get('GOOGLE_REDIRECT_URI', '').strip() or ('https://%s%s/callback' % (self.dominio, PREFIJO))
+        self.owrx_url = (env.get('GOOGLE_OWRX_URL') or 'http://127.0.0.1:8073').rstrip('/')
+        self.owrx_usuario = (env.get('GOOGLE_OWRX_USUARIO') or 'bricohams-google').strip()
+        self.mesh_auth = env.get('GOOGLE_MESH_AUTH_URL') or 'http://127.0.0.1:8076/settings/bricohams/auth'
+        self.auth_url = env.get('GOOGLE_AUTH_ENDPOINT') or AUTH_URL
+        self.token_url = env.get('GOOGLE_TOKEN_ENDPOINT') or TOKEN_URL
+        self.http_pruebas = env.get('GOOGLE_PERMITIR_HTTP_PRUEBAS') == '1'
+        cred = env.get('CREDENTIALS_DIRECTORY') or env.get('GOOGLE_CRED_DIR') or CRED_DIR_ETC
+        self.client_secret = self._leer(cred, 'client_secret')
+        clave = self._leer(cred, 'cookie_key')
+        self.cookie_key = bytes.fromhex(clave) if re.match(r'^[0-9a-f]{64,}$', clave) else b''
+        self.owrx_clave = self._leer(cred, 'owrx_password') if self.modo in CON_CUENTA else ''
+
+    @staticmethod
+    def _leer(d, nombre):
+        try:
+            with open(os.path.join(d, nombre), encoding='utf-8') as f:
+                return f.read().strip()
+        except OSError:
+            return ''
+
+    def errores(self):
+        e = list(self.problemas)
+        if self.modo not in MODOS:
+            e.append('GOOGLE_AUTH_MODO debe ser %s' % ', '.join(MODOS))
+        if not CLIENT_ID_RE.match(self.client_id):
+            e.append('GOOGLE_CLIENT_ID no parece un ID de cliente OAuth de Google')
+        if not self.admins and not self.problemas:
+            e.append('GOOGLE_ADMINS vacío: nadie podría entrar')
+        if not self.client_secret:
+            e.append('falta el secreto del cliente (client_secret)')
+        if len(self.cookie_key) < 32:
+            e.append('falta la clave de las cookies (cookie_key)')
+        if not self.redirect_uri.startswith('https://') or not urlsplit(self.redirect_uri).hostname:
+            e.append('la URI de redirección debe ser https://DOMINIO%s/callback' % PREFIJO)
+        if not self.dominio:
+            e.append('falta el dominio (SSL_DOMAIN)')
+        for u in (self.token_url, self.auth_url):
+            if not u.startswith('https://') and not self.http_pruebas:
+                e.append('los endpoints de Google deben ser https')
+        if self.modo in CON_CUENTA:
+            if not USUARIO_OWRX_RE.match(self.owrx_usuario):
+                e.append('GOOGLE_OWRX_USUARIO no válido')
+            if not self.owrx_clave:
+                e.append('falta la clave de la cuenta de servicio (owrx_password)')
+        if not 0.25 <= self.horas <= 168:
+            e.append('GOOGLE_SESION_HORAS fuera de 0,25…168')
+        return e
+
+
+# ---------------------------------------------------------------- servicio HTTP
+class Limite:
+    """N peticiones por IP en una ventana (login y callback)."""
+
+    def __init__(self, n=30, seg=300):
+        self.n, self.seg, self.d, self.l = n, seg, {}, threading.Lock()
+
+    def permite(self, ip):
+        ahora = time.monotonic()
+        with self.l:
+            if len(self.d) > 5000:
+                self.d = {k: v for k, v in self.d.items() if v and v[-1] > ahora - self.seg}
+            t = [x for x in self.d.get(ip, []) if x > ahora - self.seg]
+            if len(t) >= self.n:
+                self.d[ip] = t
+                return False
+            t.append(ahora)
+            self.d[ip] = t
+            return True
+
+
+AYUDA_CONFIG = '''Dónde se configura el acceso de administradores (manual 46, docs/manuales/46_ACCESO_GOOGLE.md):
+  · Web: https://SSL_DOMAIN/settings/bricohams/seguridad → «Métodos de acceso de administradores»
+    (solo usuarios locales · usuario local o Google · Google y además local · solo Google).
+  · Google Cloud Console → APIs y servicios → Credenciales → ID de cliente de OAuth («Aplicación web»):
+    origen https://SSL_DOMAIN y redirección https://SSL_DOMAIN/_bh_google/callback
+  · Usuarios locales: misma página, tarjeta «Usuarios de la web (OpenWebRX+)».
+  · Consola: sudo bricohams-google-auth configurar --kit-env RUTA  y  sudo bricohams-google-auth aplicar --kit-env RUTA
+  · Emergencia (volver a solo usuarios locales): configurar --kit-env RUTA --desactivar  y  aplicar --kit-env RUTA'''
+
+PAGINA = '''<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>BricoHams · acceso</title><style>body{font-family:system-ui,sans-serif;background:#10161d;color:#e8edf2;
+display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}main{max-width:30rem;padding:2rem;
+background:#1b2530;border-radius:12px}a{color:#7cc4ff}h1{font-size:1.3rem}</style></head><body><main>
+<h1>%s</h1><p>%s</p><p><a href="%s/login?rd=%%2Fsettings">Entrar con otra cuenta de Google</a> · <a href="/login">Usuario local</a> · <a href="/">Receptor</a></p>
+<p style="font-size:.8rem;color:#9fb0c0">Administradores: el acceso (usuarios locales y cuentas de Google autorizadas) se configura en
+<i>Ajustes → Seguridad → Métodos de acceso de administradores</i> (manual 46 del kit BricoHams).</p>
+</main></body></html>'''
+
+
+class Manejador(http.server.BaseHTTPRequestHandler):
+    server_version = 'bricohams'
+    sys_version = ''
+    protocol_version = 'HTTP/1.0'
+
+    def log_message(self, fmt, *a):
+        pass
+
+    @property
+    def cfg(self):
+        return self.server.cfg
+
+    def ip(self):
+        return (self.headers.get('X-Forwarded-For') or self.client_address[0]).split(',')[0].strip()
+
+    def responder(self, codigo, cuerpo=b'', tipo='text/html; charset=utf-8', cabeceras=()):
+        self.send_response(codigo)
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('X-Robots-Tag', 'noindex')
+        for k, v in cabeceras:
+            self.send_header(k, v)
+        if cuerpo:
+            self.send_header('Content-Type', tipo)
+        self.send_header('Content-Length', str(len(cuerpo)))
+        self.end_headers()
+        if cuerpo and self.command != 'HEAD':
+            self.wfile.write(cuerpo)
+
+    def redirigir(self, destino, galletas=()):
+        self.responder(302, cabeceras=[('Location', destino)] + [('Set-Cookie', g) for g in galletas])
+
+    def pagina(self, codigo, titulo, texto):
+        cuerpo = PAGINA % (html.escape(titulo), texto, PREFIJO)
+        self.responder(codigo, cuerpo.encode('utf-8'))
+
+    def sesion(self):
+        datos = verificar(self.cfg.cookie_key, 'ses', leer_galletas(self.headers.get('Cookie')).get(COOKIE))
+        if not datos or not permitido(datos.get('e'), datos.get('h'), self.cfg.admins):
+            return None
+        return datos
+
+    def do_HEAD(self):
+        self.do_GET()
+
+    def do_POST(self):
+        self.do_GET()
+
+    def do_GET(self):
+        u = urlsplit(self.path)
+        q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        ruta = u.path
+        try:
+            if ruta == PREFIJO + '/auth':
+                return self.responder(204 if self.sesion() else 401)
+            if ruta == PREFIJO + '/auth-owrx':
+                return self.auth_owrx()
+            if ruta == PREFIJO + '/login':
+                return self.login(q)
+            if ruta == PREFIJO + '/callback':
+                return self.callback(q)
+            if ruta == PREFIJO + '/entrar':
+                return self.entrar(q)
+            if ruta == PREFIJO + '/salir':
+                return self.redirigir('/', [galleta(COOKIE, '', max_age=0), galleta('owrx-session', '', max_age=0)])
+            return self.responder(404)
+        except Exception as ex:  # noqa: BLE001 — nunca se enseña el detalle al navegador
+            log('error interno en %s: %s' % (ruta, type(ex).__name__))
+            return self.pagina(500, 'Error interno', 'No se ha podido completar el acceso. Inténtalo de nuevo.')
+
+    # -- nginx auth_request de Grafana y Meshtastic: Google y además la sesión de OpenWebRX+
+    def auth_owrx(self):
+        if not self.sesion():
+            return self.responder(401)
+        u = urlsplit(self.cfg.mesh_auth)
+        try:
+            c = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=6)
+            c.request('GET', u.path or '/', headers={'Cookie': self.headers.get('Cookie', ''), 'Host': self.headers.get('Host', 'localhost')})
+            r = c.getresponse()
+            r.read()
+            c.close()
+            return self.responder(204 if 200 <= r.status < 300 else 401)
+        except (OSError, http.client.HTTPException):
+            return self.responder(401)
+
+    # -- inicio de sesión con Google
+    def login(self, q):
+        if not self.server.limite.permite(self.ip()):
+            return self.pagina(429, 'Demasiados intentos', 'Espera unos minutos y vuelve a probar.')
+        rd = ruta_segura(self.headers.get('X-BH-Rd') or q.get('rd'))
+        if rd.startswith(PREFIJO + '/login') or rd.startswith(PREFIJO + '/callback'):
+            rd = '/settings'
+        host = (self.headers.get('Host') or '').split(':')[0].lower()
+        if self.cfg.dominio and host != self.cfg.dominio:
+            # la cookie es del dominio de la URI registrada en Google: se entra siempre por él
+            return self.redirigir('https://%s%s/login?rd=%s' % (self.cfg.dominio, PREFIJO, quote(rd, safe='')))
+        estado, nonce, verificador = secrets.token_urlsafe(24), secrets.token_urlsafe(24), secrets.token_urlsafe(48)
+        reto = b64u(hashlib.sha256(verificador.encode('ascii')).digest())
+        g = firmar(self.cfg.cookie_key, 'est', {'s': estado, 'n': nonce, 'v': verificador, 'r': rd, 'x': int(time.time()) + ESTADO_SEG})
+        params = {
+            'client_id': self.cfg.client_id, 'redirect_uri': self.cfg.redirect_uri, 'response_type': 'code',
+            'scope': 'openid email', 'state': estado, 'nonce': nonce, 'code_challenge': reto,
+            'code_challenge_method': 'S256', 'prompt': 'select_account',
+        }
+        dominios = [a[1:] for a in self.cfg.admins if a.startswith('@')]
+        if len(dominios) == 1 and len(dominios) == len(self.cfg.admins):
+            params['hd'] = dominios[0]
+        return self.redirigir(self.cfg.auth_url + '?' + urlencode(params),
+                              [galleta(COOKIE_ESTADO, g, PREFIJO + '/', ESTADO_SEG)])
+
+    def callback(self, q):
+        borrar = galleta(COOKIE_ESTADO, '', PREFIJO + '/', 0)
+        if not self.server.limite.permite(self.ip()):
+            return self.pagina(429, 'Demasiados intentos', 'Espera unos minutos y vuelve a probar.')
+        est = verificar(self.cfg.cookie_key, 'est', leer_galletas(self.headers.get('Cookie')).get(COOKIE_ESTADO))
+        if not est or not q.get('state') or not hmac.compare_digest(str(est.get('s')), q['state']):
+            log('rechazado desde %s: estado OAuth ausente, caducado o distinto' % self.ip())
+            return self.pagina(400, 'Acceso caducado', 'La solicitud de acceso ha caducado o no es válida. Vuelve a entrar.')
+        if q.get('error') or not q.get('code'):
+            log('Google no autorizó desde %s: %s' % (self.ip(), re.sub(r'[^a-z_]', '', q.get('error', 'sin código'))[:40]))
+            return self.pagina(403, 'Acceso cancelado', 'Google no ha autorizado el acceso.')
+        try:
+            datos = self.canjear(q['code'], est['v'])
+            claims = validar_id_token(datos.get('id_token', ''), self.cfg.client_id, est['n'])
+        except ValueError as ex:
+            log('rechazado desde %s: %s' % (self.ip(), ex))
+            return self.pagina(403, 'Acceso denegado', 'No se ha podido validar la cuenta de Google.')
+        correo, hd = claims['email'].strip().lower(), str(claims.get('hd', '')).lower()
+        if not permitido(correo, hd, self.cfg.admins):
+            log('DENEGADO %s desde %s (no está en GOOGLE_ADMINS)' % (correo, self.ip()))
+            return self.pagina(403, 'Cuenta sin permiso',
+                               'La cuenta <b>%s</b> no es administradora de esta estación.' % html.escape(correo))
+        seg = int(self.cfg.horas * 3600)
+        ses = firmar(self.cfg.cookie_key, 'ses', {'e': correo, 'h': hd, 'x': int(time.time()) + seg})
+        log('ACCESO %s desde %s (modo %s)' % (correo, self.ip(), self.cfg.modo))
+        return self.redirigir(ruta_segura(est.get('r')), [galleta(COOKIE, ses, '/', seg), borrar])
+
+    def canjear(self, codigo, verificador):
+        cuerpo = urlencode({
+            'code': codigo, 'client_id': self.cfg.client_id, 'client_secret': self.cfg.client_secret,
+            'redirect_uri': self.cfg.redirect_uri, 'grant_type': 'authorization_code', 'code_verifier': verificador,
+        }).encode('ascii')
+        pet = urllib.request.Request(self.cfg.token_url, data=cuerpo, method='POST',
+                                     headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+        try:
+            with urllib.request.urlopen(pet, timeout=10, context=ssl.create_default_context()) as r:
+                datos = json.loads(r.read(200000).decode('utf-8'))
+        except urllib.error.HTTPError as ex:
+            raise ValueError('Google rechazó el código (HTTP %d)' % ex.code)
+        except (OSError, ValueError):
+            raise ValueError('no se pudo hablar con Google')
+        if not isinstance(datos, dict) or not datos.get('id_token'):
+            raise ValueError('respuesta de Google sin id_token')
+        return datos
+
+    # -- alternativa y solo_google: abre la sesión de OpenWebRX+ con la cuenta de servicio
+    def entrar(self, q):
+        if self.cfg.modo not in CON_CUENTA:
+            return self.responder(404)
+        ref = q.get('ref') or '/settings'
+        # OpenWebRX+ usa «/login?ref=settings» (sin barra inicial)
+        if re.match(r'^[A-Za-z0-9_-][A-Za-z0-9_./?=&%-]*$', ref):
+            ref = '/' + ref
+        ref = ruta_segura(ref)
+        if ref.startswith(PREFIJO):
+            ref = '/settings'
+        datos = self.sesion()
+        if not datos:
+            return self.redirigir('%s/login?rd=%s' % (PREFIJO, quote('%s/entrar?ref=%s' % (PREFIJO, quote(ref, safe='')), safe='')))
+        clave, destino = owrx_login(self.cfg.owrx_url, self.cfg.owrx_usuario, self.cfg.owrx_clave, ref)
+        if not clave:
+            log('ERROR: OpenWebRX+ no acepta la cuenta de servicio %s' % self.cfg.owrx_usuario)
+            return self.pagina(502, 'OpenWebRX+ no responde',
+                               'No se ha podido abrir la sesión de administración. Revisa el registro del servicio.')
+        log('sesión OpenWebRX+ (%s) para %s desde %s' % (self.cfg.owrx_usuario, datos['e'], self.ip()))
+        return self.redirigir(destino, [galleta('owrx-session', clave)])
+
+
+def owrx_login(base, usuario, clave, ref):
+    """(clave de sesión, destino) haciendo el POST /login de OpenWebRX+; ('', '') si falla."""
+    u = urlsplit(base)
+    try:
+        c = http.client.HTTPConnection(u.hostname, u.port or 80, timeout=8)
+        c.request('POST', '/login?' + urlencode({'ref': ref}), body=urlencode({'user': usuario, 'password': clave}),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        r = c.getresponse()
+        r.read()
+        cabeceras = r.getheaders()
+        c.close()
+    except (OSError, http.client.HTTPException):
+        return '', ''
+    sesion = ''
+    for k, v in cabeceras:
+        if k.lower() == 'set-cookie':
+            sesion = leer_galletas(v).get('owrx-session', '') or sesion
+    destino = dict((k.lower(), v) for k, v in cabeceras).get('location', '')
+    if r.status not in (301, 302, 303) or not SESION_OWRX_RE.match(sesion) or destino.startswith('/pwchange'):
+        return '', ''
+    return sesion, ruta_segura(destino, ref)
+
+
+class Servidor(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+def servicio(cfg=None):
+    cfg = cfg or Config()
+    errores = cfg.errores()
+    if errores:
+        for e in errores:
+            log('CONFIGURACIÓN: ' + e)
+        return 2
+    s = Servidor(('127.0.0.1', cfg.puerto), Manejador)
+    s.cfg, s.limite = cfg, Limite()
+    log('escuchando en 127.0.0.1:%d · modo %s · %d administradores · %s' % (cfg.puerto, cfg.modo, len(cfg.admins), cfg.redirect_uri))
+    s.serve_forever()
+    return 0
+
+
+# ---------------------------------------------------------------- cuenta de servicio de OpenWebRX+
+def owrx_usuarios(kit):
+    if kit.get('OWRX_BACKEND', 'native') == 'docker':
+        ruta = os.path.join(kit.get('OWRX_DOCKER_DIR', '/opt/owrx-docker'), 'var', 'users.json')
+    else:
+        ruta = '/var/lib/openwebrx/users.json'
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            d = json.load(f)
+        return ruta, [u.get('user') for u in d if isinstance(u, dict)]
+    except (OSError, ValueError):
+        return ruta, []
+
+
+def owrx_cuenta(kit, usuario, clave):
+    """Crea la cuenta de servicio (o le pone clave nueva) con «openwebrx admin»; la clave va por entorno."""
+    ruta, usuarios = owrx_usuarios(kit)
+    orden = 'resetpassword' if usuario in usuarios else 'adduser'
+    entorno = dict(os.environ, OWRX_PASSWORD=clave)
+    cli = ['openwebrx', 'admin', '--noninteractive', orden, usuario]
+    docker = kit.get('OWRX_BACKEND', 'native') == 'docker'
+    if docker:
+        contenedor = kit.get('OWRX_DOCKER_CONTAINER', 'owrx-mbe')
+        if not re.match(r'^[A-Za-z0-9_.-]{1,64}$', contenedor):
+            raise ValueError('OWRX_DOCKER_CONTAINER no válido')
+        cli = ['docker', 'exec', '-e', 'OWRX_PASSWORD', contenedor] + cli
+    r = subprocess.run(cli, capture_output=True, text=True, timeout=60, env=entorno)
+    if r.returncode:
+        raise OSError('openwebrx admin %s falló (código %d)' % (orden, r.returncode))
+    if not docker and os.path.exists(ruta):
+        try:
+            import shutil
+            shutil.chown(ruta, 'openwebrx', 'openwebrx')
+            os.chmod(ruta, 0o600)
+        except (OSError, LookupError):
+            pass
+    return orden
+
+
+# ---------------------------------------------------------------- preparar (install.sh)
+CLAVES_SERVICIO = ('GOOGLE_AUTH_MODO', 'GOOGLE_CLIENT_ID', 'GOOGLE_ADMINS', 'GOOGLE_SESION_HORAS',
+                   'GOOGLE_REDIRECT_URI', 'GOOGLE_OWRX_USUARIO')
+
+
+def texto_unidad(modo):
+    cred = ['LoadCredential=client_secret:%s/client_secret' % CRED_DIR_ETC,
+            'LoadCredential=cookie_key:%s/cookie_key' % CRED_DIR_ETC]
+    if modo in CON_CUENTA:
+        cred.append('LoadCredential=owrx_password:%s/owrx_password' % CRED_DIR_ETC)
+    return '''[Unit]
+Description=BricoHams: acceso de administradores con Google (OpenID Connect, 127.0.0.1:8077)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+EnvironmentFile=%s
+%s
+ExecStart=/usr/bin/python3 /usr/local/bin/bricohams-google-auth servicio
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+''' % (ENV_SERVICIO, '\n'.join(cred))
+
+
+def preparar(kit_env, crear_cuenta=owrx_cuenta):
+    """0 listo · 3 desactivado (GOOGLE_AUTH≠yes) · 4 falta algo (mensaje en stderr)."""
+    kit = leer_env(kit_env)
+    if not si(kit.get('GOOGLE_AUTH')):
+        print('Acceso con Google desactivado (GOOGLE_AUTH=no).')
+        return 3
+    falta = []
+    if kit.get('SSL_MODO', 'todo') == 'no':
+        falta.append('SSL_MODO=no: Google exige HTTPS; usa SSL_MODO=admin o todo')
+    dominio = kit.get('SSL_DOMAIN', '').strip().lower()
+    if not dominio:
+        falta.append('falta SSL_DOMAIN: Google no admite una IP como URI de redirección')
+    os.makedirs(CRED_DIR_ETC, mode=0o700, exist_ok=True)
+    os.chmod(CRED_DIR_ETC, 0o700)
+    llave = os.path.join(CRED_DIR_ETC, 'cookie_key')
+    if not os.path.exists(llave):
+        escribir_atomico(llave, secrets.token_hex(32) + '\n')
+    modo = kit.get('GOOGLE_AUTH_MODO') or MODO_DEFECTO
+    if modo in CON_CUENTA and not falta:
+        clave_owrx = os.path.join(CRED_DIR_ETC, 'owrx_password')
+        usuario = kit.get('GOOGLE_OWRX_USUARIO') or 'bricohams-google'
+        if not os.path.exists(clave_owrx) and USUARIO_OWRX_RE.match(usuario):
+            clave = secrets.token_urlsafe(32)
+            try:
+                orden = crear_cuenta(kit, usuario, clave)
+            except (OSError, ValueError, subprocess.TimeoutExpired) as ex:
+                falta.append('no se pudo crear la cuenta de servicio %s en OpenWebRX+: %s' % (usuario, ex))
+            else:
+                escribir_atomico(clave_owrx, clave + '\n')
+                print('Cuenta de servicio de OpenWebRX+ «%s»: %s con clave aleatoria (solo root la puede leer).' % (usuario, orden))
+    env = {k: kit.get(k, '') for k in CLAVES_SERVICIO}
+    env['GOOGLE_DOMINIO'] = dominio
+    lineas = ''.join("%s='%s'\n" % (k, v) for k, v in env.items() if v and not re.search(r"['\n\r]", v))
+    entorno = dict({k: v for k, v in env.items() if v}, GOOGLE_CRED_DIR=CRED_DIR_ETC)
+    cfg = Config(entorno)
+    falta += cfg.errores()
+    if falta:
+        for f in dict.fromkeys(falta):
+            print('ERROR: ' + f, file=sys.stderr)
+        print('Configura con: sudo bricohams-google-auth configurar --kit-env %s' % kit_env, file=sys.stderr)
+        return 4
+    escribir_atomico(ENV_SERVICIO, lineas, 0o640)
+    escribir_atomico(UNIDAD, texto_unidad(cfg.modo), 0o644)
+    print('Acceso con Google listo: modo %s, %d administradores, %s' % (cfg.modo, len(cfg.admins), cfg.redirect_uri))
+    return 0
+
+
+# ---------------------------------------------------------------- configurar (asistente)
+def preguntar(texto, actual='', validar=None):
+    while True:
+        v = input('%s%s: ' % (texto, ' [%s]' % actual if actual else '')).strip() or actual
+        try:
+            return validar(v) if validar else v
+        except ValueError as ex:
+            print('  ✗ %s' % ex)
+
+
+def configurar(a):
+    if not os.path.isfile(a.kit_env):
+        print('No existe %s' % a.kit_env, file=sys.stderr)
+        return 1
+    kit = leer_env(a.kit_env)
+    dominio = kit.get('SSL_DOMAIN', '')
+    if a.desactivar:
+        cambios = {'GOOGLE_AUTH': 'no'}
+    else:
+        print('Acceso de administradores con Google para %s' % (dominio or '(sin SSL_DOMAIN)'))
+        print('En Google Cloud Console → APIs y servicios → Credenciales → ID de cliente OAuth (Aplicación web):')
+        print('  Orígenes de JavaScript autorizados:  https://%s' % (dominio or 'DOMINIO'))
+        print('  URI de redirección autorizados:      https://%s%s/callback' % (dominio or 'DOMINIO', PREFIJO))
+
+        def v_id(x):
+            if not CLIENT_ID_RE.match(x):
+                raise ValueError('debe acabar en .apps.googleusercontent.com')
+            return x
+
+        def v_admins(x):
+            if not lista_admins(x):
+                raise ValueError('pon al menos un correo')
+            return ','.join(lista_admins(x))
+
+        def v_modo(x):
+            if x not in MODOS:
+                raise ValueError(' o '.join(MODOS))
+            return x
+
+        def v_horas(x):
+            if not 0.25 <= float(x) <= 168:
+                raise ValueError('entre 0.25 y 168')
+            return x
+
+        cid = a.client_id or preguntar('ID de cliente', kit.get('GOOGLE_CLIENT_ID', ''), v_id)
+        v_id(cid)
+        admins = v_admins(a.admins) if a.admins else preguntar('Correos de administradores (o @dominio de Workspace), separados por comas',
+                                                              kit.get('GOOGLE_ADMINS', ''), v_admins)
+        modo = v_modo(a.modo) if a.modo else preguntar('Modo (alternativa = usuario local o Google · doble = Google y contraseña · solo_google)',
+                                                      kit.get('GOOGLE_AUTH_MODO') or MODO_DEFECTO, v_modo)
+        horas = v_horas(a.horas) if a.horas else preguntar('Horas de sesión de Google', kit.get('GOOGLE_SESION_HORAS') or '8', v_horas)
+        os.makedirs(CRED_DIR_ETC, mode=0o700, exist_ok=True)
+        os.chmod(CRED_DIR_ETC, 0o700)
+        ruta_secreto = os.path.join(CRED_DIR_ETC, 'client_secret')
+        hay = os.path.exists(ruta_secreto)
+        texto = 'Secreto del cliente (no se muestra%s): ' % ('; Intro conserva el actual' if hay else '')
+        secreto = getpass.getpass(texto) if sys.stdin.isatty() else sys.stdin.readline()
+        secreto = secreto.strip()
+        if secreto:
+            if not re.match(r'^[A-Za-z0-9_-]{10,200}$', secreto):
+                print('El secreto tiene caracteres inesperados; no se guarda.', file=sys.stderr)
+                return 1
+            escribir_atomico(ruta_secreto, secreto + '\n')
+            print('Secreto guardado en %s (600, solo root).' % ruta_secreto)
+        elif not hay:
+            print('Sin secreto no se puede activar.', file=sys.stderr)
+            return 1
+        cambios = {'GOOGLE_AUTH': 'yes', 'GOOGLE_AUTH_MODO': modo, 'GOOGLE_CLIENT_ID': cid,
+                   'GOOGLE_ADMINS': admins, 'GOOGLE_SESION_HORAS': horas}
+        if modo == 'doble':
+            # al volver a alternativa o solo_google se genera una clave nueva para la cuenta de servicio
+            try:
+                os.unlink(os.path.join(CRED_DIR_ETC, 'owrx_password'))
+            except OSError:
+                pass
+    escribir_env(a.kit_env, cambios, '"')
+    etc_env = os.path.join(ETC, 'bricohams.env')
+    if os.path.isfile(etc_env) and os.path.realpath(etc_env) != os.path.realpath(a.kit_env):
+        escribir_env(etc_env, cambios, "'")
+    print('Guardado en %s.' % a.kit_env)
+    if cambios['GOOGLE_AUTH'] == 'no':
+        print('Para aplicarlo: sudo bricohams-google-auth aplicar --kit-env %s' % a.kit_env)
+        return 0
+    r = preparar(a.kit_env)
+    if r == 0:
+        print('Para aplicarlo: sudo bricohams-google-auth aplicar --kit-env %s' % a.kit_env)
+        print('También se puede cambiar en /settings/bricohams/seguridad → «Métodos de acceso de administradores».')
+    return r
+
+
+# ---------------------------------------------------------------- nginx
+MARCA = '  # bricohams-google'
+INICIO = '# bricohams-google:inicio'
+FIN = '# bricohams-google:fin'
+AUTH_MESH = 'proxy_pass http://127.0.0.1:8076/settings/bricohams/auth;'
+AUTH_CADENA = 'proxy_pass http://127.0.0.1:8077%s/auth-owrx;%s' % (PREFIJO, MARCA)
+ADMIN_RX = 'files/delete)(/|$) {'
+ADMIN_RX_G = 'files/delete|_bh_google)(/|$) {' + MARCA
+PAGINAS_OWRX = r'location ~ ^/(settings(?!/bricohams/)|logout|imageupload|clients|services|ban|unban|broadcast|files/delete)(/|$) {'
+# alternativa: botón «Entrar con Google» debajo del formulario de /login de OpenWebRX+ (enlace fijo, sin
+# copiar nada de la petición al HTML)
+BOTON_GOOGLE = ('<p style=\"margin-top:1em;text-align:center\"><a class=\"btn btn-outline-primary\" href=\"%s/entrar\" '
+                'style=\"width:100%%\">Entrar con Google</a></p>'
+                '<p class=\"small text-muted\" style=\"text-align:center\">Administradores: usuario local o cuenta de Google '
+                'autorizada. Se configura en Ajustes, Seguridad, Métodos de acceso de administradores.</p>' % PREFIJO)
+
+
+def nginx_quitar(texto):
+    texto = re.sub(r'(?ms)^[ \t]*' + re.escape(INICIO) + r'.*?^[ \t]*' + re.escape(FIN) + r'[^\n]*\n', '', texto)
+    texto = texto.replace(AUTH_CADENA, AUTH_MESH).replace(ADMIN_RX_G, ADMIN_RX)
+    return ''.join(l for l in texto.splitlines(True) if not l.rstrip('\n').endswith(MARCA))
+
+
+def _bloque_raiz(texto):
+    """Líneas de «location / {» que hay que repetir (logo de BricoHams con sub_filter)."""
+    m = re.search(r'(?ms)^location / \{\n(.*?)^\}', texto)
+    if not m:
+        return []
+    return [l.strip() for l in m.group(1).splitlines()
+            if l.strip().startswith(('sub_filter', 'proxy_set_header Accept-Encoding'))]
+
+
+def nginx_rutas(texto, modo):
+    texto = nginx_quitar(texto)
+    auth = ['    auth_request /_bh_google_auth;' + MARCA, '    error_page 401 = @bh_google_login;' + MARCA]
+    lineas = texto.split('\n')
+    salida, hechos = [], set()
+    for l in lineas:
+        if l == 'location / {' and 'bloque' not in hechos and modo == 'alternativa':
+            # usuario local O Google: OpenWebRX+ sigue decidiendo con su sesión; solo hace falta la pasarela
+            salida += [
+                INICIO + ' · acceso con Google opcional (bricohams-google-auth, 127.0.0.1:8077)',
+                'location %s/ {' % PREFIJO,
+                '    proxy_pass http://127.0.0.1:8077;',
+                '    proxy_set_header Host $host;',
+                '    proxy_set_header X-Forwarded-For $remote_addr;',
+                '    proxy_set_header X-Forwarded-Proto $scheme;',
+                '}',
+                FIN]
+            hechos.add('bloque')
+        elif l == 'location / {' and 'bloque' not in hechos:
+            extra = ['    ' + x for x in _bloque_raiz(texto)]
+            salida += [
+                INICIO + ' · acceso de administradores con Google (bricohams-google-auth, 127.0.0.1:8077)',
+                'location %s/ {' % PREFIJO,
+                '    proxy_pass http://127.0.0.1:8077;',
+                '    proxy_set_header Host $host;',
+                '    proxy_set_header X-Forwarded-For $remote_addr;',
+                '    proxy_set_header X-Forwarded-Proto $scheme;',
+                '}',
+                'location = /_bh_google_auth {',
+                '    internal;',
+                '    proxy_pass http://127.0.0.1:8077%s/auth;' % PREFIJO,
+                '    proxy_pass_request_body off;',
+                '    proxy_set_header Content-Length "";',
+                '    proxy_set_header Host $host;',
+                '}',
+                'location @bh_google_login {',
+                '    rewrite ^ %s/login break;' % PREFIJO,
+                '    proxy_pass http://127.0.0.1:8077;',
+                '    proxy_pass_request_body off;',
+                '    proxy_set_header Content-Length "";',
+                '    proxy_set_header Host $host;',
+                '    proxy_set_header X-BH-Rd $request_uri;',
+                '    proxy_set_header X-Forwarded-For $remote_addr;',
+                '    proxy_set_header X-Forwarded-Proto $scheme;',
+                '}',
+                '# páginas de administración de OpenWebRX+ (las de /settings/bricohams/ tienen su propio bloque)',
+                PAGINAS_OWRX,
+                '    auth_request /_bh_google_auth;',
+                '    error_page 401 = @bh_google_login;',
+                '    proxy_pass http://127.0.0.1:8073;',
+                '    proxy_http_version 1.1;',
+                '    proxy_set_header Host $host;',
+                '    proxy_set_header X-Forwarded-For $remote_addr;',
+                '    proxy_set_header X-Forwarded-Proto $scheme;',
+                '    proxy_read_timeout 300s;',
+            ] + extra + ['}', FIN]
+            hechos.add('bloque')
+        salida.append(l)
+        if l == 'location ~ ^/(login|pwchange)$ {':
+            if modo == 'alternativa':
+                salida += ['    proxy_set_header Accept-Encoding "";' + MARCA, '    sub_filter_once on;' + MARCA,
+                           "    sub_filter '</form>' '</form>%s';%s" % (BOTON_GOOGLE, MARCA)]
+            else:
+                if modo == 'solo_google':
+                    salida.append('    if ($uri = /login) { return 302 %s/entrar?$args; }%s' % (PREFIJO, MARCA))
+                salida += auth
+            hechos.add('login')
+        elif l == 'location /settings/bricohams/ {':
+            if modo != 'alternativa':
+                salida += auth
+            hechos.add('paneles')
+    falta = {'bloque', 'login', 'paneles'} - hechos
+    if falta:
+        raise ValueError('el snippet de rutas no tiene los anclajes esperados: %s' % ', '.join(sorted(falta)))
+    texto = '\n'.join(salida)
+    return texto if modo == 'alternativa' else texto.replace(AUTH_MESH, AUTH_CADENA)
+
+
+def nginx_sitio(texto, modo=MODO_DEFECTO):
+    texto = nginx_quitar(texto).replace(ADMIN_RX, ADMIN_RX_G)
+    return texto if modo == 'alternativa' else texto.replace(AUTH_MESH, AUTH_CADENA)
+
+
+def nginx(a):
+    modo = a.modo or leer_env(ENV_SERVICIO).get('GOOGLE_AUTH_MODO') or MODO_DEFECTO
+    if modo not in MODOS:
+        print('Modo no válido: %s' % modo, file=sys.stderr)
+        return 4
+    for ruta, func in ((a.rutas, (lambda t: nginx_rutas(t, modo)) if a.aplicar else nginx_quitar),
+                       (a.sitio, (lambda t: nginx_sitio(t, modo)) if a.aplicar else nginx_quitar)):
+        if not os.path.isfile(ruta):
+            print('No existe %s' % ruta, file=sys.stderr)
+            return 4
+        with open(ruta, encoding='utf-8') as f:
+            antes = f.read()
+        try:
+            despues = func(antes)
+        except ValueError as ex:
+            print('ERROR: %s (%s)' % (ex, ruta), file=sys.stderr)
+            return 4
+        if despues != antes:
+            escribir_atomico(ruta, despues, os.stat(ruta).st_mode & 0o777)
+        print('%s: %s' % (ruta, 'sin cambios' if despues == antes else ('Google activado (%s)' % modo if a.aplicar else 'Google retirado')))
+    return 0
+
+
+# ---------------------------------------------------------------- aplicar (panel Seguridad → unidad oneshot)
+ESTADO_JSON = os.path.join(CRED_DIR_ETC, 'estado.json')
+UNIDAD_APLICAR = os.path.join(os.path.dirname(UNIDAD), 'bricohams-google-auth-aplicar.service')
+
+
+def texto_unidad_aplicar(kit_env):
+    if not os.path.isabs(kit_env) or re.search(r'[\s\'"\\$`%;]', kit_env):
+        raise ValueError('ruta del env del kit no válida: %r' % kit_env)
+    return '''[Unit]
+Description=BricoHams: aplica el método de acceso de administradores elegido en /settings → Seguridad
+After=network-online.target openwebrx.service nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/bricohams-google-auth aplicar --kit-env %s
+TimeoutStartSec=300
+''' % kit_env
+
+
+def instalar_aplicar(kit_env):
+    try:
+        texto = texto_unidad_aplicar(kit_env)
+    except ValueError as ex:
+        print('ERROR: %s' % ex, file=sys.stderr)
+        return 4
+    escribir_atomico(UNIDAD_APLICAR, texto, 0o644)
+    print('Unidad %s instalada.' % UNIDAD_APLICAR)
+    return 0
+
+
+def _orden(cli):
+    try:
+        r = subprocess.run(cli, capture_output=True, text=True, timeout=90)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    except (OSError, subprocess.TimeoutExpired) as ex:
+        return 1, str(ex)
+
+
+def _estado(ok, texto, modo=''):
+    d = {'ok': ok, 'mensaje': texto, 'modo': modo, 'hora': int(time.time())}
+    try:
+        os.makedirs(CRED_DIR_ETC, mode=0o700, exist_ok=True)
+        escribir_atomico(ESTADO_JSON, json.dumps(d, ensure_ascii=False) + '\n', 0o600)
+    except OSError:
+        pass
+    print(('OK: ' if ok else 'ERROR: ') + texto, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 4
+
+
+def aplicar(a, orden=_orden):
+    """preparar + servicio + nginx en un paso; si nginx -t falla deja nginx como estaba."""
+    copia = {}
+    for ruta in (a.rutas, a.sitio):
+        try:
+            with open(ruta, encoding='utf-8') as f:
+                copia[ruta] = f.read()
+        except OSError:
+            return _estado(False, 'no existe %s (¿nginx sin instalar?)' % ruta)
+    r = preparar(a.kit_env)
+    modo = leer_env(ENV_SERVICIO).get('GOOGLE_AUTH_MODO') or MODO_DEFECTO
+    if r not in (0, 3):
+        return _estado(False, 'configuración incompleta: revisa el ID de cliente, el secreto, los correos y SSL_DOMAIN '
+                              '(nginx no se ha tocado)')
+    nombre = os.path.basename(UNIDAD)
+    aviso = ''
+    if r == 0:
+        orden(['systemctl', 'daemon-reload'])
+        orden(['systemctl', 'enable', nombre])
+        orden(['systemctl', 'restart', nombre])
+        time.sleep(1)
+        if orden(['systemctl', 'is-active', '--quiet', nombre])[0]:
+            # sin pasarela no se debe exigir Google: se vuelve a solo usuarios locales
+            r, aviso = 3, 'el servicio %s no arrancó (journalctl -u %s); se queda el acceso con usuario local' % (nombre, nombre)
+    if r == 3 and os.path.exists(UNIDAD):
+        orden(['systemctl', 'disable', '--now', nombre])
+    ns = argparse.Namespace(aplicar=r == 0, quitar=r != 0, modo=modo, rutas=a.rutas, sitio=a.sitio)
+    if nginx(ns):
+        return _estado(False, 'no se pudo transformar la configuración de nginx (nginx no se ha tocado)', modo)
+    cod, salida = orden(['nginx', '-t'])
+    if cod:
+        for ruta, texto in copia.items():
+            escribir_atomico(ruta, texto, os.stat(ruta).st_mode & 0o777)
+        return _estado(False, 'nginx -t falló; se ha dejado nginx como estaba: %s' % salida[-300:], modo)
+    orden(['systemctl', 'reload', 'nginx'])
+    if aviso:
+        return _estado(False, aviso, modo)
+    if r == 3:
+        return _estado(True, 'solo usuarios locales de OpenWebRX+ (Google desactivado)', 'local')
+    return _estado(True, 'Google activo en modo %s' % modo, modo)
+
+
+# ---------------------------------------------------------------- main
+def main(argv):
+    p = argparse.ArgumentParser(prog='bricohams-google-auth', formatter_class=argparse.RawDescriptionHelpFormatter,
+                                description='Acceso de administradores con usuarios locales de OpenWebRX+ y/o Google (OpenID Connect).',
+                                epilog=AYUDA_CONFIG)
+    sub = p.add_subparsers(dest='orden', required=True)
+    sub.add_parser('servicio')
+    c = sub.add_parser('configurar')
+    c.add_argument('--kit-env', required=True)
+    c.add_argument('--client-id')
+    c.add_argument('--admins')
+    c.add_argument('--modo', choices=MODOS)
+    c.add_argument('--horas')
+    c.add_argument('--desactivar', action='store_true')
+    pr = sub.add_parser('preparar')
+    pr.add_argument('--kit-env', required=True)
+    n = sub.add_parser('nginx')
+    g = n.add_mutually_exclusive_group(required=True)
+    g.add_argument('--aplicar', action='store_true')
+    g.add_argument('--quitar', action='store_true')
+    n.add_argument('--modo', choices=MODOS)
+    n.add_argument('--rutas', default=RUTAS_NGINX)
+    n.add_argument('--sitio', default=SITIO_NGINX)
+    ia = sub.add_parser('instalar-aplicar')
+    ia.add_argument('--kit-env', required=True)
+    ap = sub.add_parser('aplicar')
+    ap.add_argument('--kit-env', required=True)
+    ap.add_argument('--rutas', default=RUTAS_NGINX)
+    ap.add_argument('--sitio', default=SITIO_NGINX)
+    co = sub.add_parser('comprobar')
+    co.add_argument('--kit-env', required=True)
+    a = p.parse_args(argv)
+    if a.orden == 'servicio':
+        return servicio()
+    if a.orden in ('configurar', 'preparar', 'nginx', 'aplicar', 'instalar-aplicar') and os.geteuid() != 0 and not os.environ.get('BRICOHAMS_ETC'):
+        print('Ejecuta con sudo.', file=sys.stderr)
+        return 1
+    if a.orden == 'configurar':
+        return configurar(a)
+    if a.orden == 'preparar':
+        return preparar(a.kit_env)
+    if a.orden == 'nginx':
+        return nginx(a)
+    if a.orden == 'aplicar':
+        return aplicar(a)
+    if a.orden == 'instalar-aplicar':
+        return instalar_aplicar(a.kit_env)
+    kit = leer_env(a.kit_env)
+    cfg = Config(dict({k: kit[k] for k in CLAVES_SERVICIO if kit.get(k)}, GOOGLE_DOMINIO=kit.get('SSL_DOMAIN', '').lower(),
+                      GOOGLE_CRED_DIR=CRED_DIR_ETC))
+    print('GOOGLE_AUTH=%s · modo %s · %d administradores · %s' % (kit.get('GOOGLE_AUTH', 'no'), cfg.modo, len(cfg.admins), cfg.redirect_uri))
+    errores = cfg.errores()
+    for e in errores:
+        print('  ✗ ' + e)
+    print('Configuración: /settings/bricohams/seguridad → «Métodos de acceso de administradores» (bricohams-google-auth --help, manual 46).')
+    return 1 if errores else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
