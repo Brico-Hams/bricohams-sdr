@@ -2774,7 +2774,7 @@ Environment=BRICOHAMS_KIT_ENV=$KIT/bricohams.env
 ExecStart=$py /usr/local/bin/bricohams-mesh-admin servicio
 RuntimeDirectory=bricohams-mesh-admin
 ProtectSystem=strict
-ReadWritePaths=/etc/bricohams $KIT/bricohams.env
+ReadWritePaths=/etc/bricohams -$KIT/bricohams.env
 ReadWritePaths=-/var/backups/bricohams
 # v5.0: el cambio de clave TAK arranca OpenTAKServer, que escribe su log aquí ("-": opcional si no hay TAK)
 ReadWritePaths=-/var/lib/bricohams-tak

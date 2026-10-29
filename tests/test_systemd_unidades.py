@@ -20,6 +20,8 @@ for nombre, _, cuerpo in re.findall(r"cat >/etc/systemd/system/([\w@.-]+\.(?:ser
             claves.setdefault(m.group(1), []).extend(m.group(2).split())
     unidades[nombre] = claves
 assert len(unidades) > 20 and 'bricohams-io.service' in unidades and 'bricohams-wx.service' in unidades, sorted(unidades)
+# Rutas del kit que pueden desaparecer (copias de despliegue): opcionales con «-», o el servicio no arranca (226/NAMESPACE)
+assert not re.search(r'^(ReadWritePaths|ReadOnlyPaths)=.*(?<![-\w/])\$KIT/', S, re.M), 'ReadWritePaths del kit sin «-»'
 
 # lo que install.sh añade luego con sed (bricohams-wx espera a la Pico)
 for unidad, extra in re.findall(r"s/\^After=network-online\.target\$/After=network-online\.target ([\w.@-]+)/' /etc/systemd/system/([\w.@-]+)", S):
