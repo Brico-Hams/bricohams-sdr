@@ -1,2 +1,0 @@
-calibracion_id;instrumento_id;fecha_hora_zona;responsable;modelo_correccion;start_Hz;stop_Hz;puntos;promediado;nivel_salida_configurado;unidad_nivel;kit_id;cable_A_id;cable_B_id;adaptadores_ids;protecciones_ids;plano_A;plano_B;slot_o_dataset;referencia_independiente_id;frecuencia_verificacion_Hz;magnitud_verificacion;unidad_verificacion;lectura_verificacion_antes;lectura_verificacion_despues;limite_verificacion;temperatura_C;configuracion_archivo;captura_archivo;estado;observaciones
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;NO_ENSAYADO;

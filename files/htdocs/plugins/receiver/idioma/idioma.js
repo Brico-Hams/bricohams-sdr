@@ -11,8 +11,11 @@
  *   Plugins.idioma.t(es, en)       -> el texto del idioma activo
  *   Plugins.idioma.cambiar('en')   -> cambia el idioma
  *   window 'bh-idioma'             -> evento con detail.idioma al cambiar
+ *
+ * Textos propios bilingües (descripción del receptor, avisos…): marca cada versión con
+ * data-lang="es" o data-lang="en"; solo se muestra la del idioma activo.
  */
-Plugins.idioma._version = '1.0.0';
+Plugins.idioma._version = '1.1.0';
 Plugins.idioma.no_css = true;
 
 Plugins.idioma.init = function () {
@@ -81,8 +84,16 @@ Plugins.idioma.init = function () {
         }
     }
 
+    function bilingue(raiz) {
+        if (!raiz || raiz.nodeType !== 1) return;
+        var els = [].slice.call(raiz.querySelectorAll('[data-lang]'));
+        if (raiz.hasAttribute('data-lang')) els.push(raiz);
+        els.forEach(function (el) { el.style.display = el.getAttribute('data-lang') === lang ? '' : 'none'; });
+    }
+
     function procesar(raiz) {
         if (!raiz) return;
+        bilingue(raiz);
         if (raiz.nodeType === 3) {
             if (!excluido(raiz.parentElement)) {
                 var r = traducir(raiz.nodeValue);

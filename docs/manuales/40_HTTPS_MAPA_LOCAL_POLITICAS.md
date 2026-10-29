@@ -104,6 +104,10 @@ sudo bash install.sh --solo ais,web
 
 - `plugins/receiver/idioma`: botón ES/EN en la cabecera; guarda `bh_idioma` en
   `localStorage` (por defecto, el idioma del navegador).
+  - Los textos propios, como la descripción del receptor (Settings → General → *Photo description*),
+    se traducen escribiendo las dos versiones con `data-lang`:
+    `<span data-lang="es">Receptor SDR</span><span data-lang="en">SDR receiver</span>`.
+    El botón muestra solo la del idioma activo (también en bloques `p`, `ul`, `div`…).
 - Logo BricoHams (`plugins/receiver/marca/bricohams-logo.png`) en todas las páginas:
   - **nginx** (`bricohams-sdr-rutas.conf`, `location /`): `sub_filter` cambia el enlace y el
     SVG `webrx-top-logo` de la cabecera de OpenWebRX+ por el logo BricoHams, enlazado a

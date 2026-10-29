@@ -1,9 +1,0 @@
-id,nombre,lat,lon,frecuencia_hz,modulacion,alcance_km,descripcion,fuente
-NAVTEX-D,NAVTEX A Coruña (D) 518 kHz,43.3670,-8.4519,518000,navtex,550,Avisos a los navegantes y meteo marina en inglés · identificador D,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-W,NAVTEX A Coruña (W) 490 kHz,43.3670,-8.4519,490000,navtex,550,Servicio nacional en español · identificador W,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-G,NAVTEX Tarifa (G) 518 kHz,36.0420,-5.5566,518000,navtex,550,Avisos a los navegantes y meteo marina en inglés · identificador G,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-T,NAVTEX Tarifa (T) 490 kHz,36.0420,-5.5566,490000,navtex,550,Servicio nacional en español · identificador T,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-X,NAVTEX Cabo de la Nao (X) 518 kHz,38.7233,0.1614,518000,navtex,550,Avisos a los navegantes y meteo marina en inglés · identificador X,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-M,NAVTEX Cabo de la Nao (M) 490 kHz,38.7233,0.1614,490000,navtex,550,Servicio nacional en español · identificador M,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-I,NAVTEX Las Palmas (I) 518 kHz,27.7585,-15.6054,518000,navtex,550,Avisos a los navegantes y meteo marina en inglés · identificador I,List of Navtex stations (Wikipedia) · Salvamento Marítimo
-NAVTEX-A,NAVTEX Las Palmas (A) 490 kHz,27.7585,-15.6054,490000,navtex,550,Servicio nacional en español · identificador A,List of Navtex stations (Wikipedia) · Salvamento Marítimo

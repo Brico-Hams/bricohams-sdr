@@ -2,6 +2,8 @@
 
 ## Sin publicar · 2026-10-28
 
+- Idioma 1.1.0: el botón ES/EN también cambia los textos propios marcados con `data-lang="es"`/`"en"`
+  (descripción del receptor, avisos), aunque lleguen después de cargar la página. Manual 40.
 - Hermes Lite 2 (`HF_HERMES`, manual 50): receptor HPSDR por Ethernet con perfiles de 384 kHz de 160 a 10 m y
   «SAT 10m» en 29,4 MHz; quita la HF del V3. `hpsdrconnector` del repositorio o, en trixie, el paquete de bookworm
   verificado por SHA256. Manual 50 con antenas de HF recomendadas (lazo activo, turnstile de 10 m, EFHW…).

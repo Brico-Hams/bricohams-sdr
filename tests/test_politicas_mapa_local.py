@@ -86,6 +86,7 @@ assert orden.index('idioma') < orden.index('consentimiento') < orden.index('iden
 assert 'Plugins.consentimiento.listo' in ident_js, 'la bienvenida espera al aviso de cookies'
 assert 'fotos de aviones' in consent_js and 'recepción local' in consent_js
 assert "'bh_idioma'" in idioma_js and "'Settings': 'Ajustes'" in idioma_js
+assert "querySelectorAll('[data-lang]')" in idioma_js and 'bilingue(raiz)' in idioma_js   # textos propios ES/EN
 assert "static/plugins/receiver/marca/bricohams-logo.png" in marca_js and '.webrx-top-logo' in marca_js
 assert '#openwebrx-bookmarks-container .bookmark' in marca_js and 'color:#111 !important' in marca_js, 'etiquetas legibles'
 with open(os.path.join(PLUG, 'marca/bricohams-logo.png'), 'rb') as f:
