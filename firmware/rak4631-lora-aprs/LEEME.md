@@ -23,7 +23,7 @@ Manual completo: [docs/manuales/35_LORA_APRS_MESHTASTIC.md](../../docs/manuales/
 
 **Compilar:** `bash tools/compilar_rak.sh`. Necesita arduino-cli, el BSP de RAKwireless 1.3.3, RadioLib 7.6.0, ArduinoJson 7.4.3, TinyGPSPlus 1.0.3, Adafruit BME280 2.3.0 y BME680 2.0.6.
 
-**Firmware precompilado:** [descarga el UF2 para flasheo web](https://github.com/anatolbricoham/bricohams-sdr/releases/download/fw-v5.4.1/bricohams-rak4631-lora-aprs-v1.0.1.uf2). El [resto de formatos y sus checksums](https://github.com/anatolbricoham/bricohams-sdr/releases/tag/fw-v5.4.1) están en la release pública.
+**Firmware precompilado:** [descarga el UF2 para flasheo web](https://github.com/Brico-Hams/bricohams-sdr/releases/download/fw-v5.4.1/bricohams-rak4631-lora-aprs-v1.0.1.uf2). El [resto de formatos y sus checksums](https://github.com/Brico-Hams/bricohams-sdr/releases/tag/fw-v5.4.1) están en la release pública.
 
 **Grabar:**
 - `sudo bricohams-rak-aprs grabar` (DFU por USB);
