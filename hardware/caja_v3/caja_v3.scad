@@ -57,10 +57,10 @@ SAI = VARIANTE == "sai";
 // ------------------------------ medidas ------------------------------
 W = EL ? 228 : SAI ? 228 : 170;
 H = EL ? 240 : SAI ? 240 : 200;
-D = EL ? 190 : SAI ? 140 : 112;   // electrónica: 190 de fondo para la 3.ª fila de N, las dos bandejas de SDR y la Pi
-T = 3.6;                    // pared de 9 líneas de 0,4: más rígida que la v2
+D = EL ? 192 : SAI ? 140 : 112;   // electrónica: 192 de fondo para la 3.ª fila de N, las dos bandejas de SDR y la Pi (con pared de 4,8)
+T = 4.8;                    // pared de 12 líneas de 0,4: más resistente a la intemperie
 R = 8;
-GAP_LID = 3;  LID_T = 4.4;  RIB_H = 6;  GROOVE_W = 4.6;  GASKET_W = 4.4;  GASKET_H = 4;   // junta TPU 4,4 × 4: más estrecha que la ranura para que se ensanche al comprimirse
+GAP_LID = 3;  LID_T = 5.2;  RIB_H = 6;  GROOVE_W = 5.8;  GASKET_W = 5.6;  GASKET_H = 4;   // junta TPU 5,6 × 4: más estrecha que la ranura para que se ensanche al comprimirse
 GASKET_COMP = (GASKET_H - GAP_LID) / GASKET_H;   // compresión de la junta (objetivo 20–30 %): 4 → 3 mm = 25 %
 // intemperie: faldón de la tapa que cae como un alero sobre la pared (el agua no llega a la junta)
 SKIRT_H = 12;               // altura del faldón desde el plano de la tapa; solapa SKIRT_H - GAP_LID = 9 mm la pared por debajo de la junta
@@ -403,7 +403,7 @@ module poste_superior() { poste(BAND_H - DECK2_H - DECK_T); } // 4: bandeja_sdr2
 // Va sobre la fila de dongles y la bahía SDRplay y bajo la bandeja de la Pi. Coordenadas absolutas
 // del módulo (DECK_O = esquina) y de cada SDR relativas a la bandeja: [nombre, [x, y], [largo x, ancho y, alto]].
 // Los conectores (SMA/USB) quedan en los extremos del lado largo, con ≥ 12 mm libres para el cable.
-DECK_O = [30, 54];  DECK = [167, 170];  DECK_T = 3;  DECK_H = 38;  DECK2_H = 82;
+DECK_O = [31, 55];  DECK = [167, 170];  DECK_T = 3;  DECK_H = 38;  DECK2_H = 82;
 SDR_DECK = [["HRF", [20, 82], [120, 75, 20]], ["V4", [12, 20], [85, 26, 13]], ["AHF", [112, 6], [45, 60, 12]]];
 // segunda bandeja (v5.5): HL2 = Hermes-Lite 2 (medida a verificar con la tuya), 3 dongles tipo RTL/FlightStick (85 × 26 × 13) y 2 bahías de 52 × 30 × 15
 // Los postes están en y≈73–77 y y≈157: las bahías los esquivan (assert). RSPdx va en la bahía de expansión del suelo; HackRF Pro en «HRF» y Airspy HF+ en «AHF».
@@ -515,8 +515,8 @@ SAI_BAT = [151, 100, 65];          // ancho × alto con bornes × fondo (de pie,
 SAI_PCB = [210, 70];               // largo × alto de la placa del SAI (medir la tuya)
 SAI_TRAFO = [80, 62, 65];
 FILTRO = [85, 50, 30];             // filtro EMI monofásico de chasis (largo con orejas × ancho × grueso)
-SAI_LAYOUT = [["BAT", [50, 4], [159, 106, 74]], ["PCB", [6, 6], [40, 216, 82]], ["TRAFO", [50, 118], [85, 70, 70]],
-              ["EMI_OUT", [140, 118], [34, 86, 54]], ["EMI_IN", [178, 118], [34, 86, 54]], ["DC", [50, 194], [86, 28, 25]]];
+SAI_LAYOUT = [["BAT", [50, 4], [159, 106, 74]], ["PCB", [6, 6], [40, 216, 82]], ["TRAFO", [50, 118], [84, 70, 70]],
+              ["EMI_OUT", [138, 118], [34, 86, 54]], ["EMI_IN", [176, 118], [34, 86, 54]], ["DC", [50, 194], [84, 28, 25]]];
 GUIA_Y = [18, 168];                // guías de la placa del SAI (lejos de los tornillos de la rejilla)
 function sai(n) = [for (s = SAI_LAYOUT) if (s[0] == n) s][0];
 module nudos(o, l, w, m = 6) {     // agujeros en los nudos de la rejilla que caen dentro de la pieza

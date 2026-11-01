@@ -25,7 +25,7 @@
 
 | Módulo | Medidas (an × al × fondo) | Lleva |
 |---|---|---|
-| **Electrónica** | 228 × 240 × 190 mm | Pi 5 + HAT, 3 SDR + FlightStick, **bandeja de SDR con HackRF Pro/One, RTL-SDR V4 y Airspy HF+**, **2.ª bandeja con Hermes-Lite 2 y 5 plazas más**, bahía del suelo para RSPdx, LilyGO + **RAK4631 (RAK19007)**, hub USB de 10 puertos (Amazon Basics, 145 × 44 × 23 mm, PENDIENTE de medir), filtro 433, bias-tee, inyector MLA-30, diplexores, RS485, DS18B20, **2 ventiladores de 60 mm**, cámara (opcional) |
+| **Electrónica** | 228 × 240 × 192 mm | Pi 5 + HAT, 3 SDR + FlightStick, **bandeja de SDR con HackRF Pro/One, RTL-SDR V4 y Airspy HF+**, **2.ª bandeja con Hermes-Lite 2 y 5 plazas más**, bahía del suelo para RSPdx, LilyGO + **RAK4631 (RAK19007)**, hub USB de 10 puertos (Amazon Basics, 145 × 44 × 23 mm, PENDIENTE de medir), filtro 433, bias-tee, inyector MLA-30, diplexores, RS485, DS18B20, **2 ventiladores de 60 mm**, cámara (opcional) |
 | **Potencia** | 170 × 200 × 112 mm | base Schuko de superficie, cargador de 120 W (2 USB-C PD + 2 USB-A QC; **12 V PD por comprobar**, §1.5), gatillo USB-C PD si hay 12 V, portafusibles, WAGO 221 |
 | **SAI** (opcional, debajo del de potencia) | 228 × 240 × 140 mm | placa, transformador y batería de plomo 12 V 7–9 Ah de un SAI reaprovechado, **2 filtros EMI** de red, fusible de batería ([§1.2](#12-módulo-sai-reaprovechar-un-sai-con-filtros-emi)) |
 
@@ -79,7 +79,7 @@ Fuente: [AEMET, valores climatológicos de Murcia 7178I](https://www.aemet.es/es
 > caben nominalmente, pero **no con brim exterior de 5 mm**. Comprobar huella
 > tras compensar contracción, purga y soportes; no escalar los STL para hacer sitio.
 > Los tiempos y pesos siguientes son estimaciones previas, no un laminado
-> validado del nuevo diseño de 190 mm ni del perfil ASA de tu máquina.
+> validado del nuevo diseño de 192 mm ni del perfil ASA de tu máquina.
 
 | Módulo | Pieza | Material | Relleno |
 |---|---|---|---|
@@ -104,7 +104,7 @@ Fuente: [AEMET, valores climatológicos de Murcia 7178I](https://www.aemet.es/es
 - **Para regenerar:** `tools/caja_v3.sh`.
 
 ### 1.1 Bandeja de SDR: 3 receptores más
-La `bandeja_sdr` va entre la fila de dongles (y la bahía SDRplay) y la bandeja de la Pi, a 38 mm de la rejilla. Por eso el módulo de electrónica tiene 190 mm de fondo en vez de 112 (con la 2.ª bandeja de §1.3).
+La `bandeja_sdr` va entre la fila de dongles (y la bahía SDRplay) y la bandeja de la Pi, a 38 mm de la rejilla. Por eso el módulo de electrónica tiene 192 mm de fondo en vez de 112 (con la 2.ª bandeja de §1.3).
 
 | Bahía | SDR | Hueco (largo × ancho × alto) | Dónde |
 |---|---|---|---|
@@ -326,9 +326,9 @@ La caja vive todo el año al aire libre (sol y UV, 47 °C de diseño a la sombra
 
 | Elemento | Regla | Parámetro |
 |---|---|---|
-| Paredes y suelo | 3,6 mm = 9 perímetros de 0,4 (mínimo 3,2 mm) | `T` |
-| Tapa | 4,4 mm (≥ 4) con nervios interiores | `LID_T` |
-| Junta TPU | 4,4 × 4 mm entre el canto de la pared (3,6 mm) y la tapa a 3 mm: **compresión 25 %** (objetivo 20–30 %); más estrecha que la ranura para que se ensanche | `GASKET_W`, `GASKET_H`, `GAP_LID`, `GASKET_COMP` |
+| Paredes y suelo | 4,8 mm = 12 perímetros de 0,4 (mínimo 3,2 mm), por la intemperie | `T` |
+| Tapa | 5,2 mm (≥ 4) con nervios interiores | `LID_T` |
+| Junta TPU | 5,6 × 4 mm entre el canto de la pared (4,8 mm) y la tapa a 3 mm: **compresión 25 %** (objetivo 20–30 %); más estrecha que la ranura para que se ensanche | `GASKET_W`, `GASKET_H`, `GAP_LID`, `GASKET_COMP` |
 | Alero de la tapa | faldón exterior que cae 9 mm sobre la pared por debajo de la junta (`SKIRT_H − GAP_LID`), holgura de 1 mm y vuelo de 1,2 mm sobre el remate de la caja: el agua gotea fuera y no llega a la junta. El remate de la caja acaba 2 mm por debajo del faldón. En las orejas de cierre el faldón se interrumpe (la oreja tapa el canto) | `SKIRT_H`, `SKIRT_CL`, `DRIP_OUT`, `BELT_TOP` |
 | Tejadillo | vuelo 8 mm por lado y 30 mm por delante de la tapa, pendiente 5 % hacia delante, cámara de aire ≥ 10 mm sobre la caja, canto de goteo delantero y faldones laterales de 2,5 mm de grosor que bajan hasta 2 mm del suelo del tejadillo (`ROOF_SKIRT_Z`) contra lluvia batida por viento de 100 km/h (presión dinámica ~460 Pa) | `ROOF_W`, `ROOF_FRONT`, `ROOF_A`, `ROOF_GAP`, `ROOF_SIDE_H`, `ROOF_SKIRT_Z` |
 | Drenaje | 4 orificios Ø3,2 en las esquinas del suelo (el módulo cuelga vertical y la condensación baja al suelo). No los tapes con silicona | `DRAIN_D`, `DRAIN_X` |

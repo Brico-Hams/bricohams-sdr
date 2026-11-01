@@ -155,7 +155,7 @@ assert 'for (x = [W * 0.25, W * 0.75]) translate([x - 3, R, -6]) cube([6, H - 2 
 
 # 2c. módulo SAI: todo cabe en la rejilla sin solaparse y las cuentas del manual 17 §1.2 cuadran
 import sai_calculo  # noqa: E402
-assert re.search(r'W = EL \? 228 : SAI \? 228 : 170;', SRC) and re.search(r'D = EL \? 190 : SAI \? 140 : 112;', SRC)
+assert re.search(r'W = EL \? 228 : SAI \? 228 : 170;', SRC) and re.search(r'D = EL \? 192 : SAI \? 140 : 112;', SRC)
 pl_w, pl_h = Wc - 2 * Tc - 6, Hc - 2 * Tc - 6
 lay = [(n, float(x), float(y), float(a), float(b), float(c)) for n, x, y, a, b, c in re.findall(
     r'\["(\w+)", \[(\d+), (\d+)\], \[(\d+), (\d+), (\d+)\]\]', re.search(r'SAI_LAYOUT = (.+?);', SRC, re.S).group(1))]
