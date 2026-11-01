@@ -235,10 +235,12 @@ L += ['## 15. Plan del mástil', '', 'Origen: `ANTENAS` de `tools/mastil.py` (es
       '| Antena | Altura (m) | Brazo (m) | Rumbo | Banda | Transmite |', '|---|---|---|---|---|---|']
 for n, z, b, r, a, cd, pe, tx, banda in sorted(mastil.ANTENAS, key=lambda x: -x[1]):
     L.append('| %s | %s | %s | %s | %s | %s |' % (n, ('%.2f' % z).replace('.', ','), ('%.2f' % b).replace('.', ','), r, banda, 'sí' if tx else 'no'))
-W40 = mastil.modulo(40, 2.0)
-L += ['', 'Mástil Ø40 × 2: %d MPa a 130 km/h sin vientos (límite S235: 235 MPa) → **vientos a %s m**: %d MPa a 150 km/h.' % (
-      round(mastil.GAMMA * mastil.momento(130, 40)[0] * 1000 / W40), ('%.1f' % mastil.Z_VIENTOS).replace('.', ','),
-      round(mastil.GAMMA * mastil.momento_con_vientos(150, 40)[0] * 1000 / W40)), '']
+_pv, _ = mastil.envolvente(True)
+_ps, _ = mastil.envolvente(False)
+L += ['', 'Mástil telescópico %d × %.2f m, %.2f m montado (solapes %.2f–%.2f m; diámetros y paredes PENDIENTES): viento de diseño vb,0 = %d m/s (CTE, zona A). '
+      'Sin vientos: σ máx. %d MPa (límite S235: 235 MPa) → **vientos a %s m**: σ máx. %d MPa, flecha en cabeza %d mm.' % (
+          len(mastil.TRAMOS), mastil.TRAMOS[0][2], mastil.altura(), min(mastil.SOLAPES), max(mastil.SOLAPES), mastil.VB0,
+          round(_ps['sigma_cr']), ' y '.join(('%.1f' % z).replace('.', ',') for z in mastil.GUY_Z), round(_pv['sigma_cr']), round(_pv['flecha_top_mm'])), '']
 
 R = os.path.join(RAIZ, 'hardware', 'antenas', 'sim', 'resultados')
 Q = json.load(open(os.path.join(R, 'quad_2m70.json'), encoding='utf-8'))

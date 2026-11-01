@@ -82,12 +82,18 @@ Después: `sudo bash install.sh --solo sensor`, o la instalación completa.
 | Formato | en mph y centésimas de pulgada, como pide APRS. Ejemplo: `_225/011g020t072r004p022P008h55b10143` |
 
 ## 5. Montaje en el mástil
-- **Sensores de viento:** en el **brazo de 1,6 m a 1,5 m de altura**, cada uno a 0,8 m del mástil: el anemómetro hacia el N y la veleta hacia el S (plan del mástil, esquema 11). Así el mástil no les hace sombra al viento. **Orienta la marca N de la veleta al norte geográfico** (con una brújula, sumando +1° de declinación en Murcia).
+- **Sensores de viento:** en el **brazo de 1,6 m a 2,8 m de altura** (1,5 m en el plan antiguo; ver 5b), cada uno a 0,8 m del mástil: el anemómetro hacia el N y la veleta hacia el S (plan del mástil, esquema 11). Así el mástil no les hace sombra al viento. **Orienta la marca N de la veleta al norte geográfico** (con una brújula, sumando +1° de declinación en Murcia).
 - **Pluviómetro:**
   - **no en el mástil**, porque el viento lo hace oscilar y da vuelcos falsos;
   - **en un poste aparte**, a 1 m del suelo, nivelado con su burbuja y lejos de paredes y árboles. **v4:** poste Ø40 de 1 m con la `pluvio_vaso` (abrazadera de poste) y la `pluvio_plataforma` con 3 tornillos de nivelación (manual 21 §3.7);
   - **sensores de viento (v4):** cada uno con su `sensor_viento_brida` sobre un tubo Ø25 de 300 mm y `cruceta_brazo_tubo` (manual 21 §3.6);
   - el cable llega al PG7 «LLUVIA».
+
+## 5b. Viento de diseño y mástil telescópico
+- **Viento de diseño:** vb,0 = 26 m/s (zona A del CTE DB-SE-AE / EN 1991-1-4, Murcia), qb = 422 N/m², grado de aspereza III. A 8,8 m equivale a unos 140 km/h de presión de cálculo, por encima de las rachas observadas en la región (~100 km/h, Águilas, enero de 2023).
+- **Mástil:** telescópico de 3 tramos × 3,00 m con 2 solapes de 0,35–0,45 m (nominal 0,40 m): 8,20 m montado (8,10–8,30 m). Diámetros y paredes **PENDIENTES** (modelo con 50×2 / 45×2 / 40×2 mm típicos), anclaje a pared a 2,0 m y vientos a 5,5 m (solape 2) y 7,6 m (tramo superior), también PENDIENTES.
+- **Sin vientos no vale:** un tubo telescópico de Ø40–50 mm con el X50 a 8,85 m supera con mucho el límite del acero S235 (235 MPa). Con vientos de 3 cables inox Ø3 a 120° en los dos niveles, el modelo calcula la tensión en el pie, en cada solape y en la boca del tubo exterior, la flecha en cabeza (límite H/50) y la tensión de los cables. Ejecuta `python3 tools/mastil.py` para ver los números del caso (pie articulado o empotrado, solapes 0,35/0,40/0,45 m) y repítelo con los valores medidos. Usa vientos **dieléctricos (Dyneema/poliéster)** cerca de las antenas.
+- **Sensores de viento:** en el nuevo mástil el brazo queda a 2,8 m (el plan conserva las separaciones verticales de antes, desplazadas 1,3 m). Con el X50 a 8,85 m y el discono Moonraker a 6,4 m, el anemómetro queda por debajo y a la sombra del viento del mástil solo en parte: orienta el brazo a los vientos dominantes.
 
 ## 6. Pruebas
 ```bash

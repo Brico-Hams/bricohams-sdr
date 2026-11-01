@@ -7,21 +7,21 @@
 <!-- guia-visual:fin -->
 
 ## 1. Cámara y conexión (v4)
-- **Cámara:** **Waveshare RPi Camera (F)**.
-  - OV5647 de 5 MP, enfoque manual, 50° de diagonal y dos LED IR de 850 nm.
-  - **No tiene filtro IR-CUT: es NoIR permanente.** Por eso `CAM_TUNING` usa por defecto `/usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json` para que los colores de día no salgan rosados.
-- **Por qué «no entra»:** la Pi 5 tiene conectores CSI **mini de 22 pines y 0,5 mm**, y la Waveshare trae un cable **estándar de 15 pines y 1 mm**.
+- **Cámara:** **Raspberry Pi Camera Module 3 Wide** (SC0874).
+  - IMX708 de 12 MP, autofoco de 5 cm a infinito, focal 2,75 mm, 120° en diagonal (102° H × 67° V).
+  - **No es NoIR: no ve de noche con IR** (sin LED IR). Para la noche, usa una cámara IP o ilumina. `CAM_TUNING` se deja vacío (libcamera elige `imx708_wide` solo; si lo fijas: `/usr/share/libcamera/ipa/rpi/pisp/imx708_wide.json`).
+- **Por qué «no entra»:** la Pi 5 tiene conectores CSI **mini de 22 pines y 0,5 mm**, y la cámara trae un conector **estándar de 15 pines y 1 mm**.
 - **Qué cable comprar:** el **«Raspberry Pi 5 Camera Cable» Standard–Mini (15 → 22 pines)** de 200, 300 o 500 mm.
   - En la cámara va el extremo ancho de 15 pines.
   - En la Pi va el estrecho de 22 pines, en el conector **CAM/DISP 0** (o 1), con los **contactos metálicos mirando hacia el puerto Ethernet**.
 - **Con el HAT puesto:** la cinta pasa por el hueco lateral entre la Pi y el HAT. Usa la de 300 mm para sacarla por el lado de la caja hasta la ventana de la tapa.
-- **Montaje:** la cámara no es estanca. Va dentro de la caja, detrás de la ventana de policarbonato (`soporte_camara`), con los LED IR fuera del reflejo y la `visera` por fuera.
+- **Montaje:** la placa (25 × 24 mm, 12,4 mm de alto, 4 × M2 a 21 × 12,5 mm: confirmar con el plano del Product Brief) no es estanca. Va dentro de la caja, con el objetivo a 3 mm de la cara exterior de un cristal de policarbonato o acrílico pegado en la ventana de 20 × 16 mm (`soporte_camara`), y la `visera` por fuera sin entrar en el campo de 67°. Con 120° la ventana no debe recortar la imagen: ≥ 2·d·tan(FOV/2) + Ø objetivo (≈ 8 mm).
 - **Comprobar:**
   1. Para MediaMTX: `sudo systemctl stop mediamtx`.
-  2. Lanza `rpicam-hello --list-cameras`: debe salir `ov5647`.
-  3. Haz una prueba: `rpicam-still -o prueba.jpg --tuning-file /usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json`.
+  2. Lanza `rpicam-hello --list-cameras`: debe salir `imx708_wide`.
+  3. Haz una prueba: `rpicam-still -o prueba.jpg`.
   4. Si no sale, revisa la orientación de la cinta y que `camera_auto_detect=1` esté en `config.txt`.
-- **Enfoque:** gira la lente con la herramienta que trae, mirando la imagen en `http://<pi>:8889/mastil/`.
+- **Enfoque:** es autofoco; comprueba la imagen en `http://<pi>:8889/mastil/`. Si el cristal desenfoca, fija el enfoque con `--lens-position` (≈ 0 para infinito).
 
 ## 2. Configuración (`/etc/mediamtx/mediamtx.yml`, la genera el paso `camara`)
 

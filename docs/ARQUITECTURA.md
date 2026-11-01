@@ -136,7 +136,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 
 ## ADR-09 · Cámara: MediaMTX con H.264 por CPU y foto servida por el puerto de OpenWebRX
 - **Decisión:**
-  - **WPI408** (OV5647, 130°, IR) por CSI, con el cable de 15 a 22 pines de la Pi 5.
+  - **Cámara Raspberry Pi Camera Module 3 Wide** (IMX708, 120° diag., no NoIR) por CSI, con el cable Standard–Mini de 15 a 22 pines de la Pi 5.
   - MediaMTX `rpiCamera` a 1280×720 y 10 fps con `softwareH264`.
   - `bricohams-camsnap` saca una foto cada 60 s a una carpeta tmpfs dentro de los plugins.
 - **Por qué:**
@@ -201,7 +201,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - **LilyGO:** los dos van sobre la tapa interior.
   - **Cara inferior:** todos los conectores (9 SMA pasamuros, PG7, M20) y las rejillas de entrada. Las de salida van arriba, bajo un tejadillo inclinado.
   - **Cierre:** la pared entra en una ranura de la tapa con una junta de TPU. Las orejetas hacen de tope y fijan la compresión en el 25 %.
-  - **Mástil Televés:** 2 sillas en V con abrazadera de 12 mm (`MAST_D`).
+  - **Mástil telescópico** (3 × 3 m, ≈ 8,2 m): 2 sillas en V con abrazadera de 12 mm (`MAST_D` = 50, tramo inferior; PENDIENTE).
   - **Cámara:** detrás de una ventana de policarbonato con junta, aro anti-reflejos IR y visera.
   - **BME280:** en una garita de platos aparte, a 1 m o más de la caja.
 - **Por qué:**
@@ -320,6 +320,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
   - Los ventiladores y los sensores de viento piden 12 V. La regleta Vansuny es de 12 V (su FX24E queda de repuesto).
 - **Implica:**
   - **Comprobar que el cargador da 12 V por PD.** Si no, gatillo a 15 V + reductor.
+  - **Actualización (cargador comprado, ASIN B0H73N2HDS):** 120 W con 2 USB-C PD + 2 USB-A QC, sin marca ni tabla por puerto: **no se da por hecho el 12 V PD**. Etiqueta a comprobar: (1) 12 V en PD, (2) un USB-C a 12 V y el otro a 20 V a la vez (el hub va a 20 V), (3) reparto con 2 USB-C + 1 USB-A. Opción A: USB-C1 → Pi 5 (pide 5 V/5 A; con 5 V/3 A limita el USB a 600 mA), USB-C2 → gatillo de 20 V para el hub y bus de 12 V desde un USB-A QC a 12 V/1,5 A (18 W: ventiladores y LilyGO, no un Hermes-Lite 2). Sin 12 V PD: gatillo 15 V + reductor, o fuente de 12 V aparte. Detalle en manual 17 §1.5.
   - Con los módulos a más de 1,5 m, la Pi se alimenta con un reductor 12 → 5,1 V 5 A en el módulo de electrónica.
 
 ## ADR-23 · Ventilación forzada con PWM por hardware y tacómetro
@@ -702,11 +703,11 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 ## Pendiente / a verificar
 1. **Pinout del HAT HackerGadgets**: en preventa, sin documentación publicada a 04/10/2026. Se han tomado los valores de la guía AIO.
 2. **Repetidor digital**: confirmar la frecuencia aplicable a la estación con fuentes oficiales antes de configurar el equipo.
-3. **WPI408**: comprobar si el filtro IR es fijo o se puede quitar, para elegir `CAM_TUNING`.
+3. **Cámara**: sustituida la WPI408 por la **Raspberry Pi Camera Module 3 Wide** (no NoIR; ajuste `imx708_wide`): confirmar el patrón M2 de 21 × 12,5 mm con el plano del Product Brief. (Histórico: de la WPI408 había que ver si el filtro IR se quitaba.)
 4. **SDRplay**: modelo (RSP1A/1B/dx) para `SDRPLAY_ANTENNA`.
-5. **Cargador de 120 W**: comprobar que su USB-C PD ofrece **12 V** (ADR-22). **Regleta Vansuny**: contar los puertos (hacen falta 8; 11 con la bandeja de SDR, o un segundo hub USB 3.0 alimentado).
+5. **Cargador de 120 W** (2 USB-C PD + 2 USB-A QC, marca desconocida): comprobar en la etiqueta si su PD ofrece **12 V**, si da 12 V y 20 V a la vez y el reparto con 3 puertos en uso (ADR-22, manual 17 §1.5). **Regleta Vansuny**: contar los puertos (hacen falta 8; 11 con la bandeja de SDR, o el hub Amazon Basics de 10).
 6. **Conectores de antena del HAT y de los LilyGO** (SMA o u.FL): según cuáles sean, los latiguillos a los SMA pasamuros cambian.
-7. **Diámetro del mástil Televés**: el modelo trae `MAST_D = 40`.
+7. **Mástil telescópico** (3 × 3 m, ≈ 8,2 m): diámetros y paredes de cada tramo, solape real, anclaje y vientos (`TRAMOS`, `ANCLAJE_Z`, `GUY_Z` en `tools/mastil.py`). `MAST_D` = 50 sigue al tramo inferior; cámbialo si abrazas otro tramo.
 8. **Pines del HAT AIO frente a GPIO 4, 5, 12, 13, 17 y 22** (ADR-23 y 25): confirmarlos cuando se publique el esquema del HAT. Se han evitado 7, 16, 23 y 27, que la guía AIO puede usar.
 9. **FBP-868s**: potencia máxima real de tu unidad (SAW, ~18 dBm).
 10. **Antenas**: ajuste final con NanoVNA (manuales 12–14).

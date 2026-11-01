@@ -35,25 +35,25 @@ Medir sin transmisores conectados y con el plano de referencia documentado.
 | Meshtastic 868 | iGate 433 | 1,60 m | 4,6 |
 | Meshtastic 433 | quad | 1,10 m | 1,6 |
 | Meshtastic 433 | discone | 1,44 m | 2,1 |
+| Meshtastic 433 | X50 | 5,90 m (5,85 m en vertical) | 8,5 |
+| Meshtastic 433 | discono Moonraker | 3,64 m (3,4 m en vertical) | 5,3 |
 
 - **Separación vertical:** aísla mucho más que la horizontal (las antenas verticales no radian hacia arriba ni hacia abajo). Por eso los dos 433 van uno encima del otro.
 - **Lo que queda:** el iGate puede perder algún paquete justo cuando transmite el Meshtastic. Es inevitable con dos equipos a 100 kHz y no tiene arreglo con filtros.
 
+### Antenas nuevas y mástil telescópico
+- **Mástil:** telescópico de 3 tramos × 3,00 m con 2 solapes de 0,35–0,45 m (nominal 0,40): **8,20 m** montado (8,10–8,30 m). Las alturas del plan se miden desde el pie; las antenas existentes conservan sus separaciones, desplazadas 1,3 m.
+- **Diamond X50 (X-50N):** en la punta, base a 8,00 m (colineal de 1,70 m, ~1,1 kg, 2 m/70 cm, conector N). **PENDIENTE:** diámetro de mástil admitido y carga de viento (hoja de Diamond); el tramo superior es el más fino (Ø40 típico).
+- **Discono Moonraker SkyScan Desktop** (0,95 m, radiales 4 × 8 cm + 8 × 29,5 cm, 25–2000 MHz, ~1,4 kg): debajo del X50, a ~5,9 m, en un brazo de 0,5 m al este. Es de sobremesa con base magnética: necesita una **placa metálica** (≥ Ø250 mm) y un soporte en el brazo; cambia su RG58 de 4 m con BNC por coaxial de baja pérdida y conector N.
+- **Se mantiene la tabla de aislamiento:** el X50 transmite (2 m/70 cm) y queda ≥ 5 m por encima de las antenas de 433/868.
+
 ## 2. Carga de viento: **el mástil necesita vientos**
 
-`tools/mastil.py` calcula el momento en la abrazadera con presión dinámica ½ρv², Cd 1,2 y coeficiente de seguridad 1,5, frente a 235 MPa (acero S235):
+`tools/mastil.py` modela el mástil telescópico como una viga de elementos finitos (EI variable, apoyo rígido en el anclaje a pared, vientos como muelles) bajo el **viento de diseño del CTE DB-SE-AE para Murcia: vb,0 = 26 m/s, zona A** (presión básica 422 N/m², grado de aspereza III; equivale a ~140 km/h a 8,8 m, por encima de las rachas observadas de ~100 km/h). Cd 1,2 y coeficiente 1,5 frente a 235 MPa (S235). Valores **PENDIENTES** de medir: diámetros y paredes (50×2 / 45×2 / 40×2 mm típicos), anclaje a 2,0 m, vientos a 5,5 y 7,6 m con anclajes a 4 m del pie.
 
-| Mástil | 130 km/h sin vientos | 150 km/h sin vientos | 150 km/h **con vientos a 2 m** |
-|---|---|---|---|
-| Televés Ø40 × 2 | 530 MPa ✘ | 705 MPa ✘ | **92 MPa ✔** |
-| Televés Ø45 × 2 | 423 MPa ✘ | 564 MPa ✘ | 73 MPa ✔ |
-| Ø50 × 2,5 | 287 MPa ✘ | 382 MPa ✘ | 50 MPa ✔ |
+Calcula la tensión en el pie, en cada solape (con concentración en la boca del tubo exterior), la flecha en cabeza (límite H/50) y las tensiones de los cables, con el pie articulado y empotrado y los solapes de 0,35, 0,40 y 0,45 m: ejecuta `python3 tools/mastil.py`.
 
-**Conclusión:** con todo el equipo, un mástil de 3 m en voladizo **no aguanta** un temporal. Hay dos soluciones:
-- **Recomendada:** un collarín de vientos a 2 m con 3 cables de acero inox de Ø3 a 120°, tensores y anclajes químicos o tacos de expansión M8. Con los cables a 45°, el de barlovento lleva hasta ~0,7 kN a 150 km/h (1,1 kN con el coeficiente 1,5). El cable de Ø3 (7 × 7) rompe a más de 5 kN: margen > 4.
-- **Si no se pueden poner vientos:** acortar la altura libre por encima de la abrazadera superior a ≤ 1,3 m y separar las dos abrazaderas ≥ 0,8 m. Eso obliga a bajar la discone y apretar el resto.
-
-**Masa total:** antenas ≈ 5,4 kg, con brazos y abrazaderas ≈ 9,4 kg.
+**Conclusión:** sin vientos, 8 m de telescópico con el X50 arriba **no aguantan** el viento de diseño. Con 2 niveles de vientos (3 cables inox Ø3 a 120° cada uno, tensores y anclajes M8), el modelo da el veredicto con los datos reales; **mídelos y repite el cálculo antes de levantarlo**. Cerca de las antenas, usa vientos dieléctricos (Dyneema o poliéster).
 
 ## 3. Soportes impresos (`hardware/antenas/stl`)
 

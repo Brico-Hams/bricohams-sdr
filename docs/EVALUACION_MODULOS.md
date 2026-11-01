@@ -32,7 +32,7 @@ Para cada módulo: qué es, si se puede integrar y cómo queda en la estación.
 - **Usos posibles:** respaldo de los LilyGO o de un equipo portátil, aunque el T3 V1.6.1 ya trae cargador para una LiPo por su conector de batería.
 - **Recomendación:** para respaldo de la estación, un SAI específico para Pi 5 o una LiFePO4 de 12 V con un regulador de 5 V y 5 A.
 
-## 3. Whadda/Velleman WPI408 (cámara con 2 luces IR) · ✅ integrado
+## 3. Whadda/Velleman WPI408 (cámara con 2 luces IR) · ✅ integrado (histórico: sustituida por la Raspberry Pi Camera Module 3 Wide)
 
 | Dato | Valor |
 |---|---|
@@ -172,6 +172,7 @@ La Pi 5 **no tiene codificador H.264 por hardware**: la WPI408 se codifica por C
 - **Margen:** la estación v3 consume 16–24 W, así que el cargador va al ~20 %: se calienta poco y tiene sitio para el SDRplay, otro SDR y los ventiladores.
 - **Gatillo de 12 V:** con dos USB-C PD, uno va a la Pi y el otro, con un **gatillo PD de 12 V** (cable USB-C → 5,5 × 2,1 mm o bornes), da el bus de 12 V. Así hay un solo transformador de 230 V.
 - **Comprobar** en su etiqueta que el USB-C ofrece **12 V**. Muchos cargadores GaN dan 5/9/12/15/20 V, pero algunos se saltan los 12 V. Si no los da: gatillo a 15 V + reductor DC-DC a 12 V, o el alimentador de la regleta (apartado 17).
+- **Cargador comprado (ASIN B0H73N2HDS):** 120 W con 2 USB-C PD + 2 USB-A QC, sin marca ni ficha por puerto. Comprobar además que un USB-C dé 12 V y el otro 20 V a la vez (el hub de 10 puertos va a 20 V) y el reparto con 2 USB-C + 1 USB-A; la Pi 5 pide 5 V/5 A y, con solo 5 V/3 A, limita el USB a 600 mA. Sin confirmarlo no se asume 12 V PD: el USB-A QC a 12 V/1,5 A (18 W) solo da para ventiladores y LilyGO, no para un Hermes-Lite 2. Ver manual 17 §1.5.
 - **Montaje:** es de enchufe directo, así que va en una **base Schuko de superficie** dentro del módulo de potencia, sujeto con `brida_cargador`.
 
 ## 17. Regleta USB Vansuny USB 3.0 + alimentador FX24E-120200C · ✅ integrada

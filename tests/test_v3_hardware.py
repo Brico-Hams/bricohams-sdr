@@ -3,6 +3,7 @@
 STL presente y ≤ 250 mm), los resultados NEC2 que usan los manuales y el
 cálculo de viento del mástil (sin vientos falla, con vientos aguanta)."""
 import json
+import math
 import os
 import re
 import sys
@@ -234,11 +235,36 @@ assert pz + res['diplexor'][4] <= fan_out[1] - 30, 'el diplexor toca el ventilad
 assert deck_h >= hub[2] + 3 + 4, 'el hub toca la bandeja de SDR'
 assert 'assert(HUB_END >= 15' in SRC and 'el hub USB pisa el hueco' in SRC, 'faltan los assert del hub en el .scad'
 
-# 4. mástil Ø40 × 2: sin vientos falla a 130 km/h, con vientos aguanta 150 km/h
-W = mastil.modulo(40, 2.0)
-s_libre = mastil.GAMMA * mastil.momento(130, 40)[0] * 1000 / W
-s_vientos = mastil.GAMMA * mastil.momento_con_vientos(150, 40)[0] * 1000 / W
-assert s_libre > mastil.FY > s_vientos, (s_libre, s_vientos)
+# 4. mástil telescópico 3 × 3,00 m con 2 solapes: geometría, solver y datos de diseño
+_l, _n = 3.0, 30
+_ei = mastil.E_ACERO * mastil.inercia(50, 2.0)
+_w0 = 100.0
+_zs = [_l * i / _n for i in range(_n + 1)]
+_u = mastil.viga(_zs, [_ei] * _n, [_w0] * _n, [0.0] * (_n + 1), [0.0] * (_n + 1), {0: 1e12}, {0: 1e12})[0]
+assert abs(_u[-1] - _w0 * _l ** 4 / (8 * _ei)) < 0.01 * _w0 * _l ** 4 / (8 * _ei), 'el solver de viga no reproduce la ménsula'
+assert abs(mastil.altura() - 8.2) < 1e-9 and abs(mastil.altura(0.35) - 8.3) < 1e-9 and abs(mastil.altura(0.45) - 8.1) < 1e-9
+assert len(mastil.TRAMOS) == 3 and all(abs(t[2] - 3.0) < 1e-9 for t in mastil.TRAMOS)
+assert abs(mastil.SOLAPE_NOM - 0.40) < 1e-9 and (min(mastil.SOLAPES), max(mastil.SOLAPES)) == (0.35, 0.45)
+assert mastil.VB0 == 26 and abs(mastil.QB - 422.5) < 0.1
+nombres = [a[0] for a in mastil.ANTENAS]
+assert 'X50 Diamond (2 m/70 cm)' in nombres and 'Discono Moonraker SkyScan' in nombres
+zx = dict((a[0], a[1]) for a in mastil.ANTENAS)
+assert zx['X50 Diamond (2 m/70 cm)'] > zx['Discono Moonraker SkyScan'] > zx['Discone grande (MULTIPERFIL)'], 'el X50 va arriba y el discono debajo'
+assert mastil.q(8.85) > mastil.q(2.0) > 0 and mastil.v_equiv_kmh(8.85) > mastil.V_RACHA_OBS_KMH
+s_sin = mastil.analizar(mastil.SOLAPE_NOM, False, 'articulada')
+assert s_sin['sigma_cr'] > mastil.FY, ('sin vientos el mástil debería superar el límite', s_sin['sigma_cr'])
+peor, _rs = mastil.envolvente(True)
+assert all(math.isfinite(v) for v in (peor['sigma_base'], peor['sigma_cr'], peor['flecha_top_mm'], peor['guy_T_N'])), peor
+assert isinstance(peor['vale'], bool) and peor['H_min'] == mastil.altura(0.45) and peor['H_max'] == mastil.altura(0.35)
+
+# 5. cámara Raspberry Pi Camera Module 3 Wide en el .scad (sin restos de la WPI408)
+assert 'WPI408' not in SRC, 'la WPI408 ya no debe aparecer en caja_v3.scad'
+for nombre in ('CAM_PCB', 'CAM_HOLES', 'CAM_WIN', 'CAM_D', 'CAM_FOV_H', 'CAM_FOV_V', 'CAM_VIS_WIN'):
+    assert re.search(r'^%s\s*=' % nombre, SRC, re.M), 'falta %s en caja_v3.scad' % nombre
+_d = sum(float(re.search(r'^%s\s*=\s*([\d.]+)' % n, SRC, re.M).group(1)) for n in ('CAM_GAP', 'CAM_VID_T'))   # CAM_D = CAM_GAP + CAM_VID_T
+_win = [float(x) for x in re.search(r'^CAM_WIN\s*=\s*\[([\d.]+),\s*([\d.]+)\]', SRC, re.M).groups()]
+assert _win[0] >= 2 * _d * math.tan(math.radians(102 / 2)) + 8 and _win[1] >= 2 * _d * math.tan(math.radians(67 / 2)) + 8, 'la ventana recorta el campo de 102 × 67°'
 
 print('OK test_v3_hardware: %d piezas de antenas y %d de la caja v3 ≤ 250 mm; NEC2 coherente; '
-      'mástil %.0f MPa sin vientos / %.0f MPa con vientos' % (n_ant, n_c3, s_libre, s_vientos))
+      'mástil telescópico %.2f m: sin vientos %.0f MPa, con vientos σ máx. %.0f MPa y flecha %.0f mm; ventana de cámara %.0f × %.0f mm' % (
+          n_ant, n_c3, mastil.altura(), s_sin['sigma_cr'], peor['sigma_cr'], peor['flecha_top_mm'], _win[0], _win[1]))

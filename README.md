@@ -67,7 +67,7 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
   - **repetidores con subtono** en los marcadores y **Wifon FM** la primera.
 - **v4.0:**
   - **Pico «bricohams-io» por USB** para sensores y ventiladores: con el HAT puesto la cabecera de 40 pines está tapada;
-  - **cámara Waveshare (F)** OV5647 NoIR con cinta 15→22 pines para el conector de la Pi 5;
+  - **cámara Raspberry Pi Camera Module 3 Wide** (IMX708, no NoIR) con cinta 15→22 pines para el conector de la Pi 5;
   - **anclajes impresos** (crucetas con tuercas cautivas) para la fibra 433, la quad, la ADS-B, los sensores de viento y el pluviómetro;
   - **marcadores nuevos:** Radio Club Región de Murcia (RU-75, 145,325, 430,325, CB canal 32, PMR 5), CB 40 canales, PMR446, FM (Radio María), DAB+, FT8/FT4/FT2, modos digitales, aviación y marina de Cartagena y Mazarrón;
   - **plugins web:** banderas en FT8/FT4/FT2, ficha QRZ/RadioID en DMR/YSF, banner de próximos pases con ▶ Escuchar (Doppler), plan de bandas, oyentes (opcional), logo más pequeño;
@@ -109,7 +109,7 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
 | 🌡️ Tiempo propio + estación WX APRS (N0CALL-13) | **BME280/BMP280** (GYBMEP) por I2C + **anemómetro y veleta RS485** + **pluviómetro** (v3) | bricohams-wx |
 | 🌬️ Estación WX LoRa alternativa (N0CALL-14) | 3.er LilyGO con los mismos sensores | LoRa_APRS_Wx_Station (CA2RXU) · `bricohams-lilygo wxstation` |
 | 🌦️ Estaciones AEMET cercanas + previsión | — | bricohams-meteo (AEMET + Open-Meteo) |
-| 📷 Cámara del mástil con visión nocturna | **cámara IP PoE por RTSP** (recomendada, v3) o WPI408 / Camera Module 3 por CSI | MediaMTX + foto para la web |
+| 📷 Cámara del mástil | **cámara IP PoE por RTSP** (recomendada, v3) o Raspberry Pi Camera Module 3 Wide por CSI (sin visión nocturna IR) | MediaMTX + foto para la web |
 | ☀️ Radiación solar, DX cluster, imagen BricoHams | — | plugins `solar`, `rig_skin`, `meteo`, `camara`, `bricohams` |
 | 📶 WiFi de casa (5 GHz preferida, 2,4 GHz de respaldo) | WiFi de la Pi 5 | NetworkManager (paso `red`) |
 | 📦 Caja del mástil + alimentación por cargador USB de 45 W | PETG + TPU (Anycubic Kobra S1) | `hardware/caja/` (OpenSCAD) |

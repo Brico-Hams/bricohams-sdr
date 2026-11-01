@@ -8,7 +8,7 @@ La estación tiene cinco zonas:
 
 | Zona | Qué hay | Esquema |
 |---|---|---|
-| **A · Mástil Televés** (Ø40 × 2, con vientos a 2 m) | discone grande, quad 2 m/70 cm, ADS-B + LNA, GPS, Meshtastic 433 (fibra), Bigsignal 868 y 433, anemómetro, veleta, garita del BME280 | [11 plan del mástil](esquemas/11_plan_mastil.png) |
+| **A · Mástil telescópico** (3 × 3 m, ≈ 8,20 m, con vientos) | X50 Diamond arriba, discono Moonraker debajo, discone grande, quad 2 m/70 cm, ADS-B + LNA, GPS, Meshtastic 433 (fibra), Bigsignal 868 y 433, anemómetro, veleta, garita del BME280 | [11 plan del mástil](esquemas/11_plan_mastil.png) |
 | **B · Postes aparte** | eggbeater de satélites (≥ 3 m del mástil), lazo MLA-30 (≥ 5 m, poste no metálico), pluviómetro (muro o barandilla) | [11](esquemas/11_plan_mastil.png) |
 | **C · Módulo de electrónica** (al pie, a ~5 m) | Pi 5 + HAT, 3 RTL-SDR + bahía de expansión, regleta USB, diplexor HF/VHF, filtros, bias-tee, LilyGO ×2, RS485, ventiladores, DS18B20 | [07](esquemas/07_caja_distribucion.png), [12](esquemas/12_cadena_rf.png), [13](esquemas/13_ventiladores.png), [14](esquemas/14_sensores_wx.png) |
 | **D · Módulo de potencia** (junto al C) | base Schuko, cargador USB de 120 W, gatillo PD de 12 V, fusibles, WAGO | [15 alimentación v3](esquemas/15_alimentacion_v3.png) |
@@ -58,11 +58,11 @@ La estación tiene cinco zonas:
 | ID | Componente | Ubicación | Conexión | Manual |
 |---|---|---|---|---|
 | S1 | **BME280** (GYBMEP) en garita de 6 platos | A, brazo N 0,05 m | **v4: Pico GP4/GP5 (I2C0) + 3V3/GND** · PG7 «WX» | 06, 20 |
-| S2 | **Anemómetro RS485** (Modbus 1) | A, brazo N 0,8 m · 1,5 m | bus RS485 (A, B) + 12 V · PG7 «VIENTO» | 19 |
-| S3 | **Veleta RS485** (Modbus 2) | A, brazo S 0,8 m · 1,5 m | mismo bus RS485 | 19 |
+| S2 | **Anemómetro RS485** (Modbus 1) | A, brazo N 0,8 m · 2,8 m | bus RS485 (A, B) + 12 V · PG7 «VIENTO» | 19 |
+| S3 | **Veleta RS485** (Modbus 2) | A, brazo S 0,8 m · 2,8 m | mismo bus RS485 | 19 |
 | S4 | **Pluviómetro** Misol WH-SP-RG | poste Ø40 de 1 m con `pluvio_vaso` + `pluvio_plataforma` | **v4: Pico GP15** + GND (10 kΩ, 100 nF) · PG7 «LLUVIA» | 19, 20, 21 |
 | S5 | **DS18B20** | C, en el centro, colgando | **v4: Pico GP22** (4,7 kΩ a 3V3) | 18, 20 |
-| S6 | **Cámara Waveshare RPi Camera (F)** (OV5647 NoIR + IR) | C, ventana de la tapa (`soporte_camara` + `visera`) | **cable Standard–Mini 15→22 pines** a CAM/DISP 0 | 07 |
+| S6 | **Raspberry Pi Camera Module 3 Wide** (IMX708, 120° diag., 102 × 67°; no NoIR) | C, ventana de la tapa (`soporte_camara` + `visera`) | **cable Standard–Mini 15→22 pines** a CAM/DISP 0 | 07 |
 | S7 | **Pico «bricohams-io»** + placa de 2 MOSFET | C, `pico_soporte` en la rejilla | USB a la regleta → `/dev/bricohams-io` | 20 |
 
 ### 2.4 Alimentación y control
@@ -121,8 +121,8 @@ La estación tiene cinco zonas:
 
 | Grupo | Artículo | Cant. |
 |---|---|---|
-| Mástil | Mástil Televés Ø40 × 2 (3 m) + 2 abrazaderas de pared | 1 |
-| | Collarín de vientos + 3 cables inox Ø3 + tensores + anclajes | 1 juego |
+| Mástil | Mástil telescópico 3 × 3,00 m (≈ 8,20 m montado, solapes 0,35–0,45 m; Ø y pared PENDIENTES) + 2 abrazaderas de pared | 1 |
+| | Collarines de vientos (2 niveles) + 3 cables inox Ø3 por nivel (dieléctricos cerca de las antenas) + tensores + anclajes | 1 juego |
 | | Tubo de aluminio Ø25 × 2 (brazos de 1,6 m) | 3 |
 | | **v4: crucetas impresas** en lugar de U: tornillos M6 × 40/50 inox (×24), tuercas M6 (×24), arandelas (×24), autotaladrantes inox 4,8 × 19 (×12), tubos Ø25 de 300 mm (×5) y poste Ø40 de 1 m para el pluviómetro | 1 juego |
 | Quad | Tubo de aluminio cuadrado 20 × 20 × 1,5 (1,1 m) · varillas de fibra Ø8 (8 × 0,45 m) y Ø6 (8 × 0,16 m) · hilo de cobre Ø2 mm (8 m) · RG-59 (0,5 m) · insertos M3 | 1 juego |
@@ -161,12 +161,14 @@ La estación tiene cinco zonas:
 ## 6. Verificaciones pendientes
 
 Ver «Pendiente / a verificar» en [ARQUITECTURA.md](ARQUITECTURA.md). Lo propio de la v3:
-- que el cargador de 120 W ofrezca **12 V** por PD;
-- los puertos de la regleta Vansuny;
+- el cargador de 120 W comprado (2 USB-C PD + 2 USB-A QC, sin marca ni ficha por puerto): leer la etiqueta y comprobar si ofrece **12 V** por PD, si un USB-C puede dar 12 V y el otro 20 V a la vez, y el reparto con 2 USB-C + 1 USB-A en uso (manual 17 §5); no se da por hecho el 12 V;
+- los puertos de la regleta Vansuny (o el hub Amazon Basics de 10 puertos a 20 V);
 - el pinout del HAT (para descartar choques con GPIO5/12/13/17/22);
 - el ajuste fino de las antenas con NanoVNA;
 - la temperatura de la caja en verano;
-- el Ø del mástil (`MAST_D`).
+- el mástil telescópico: Ø y pared de cada tramo, solape real, altura del anclaje a pared, niveles y radio de los vientos, base y viento de diseño (`TRAMOS`, `ANCLAJE_Z`, `GUY_Z` en `tools/mastil.py`); el Ø del tramo donde se abraza la caja (`MAST_D`, ahora 50 como el tramo inferior);
+- la abrazadera y la carga de viento del Diamond X50 (hoja de Diamond), y la placa metálica y el coaxial de baja pérdida con N del discono Moonraker;
+- confirmar el patrón M2 de 21 × 12,5 mm de la Camera Module 3 Wide con el plano del Product Brief y medir su portaobjetivos.
 
 Hecho en el código y en `tests/test_v3_hardware.py` (diseño de intemperie, manual 17 §6): pared ≥ 3,2 mm, compresión de la junta 25 %, faldón de 9 mm con vuelo, tejadillo con faldones, 4 drenajes, respiradero PG7 «VENT», cejas en las rejillas superiores, tapones que cubren la punta de la gota y todo ≤ 250 mm.
 Pendiente de la intemperie, **solo con la caja real**: prueba de manguera, 24 h de lluvia, temperatura en verano, estado de la junta, medir la membrana del respiradero (`BREATH_MEMB`) y regenerar los STL con OpenSCAD (los actuales son anteriores a estos cambios).

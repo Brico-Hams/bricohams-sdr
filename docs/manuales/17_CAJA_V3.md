@@ -19,14 +19,14 @@
 ![Alimentación](../esquemas/15_alimentacion_v3.png)
 
 **Por qué dos módulos al pie y no una caja en el mástil** (decisión del usuario, ADR-21):
-- **Mástil:** con 5 antenas y brazos, el mástil ya trabaja cerca de su límite (ver `tools/mastil.py`). Una caja de 2–3 kg a 2 m de altura sumaría ~0,1 m² de superficie al viento y un momento que no hace falta.
+- **Mástil:** con el telescópico de 8,2 m, el X50 y el discono Moonraker, el mástil trabaja con vientos de cable (ver `tools/mastil.py` y manual 19 §5b). Una caja de 2–3 kg en lo alto sumaría superficie al viento y un momento que no hace falta.
 - **A 5 m, al pie:** se abre sin subir, se amplía sin desmontar y no carga el mástil.
 - **Cables:** la pérdida que añade la bajada se compensa con coaxial de baja pérdida (LMR-400 en VHF/UHF y el LNA en la antena para ADS-B).
 
 | Módulo | Medidas (an × al × fondo) | Lleva |
 |---|---|---|
 | **Electrónica** | 228 × 240 × 190 mm | Pi 5 + HAT, 3 SDR + FlightStick, **bandeja de SDR con HackRF Pro/One, RTL-SDR V4 y Airspy HF+**, **2.ª bandeja con Hermes-Lite 2 y 5 plazas más**, bahía del suelo para RSPdx, LilyGO + **RAK4631 (RAK19007)**, hub USB de 10 puertos (Amazon Basics, 145 × 44 × 23 mm, PENDIENTE de medir), filtro 433, bias-tee, inyector MLA-30, diplexores, RS485, DS18B20, **2 ventiladores de 60 mm**, cámara (opcional) |
-| **Potencia** | 170 × 200 × 112 mm | base Schuko de superficie, cargador de 120 W, gatillo USB-C PD a 12 V, portafusibles, WAGO 221 |
+| **Potencia** | 170 × 200 × 112 mm | base Schuko de superficie, cargador de 120 W (2 USB-C PD + 2 USB-A QC; **12 V PD por comprobar**, §1.5), gatillo USB-C PD si hay 12 V, portafusibles, WAGO 221 |
 | **SAI** (opcional, debajo del de potencia) | 228 × 240 × 140 mm | placa, transformador y batería de plomo 12 V 7–9 Ah de un SAI reaprovechado, **2 filtros EMI** de red, fusible de batería ([§1.2](#12-módulo-sai-reaprovechar-un-sai-con-filtros-emi)) |
 
 > La **caja v2** (`hardware/caja`, manual 10) sigue siendo válida si se quiere todo en el mástil y solo con los SDR actuales. La v3 es la recomendada.
@@ -220,6 +220,24 @@ Sustituye a la regleta Vansuny: **Amazon Basics hub USB-A 3.1 de 10 puertos con 
 
 **Recomendada: c** (el calor y el ruido se quedan fuera del módulo caliente); la **a** es el plan B si se confirma el cargador. `python3 tools/termica_caja.py --opcion c` calcula el caso c.
 
+## 1.5 Cargador de 120 W comprado (ASIN B0H73N2HDS): comprobaciones antes de cablear
+
+Es un cargador de **120 W con 2 USB-C PD y 2 USB-A QC**. Amazon no da marca ni tabla de potencias por puerto, así que **no se da por hecho que ofrezca 12 V por PD**. En equivalentes de 120 W lo habitual es: USB-C PD 5 V/3 A, 9 V/3 A, 12 V/3 A (no siempre), 15 V/3 A y 20 V/5 A; USB-A QC 5 V/3 A, 9 V/2 A y 12 V/1,5 A. Los 120 W se reparten cuando hay varios puertos en uso.
+
+**Lee la etiqueta (o la ficha del fabricante) y apunta:**
+1. si el PD ofrece **12 V** (si no, el gatillo de 12 V no funciona);
+2. si un USB-C puede dar **12 V** y el otro **20 V a la vez** (el hub va a 20 V);
+3. el reparto de potencia con **2 USB-C y 1 USB-A** en uso;
+4. si la Pi 5 puede pedir **5 V/5 A** en su USB-C (pocos cargadores PD lo dan; con solo 5 V/3 A la Pi limita la corriente USB a 600 mA, lo que no importa si el hub tiene su propia fuente).
+
+| Resultado de la etiqueta | Cableado |
+|---|---|
+| A · hay 12 V PD y 20 V PD en puertos distintos a la vez | USB-C1 → Pi 5 (PD); USB-C2 → gatillo de 20 V para el hub; bus de 12 V desde un USB-A QC a 12 V/1,5 A (18 W: solo ventiladores y LilyGO, **no** un Hermes-Lite 2) o con otro gatillo de 12 V si queda un USB-C libre |
+| B · hay 20 V pero no 12 V | gatillo a 20 V y un DC-DC 20 → 12 V para el bus, o gatillo a 15 V y DC-DC a 12 V; el hub conserva su adaptador original (opción c) |
+| C · no hay 12 V ni 20 V utilizables | el cargador solo sirve para la Pi y el USB-A QC; el hub con su adaptador de 65 W y el bus de 12 V con una fuente de 12 V o el cargador 13,8 V del SAI |
+
+Hasta confirmarlo, el diseño mantiene la **opción c del hub** (adaptador original de 65 W) y un bus de 12 V independiente del PD.
+
 ## 2. Material
 | Artículo | Cant. |
 |---|---|
@@ -271,7 +289,7 @@ Sustituye a la regleta Vansuny: **Amazon Basics hub USB-A 3.1 de 10 puertos con 
    1. Enrosca los 4 `poste_superior` (30 mm) en los espárragos. Sobre ellos va la `bandeja`, 71 mm por encima de la rejilla.
    2. En la bandeja, la Pi 5 + HAT (taladros de 58 × 49) y los 2 `soporte_lilygo`.
    3. La Pi queda arriba, que es donde el ventilador de salida saca el aire caliente.
-8. **Cámara (opcional):** el `soporte_camara` va en la tapa detrás de la ventana, con la `visera` por fuera. **Recomendado:** cámara IP en el mástil (ADR-24) y ventana tapada.
+8. **Cámara (opcional):** Raspberry Pi Camera Module 3 Wide (placa 25 × 24 mm, objetivo de 12,4 mm de alto, 4 × M2 en 21 × 12,5 mm: **confirmar con el plano del Product Brief**). El `soporte_camara` va en la tapa detrás de la ventana de 20 × 16 mm, con 4 tornillos M2 autorroscantes o insertos M2 (`CAM_M2_INS`); el objetivo queda a 3 mm de la cara exterior del cristal (policarbonato o acrílico de 2 mm pegado en el rebaje exterior con sellador, junta de TPU) y la `visera` va por fuera sin entrar en el campo de 67° vertical. La ventana cumple ≥ 2·d·tan(FOV/2) + Ø objetivo (8 mm) con d = 3 mm: mínimo 15,4 × 12,0 mm, por lo que el campo de 102° × 67° no se recorta. **Recomendado:** cámara IP en el mástil (ADR-24) y ventana tapada.
 9. **Módulo de potencia:**
    1. `soporte_schuko` + base Schuko de superficie.
    2. `brida_cargador` sujetando el cargador de 120 W.
@@ -280,7 +298,7 @@ Sustituye a la regleta Vansuny: **Amazon Basics hub USB-A 3.1 de 10 puertos con 
    - **5 V de la Pi:** **cable USB-C PD directo** del cargador a la Pi, de 1 m, con un pequeño bucle en el M25. Si los módulos van a más de 1,5 m, la Pi se alimenta en su lugar con un reductor 12 → 5,1 V 5 A dentro del módulo de electrónica (ver pendientes en MEMORIA_TECNICA).
 10. **Fijación:**
    1. `pletina_pared` + 4 tacos.
-   2. O `soporte_mastil` + 2 U M8 a un poste de Ø40–50.
+   2. O `soporte_mastil` + 2 U M8 a un poste de Ø40–50 (`MAST_D` = 50, el tramo inferior del telescópico; si abrazas otro tramo, cambia `MAST_D`).
    3. El módulo de potencia, **más bajo** que el de electrónica, para que el agua de condensación no baje por la manguera hacia la electrónica.
    4. Por último, el `tejadillo` sobre cada uno.
 11. **Cierre:**
@@ -292,7 +310,7 @@ Sustituye a la regleta Vansuny: **Amazon Basics hub USB-A 3.1 de 10 puertos con 
 - **Coaxiales:** pasamuros N → latiguillo → filtro, bias-tee o inyector → SDR (esquema 12).
 - **12 V:** WAGO de electrónica → ventiladores (esquema 13), hub USB (20 V, ver §1.4) y sensores RS485 (esquema 14).
 - **Sensores y ventiladores (v4):** Pico «bricohams-io» por USB → DS18B20 (GP22), pluviómetro (GP15), BME280 (GP4/GP5), PWM (GP16/GP17) y tacómetros (GP18/GP19) (esquema 16). La cabecera de 40 pines queda bajo el HAT.
-- **Cámara (v4):** Waveshare (F) con cinta Standard–Mini 15→22 pines a CAM/DISP 0; pasa por el lateral del HAT (manual 07).
+- **Cámara (v4):** Raspberry Pi Camera Module 3 Wide (IMX708, no NoIR: **sin visión nocturna por IR**) con el cable **Standard–Mini 15→22 pines** a CAM/DISP 0 (la Pi 5 lo exige); pasa por el lateral del HAT (manual 07). Ajuste de libcamera/rpicam: `imx708_wide`.
 - **USB:** todo al hub de 10 puertos, cuyo upstream USB 3.x va a la Pi. Excepciones: el HAT va por PCIe/USB interno y la cámara CSI por su cinta.
 
 ## 5. Comprobación

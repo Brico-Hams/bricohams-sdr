@@ -16,7 +16,7 @@
 //     - Intemperie: faldón de la tapa (alero de 9 mm sobre la pared, vuelo 1,2 mm), junta TPU
 //       con compresión 25 %, 4 orificios de drenaje, cejas en las rejillas superiores, respiradero
 //       con membrana (PG7 «VENT»), tapones con cabeza que tapa la punta de la gota, tejadillo con faldones.
-//     - Ventana opcional para la cámara WPI408 en la tapa.
+//     - Ventana opcional en la tapa para la Raspberry Pi Camera Module 3 Wide (cristal pegado, visera sin recorte del campo de 102° × 67°).
 //   MÓDULO DE POTENCIA  (VARIANTE="potencia")
 //     - Base Schuko de superficie + cargador USB de 120 W + gatillo USB-C PD a 12 V,
 //       portafusibles y regleta WAGO. Entrada de 230 V por PG9 y salida M25.
@@ -101,7 +101,23 @@ FAN_IN = [55, 60];          // (y, z) en la pared izquierda
 FAN_OUT = [190, 68];        // (y, z) en la pared derecha; z = 68 deja el ventilador (borde inferior 38) por encima del diplexor (arriba 34,8)
 
 // cámara
-CAM_C = [W / 2, 210];  CAM_WIN = [76, 26];  CAM_PC = [86.5, 36.5];  CAM_FRAME = 6;  CAM_FRAME_H = 5;
+// Raspberry Pi Camera Module 3 Wide (SC0874, IMX708): placa 25 × 24, 12,4 mm de alto con el objetivo, 4 × M2 en 21 × 12,5
+// (patrón oficial: confirmar con el plano del Product Brief). Campo 120° diagonal / 102° H / 67° V.
+CAM_PCB = [25, 24, 12.4];
+CAM_HOLES = [21, 12.5];   // patrón M2 de las cámaras oficiales (confirmar con el plano del Product Brief)
+CAM_LENS_D = 8;
+CAM_FOV_H = 102;
+CAM_FOV_V = 67;
+CAM_VID_T = 2;     // cristal de policarbonato/acrílico pegado en un rebaje de la cara exterior de la tapa
+CAM_GAP = 1;       // objetivo → cara interior del cristal
+CAM_D = CAM_GAP + CAM_VID_T;   // objetivo → cara exterior del cristal (d de la fórmula de la ventana)
+CAM_LENS_Z = LID_T - CAM_VID_T - CAM_GAP;   // el objetivo sobresale 1,4 mm del plano interior de la tapa
+// ventana ≥ 2·d·tan(FOV/2) + Ø objetivo (15,4 × 12,0 mm con d = 3); se dan 2 mm de margen por lado
+CAM_WIN = [20, 16];  CAM_LAP = 4;   // CAM_LAP: solape del cristal sobre la tapa (cordón de silicona neutra/MS por todo el perímetro)
+CAM_PC = [27, 26];  CAM_FRAME = 8;  CAM_FRAME_H = 5;   // cavidad de la placa y collar de insertos M3 (visera y soporte)
+CAM_BOSS_H = 4;  CAM_M2_INS = false;   // postes M2: autorroscantes (Ø1,8) o con inserto M2 (Ø3,2 × 4) si CAM_M2_INS = true
+CAM_C = [W / 2, 210];
+CAM_GL = [CAM_WIN[0] + 2 * CAM_LAP + 0.6, CAM_WIN[1] + 2 * CAM_LAP + 0.6];   // rebaje del cristal (0,3 mm de holgura por lado)
 
 // tejadillo y fijación
 ROOF_A = 5;  ROOF_GAP = 10;
@@ -275,6 +291,8 @@ module tapa() {
         }
         if (cam) {
             translate([CAM_C[0] - CAM_WIN[0] / 2, CAM_C[1] - CAM_WIN[1] / 2, LID_Z0 - 10]) cube([CAM_WIN[0], CAM_WIN[1], 20]);
+            // rebaje exterior para el cristal (queda enrasado con la cara exterior; la lluvia lo apoya contra el resalte)
+            translate([CAM_C[0] - CAM_GL[0] / 2, CAM_C[1] - CAM_GL[1] / 2, LID_Z0 + LID_T - CAM_VID_T]) cube([CAM_GL[0], CAM_GL[1], CAM_VID_T + 1]);
             translate([CAM_C[0] - CAM_PC[0] / 2, CAM_C[1] - CAM_PC[1] / 2, LID_Z0 - CAM_FRAME_H - 1]) cube([CAM_PC[0], CAM_PC[1], CAM_FRAME_H + 1 - 1.4]);
             for (s = [-1, 1]) {
                 translate([CAM_C[0] + s * (CAM_PC[0] / 2 + CAM_FRAME / 2), CAM_C[1] - 8, LID_Z0 + LID_T - INS_M3_L]) cylinder(d = INS_M3, h = INS_M3_L + 1);
@@ -559,7 +577,7 @@ module pletina_pared() {   // dos por módulo: insertos M5 de la espalda → tac
     }
     for (x = [-20, W * 0.5 + 20]) difference() { translate([x, 0, 0]) cylinder(d = 22, h = 8); translate([x, 0, -1]) cylinder(d = 6, h = 10); translate([x, 0, 4]) cylinder(d1 = 6, d2 = 12, h = 4.1); }
 }
-MAST_D = 40;
+MAST_D = 50;   // Ø de la sección donde se sujeta la caja: la INFERIOR del telescópico (50 × 2 mm, PENDIENTE de medir; = TRAMOS[0] en tools/mastil.py)
 module soporte_mastil() {   // silla en V para abrazadera de 12–14 mm (poste al pie o el propio mástil)
     bw = W * 0.5 + 24; bh = 40; bz = 26; vw = MAST_D * 0.9;
     difference() {
@@ -574,29 +592,34 @@ module soporte_mastil() {   // silla en V para abrazadera de 12–14 mm (poste a
 }
 
 // ----------------------- cámara (visera y soporte) -------------------
-CAM_SX = CAM_PC[0] / 2 + CAM_FRAME / 2;  CAM_MOD = [76, 28, 25];
+CAM_SX = CAM_PC[0] / 2 + CAM_FRAME / 2;  CAM_MOD = CAM_PCB;
+CAM_VIS_Y = CAM_WIN[1] / 2 + 11;   // cara interior del goterón superior, medida desde el eje del objetivo
+CAM_VIS_V = 18;  CAM_VIS_S = 11;   // altura del goterón superior y de las mejillas laterales sobre la tapa
+CAM_VIS_WIN = [CAM_WIN[0] + 8, CAM_WIN[1] + 8];   // la visera (3 mm) eleva el borde a d + 3: abertura mayor para no recortar el campo
+CAM_SOP_H = 3 + CAM_BOSS_H + CAM_PCB[2] - CAM_LENS_Z - CAM_FRAME_H;   // altura del soporte: placa base + columnas hasta el collar de la tapa
 module visera() {
-    vw = 2 * CAM_SX + 14; vh = CAM_WIN[1] / 2 + 12; vv = 32;
+    vw = 2 * CAM_SX + 14; vh = CAM_VIS_Y + 3;
     difference() {
         union() {
             translate([-vw / 2, -vh, 0]) cube([vw, 2 * vh, 3]);
-            translate([-vw / 2, vh - 3, 0]) cube([vw, 3, vv]);
-            for (s = [-1, 1]) translate([s * (vw / 2 - 1.5) - 1.5, 0, 0]) hull() { translate([0, vh - 3, 0]) cube([3, 3, vv]); translate([0, -vh, 0]) cube([3, 1, 3]); }
+            translate([-vw / 2, CAM_VIS_Y, 0]) cube([vw, 3, CAM_VIS_V]);   // goterón: no entra en el campo de 67°
+            for (s = [-1, 1]) translate([s * (vw / 2 - 1.5) - 1.5, -vh, 0]) cube([3, 2 * vh, CAM_VIS_S]);   // mejillas: no entran en el de 102°
         }
-        translate([-CAM_WIN[0] / 2 - 1, -CAM_WIN[1] / 2 - 1, -1]) cube([CAM_WIN[0] + 2, CAM_WIN[1] + 2, 10]);
+        translate([-CAM_VIS_WIN[0] / 2, -CAM_VIS_WIN[1] / 2, -1]) cube([CAM_VIS_WIN[0], CAM_VIS_WIN[1], 10]);
         for (s = [-1, 1]) translate([s * CAM_SX, -8, -1]) cylinder(d = HOLE_M3, h = 10);
     }
 }
-module soporte_camara() {
+module soporte_camara() {   // placa base + 4 postes M2 para la placa de 25 × 24 + 2 columnas M3 al collar de la tapa
     L = 2 * CAM_SX + 10;
     difference() {
         union() {
-            translate([-L / 2, -CAM_MOD[1] / 2 - 2, 0]) cube([L, CAM_MOD[1] + 4, 3]);
-            for (s = [-1, 1]) translate([s * CAM_SX, 8, 0]) cylinder(d = 8, h = 3 + CAM_MOD[2]);
-            for (s = [-1, 1]) translate([s * 30 - 6, -8, 0]) cube([12, 16, 4]);
+            translate([-L / 2, -CAM_PCB[1] / 2 - 2, 0]) cube([L, CAM_PCB[1] + 4, 3]);
+            for (s = [-1, 1]) translate([s * CAM_SX, 8, 0]) cylinder(d = 7, h = CAM_SOP_H);
+            for (sx = [-1, 1], sy = [-1, 1]) translate([sx * CAM_HOLES[0] / 2, sy * CAM_HOLES[1] / 2, 0]) cylinder(d = 6, h = 3 + CAM_BOSS_H);
         }
-        for (s = [-1, 1]) translate([s * CAM_SX, 8, -1]) cylinder(d = HOLE_M3, h = 40);
-        translate([-12, -CAM_MOD[1] / 2 + 1, -1]) cube([24, CAM_MOD[1] - 2, 10]);
+        for (s = [-1, 1]) translate([s * CAM_SX, 8, -1]) cylinder(d = HOLE_M3, h = CAM_SOP_H + 2);
+        for (sx = [-1, 1], sy = [-1, 1]) translate([sx * CAM_HOLES[0] / 2, sy * CAM_HOLES[1] / 2, 3 + CAM_BOSS_H - 5]) cylinder(d = CAM_M2_INS ? 3.2 : 1.8, h = 6);
+        translate([-6, -9, -1]) cube([12, 18, 10]);   // paso del cable plano (15 pines) y ventilación
     }
 }
 
@@ -635,7 +658,7 @@ module componentes() {
             ghost("royalblue") translate([99.2, 13.2, 7]) cube([27, 65, 10]);                                     // LilyGO
             ghost("teal") translate([RAK_O[0] + 1.4, RAK_O[1] + 1.4, 8]) cube([30, 60, 26]);                      // RAK19007 + RAK4631 + GPS
         }
-        if (CAMARA) ghost("black") translate([CAM_C[0] - CAM_MOD[0] / 2, CAM_C[1] - CAM_MOD[1] / 2, LID_Z0 - CAM_FRAME_H - CAM_MOD[2]]) cube(CAM_MOD);
+        if (CAMARA) ghost("black") translate([CAM_C[0] - CAM_MOD[0] / 2, CAM_C[1] - CAM_MOD[1] / 2, LID_Z0 + CAM_LENS_Z - CAM_MOD[2]]) cube(CAM_MOD);
         for (f = [[0, FAN_IN], [W - T - 25, FAN_OUT]]) ghost("black") translate([f[0] == 0 ? T : f[0], f[1][0] - 30, f[1][1] - 30]) cube([25, 60, 60]);
     } else if (SAI) {
         b = sai("BAT"); translate([PL[0] + b[1][0], PL[1] + b[1][1], pz]) { color("lightyellow") soporte_bateria(); ghost("dimgray") translate([4, 4, 3]) cube(SAI_BAT); }
@@ -676,6 +699,12 @@ assert(SKIRT_H - GAP_LID >= 8, "el faldón de la tapa solapa < 8 mm sobre la par
 assert(DRIP_OUT >= 1, "el faldón debe sobresalir ≥ 1 mm para gotear");
 assert(BELT_TOP >= SKIRT_H - GAP_LID + 1, "el remate de la caja toca el faldón de la tapa");
 assert(H + 2 * LID_OFF <= 250 && W + 2 * (EAR_L + 0.5) <= 250, "la tapa no cabe en 250 mm");
+assert(CAM_WIN[0] >= 2 * CAM_D * tan(CAM_FOV_H / 2) + CAM_LENS_D && CAM_WIN[1] >= 2 * CAM_D * tan(CAM_FOV_V / 2) + CAM_LENS_D, "la ventana de la cámara recorta el campo de 102° × 67°");
+assert(CAM_VIS_WIN[0] >= 2 * (CAM_D + 3) * tan(CAM_FOV_H / 2) + CAM_LENS_D && CAM_VIS_WIN[1] >= 2 * (CAM_D + 3) * tan(CAM_FOV_V / 2) + CAM_LENS_D, "la abertura de la visera recorta el campo de la cámara");
+assert((CAM_D + CAM_VIS_V) * tan(CAM_FOV_V / 2) <= CAM_VIS_Y - CAM_LENS_D / 2, "el goterón de la visera entra en el campo vertical de 67°");
+assert((CAM_D + CAM_VIS_S) * tan(CAM_FOV_H / 2) <= CAM_SX + 7 - 3 - CAM_LENS_D / 2, "las mejillas de la visera entran en el campo horizontal de 102°");
+assert(CAM_LENS_Z > 0 && abs(CAM_VID_T + CAM_GAP + CAM_LENS_Z - LID_T) < 1e-6 && CAM_SOP_H >= 3 + CAM_BOSS_H + 2, "cotas de la cámara incoherentes");
+assert(CAM_PC[0] >= CAM_PCB[0] + 1 && CAM_PC[1] >= CAM_PCB[1] + 1 && CAM_GL[1] / 2 + 2 <= CAM_PC[1] / 2 + CAM_FRAME, "la cavidad de la placa o el rebaje del cristal no caben en el collar");
 assert(ROOF_W <= 250 && ROOF_L / cos(ROOF_A) <= 250, "el tejadillo no cabe en 250 mm");
 assert(DRAIN_D >= 3 && DRAIN_D <= 4, "orificio de drenaje fuera de 3–4 mm (menos se tapa, más deja pasar insectos)");
 assert(BREATH_MEMB <= 12.7 - 4, "la membrana no cabe en el hueco del tapón PG7");

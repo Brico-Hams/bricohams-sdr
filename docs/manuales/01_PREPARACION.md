@@ -17,7 +17,7 @@
   - 2 LilyGO T3 V1.6.1 de 433 MHz con sus antenas.
 - **Sensor y cámara:**
   - Sensor GY-BME/BMP280, cable apantallado de 4 hilos y garita.
-  - Cámara WPI408 con cable de 15 a 22 pines para Pi 5.
+  - Cámara Raspberry Pi Camera Module 3 Wide con cable de 15 a 22 pines para Pi 5.
 - **Conexiones:** hub USB 2.0 alimentado y diplexor HF/VHF para el V3.
 - **Caja del mástil:** piezas impresas, tornillería, SMA pasamuros y prensaestopas ([manual 10](10_CAJA_3D.md)).
 - **v3.0:** caja de dos módulos, antenas, ventiladores, sensores de viento y lluvia, filtros, LNA, coaxiales y vientos del mástil. La lista completa está en la [memoria técnica](../MEMORIA_TECNICA.md) (BOM consolidada) y en cada manual del 11 al 19.

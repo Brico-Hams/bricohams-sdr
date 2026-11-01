@@ -80,7 +80,7 @@ def bloques():
     b += box(330, 640, 300, 56, 'LilyGO T3 V1.6.1 · 433 (USB)', ['/dev/lilygo-mesh → Meshtastic EU_433'], C['lora'])
     b += box(330, 720, 300, 56, 'LilyGO T3 V1.6.1 · 433 (USB)', ['/dev/lilygo-igate → iGate LoRa APRS RX'], C['lora'])
     b += box(330, 800, 300, 56, 'Sensor BME280/BMP280 (garita)', ['I2C-1 0x76/0x77 · cable 4 hilos'], C['i2c'])
-    b += box(330, 870, 300, 56, 'Cámara WPI408 (OV5647 + 2 IR)', ['CSI 15→22 pines · cámara Pi 5'], C['cam'])
+    b += box(330, 870, 300, 56, 'Cámara Pi Camera Module 3 Wide (IMX708)', ['CSI 15→22 pines · cámara Pi 5'], C['cam'])
     for (y1, y2, c) in [(107, 107, C['rf']), (187, 187, C['rf']), (267, 270, C['rf']), (347, 320, C['rf']),
                         (427, 428, C['rf']), (507, 495, C['lora']), (587, 525, C['gps']), (667, 668, C['lora']), (747, 748, C['lora'])]:
         b += arrow(256, y1, 328, y2, c)
@@ -230,7 +230,7 @@ def rf():
     b += (f"<text x='24' y='{760}' font-size='13' font-weight='bold' fill='{C['pwr']}'>Alimentación y USB</text>")
     notes = ['En la caja: cargador USB de 45 W. USB-C PD (5 V 3 A) a la Pi 5; USB-A al hub alimentado (esquema 06).',
              'Mini, V3, FlightStick y los 2 LilyGO cuelgan del HUB USB 2.0 ALIMENTADO; a la Pi solo llegan sus datos.',
-             'Cámara WPI408 por CSI con cable 15→22 pines de la Pi 5 (máx. ~1 m dentro de la caja). Los LED IR toman 3,3 V de la placa de la cámara.',
+             'Cámara Pi Camera Module 3 Wide por CSI con cable Standard–Mini 15→22 pines de la Pi 5 (máx. ~1 m dentro de la caja). No es NoIR: sin LED IR.',
              'El módulo LX-LBU2C (power bank 18650, 5 V 2,4 A) NO sirve para la Pi 5: ver docs/EVALUACION_MODULOS.md.']
     for i, t in enumerate(notes):
         b += f"<text x='24' y='{784 + i * 20}' font-size='12' fill='{C['ink']}'>{esc(t)}</text>"
@@ -276,7 +276,7 @@ def alimentacion():
     b += box(24, 150, 230, 120, '230 V · red', ['manguera H07RN-F 2 × 1 mm²', 'diferencial 30 mA', 'prensaestopas PG9', 'empalme WAGO 221 + anclaje'], C['pwr'], '#fdecea')
     b += box(330, 130, 280, 160, 'Cargador USB 45 W', ['multitoma, clase II, marcado CE', 'USB-C PD: 5 V 3 A (15 W)', 'USB-A: 5 V 2,4 A (12 W)', 'resto de puertos: reserva', '(compartimento de potencia)'], C['pwr'], '#fdecea')
     b += arrow(254, 210, 328, 210, C['pwr'], '230 V')
-    b += box(720, 90, 300, 150, 'Raspberry Pi 5', ['+ HAT: RTL-SDR, SX1262, GPS, RTC', '+ cámara WPI408 + LED IR (CSI)', 'consumo 8–12 W', 'USB limitado a 0,6 A en total', '(PI5_USB_MAX_CURRENT="no")'], C['pi'], '#edf7ee')
+    b += box(720, 90, 300, 150, 'Raspberry Pi 5', ['+ HAT: RTL-SDR, SX1262, GPS, RTC', '+ cámara Camera Module 3 Wide (CSI)', 'consumo 8–12 W', 'USB limitado a 0,6 A en total', '(PI5_USB_MAX_CURRENT="no")'], C['pi'], '#edf7ee')
     b += arrow(610, 170, 718, 170, C['pwr'], 'USB-C')
     b += box(720, 330, 300, 120, 'Hub USB 2.0 alimentado', ['«regleta USB energizada»', 'alimentado por el USB-A del cargador', 'consumo de lo que cuelga: ~6 W'], C['sdr'], '#eef4fb')
     b += arrow(610, 250, 718, 380, C['pwr'], 'USB-A 5 V')
@@ -352,7 +352,7 @@ def caja():
     b += r(pe + 42, 147, 85, 56, '#e8f5e9', C['pi'], 'Pi 5 + HAT', 'SDR · LoRa · GPS · RTC')
     cx, cy = 160, 196
     b += f"<rect x='{X(cx - 38):.1f}' y='{Y(cy + 14):.1f}' width='{76 * k:.1f}' height='{28 * k:.1f}' rx='3' fill='none' stroke='#263238' stroke-width='2.2' stroke-dasharray='7 4'/>"
-    b += f"<text x='{X(cx):.1f}' y='{Y(cy + 16):.1f}' font-size='11' text-anchor='middle' fill='#263238' font-weight='bold'>cámara WPI408 (en la tapa)</text>"
+    b += f"<text x='{X(cx):.1f}' y='{Y(cy + 16):.1f}' font-size='11' text-anchor='middle' fill='#263238' font-weight='bold'>cámara Camera Module 3 Wide (en la tapa)</text>"
     # cara inferior
     labels = re.search(r'SMA_LABELS = \[([^\]]*)\]', SCAD).group(1).replace('"', '').replace(' ', '').split(',')
     pitch = scad('SMA_PITCH')

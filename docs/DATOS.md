@@ -342,18 +342,20 @@ Origen: `ANTENAS` de `tools/mastil.py` (esquema 11).
 
 | Antena | Altura (m) | Brazo (m) | Rumbo | Banda | Transmite |
 |---|---|---|---|---|---|
-| Discone grande (MULTIPERFIL) | 2,90 | 0,00 | punta | 88–1300 MHz | no |
-| ADS-B λ/4 + LNA | 1,70 | 0,80 | E | 1090 MHz | no |
-| GPS activa | 1,70 | 0,40 | E | 1575 MHz | no |
-| Meshtastic 433 (fibra) | 1,70 | 0,80 | O | 433 MHz | sí |
-| Anemómetro RS485 | 1,50 | 0,80 | N | — | no |
-| Veleta RS485 | 1,50 | 0,80 | S | — | no |
-| Quad 2 m/70 cm (RADIOAFICIONADOS) | 0,95 | 0,00 | rumbo | 144/430 MHz | no |
-| Bigsignal 868 (Meshtastic HAT) | 0,20 | 0,80 | N | 868 MHz | sí |
-| Bigsignal 433 (iGate) | 0,20 | 0,80 | S | 433 MHz | no |
-| Garita BME280 | 0,05 | 0,45 | N | — | no |
+| X50 Diamond (2 m/70 cm) | 8,85 | 0,00 | punta | 144/430 MHz | sí |
+| Discono Moonraker SkyScan | 6,40 | 0,50 | E | 25–2000 MHz | no |
+| Discone grande (MULTIPERFIL) | 4,20 | 0,00 | punta | 88–1300 MHz | no |
+| ADS-B λ/4 + LNA | 3,00 | 0,80 | E | 1090 MHz | no |
+| GPS activa | 3,00 | 0,40 | E | 1575 MHz | no |
+| Meshtastic 433 (fibra) | 3,00 | 0,80 | O | 433 MHz | sí |
+| Anemómetro RS485 | 2,80 | 0,80 | N | — | no |
+| Veleta RS485 | 2,80 | 0,80 | S | — | no |
+| Quad 2 m/70 cm (RADIOAFICIONADOS) | 2,25 | 0,00 | rumbo | 144/430 MHz | no |
+| Bigsignal 868 (Meshtastic HAT) | 1,50 | 0,80 | N | 868 MHz | sí |
+| Bigsignal 433 (iGate) | 1,50 | 0,80 | S | 433 MHz | no |
+| Garita BME280 | 1,35 | 0,45 | N | — | no |
 
-Mástil Ø40 × 2: 530 MPa a 130 km/h sin vientos (límite S235: 235 MPa) → **vientos a 2,0 m**: 92 MPa a 150 km/h.
+Mástil telescópico 3 × 3,00 m, 8,20 m montado (solapes 0,35–0,45 m; diámetros y paredes PENDIENTES): viento de diseño vb,0 = 26 m/s (CTE, zona A). Las tensiones y la flecha exactas salen de `python3 tools/mastil.py` (se regenera este bloque con `tools/datos.py`; aquí no se han calculado todavía).
 
 ## 16. Antenas construidas: resultados NEC2
 

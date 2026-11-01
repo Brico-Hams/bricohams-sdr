@@ -103,7 +103,7 @@ Cableado del sensor: [esquema 03](esquemas/03_cableado_bme280.png) y [manual 06]
 
 | Elemento | Detalle |
 |---|---|
-| Cámara | Whadda/Velleman **WPI408**: OV5647 de 5 MP, 2592×1944, objetivo de 3,6 mm, 130°, 2 LED IR a 3,3 V |
+| Cámara | Raspberry Pi Camera Module 3 Wide (SC0874): IMX708 12 MP, 120° diag. (102° × 67°), focal 2,75 mm, autofoco 5 cm–∞, no NoIR. Placa 25 × 24 mm, 12,4 mm de alto, 4 × M2 a 21 × 12,5 mm (confirmar), conector FPC de 15 pines (Pi 5: cable Standard–Mini 15→22) |
 | Conector de la Pi 5 | CAM/DISP 0 o 1, **22 pines de paso 0,5 mm** |
 | Cable | **15 → 22 pines** («cable de cámara para Pi 5»). El de 15 pines de la cámara no entra en la Pi 5 |
 | Detección | `camera_auto_detect=1` + `rpicam-hello --list-cameras` → `ov5647` |

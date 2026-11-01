@@ -5,7 +5,7 @@ Consumos NOMINALES (verifícalos con la hoja de datos de tu unidad). Carril 12 V
 potencia; dos reductores 12→5 V de 5 A independientes: «5V-Pi» (solo la Pi y su electrónica) y «5V» (hub alimentado de los SDR USB).
 Uso: python3 tools/presupuesto_potencia.py
 """
-CARGADOR_W = 120.0            # cargador de la caja de potencia
+CARGADOR_W = 120.0            # cargador de la caja de potencia (2 USB-C PD + 2 USB-A QC, marca desconocida: los 120 W se reparten entre puertos; el PD a 12 V NO está confirmado, manual 17 §1.5)
 MARGEN_MAX = 0.60             # carga continua máxima sobre el cargador
 REDUCTOR_5V_A = 5.0           # reductor 12→5 V
 MARGEN_5V = 0.80              # carga continua máxima sobre el reductor

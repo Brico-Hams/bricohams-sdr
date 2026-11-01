@@ -1268,7 +1268,7 @@ paso_camara() {
         cam_src=$(printf '    source: %s\n    rtspTransport: tcp' "$CAM_RTSP_URL")
     else
         cam_src=$(printf '%s\n' \
-            "    # Whadda/Velleman WPI408: OV5647 5 MP, 130°, 2 LED IR" \
+            "    # Raspberry Pi Camera Module 3 Wide: IMX708 12 MP, 120° (no NoIR)" \
             "    source: rpiCamera" \
             "    rpiCameraWidth: ${CAM_WIDTH}" \
             "    rpiCameraHeight: ${CAM_HEIGHT}" \
