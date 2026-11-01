@@ -1,4 +1,4 @@
-﻿// =====================================================================
+// =====================================================================
 //  Caja v3 BricoHams SDR · N0CALL — DOS MÓDULOS al pie del mástil (~5 m)
 //
 //   MÓDULO DE ELECTRÓNICA  (VARIANTE="electronica")
@@ -13,6 +13,9 @@
 //       pluviómetro y reserva) en la cara inferior.
 //     - Ventilación forzada: entrada de 60 mm abajo a la izquierda y salida de
 //       60 mm arriba a la derecha (flujo en diagonal), cada una con capota.
+//     - Intemperie: faldón de la tapa (alero de 9 mm sobre la pared, vuelo 1,2 mm), junta TPU
+//       con compresión 25 %, 4 orificios de drenaje, cejas en las rejillas superiores, respiradero
+//       con membrana (PG7 «VENT»), tapones con cabeza que tapa la punta de la gota, tejadillo con faldones.
 //     - Ventana opcional para la cámara WPI408 en la tapa.
 //   MÓDULO DE POTENCIA  (VARIANTE="potencia")
 //     - Base Schuko de superficie + cargador USB de 120 W + gatillo USB-C PD a 12 V,
@@ -27,6 +30,13 @@
 //
 //  Coordenadas montada: X ancho, Y alto (0 = abajo), Z fondo (0 = espalda).
 //  Exportar: openscad -D 'VARIANTE="potencia"' -D 'PART="cuerpo"' -o …  (tools/caja_v3.sh)
+//
+//  MATERIAL (clima de diseño: 47 °C a la sombra; al sol el interior llega a 55–65 °C, ver docs/manuales/17_CAJA_V3.md):
+//    ASA blanco en TODAS las piezas rígidas (cuerpo, tapa, tejadillo, capotas, placa_rejilla, bandejas, postes, soportes, cunas
+//    de batería, guías de placa, pletina del transformador): HDT ≈ 95 °C. PETG (HDT ≈ 70 °C) no se usa: fluye bajo carga a 60–65 °C.
+//    TPU 95A solo en junta_tapa y tapones (no portan carga, trabajan por compresión y aguantan 80–100 °C).
+//  LLUVIA (rachas de 100 km/h, chubascos de más de 100 mm/h): faldón de la tapa, tejadillo con faldones laterales hasta 2 mm del techo
+//    (ROOF_SKIRT_Z), cejas en las rejillas superiores (ceja_techo), capotas con la boca hacia abajo, 4 drenajes y respiradero PG7 «VENT».
 // =====================================================================
 
 VARIANTE = "electronica";   // electronica | potencia | sai
@@ -36,6 +46,7 @@ PART = "montaje";           // montaje | cuerpo | tapa | tejadillo | placa_rejil
                             // soporte_dongle | soporte_hub | soporte_lilygo | soporte_sdrplay | soporte_wago |
                             // tapon_n | tapon_pg | soporte_schuko | brida_cargador |
                             // soporte_bateria | guia_pcb | pletina_trafo | soporte_filtro
+RESPIRO = false;            // true con PART="tapon_pg": tapón con orificio para la membrana del respiradero
 CAMARA = true;              // ventana de la cámara en la tapa del módulo de electrónica
 $fn = 48;
 E = 0.01;
@@ -49,10 +60,20 @@ H = EL ? 240 : SAI ? 240 : 200;
 D = EL ? 190 : SAI ? 140 : 112;   // electrónica: 190 de fondo para la 3.ª fila de N, las dos bandejas de SDR y la Pi
 T = 3.6;                    // pared de 9 líneas de 0,4: más rígida que la v2
 R = 8;
-GAP_LID = 3;  LID_T = 4.4;  RIB_H = 6;  GROOVE_W = 4.6;  GASKET_W = 4.8;  GASKET_H = 4;
+GAP_LID = 3;  LID_T = 4.4;  RIB_H = 6;  GROOVE_W = 4.6;  GASKET_W = 4.4;  GASKET_H = 4;   // junta TPU 4,4 × 4: más estrecha que la ranura para que se ensanche al comprimirse
+GASKET_COMP = (GASKET_H - GAP_LID) / GASKET_H;   // compresión de la junta (objetivo 20–30 %): 4 → 3 mm = 25 %
+// intemperie: faldón de la tapa que cae como un alero sobre la pared (el agua no llega a la junta)
+SKIRT_H = 12;               // altura del faldón desde el plano de la tapa; solapa SKIRT_H - GAP_LID = 9 mm la pared por debajo de la junta
+SKIRT_CL = 1.0;             // holgura faldón–pared (rompe la capilaridad y absorbe el alabeo del ASA)
+DRIP_OUT = 1.2;             // el faldón sobresale del faldón de remate de la caja: el agua gotea sin volver hacia la junta
+BELT_TOP = 11;              // el remate de la caja termina 2 mm por debajo del faldón de la tapa (hueco de escurrido)
+DRAIN_D = 3.2;  DRAIN_X = 14;   // orificios de drenaje del suelo (condensación): 4 por módulo, en las esquinas
+BREATH_D = 4;  BREATH_MEMB = 8; // respiradero: orificio y disco de membrana ePTFE; BREATH_MEMB es PENDIENTE de medir con la membrana que compres
+RAIN_CURB_H = 3;                // ceja alrededor de las rejillas de la cara superior
 EAR_L = 9;  EAR_Y = 26;  EAR_Z = 10;   // cierres laterales anchos (v5.5)
 // diseño «caja rígida de transporte» (v5.5): faldón perimetral que enrasa con la tapa y aspa en X hundida
-BELT_H = 16;  BELT_OUT = 2.3;           // BELT_OUT = vuelo de la tapa (offset 2.3)
+BELT_H = 16;  BELT_OUT = 2.3;           // BELT_OUT = vuelo del faldón de remate de la caja
+LID_OFF = BELT_OUT + DRIP_OUT;          // vuelo de la tapa y de su faldón (= 3,5 mm; la tapa sigue ≤ 250 mm con las orejas)
 LID_GR_W = 7;  LID_GR_D = 1.2;          // ancho y profundidad de las vetas de la tapa (sin voladizos al imprimir boca abajo)
 EARS_Y = H == 240 ? [24, 92, 148, 216] : [24, 100, 176];
 HOLE_M3 = 3.4;  INS_M3 = 4.0;  INS_M3_L = 6;
@@ -70,14 +91,14 @@ N_HOLE = 16.2;              // pasamuros N hembra (rosca 5/8")
 N_ROWS = [[26, ["SAT", "HAM", "VHF", "HF", "ADSB", "868", "GPS"]], [56, ["M433", "IG433", "DISC2", "HF2", "R1", "R2", "R3"]], [86, ["HRF", "AHF", "V4", "R4"]]];
 N_PITCH = 27;
 GL_Z = 116;
-GLANDS_E = [["M25", 25.4, "PWR"], ["M20", 20.4, "LAN"], ["PG7", 12.7, "WX"], ["PG7", 12.7, "VIENTO"], ["PG7", 12.7, "LLUVIA"], ["PG7", 12.7, "RES"]];
-GLANDS_P = [["PG9", 15.5, "230 V"], ["M25", 25.4, "A ELECTRONICA"]];
+GLANDS_E = [["M25", 25.4, "PWR"], ["M20", 20.4, "LAN"], ["PG7", 12.7, "WX"], ["PG7", 12.7, "VIENTO"], ["PG7", 12.7, "LLUVIA"], ["PG7", 12.7, "VENT"]];   // VENT: respiradero con membrana (tapon_pg con RESPIRO=true o PG7 comercial)
+GLANDS_P = [["PG9", 15.5, "230 V"], ["M25", 25.4, "A ELECTRONICA"], ["PG7", 12.7, "VENT"]];
 GLANDS_S = [["PG9", 15.5, "RED"], ["PG9", 15.5, "SALIDA"], ["PG7", 12.7, "DATOS"]];
 
 // ventiladores de 60 mm (12 V PWM de 4 hilos)
 FAN = 60;  FAN_HOLE = 57;  FAN_SCREW = 50;
 FAN_IN = [55, 60];          // (y, z) en la pared izquierda
-FAN_OUT = [190, 60];        // (y, z) en la pared derecha
+FAN_OUT = [190, 68];        // (y, z) en la pared derecha; z = 68 deja el ventilador (borde inferior 38) por encima del diplexor (arriba 34,8)
 
 // cámara
 CAM_C = [W / 2, 210];  CAM_WIN = [76, 26];  CAM_PC = [86.5, 36.5];  CAM_FRAME = 6;  CAM_FRAME_H = 5;
@@ -130,14 +151,19 @@ module cuerpo() {
                 translate([0, 0, T]) linear_extrude(D) offset(-T) outline();
             }
             ears();
-            // faldón de remate: sube 45° (imprime sin soportes) y deja el borde alineado con la tapa
+            // faldón de remate: sube 45° (imprime sin soportes), remata con otro 45° a SKIRT_H - GAP_LID + 2 mm de la junta
+            // y queda más bajo que el faldón de la tapa, que lo cubre con vuelo DRIP_OUT
             difference() {
                 hull() {
                     translate([0, 0, D - BELT_H]) linear_extrude(E) outline();
-                    translate([0, 0, D - BELT_H + BELT_OUT]) linear_extrude(BELT_H - BELT_OUT) offset(BELT_OUT) outline();
+                    translate([0, 0, D - BELT_H + BELT_OUT]) linear_extrude(E) offset(BELT_OUT) outline();
+                    translate([0, 0, D - BELT_TOP - BELT_OUT]) linear_extrude(E) offset(BELT_OUT) outline();
+                    translate([0, 0, D - BELT_TOP]) linear_extrude(E) outline();
                 }
                 translate([0, 0, D - BELT_H - 1]) linear_extrude(BELT_H + 2) offset(-T) outline();
             }
+            // cejas antilluvia alrededor de las rejillas de la cara superior (el agua de la tapa/pared no entra por ellas)
+            if (EL) ceja_techo(34, 78); else if (SAI) ceja_techo(30, 90); else ceja_techo(30, 80);
             // nervios exteriores en la espalda (rigidez frente a la presión del viento y a la fijación)
             for (x = [W * 0.25, W * 0.75]) translate([x - 3, R, -6]) cube([6, H - 2 * R, 6 + E]);
             // pilares de la rejilla
@@ -152,6 +178,8 @@ module cuerpo() {
                 translate([W - T - 4 + E, FAN_OUT[0] - FAN / 2 - 2, FAN_OUT[1] - FAN / 2 - 2]) difference() { cube([4, FAN + 4, FAN + 4]); translate([-1, 4, 4]) cube([6, FAN - 4, FAN - 4]); }
             }
         }
+        // drenaje de la condensación: 4 orificios en las esquinas del suelo (el módulo cuelga vertical; el agua baja al suelo)
+        for (x = [DRAIN_X, W - DRAIN_X], z = [8, D - 12]) translate([x, -1, z]) rotate([-90, 0, 0]) cylinder(d = DRAIN_D, h = T + 2);
         // insertos
         for (b = PL_BOSS) translate([PL[0] + b[0], PL[1] + b[1], T + STANDOFF - INS_M3_L]) cylinder(d = INS_M3, h = INS_M3_L + 1);
         for (y = WALL_Y, x = [W * 0.25, W * 0.75]) translate([x, y, -7]) cylinder(d = 7.0, h = 17);   // inserto M5 (agujero 7,0)
@@ -189,6 +217,15 @@ module cuerpo() {
     }
 }
 
+// ceja antilluvia: marco de 2 mm y RAIN_CURB_H de alto que rodea las rejillas de la cara superior (por fuera de las ranuras)
+module ceja_techo(z0, z1) {
+    x0 = 27;  x1 = W - 27;  za = z0 - 3;  zb = z1 + 3;
+    translate([x0, H - E, za]) difference() {
+        cube([x1 - x0, RAIN_CURB_H + E, zb - za]);
+        translate([2, -1, 2]) cube([x1 - x0 - 4, RAIN_CURB_H + E + 2, zb - za - 4]);
+    }
+}
+
 module glands(lista) {
     tot = sum_w(lista, len(lista) - 1) + 8 * (len(lista) - 1);
     for (i = [0 : len(lista) - 1]) {
@@ -221,17 +258,19 @@ module tapa() {
     difference() {
         union() {
             translate([0, 0, LID_Z0]) linear_extrude(LID_T) union() {
-                offset(2.3) outline();
+                offset(LID_OFF) outline();
                 for (y = EARS_Y, xs = [-1, 1]) translate([xs < 0 ? -EAR_L - 0.5 : W, y - EAR_Y / 2]) square([EAR_L + 0.5, EAR_Y]);
             }
-            translate([0, 0, LID_Z0 - RIB_H]) linear_extrude(RIB_H + E) difference() { offset(2.3) outline(); offset(-(T / 2 + GROOVE_W / 2 + 1.6)) outline(); }
+            // labio interior (centra la tapa y encierra la junta por dentro)
+            translate([0, 0, LID_Z0 - RIB_H]) linear_extrude(RIB_H + E) difference() { offset(-(T / 2 + GROOVE_W / 2)) outline(); offset(-(T / 2 + GROOVE_W / 2 + 1.6)) outline(); }
+            // faldón exterior (alero): cae SKIRT_H - GAP_LID sobre la pared, con holgura SKIRT_CL
+            translate([0, 0, LID_Z0 - SKIRT_H]) linear_extrude(SKIRT_H + E) difference() { offset(LID_OFF) outline(); offset(SKIRT_CL) outline(); }
             // nervios de rigidez por dentro
             for (x = [W * 0.33, W * 0.66]) translate([x - 2, 20, LID_Z0 - 5]) cube([4, H - 40, 5 + E]);
             if (cam) translate([CAM_C[0] - fx / 2, CAM_C[1] - fy / 2, LID_Z0 - CAM_FRAME_H]) cube([fx, fy, CAM_FRAME_H + E]);
         }
-        translate([0, 0, LID_Z0 - RIB_H - 1]) linear_extrude(RIB_H + 1) difference() { offset(-(T / 2 - GROOVE_W / 2)) outline(); offset(-(T / 2 + GROOVE_W / 2)) outline(); }
         for (y = EARS_Y, xs = [-1, 1]) {
-            translate([xs < 0 ? -EAR_L - 3 : W - 0.5, y - EAR_Y / 2 - 0.5, LID_Z0 - RIB_H - 1]) cube([EAR_L + 3.5, EAR_Y + 1, RIB_H + 1]);
+            translate([xs < 0 ? -EAR_L - 3 : W - 0.5, y - EAR_Y / 2 - 0.5, LID_Z0 - SKIRT_H - 1]) cube([EAR_L + 3.5, EAR_Y + 1, SKIRT_H + 1]);
             translate([xs < 0 ? -EAR_L / 2 - 0.5 : W + EAR_L / 2 + 0.5, y, LID_Z0 - 1]) cylinder(d = HOLE_M4, h = LID_T + 2);
         }
         if (cam) {
@@ -256,12 +295,20 @@ module junta_tapa() {
 }
 
 // ----------------------------- tejadillo -----------------------------
-ROOF_W = W + 16;  ROOF_L = D + GAP_LID + LID_T + 16;
+ROOF_W = W + 16;  ROOF_FRONT = 30;   // vuelo lateral 8 mm por lado (cabe en 250 mm) y 30 mm por delante de la tapa
+ROOF_L = D + GAP_LID + LID_T + ROOF_FRONT;  ROOF_SIDE_H = 8;   // refuerzo del borde del tejadillo
+ROOF_SKIRT_Z = 2;  // el faldón lateral baja hasta 2 mm del techo de la caja (lluvia batida por viento de 100 km/h)
 function roof_z(y) = ROOF_GAP + (ROOF_L - y) * tan(ROOF_A);
 module tejadillo() {
     difference() {
         union() {
-            translate([0, ROOF_L, ROOF_GAP]) rotate([-ROOF_A, 0, 0]) translate([0, -ROOF_L / cos(ROOF_A), 0]) cube([ROOF_W, ROOF_L / cos(ROOF_A), 4]);
+            translate([0, ROOF_L, ROOF_GAP]) rotate([-ROOF_A, 0, 0]) translate([0, -ROOF_L / cos(ROOF_A), 0]) {
+                cube([ROOF_W, ROOF_L / cos(ROOF_A), 4]);
+                for (x = [0, ROOF_W - 2.5]) translate([x, 0, -ROOF_SIDE_H]) cube([2.5, ROOF_L / cos(ROOF_A), ROOF_SIDE_H + 4]);   // refuerzo del borde
+            }
+            // faldones laterales hasta ROOF_SKIRT_Z del techo de la caja: con rachas de 100 km/h la lluvia no entra de lado por las rejillas superiores
+            for (x = [0, ROOF_W - 2.5]) translate([x, 0, 0]) rotate([90, 0, 90]) linear_extrude(2.5)
+                polygon([[0, ROOF_SKIRT_Z], [ROOF_L, ROOF_SKIRT_Z], [ROOF_L, roof_z(ROOF_L) + 1], [0, roof_z(0) + 1]]);
             translate([0, ROOF_L - 2.5, ROOF_GAP - 6]) cube([ROOF_W, 2.5, 7]);
             for (p = ROOF_PILLARS) translate([ROOF_W - 8 - p[0], p[1] + 2, 0]) cylinder(d = 11, h = roof_z(p[1] + 2) + 1);
         }
@@ -392,15 +439,40 @@ module soporte_dongle(ancho = 26, largo = 90) {   // cuna para un dongle (RTL, F
         for (x = [largo * 0.3, largo * 0.7]) translate([x, -1, 5]) cube([3, ancho + 20, 2]);
     }
 }
-module soporte_hub() { soporte_dongle(36, 124); }                    // regleta USB Vansuny 120 × 34 × 18
+// Hub USB Amazon Basics de 10 puertos con adaptador de 65 W (20 V / 3,25 A), ASIN B076YRSWGW. HUB_O = esquina del hub sobre la rejilla;
+// HUB_END: holgura libre en cada extremo (enchufes USB y conectores de entrada/alimentación).
+HUB = [145, 44, 23];     // PENDIENTE de medir (cifras de un anuncio de terceros, modelo HU9002V1SBL)
+HUB_O = [20, 136];  HUB_END = 15;
+// huecos reservados de la rejilla del módulo de electrónica: [nombre, [x, y], [ancho x, alto y, alto z]]
+EL_RES = [["dongles", [12, 28], [94, 85, 13]], ["bahia", [114, 28], [100, 90, 35]], ["diplexor", [182, 132], [26, 50, 20]],
+          ["wago", [90, 186], [60, 26, 10]], ["reserva", [20, 186], [60, 26, 22]]];
+function res(n) = [for (s = EL_RES) if (s[0] == n) s][0];
+module soporte_hub() {   // cuna ajustada al hub: dos carriles largos y extremos abiertos; dos ranuras para bridas
+    l = HUB[0] + 4;  w = HUB[1] + 8;
+    difference() {
+        union() {
+            base_rejilla(l, w);
+            for (y = [0, w - 2]) translate([0, y, 0]) cube([l, 2, 8]);
+        }
+        for (x = [l * 0.3, l * 0.7]) translate([x - 1.5, -1, 4]) cube([3, w + 2, 2]);
+    }
+}
 module soporte_sdrplay() { soporte_dongle(100, 100); }               // RSPdx/RSP1B (≈ 98 × 88 × 32)
 module soporte_lilygo() { soporte_dongle(29, 70); }
 module soporte_rak() { soporte_dongle(32, 64); }                     // RAK19007 (30 × 60) con RAK4631 y GPS
 module soporte_wago() {   // 3 WAGO 221-415 en línea (bus de 12 V y masa)
     difference() { union() { base_rejilla(70, 26); translate([5, 3, 0]) cube([60, 20, 8]); } translate([7, 5, 3]) cube([56, 16, 10]); for (x = [20, 40, 60]) translate([x - 1.4, -1, 5]) cube([2.8, 30, 2]); }
 }
-module tapon_n() { difference() { union() { cylinder(d = N_HOLE + 6, h = 2); cylinder(d = N_HOLE - 0.4, h = T + 4); } translate([0, 0, 2]) cylinder(d = N_HOLE - 4, h = 10); } }
-module tapon_pg(d = 12.7) { difference() { union() { cylinder(d = d + 6, h = 2); cylinder(d = d - 0.4, h = T + 4); } translate([0, 0, 2]) cylinder(d = d - 4, h = 10); } }
+module tapon_n() {   // la cabeza cubre la punta de la gota (radio ≈ 0,71 · N_HOLE): sin ello el agua entra por la punta bajo la cabeza
+    difference() { union() { cylinder(d = N_HOLE * 1.42 + 2, h = 2); cylinder(d = N_HOLE - 0.4, h = T + 4); } translate([0, 0, 2]) cylinder(d = N_HOLE - 4, h = 10); }
+}
+module tapon_pg(d = 12.7, resp = RESPIRO) {   // con resp = true lleva orificio BREATH_D: pega por dentro un disco de membrana ePTFE de BREATH_MEMB
+    difference() {
+        union() { cylinder(d = d * 1.42 + 2, h = 2); cylinder(d = d - 0.4, h = T + 4); }
+        translate([0, 0, 2]) cylinder(d = d - 4, h = 10);
+        if (resp) translate([0, 0, -1]) cylinder(d = BREATH_D, h = 5);
+    }
+}
 
 // ------------------------- módulo de potencia ------------------------
 SCHUKO = [80, 80, 42];       // base Schuko de superficie (medir la tuya)
@@ -537,10 +609,10 @@ module componentes() {
         for (i = [0 : 2]) ghost("steelblue") translate([PL[0] + 12 + i * 34, PL[1] + DONGLE_Y, pz]) cube([26, 85, 13]);
         ghost("gold") translate([PL[0] + 114, PL[1] + DONGLE_Y, pz]) cube([100, 90, 3]);         // bahía de expansión (marcada)
         ghost("lightgoldenrodyellow") translate([PL[0] + 114, PL[1] + DONGLE_Y, pz + 3]) cube([98, 88, 32]);   // SDRplay futuro
-        ghost("dimgray") translate([PL[0] + 20, PL[1] + 140, pz]) cube([124, 36, 18]);          // hub Vansuny
-        ghost("silver") translate([PL[0] + 150, PL[1] + 140, pz]) cube([26, 50, 20]);           // diplexor HF/VHF
-        ghost("orange") translate([PL[0] + 90, PL[1] + 186, pz]) cube([60, 26, 10]);            // WAGO 12 V
-        ghost("firebrick") translate([PL[0] + 20, PL[1] + 186, pz]) cube([60, 26, 22]);         // reserva: fusibles ATO por carril + 2 reductores 12→5 V (Pi y SDR USB) + 12 V del Hermes-Lite
+        ghost("dimgray") translate([PL[0] + HUB_O[0], PL[1] + HUB_O[1], pz]) cube(HUB);         // hub USB Amazon Basics de 10 puertos
+        dx = res("diplexor"); ghost("silver") translate([PL[0] + dx[1][0], PL[1] + dx[1][1], pz]) cube(dx[2]);   // diplexor HF/VHF
+        wg = res("wago"); ghost("orange") translate([PL[0] + wg[1][0], PL[1] + wg[1][1], pz]) cube(wg[2]);       // WAGO 12 V
+        rs = res("reserva"); ghost("firebrick") translate([PL[0] + rs[1][0], PL[1] + rs[1][1], pz]) cube(rs[2]); // reserva: fusibles ATO por carril + reductores 12→5 V y 12→20 V (opción b del hub) + 12 V del Hermes-Lite
         // bandeja intermedia con HackRF One, RTL-SDR V4 y Airspy HF+ Discovery
         for (p = deck_posts()) color("lightyellow") translate([p[0], p[1], pz]) cylinder(d = 10, h = DECK_H);
         translate([DECK_O[0], DECK_O[1], pz + DECK_H]) {
@@ -586,7 +658,7 @@ module montaje(abierta = false) {
     color("white") cuerpo();
     color("lightyellow") translate([PL[0], PL[1], T + STANDOFF]) placa_rejilla();
     if (!abierta) color("gainsboro") tapa();
-    color("orange") translate([0, 0, LID_Z0 - GASKET_H]) junta_tapa();
+    color("orange") translate([0, 0, LID_Z0 - GAP_LID]) junta_tapa();   // sobre el canto de la pared (z = D); 4 mm libres → 3 mm comprimida
     color("white") translate([W + 8, H, -2]) rotate([90, 0, 180]) tejadillo();
     if (EL && CAMARA && !abierta) color("white") translate([CAM_C[0], CAM_C[1], LID_Z0 + LID_T]) visera();
     if (EL) {
@@ -596,6 +668,17 @@ module montaje(abierta = false) {
     componentes();
 }
 
+// comprobaciones de intemperie (fallan al exportar si se cambian medidas y se pierde estanqueidad)
+assert(T >= 3.2, "pared < 3,2 mm: el ASA exterior necesita ≥ 8 perímetros de 0,4");
+assert(GASKET_COMP >= 0.20 && GASKET_COMP <= 0.30, "compresión de la junta fuera de 20–30 %");
+assert(GASKET_W < GROOVE_W, "la junta debe ser más estrecha que la ranura para ensancharse");
+assert(SKIRT_H - GAP_LID >= 8, "el faldón de la tapa solapa < 8 mm sobre la pared");
+assert(DRIP_OUT >= 1, "el faldón debe sobresalir ≥ 1 mm para gotear");
+assert(BELT_TOP >= SKIRT_H - GAP_LID + 1, "el remate de la caja toca el faldón de la tapa");
+assert(H + 2 * LID_OFF <= 250 && W + 2 * (EAR_L + 0.5) <= 250, "la tapa no cabe en 250 mm");
+assert(ROOF_W <= 250 && ROOF_L / cos(ROOF_A) <= 250, "el tejadillo no cabe en 250 mm");
+assert(DRAIN_D >= 3 && DRAIN_D <= 4, "orificio de drenaje fuera de 3–4 mm (menos se tapa, más deja pasar insectos)");
+assert(BREATH_MEMB <= 12.7 - 4, "la membrana no cabe en el hueco del tapón PG7");
 // comprobaciones de holgura (fallan al exportar si se cambian medidas y algo deja de caber)
 if (EL) {
     for (s = SDR_DECK) assert(s[1][0] >= 4 && s[1][1] >= 4 && s[1][0] + s[2][0] <= DECK[0] - 4 && s[1][1] + s[2][1] <= DECK[1] - 4, str("SDR fuera de la bandeja_sdr: ", s[0]));
@@ -609,6 +692,17 @@ if (EL) {
     assert(RAK_O[0] + RAK_C[0] <= BAND[0] - 5 && RAK_O[1] + RAK_C[1] <= BAND[1] - 8, "la cuna RAK se sale de la bandeja");
     assert(T + STANDOFF + PL_T + BAND_H + 41 <= D + GAP_LID - RIB_H, "la Pi + HAT toca la tapa");
     assert(GL_Z + 25.4 / 2 + 8 <= D, "los prensaestopas no caben en la cara inferior");
+    // hub USB: zona = hub + HUB_END libre en cada extremo (x) y 4 mm de cuna a cada lado (y); no pisa nada de la rejilla
+    hz = [HUB_O[0] - HUB_END, HUB_O[1] - 4, HUB[0] + 2 * HUB_END, HUB[1] + 8];
+    assert(HUB_END >= 15, "el hub necesita ≥ 15 mm libres en cada extremo (USB y conectores)");
+    assert(hz[0] >= 2 && hz[1] >= 2 && hz[0] + hz[2] <= PL[2] - 2 && hz[1] + hz[3] <= PL[3] - 2, "el hub USB se sale de la rejilla");
+    for (r = EL_RES) assert(max(r[1][0] - hz[0] - hz[2], hz[0] - r[1][0] - r[2][0], r[1][1] - hz[1] - hz[3], hz[1] - r[1][1] - r[2][1]) >= 1, str("el hub USB pisa el hueco: ", r[0]));
+    for (p = deck_posts()) assert(max(p[0] - PL[0] - 6 - hz[0] - hz[2], hz[0] - (p[0] - PL[0] + 6), p[1] - PL[1] - 6 - hz[1] - hz[3], hz[1] - (p[1] - PL[1] + 6)) >= 0, "el hub USB pisa un poste de las bandejas");
+    // zonas de los ventiladores sobre la rejilla (entrada x ≤ 22, y 18–78; salida x 192,8–217,8, y 153,4–213,4)
+    for (f = [[-3, FAN_IN[0] - 30 - PL[1], 25, 60], [W - T - 25 - PL[0], FAN_OUT[0] - 30 - PL[1], 25, 60]])
+        assert(max(f[0] - hz[0] - hz[2], hz[0] - f[0] - f[2], f[1] - hz[1] - hz[3], hz[1] - f[1] - f[3]) >= 1, "el hub USB pisa la zona de un ventilador");
+    assert(T + STANDOFF + PL_T + res("diplexor")[2][2] <= FAN_OUT[1] - 30, "el diplexor toca el ventilador de salida");
+    assert(DECK_H >= HUB[2] + 3 + 4, "el hub USB toca la bandeja de SDR");
 }
 if (SAI) {
     for (s = SAI_LAYOUT) assert(s[1][0] >= 2 && s[1][1] >= 2 && s[1][0] + s[2][0] <= PL[2] - 2 && s[1][1] + s[2][1] <= PL[3] - 2, str("fuera de la rejilla: ", s[0]));

@@ -114,6 +114,44 @@ assert all((len(f[1]) - 1) * num('N_PITCH') + num('N_HOLE') + 12 <= Wc - 2 * num
 assert filas[-1][0] + 13 + 2 < num('GL_Z') - 25.4 / 2 and num('GL_Z') + 25.4 / 2 + 8 <= Dc, 'prensaestopas'
 assert Dc <= 250 - 10
 
+# 2d. intemperie (España, sol/UV, 45 °C, lluvia con viento, polvo, condensación): reglas que usa el diseño
+par = num
+
+
+assert Tc >= 3.2 and abs(Tc / 0.4 - round(Tc / 0.4)) < 1e-9 and Tc / 0.4 >= 8, 'pared ASA: ≥ 8 perímetros de 0,4 (≥ 3,2 mm)'
+assert par('LID_T') >= 4.0, 'tapa < 4 mm'
+gap_lid, gasket_h, gasket_w, groove_w = par('GAP_LID'), par('GASKET_H'), par('GASKET_W'), par('GROOVE_W')
+comp = (gasket_h - gap_lid) / gasket_h
+assert 0.20 <= comp <= 0.30, ('compresión de la junta fuera de 20–30 %', comp)
+assert gasket_w < groove_w, 'la junta debe ser más estrecha que la ranura (se ensancha al comprimirse)'
+assert re.search(r'GASKET_COMP = \(GASKET_H - GAP_LID\) / GASKET_H', SRC) and 'assert(GASKET_COMP >= 0.20 && GASKET_COMP <= 0.30' in SRC
+skirt_h, drip_out, belt_out = par('SKIRT_H'), par('DRIP_OUT'), par('BELT_OUT')
+assert skirt_h - gap_lid >= 8, 'el faldón de la tapa debe solapar ≥ 8 mm la pared por debajo de la junta (alero)'
+assert drip_out >= 1.0, 'el faldón debe sobresalir ≥ 1 mm del remate de la caja (goteo)'
+assert num('BELT_TOP') >= skirt_h - gap_lid + 1, 'el remate de la caja no debe tocar el faldón'
+assert 'linear_extrude(SKIRT_H + E) difference() { offset(LID_OFF) outline(); offset(SKIRT_CL) outline(); }' in SRC, 'la tapa no lleva faldón'
+assert Hc + 2 * (belt_out + drip_out) <= 250 and Wc + 2 * (num('EAR_L') + 0.5) <= 250, 'la tapa con faldón y orejas no cabe en 250 mm'
+roof_w = Wc + 16
+roof_l = Dc + gap_lid + par('LID_T') + par('ROOF_FRONT')
+assert roof_w <= 250 and roof_l / 0.9961 <= 250, 'el tejadillo no cabe en 250 mm'
+assert par('ROOF_FRONT') >= 25 and num('ROOF_GAP') >= 10 and 'ROOF_SIDE_H' in SRC and 'ROOF_L - 2.5' in SRC, 'tejadillo: vuelo, cámara de aire 10 mm, faldones y canto de goteo'
+assert re.search(r'DRAIN_D = 3\.\d', SRC) and 'for (x = [DRAIN_X, W - DRAIN_X], z = [8, D - 12])' in SRC, 'faltan los orificios de drenaje'
+assert 3 <= num('DRAIN_D') <= 4, 'drenaje: ≥ 3 mm no se tapa y ≤ 4 mm frena a los insectos'
+assert '["PG7", 12.7, "VENT"]' in re.search(r'GLANDS_E = .+', SRC).group(0) and '["PG7", 12.7, "VENT"]' in re.search(r'GLANDS_P = .+', SRC).group(0), 'falta el respiradero'
+assert 'RESPIRO' in SRC and 'BREATH_D' in SRC and num('BREATH_MEMB') <= 12.7 - 4, 'respiradero: tapón con orificio y membrana que cabe'
+assert 'ceja_techo(34, 78)' in SRC and 'ceja_techo(30, 90)' in SRC and 'ceja_techo(30, 80)' in SRC and num('RAIN_CURB_H') >= 3, 'rejillas superiores sin ceja antilluvia'
+assert 'capota' in SRC and 'boca hacia abajo' in SRC, 'capotas con la boca hacia abajo'
+assert 'cube([3.5, T + 2' in SRC and 'cube([3.2, 80, T + 4])' in SRC, 'rejillas con lamas ≤ 3,5 mm'
+for t in ('tapon_n', 'tapon_pg'):   # la cabeza del tapón debe cubrir la punta de la gota (radio 0,707·d)
+    assert re.search(r'module %s\(.*?\* 1\.42 \+ 2' % t, SRC, re.S), 'la cabeza de %s no cubre la punta de la gota' % t
+assert 'N_HOLE * 1.42 + 2' in SRC and (num('N_HOLE') * 1.42 + 2) / 2 > num('N_HOLE') * 0.7072 + 1, 'tapón N'
+assert (num('N_HOLE') * 1.42 + 2) <= num('N_PITCH'), 'las cabezas de tapón_n no deben solaparse'
+assert 12.7 * 1.42 + 2 <= 12.7 + 8, 'las cabezas de tapon_pg no deben solaparse con el prensaestopas vecino'
+assert 'rotate([-90, 0, 0]) cylinder(d = DRAIN_D' in SRC
+assert 'assert(GASKET_COMP' in SRC and 'assert(SKIRT_H - GAP_LID >= 8' in SRC, 'faltan los assert de intemperie en el .scad'
+# soportes de pared: los nervios de la espalda son verticales (el agua baja entre la caja y la pared)
+assert 'for (x = [W * 0.25, W * 0.75]) translate([x - 3, R, -6]) cube([6, H - 2 * R, 6 + E]);' in SRC
+
 # 2c. módulo SAI: todo cabe en la rejilla sin solaparse y las cuentas del manual 17 §1.2 cuadran
 import sai_calculo  # noqa: E402
 assert re.search(r'W = EL \? 228 : SAI \? 228 : 170;', SRC) and re.search(r'D = EL \? 190 : SAI \? 140 : 112;', SRC)
@@ -151,6 +189,50 @@ p1090 = [x for x in g['barrido'] if x['f'] == 1090][0]
 assert p1090['roe50'] < 1.3 and g['radiante_mm'] == 62 and g['radiales_mm'] == 68
 dsc = json.load(open(os.path.join(R, 'discone.json')))
 assert set(dsc) == {'grande', 'compacta'}
+
+# 2e. guardas de regresión: insertos M3 de los pilares de la rejilla, selectores de caja_v3.sh, tejadillo y cejas
+CUERPO = re.search(r'module cuerpo\(\) \{.*?\n\}\n', SRC, re.S).group(0)
+assert 'for (b = PL_BOSS) col(PL[0] + b[0], PL[1] + b[1], 10, T - E, T + STANDOFF);' in CUERPO, 'faltan los pilares de la rejilla (PL_BOSS)'
+assert ('for (b = PL_BOSS) translate([PL[0] + b[0], PL[1] + b[1], T + STANDOFF - INS_M3_L]) '
+        'cylinder(d = INS_M3, h = INS_M3_L + 1);') in CUERPO, 'faltan los agujeros de los insertos M3 de los pilares de la placa_rejilla'
+assert num('INS_M3') >= 4.0 and num('INS_M3_L') >= 6 and len(re.search(r'PL_BOSS = (.+);', SRC).group(1).split('], [')) == 5, 'PL_BOSS: 4 esquinas + centro'
+for _p in com + se + sp + ss:   # cada pieza de caja_v3.sh tiene selector (sin depender de los STL)
+    assert re.search(r'PART == "%s"\) \w+\(' % re.escape(_p), SRC), 'pieza de caja_v3.sh sin selector: ' + _p
+assert re.search(r'module ceja_techo\(z0, z1\)', SRC), 'ceja_techo se llama pero no está definido: no se genera la ceja'
+assert 'ROOF_SKIRT_Z' in SRC and 1 <= num('ROOF_SKIRT_Z') <= 3, 'los faldones laterales del tejadillo deben bajar hasta ≤ 3 mm del techo de la caja'
+assert 'polygon([[0, ROOF_SKIRT_Z], [ROOF_L, ROOF_SKIRT_Z]' in SRC, 'faldón lateral del tejadillo'
+assert (Hc + num('LID_T') + 0) <= 250 and 3 <= num('RAIN_CURB_H') <= 6
+
+# 2f. hub USB Amazon Basics de 10 puertos (electrónica): medidas, hueco libre y sin choques
+hub, hub_o, hub_end = vec('HUB'), vec('HUB_O'), num('HUB_END')
+assert hub == [145, 44, 23] and 'PENDIENTE de medir' in re.search(r'\bHUB = .*', SRC).group(0), 'HUB sin marcar como pendiente de medir'
+assert 'soporte_dongle(36, 124)' not in SRC and 'HUB[0]' in re.search(r'module soporte_hub\(\).*?\n\}\n', SRC, re.S).group(0), 'soporte_hub no usa HUB'
+assert 'cube(HUB)' in SRC, 'el fantasma del hub no usa HUB'
+assert hub_end >= 15, 'el hub necesita ≥ 15 mm libres en cada extremo'
+res = {n: (float(x), float(y), float(l), float(w), float(h)) for n, x, y, l, w, h in re.findall(
+    r'\["(\w+)", \[(\d+), (\d+)\], \[(\d+), (\d+), (\d+)\]\]', re.search(r'EL_RES = (.+?);', SRC, re.S).group(1))}
+assert set(res) == {'dongles', 'bahia', 'diplexor', 'wago', 'reserva'}, res
+assert res['dongles'][1] == num('DONGLE_Y') and res['bahia'][1] == num('DONGLE_Y'), 'EL_RES y DONGLE_Y deben coincidir'
+pl_w, pl_h = Wc - 2 * Tc - 6, Hc - 2 * Tc - 6
+hz = (hub_o[0] - hub_end, hub_o[1] - 4, hub[0] + 2 * hub_end, hub[1] + 8)   # hub + extremos libres + cuna
+assert hz[0] >= 2 and hz[1] >= 2 and hz[0] + hz[2] <= pl_w - 2 and hz[1] + hz[3] <= pl_h - 2, ('el hub se sale de la rejilla', hz)
+
+
+def _sep(a, b):   # separación entre dos rectángulos (x, y, ancho, alto)
+    return max(b[0] - a[0] - a[2], a[0] - b[0] - b[2], b[1] - a[1] - a[3], a[1] - b[1] - b[3])
+
+
+for n, (x, y, l, w, h) in res.items():
+    assert _sep(hz, (x, y, l, w)) >= 1, ('el hub pisa el hueco', n)
+for px, py in postes:
+    assert _sep(hz, (px - pl - 6, py - pl - 6, 12, 12)) >= 0, ('el hub pisa un poste', px, py)
+# FAN_OUT está en la pared derecha y FAN_IN en la izquierda (abajo)
+assert _sep(hz, (Wc - Tc - 25 - pl, fan_out[0] - 30 - pl, 25, 60)) >= 1, 'el hub pisa la zona del ventilador de salida'
+fan_in = vec('FAN_IN')
+assert _sep(hz, (-3, fan_in[0] - 30 - pl, 25, 60)) >= 1
+assert pz + res['diplexor'][4] <= fan_out[1] - 30, 'el diplexor toca el ventilador de salida'
+assert deck_h >= hub[2] + 3 + 4, 'el hub toca la bandeja de SDR'
+assert 'assert(HUB_END >= 15' in SRC and 'el hub USB pisa el hueco' in SRC, 'faltan los assert del hub en el .scad'
 
 # 4. mástil Ø40 × 2: sin vientos falla a 130 km/h, con vientos aguanta 150 km/h
 W = mastil.modulo(40, 2.0)

@@ -201,7 +201,7 @@ Cableado del sensor: [esquema 03](esquemas/03_cableado_bme280.png) y [manual 06]
 - **Pasamuros N de la cara inferior:**
   - fila delantera: SAT · HAM · VHF · HF · ADSB · 868 · GPS;
   - fila trasera: M433 · IG433 · DISC2 · HF2 · R1 · R2 · R3.
-- **Prensaestopas:** M25 «PWR», M20 «LAN» y PG7 «WX», «VIENTO», «LLUVIA» y «RES».
+- **Prensaestopas:** M25 «PWR», M20 «LAN» y PG7 «WX», «VIENTO», «LLUVIA» y «VENT» (respiradero con membrana).
 - **Módulo SAI** (opcional, 228 × 240 × 140, debajo del de potencia): SAI de 600 VA con batería de 12 V 7–9 Ah, filtros EMI de 6 A a la entrada y a la salida, fusible ATO de 15 A en BAT+ y PG9 «RED», «SALIDA» y PG7 «DATOS» (USB del SAI → NUT en la Pi). Cálculos: `tools/sai_calculo.py`; montaje y seguridad: manual 17 §1.2.
 - **Ventilación:** [manual 18](manuales/18_VENTILACION.md).
 - **Viento y lluvia:** [manual 19](manuales/19_VIENTO_Y_LLUVIA.md).

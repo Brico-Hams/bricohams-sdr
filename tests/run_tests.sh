@@ -25,6 +25,7 @@ python3 tests/test_caja.py
 python3 tests/test_viento_lluvia.py
 python3 tests/test_fan.py
 python3 tests/test_v3_hardware.py
+python3 tests/test_termica_caja.py
 python3 tests/test_instalador_os.py
 python3 tests/test_instalador_docker.py
 python3 tests/test_pico_io.py

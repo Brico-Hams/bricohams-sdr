@@ -113,7 +113,7 @@ Kit para montar **desde cero** (o restaurar) la estación SDR multiusuario de Br
 | ☀️ Radiación solar, DX cluster, imagen BricoHams | — | plugins `solar`, `rig_skin`, `meteo`, `camara`, `bricohams` |
 | 📶 WiFi de casa (5 GHz preferida, 2,4 GHz de respaldo) | WiFi de la Pi 5 | NetworkManager (paso `red`) |
 | 📦 Caja del mástil + alimentación por cargador USB de 45 W | PETG + TPU (Anycubic Kobra S1) | `hardware/caja/` (OpenSCAD) |
-| 📦 **Caja v3** al pie del mástil: electrónica + potencia (120 W, bus de 12 V) | ASA/PETG + TPU | `hardware/caja_v3/` |
+| 📦 **Caja v3** al pie del mástil: electrónica + potencia (120 W, bus de 12 V) | ASA + TPU | `hardware/caja_v3/` |
 | 🌀 Ventilación con control PWM, tacómetros y DS18B20 | 2 × 60 mm 12 V de 4 hilos | `bricohams-fan` |
 | 📡 Antenas: quad 2 m/70, discones, ADS-B + LNA, MLA-30 | aluminio, fibra, piezas impresas | `hardware/antenas/` (NEC2 + OpenSCAD) |
 | 🔌 **v4** · Sensores y ventiladores con el HAT puesto | **Raspberry Pi Pico** por USB + 2 × 2N7002 | `firmware/pico-io` + `bricohams-io` |

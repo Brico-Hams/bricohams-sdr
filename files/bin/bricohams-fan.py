@@ -298,8 +298,8 @@ def main():
         except OSError:
             print('sin estado: ¿está en marcha bricohams-fan?')
         return 0
-    cfg = {'cpu_min': float(env('FAN_T_CPU_MIN', '55')), 'cpu_max': float(env('FAN_T_CPU_MAX', '75')),
-           'caja_min': float(env('FAN_T_CAJA_MIN', '35')), 'caja_max': float(env('FAN_T_CAJA_MAX', '45')),
+    cfg = {'cpu_min': float(env('FAN_T_CPU_MIN', '50')), 'cpu_max': float(env('FAN_T_CPU_MAX', '70')),
+           'caja_min': float(env('FAN_T_CAJA_MIN', '40')), 'caja_max': float(env('FAN_T_CAJA_MAX', '55')),
            'duty_min': int(env('FAN_DUTY_MIN', '30')), 'hist': float(env('FAN_HIST', '3'))}
     pwm_gpios = [int(x) for x in env('FAN_PWM_GPIOS', '12,13').split(',') if x]
     tach_gpios = [int(x) for x in env('FAN_TACH_GPIOS', '22,5').split(',') if x]

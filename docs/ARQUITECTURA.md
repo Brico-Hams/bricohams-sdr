@@ -711,6 +711,7 @@ Registro de decisiones (ADR) de la estación BricoHams SDR. Cada una dice **qué
 9. **FBP-868s**: potencia máxima real de tu unidad (SAW, ~18 dBm).
 10. **Antenas**: ajuste final con NanoVNA (manuales 12–14).
 11. **Temperatura de la caja en verano**: medir con `bricohams-fan --estado` y ajustar la curva.
+    - **Intemperie de la caja v3** (manual 17 §6): el diseño (faldón de tapa, junta al 25 %, drenaje, respiradero, tejadillo) está hecho en el `.scad` y comprobado por texto en `tests/test_v3_hardware.py`; **quedan** la prueba de manguera, 24 h de lluvia, el estado de la junta, la medida de la membrana del respiradero y regenerar los STL con OpenSCAD.
 12. **v4.3 · Docker en la Pi real**: primer `docker compose up` con `slechev/openwebrxplus-softmbe` en Trixie y Bookworm, SDR enchufados en caliente con `c 189:* rmw`, y RSP de SDRplay (¿hace falta `OWRX_DOCKER_PRIVILEGED`?).
 13. **v4.3 · Datos en línea**: respuesta real de `maps.fmdx.org/api?qth=` (formato y clasificación de emisoras) y de `observacion/convencional/todas` de AEMET desde la Pi. Las pruebas usan respuestas de muestra.
 14. **v4.3 · Coordenadas «aprox» del catálogo AEMET**: se afinan solas con `AEMET_API_KEY`. Las frecuencias de OurAirports marcadas «sin verificar» conviene contrastarlas con el AIP de ENAIRE.

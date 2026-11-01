@@ -165,4 +165,8 @@ Ver «Pendiente / a verificar» en [ARQUITECTURA.md](ARQUITECTURA.md). Lo propio
 - los puertos de la regleta Vansuny;
 - el pinout del HAT (para descartar choques con GPIO5/12/13/17/22);
 - el ajuste fino de las antenas con NanoVNA;
-- la temperatura de la caja en verano.
+- la temperatura de la caja en verano;
+- el Ø del mástil (`MAST_D`).
+
+Hecho en el código y en `tests/test_v3_hardware.py` (diseño de intemperie, manual 17 §6): pared ≥ 3,2 mm, compresión de la junta 25 %, faldón de 9 mm con vuelo, tejadillo con faldones, 4 drenajes, respiradero PG7 «VENT», cejas en las rejillas superiores, tapones que cubren la punta de la gota y todo ≤ 250 mm.
+Pendiente de la intemperie, **solo con la caja real**: prueba de manguera, 24 h de lluvia, temperatura en verano, estado de la junta, medir la membrana del respiradero (`BREATH_MEMB`) y regenerar los STL con OpenSCAD (los actuales son anteriores a estos cambios).
