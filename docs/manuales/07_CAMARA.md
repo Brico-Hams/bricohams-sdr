@@ -1,50 +1,59 @@
-# 07 · Cámara del mástil (Waveshare RPi Camera (F) · OV5647 con visión nocturna)
+# 07 · Cámara pública del mástil (Camera Module 3 · IMX708 Wide)
 
 <!-- guia-visual:inicio -->
 > **Ruta visual:** [Cámara y MediaMTX](../GUIA_VISUAL_MODULOS.md#camara).
 > Consulta allí requisitos, ilustración, cuadro de instalación, comprobaciones y restauración.
-> Los comandos de este manual se ejecutan en Bash en la Pi; revisa el backup antes de cambiarla.
+> Los comandos de este manual se ejecutan en Bash en la Pi; crea y verifica el backup antes de cambiarla.
 <!-- guia-visual:fin -->
 
-## 1. Cámara y conexión (v4)
-- **Cámara:** **Raspberry Pi Camera Module 3 Wide** (SC0874).
-  - IMX708 de 12 MP, autofoco de 5 cm a infinito, focal 2,75 mm, 120° en diagonal (102° H × 67° V).
-  - **No es NoIR: no ve de noche con IR** (sin LED IR). Para la noche, usa una cámara IP o ilumina. `CAM_TUNING` se deja vacío (libcamera elige `imx708_wide` solo; si lo fijas: `/usr/share/libcamera/ipa/rpi/pisp/imx708_wide.json`).
-- **Por qué «no entra»:** la Pi 5 tiene conectores CSI **mini de 22 pines y 0,5 mm**, y la cámara trae un conector **estándar de 15 pines y 1 mm**.
-- **Qué cable comprar:** el **«Raspberry Pi 5 Camera Cable» Standard–Mini (15 → 22 pines)** de 200, 300 o 500 mm.
-  - En la cámara va el extremo ancho de 15 pines.
-  - En la Pi va el estrecho de 22 pines, en el conector **CAM/DISP 0** (o 1), con los **contactos metálicos mirando hacia el puerto Ethernet**.
-- **Con el HAT puesto:** la cinta pasa por el hueco lateral entre la Pi y el HAT. Usa la de 300 mm para sacarla por el lado de la caja hasta la ventana de la tapa.
-- **Montaje:** la placa (25 × 24 mm, 12,4 mm de alto, 4 × M2 a 21 × 12,5 mm: confirmar con el plano del Product Brief) no es estanca. Va dentro de la caja, con el objetivo a 3 mm de la cara exterior de un cristal de policarbonato o acrílico pegado en la ventana de 20 × 16 mm (`soporte_camara`), y la `visera` por fuera sin entrar en el campo de 67°. Con 120° la ventana no debe recortar la imagen: ≥ 2·d·tan(FOV/2) + Ø objetivo (≈ 8 mm).
-- **Comprobar:**
-  1. Para MediaMTX: `sudo systemctl stop mediamtx`.
-  2. Lanza `rpicam-hello --list-cameras`: debe salir `imx708_wide`.
-  3. Haz una prueba: `rpicam-still -o prueba.jpg`.
-  4. Si no sale, revisa la orientación de la cinta y que `camera_auto_detect=1` esté en `config.txt`.
-- **Enfoque:** es autofoco; comprueba la imagen en `http://<pi>:8889/mastil/`. Si el cristal desenfoca, fija el enfoque con `--lens-position` (≈ 0 para infinito).
+## 1. Cámara y conexión
 
-## 2. Configuración (`/etc/mediamtx/mediamtx.yml`, la genera el paso `camara`)
+- **Cámara instalada:** Raspberry Pi Camera Module 3 gran angular, sensor `imx708_wide`, 4608 × 2592 píxeles y autofoco.
+- **Cable:** Raspberry Pi 5 Camera Cable Standard–Mini (15 → 22 pines). Conecta y desconecta únicamente con la Raspberry apagada; el índice `0` de libcamera no identifica el número del conector físico.
+- **Montaje:** protección de intemperie y ventana limpia delante de la lente. El encuadre definitivo es el mástil; las imágenes de pruebas interiores también son públicas mientras la transmisión esté activa.
+- **Perfil del sensor:** `CAM_TUNING=""` permite que libcamera seleccione automáticamente el perfil de la cámara detectada. No fuerces `ov5647_noir.json` en una IMX708.
+- **Cámara anterior:** Waveshare RPi Camera (F), OV5647 NoIR de 5 MP y enfoque manual. Solo para ese sensor conserva la opción explícita `CAM_TUNING=/usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json`.
 
-| Parámetro | Valor | Por qué |
+## 2. Configuración
+
+`/etc/mediamtx/mediamtx.yml` se genera en el paso `camara`.
+
+| Parámetro | Valor | Motivo |
 |---|---|---|
-| `source` | `rpiCamera` | cámara CSI |
-| Resolución | 1280×720 a 10 fps | equilibrio con la CPU |
-| `rpiCameraCodec` | `softwareH264` | la Pi 5 no tiene codificador por hardware |
-| `rpiCameraBitrate` | 1,5 Mb/s | |
-| `rpiCameraTuningFile` | `CAM_TUNING` | `ov5647_noir.json` si la cámara no tiene filtro IR |
+| `source` | `rpiCamera` | Cámara CSI |
+| Resolución | 1280 × 720 a 10 fps | Limitar carga en la Pi |
+| `rpiCameraCodec` | `softwareH264` | La Pi 5 no tiene codificador H.264 por hardware |
+| `rpiCameraBitrate` | 1,5 Mb/s | Caudal por espectador aproximado |
+| `rpiCameraTuningFile` | `CAM_TUNING` vacío por defecto | Selección automática del perfil |
+| RTSP | TCP en `127.0.0.1:8554` | Solo consumidores internos, incluida la foto periódica |
+| HLS | `127.0.0.1:8888` | Solo accesible mediante el proxy Nginx |
+| WebRTC | Desactivado | Evitar puertos adicionales para vídeo |
 
-**Accesos:**
-- Directo WebRTC: `http://<pi>:8889/mastil/`
-- RTSP: `rtsp://<pi>:8554/mastil`
-- HLS: `http://<pi>:8888/mastil/`
-- Foto para la web: `bricohams-camsnap` cada 60 s a `htdocs/plugins/receiver/camara/snap/mastil.jpg` (tmpfs).
+Nginx sirve `/camara/` desde el HLS interno. El vídeo y las fotos son públicos para todos los usuarios del SDR; los ajustes y la administración conservan su autenticación. No reenvíes los puertos de MediaMTX en el router. El navegador utiliza únicamente HTTPS por el **443**, sin conexiones a 8889 ni a UDP 8189.
 
-## 3. En OpenWebRX
-El botón 📷 **CAM** de la barra abre dos vistas:
-- **FOTO:** funciona desde fuera por el puerto 8073.
-- **DIRECTO:** solo en la LAN, o si abres 8889/tcp y 8189/udp.
+## 3. En OpenWebRX+
 
-## 4. Ajustes
-- **Imagen girada:** `CAM_HFLIP` / `CAM_VFLIP`.
-- **Colores rosados de día:** `CAM_TUNING=/usr/share/libcamera/ipa/rpi/pisp/ov5647_noir.json`.
-- **Cada vez que cambies algo:** `sudo bash install.sh --solo camara`.
+El botón 📷 **CAM** ofrece:
+
+- **FOTO:** imagen pública en `static/plugins/receiver/camara/snap/mastil.jpg`, por el mismo HTTPS del SDR. `bricohams-camsnap` la actualiza cada 60 s y la guarda en tmpfs.
+- **DIRECTO:** HLS público en `https://DOMINIO/camara/mastil/`. `live: 'auto'` utiliza esa ruta en el mismo origen. HLS tiene cierto retardo respecto a la escena.
+
+Cerrar el panel retira la imagen o el reproductor. No hay detección automática de disponibilidad ni cambio automático de DIRECTO a FOTO.
+
+## 4. Comprobación y ajustes
+
+Sin detener MediaMTX, comprueba una captura del flujo interno:
+
+```bash
+ffmpeg -hide_banner -loglevel error -rtsp_transport tcp \
+  -i rtsp://127.0.0.1:8554/mastil \
+  -frames:v 1 -y /tmp/mastil-test.jpg
+```
+
+Abre la imagen para verificar nitidez y color. Revisa FOTO y DIRECTO desde el SDR mediante HTTPS, también desde una conexión exterior; comprueba en las herramientas de red del navegador que la cámara solo utiliza el 443.
+
+`rpicam-hello --list-cameras` permite identificar el sensor. Una captura independiente con `rpicam-still` requiere liberar la cámara: MediaMTX mantiene acceso exclusivo. Pararlo interrumpe el vídeo público; vuelve a iniciarlo al terminar.
+
+- **Imagen girada:** ajusta `CAM_HFLIP` / `CAM_VFLIP`.
+- **Color incorrecto:** comprueba el sensor detectado y elimina un perfil forzado de otra cámara antes de ajustar el balance de blancos.
+- **Aplicar configuración:** después del backup verificado, `sudo bash install.sh --solo camara`. Comprueba el reinicio del servicio y la reproducción; un servicio activo no demuestra por sí solo que la imagen sea correcta.

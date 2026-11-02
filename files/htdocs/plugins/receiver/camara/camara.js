@@ -7,13 +7,13 @@
  *   - FOTO: una foto que se renueva sola (por defecto cada 60 s). La saca
  *     bricohams-camsnap en el servidor y se sirve por el mismo puerto de
  *     OpenWebRX, así que funciona desde fuera sin abrir más puertos.
- *   - DIRECTO: vídeo WebRTC de MediaMTX (puerto 8889). Funciona en la red
- *     local o si abres/rediriges ese puerto; si no, usa la FOTO.
+ *   - DIRECTO: vídeo HLS de MediaMTX por HTTPS (puerto 443). Funciona en la red
+ *     local y desde Internet por el mismo HTTPS; si falla, usa FOTO.
  *
  * Ajustes opcionales en init.js:
  *   window.camara_config = {
  *       snapshot: 'static/plugins/receiver/camara/snap/mastil.jpg',
- *       live: 'auto',        // 'auto' = mismo host, puerto 8889; o una URL completa; '' = sin directo
+ *       live: 'auto',        // 'auto' = /camara/mastil/ en el mismo origen; o una URL completa; '' = sin directo
  *       refresh: 60,         // segundos entre fotos
  *       after: '#bh-meteo-button',
  *       title: 'Cámara del mástil · Mi QTH'
@@ -31,7 +31,7 @@ Plugins.camara.init = function () {
     var AFTER = cfg.after || '#bh-meteo-button';
     var TITLE = cfg.title || 'CÁMARA DEL MÁSTIL';
     var LIVE = (cfg.live === undefined || cfg.live === 'auto')
-        ? location.protocol + '//' + location.hostname + ':8889/mastil/'
+        ? '/camara/mastil/'
         : cfg.live;
 
     var css =
@@ -95,7 +95,7 @@ Plugins.camara.init = function () {
         $win.find('.cm-chip[data-v]').removeClass('on').filter('[data-v="' + view + '"]').addClass('on');
         if (view === 'directo') {
             $view.html('<iframe allow="autoplay; fullscreen" allowfullscreen src="' + LIVE + '"></iframe>');
-            $note.text('Vídeo en directo (WebRTC). Si no carga, el puerto 8889 no es accesible desde aquí: usa FOTO.');
+            $note.text('Vídeo en directo (HLS). Si no carga, usa FOTO.');
             $open.attr('href', LIVE);
         } else {
             var $img = $('<img alt="Vista desde el mástil">').attr('src', snapUrl());

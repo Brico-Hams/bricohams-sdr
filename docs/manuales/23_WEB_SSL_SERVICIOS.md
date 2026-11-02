@@ -60,12 +60,12 @@
 | Receptor OpenWebRX+ | `https://DOMINIO/` | `https://IP/` |
 | Portal con todos los servicios | `http://DOMINIO/bricohams/` | `http://IP/bricohams/` |
 | Mapa de aviones tar1090 | `http://DOMINIO/tar1090/` | igual |
-| Cámara del mástil (HLS) | `http://DOMINIO/camara/mastil/` | `http://IP:8888/mastil/` |
+| Cámara del mástil (HLS público) | `https://DOMINIO/camara/mastil/` | mismo dominio HTTPS, puerto 443 |
 | Aviso de privacidad | `http://DOMINIO/bricohams/privacidad.html` | — |
 | API de los plugins | `http://DOMINIO/bricohams/api/salud` | — |
 | Meshtastic 433 / 868 (configuración) | **solo con sesión de admin:** `https://DOMINIO/settings/bricohams/meshtastic` (botón «Meshtastic 433 / 868» en Ajustes) | igual |
 | Meshtastic API del nodo 868 | no expuesto | `IP:4403` (TCP, sin clave: solo LAN) |
-| RTSP de la cámara | no expuesto | `rtsp://IP:8554/mastil` |
+| RTSP de la cámara | no expuesto | `rtsp://127.0.0.1:8554/mastil` (solo Pi, TCP) |
 | Admin de OpenWebRX+ | **`https://DOMINIO/settings`** (si entras por http, te lleva a https) | igual |
 
 **«¿Quieres una estación como esta?» (v5.0):** con `FUENTES_URL` en `bricohams.env` (la dirección `https://` de tu repositorio) el portal muestra una tarjeta y el receptor un botón 🛠️ «Monta la tuya» (encima del de Telegram). Solo se admiten direcciones `https://`; vacío (por defecto) = no aparecen. Para cambiarlo: `sudo bash install.sh --solo plugins,web`.

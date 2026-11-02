@@ -1278,7 +1278,7 @@ paso_camara() {
             "    # la Pi 5 no tiene codificador H.264 por hardware" \
             "    rpiCameraCodec: softwareH264" \
             "    rpiCameraBitrate: ${CAM_BITRATE}" \
-            "    rpiCameraTuningFile: ${CAM_TUNING}")
+            "    rpiCameraTuningFile: \"${CAM_TUNING}\"")
     fi
     install -d /etc/mediamtx
     cat >/etc/mediamtx/mediamtx.yml <<EOF
@@ -1287,13 +1287,14 @@ logLevel: info
 api: yes
 apiAddress: 127.0.0.1:9997
 rtsp: yes
-rtspAddress: :8554
+rtspAddress: 127.0.0.1:8554
+rtspTransports: [tcp]
 rtmp: no
 srt: no
 hls: yes
-hlsAddress: :8888
-webrtc: yes
-webrtcAddress: :8889
+hlsAddress: 127.0.0.1:8888
+hlsVariant: fmp4
+webrtc: no
 paths:
   mastil:
 ${cam_src}
@@ -1347,7 +1348,7 @@ WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable --now mediamtx bricohams-camsnap
-    bien "MediaMTX (RTSP :8554/mastil · WebRTC :8889/mastil · HLS :8888/mastil) y foto cada ${CAM_SNAPSHOT_SECONDS}s"
+    bien "MediaMTX (RTSP/HLS locales · vídeo público /camara/mastil/ por HTTPS) y foto cada ${CAM_SNAPSHOT_SECONDS}s"
 }
 
 paso_sensor() {
@@ -3061,7 +3062,7 @@ cat <<EOF
   Servicios:  bricohams-servicios        (lista con estado y direcciones)
   Web:        $([ "${SSL_MODO:-todo}" = todo ] && echo https || echo http)://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/   · admin https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings (SSL_MODO=${SSL_MODO:-todo}; OpenWebRX+ 8073 solo en la Pi)
   Meshtastic: https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/settings/bricohams/meshtastic  (solo administrador)
-  Cámara:     http://$(hostname -I 2>/dev/null | awk '{print $1}'):8889/mastil/
+  Cámara:     https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/camara/mastil/
   Aviones:    https://${SSL_DOMAIN:-$(hostname -I 2>/dev/null | awk '{print $1}')}/tar1090/
   Pico IO:    sudo bricohams-io estado      FT2: sudo bricohams-ft2 estado
   TAK:        /settings → «Servidor TAK» (TAK=${TAK:-no})   Grafana: /settings → «Monitorización» (MONITORIZACION=${MONITORIZACION:-no})

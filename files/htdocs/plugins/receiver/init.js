@@ -29,7 +29,7 @@ const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' + location.h
 // Botones propios de la barra superior: DX (rig_skin) · SOL · 21,3° (METEO) · CAM
 window.solar_config     = { lat: __LAT__, lon: __LON__ };                   // QTH para día/noche
 window.meteo_config     = { url: 'static/plugins/receiver/meteo/meteo.json' };
-window.camara_config    = { live: 'auto', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · __QTH__' };
+window.camara_config    = { live: BH_WEB + '/camara/mastil/', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · __QTH__' };
 window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true, fuentes: '__FUENTES__' };   // fuentes: «¿Quieres una estación como esta?» (FUENTES_URL)
 // v4
 window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
