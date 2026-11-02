@@ -375,6 +375,19 @@ if [ -e /etc/systemd/system/bricohams-wx-red.service ]; then
             || mal "wx-red.json viejo o ausente: journalctl -u bricohams-wx-red -n 30"
     else aviso "Clima en red desactivado (WXRED_ENABLE)"; fi
 fi
+if [ -e /etc/systemd/system/bricohams-sondas.service ]; then
+    if systemctl is-enabled --quiet bricohams-sondas 2>/dev/null; then
+        servicio bricohams-sondas-rx
+        servicio bricohams-sondas
+        sj=$HTDOCS/plugins/receiver/meteo/sondas.json
+        [ "$(edad "$sj")" -lt 120 ] && bien "Radiosondas: $(python3 -c "import json;d=json.load(open('$sj'));print(len(d['sondas']),'sondas en seguimiento')" 2>/dev/null)" \
+            || mal "sondas.json viejo o ausente: journalctl -u bricohams-sondas -n 30"
+        [ "$(stat -c %a /etc/bricohams/sondas.env 2>/dev/null)" = 600 ] && bien "sondas.env con permisos 600" \
+            || mal "/etc/bricohams/sondas.env debe ser 600 (chmod 600)"
+        { [ -z "${SONDAS_SDR_SERIAL:-}" ] || [ "${SONDAS_SDR_SERIAL}" = "${SERIAL_ADSB:-}" ] || [ "${SONDAS_SDR_SERIAL}" = "${AIS_SDR_SERIAL:-}" ]; } \
+            && mal "SONDAS_SDR_SERIAL vacío o repetido (ADS-B/AIS): cada SDR hace una sola cosa" || bien "SDR de radiosondas ${SONDAS_SDR_SERIAL} distinto del de ADS-B y AIS"
+    else aviso "Radiosondas desactivadas (SONDAS_ENABLE)"; fi
+fi
 if [ -e /etc/systemd/system/bricohams-wspr.timer ]; then
     systemctl is-active --quiet bricohams-wspr.timer && bien "resumen WSPR cada 15 min" || aviso "bricohams-wspr.timer parado"
     systemctl is-failed --quiet bricohams-wspr.service && aviso "resumen WSPR falló (¿sin indicativo WSPRnet?): journalctl -u bricohams-wspr -n 10"

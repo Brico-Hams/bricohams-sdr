@@ -8,6 +8,7 @@
     const ships = new Map();
     let aprsLayer, aircraftLayer, status;
     let aisLayer = null, aisStatus = '';
+    let sondasLayer = null, sondasStatus = '';
     let takLayer;
     const takMarkers = new Map();
 
@@ -340,11 +341,11 @@
                     aircraft.delete(id);
                 }
             });
-            status.textContent = 'ADS-B local: ' + seen.size + ' con posicion' + (aisStatus ? ' · ' + aisStatus : '');
+            status.textContent = 'ADS-B local: ' + seen.size + ' con posicion' + (aisStatus ? ' · ' + aisStatus : '') + (sondasStatus ? ' · ' + sondasStatus : '');
         } catch (e) {
             aircraftLayer.clearLayers();
             aircraft.clear();
-            status.textContent = 'ADS-B local no disponible' + (aisStatus ? ' · ' + aisStatus : '');
+            status.textContent = 'ADS-B local no disponible' + (aisStatus ? ' · ' + aisStatus : '') + (sondasStatus ? ' · ' + sondasStatus : '');
             console.error('BricoHams ADS-B:', e);
         }
     }
@@ -459,6 +460,75 @@
         return true;
     }
 
+    function textoSonda(s) {
+        const n = function (v, d, u) { return Number.isFinite(v) ? v.toFixed(d) + u : '?'; };
+        return String(s.serie) + (s.modelo ? ' · ' + s.modelo : '') +
+            '\nFrecuencia: ' + n(s.freq, 3, ' MHz') +
+            '\nAltitud: ' + n(s.alt, 0, ' m') + '\nV. vertical: ' + n(s.vel_v, 1, ' m/s') +
+            '\nTemperatura: ' + n(s.temp, 1, ' °C') +
+            '\nÚltima señal: hace ' + Math.max(0, Math.round(Date.now() / 1000 - s.visto)) + ' s';
+    }
+
+    function puntoSonda(lat, lon, html, titulo, texto) {
+        const m = L.marker([lat, lon], {icon: L.divIcon({className: 'bricohams-sonda', html: html, iconSize: [22, 22]})});
+        const div = document.createElement('div');
+        div.style.cssText = 'white-space:pre-line;min-width:180px';
+        div.textContent = texto;
+        const etiqueta = document.createElement('span');
+        etiqueta.textContent = titulo;
+        return m.bindPopup(div).bindTooltip(etiqueta).addTo(sondasLayer);
+    }
+
+    async function pollSondas() {
+        if (document.hidden) return true;
+        try {
+            const response = await fetch('static/plugins/receiver/meteo/sondas.json', {cache: 'no-store'});
+            if (response.status === 404) return false;
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const data = await response.json();
+            if (!Array.isArray(data.sondas)) throw new Error('Respuesta de sondas no valida');
+            if (!sondasLayer) {
+                sondasLayer = L.layerGroup().addTo(map);
+                layerControl.addOverlay(sondasLayer, 'Radiosondas (AEMET)');
+            }
+            sondasLayer.clearLayers();
+            const sitio = data.sitio;
+            if (sitio && position(sitio.lat, sitio.lon)) {
+                puntoSonda(sitio.lat, sitio.lon, '&#127968;', 'Lanzamiento ' + sitio.id,
+                    'Sitio de lanzamiento ' + sitio.id + ' (' + sitio.nombre + ')\nLanzamientos 00 y 12 UTC');
+            }
+            let vivas = 0;
+            data.sondas.slice(0, 20).forEach(function (s) {
+                if (typeof s.serie !== 'string' || !position(s.lat, s.lon)) return;
+                vivas++;
+                const traza = Array.isArray(s.traza) ? s.traza.filter(t => Array.isArray(t) && position(t[0], t[1])) : [];
+                if (traza.length > 1) {
+                    L.polyline(traza.map(t => [t[0], t[1]]), {color: '#c62828', weight: 2, opacity: 0.8}).addTo(sondasLayer);
+                }
+                puntoSonda(s.lat, s.lon, '&#127880;', s.serie, textoSonda(s));
+                if (s.burst && position(s.burst.lat, s.burst.lon)) {
+                    puntoSonda(s.burst.lat, s.burst.lon, '&#128165;', 'Reventon ' + s.serie,
+                        'Reventon de ' + s.serie + '\nAltitud: ' + (Number.isFinite(s.burst.alt) ? s.burst.alt.toFixed(0) + ' m' : '?'));
+                }
+                const p = s.prediccion;
+                if (p && position(p.lat, p.lon)) {
+                    puntoSonda(p.lat, p.lon, '&#127937;', 'Aterrizaje previsto ' + s.serie,
+                        'Aterrizaje previsto de ' + s.serie + '\nPrediccion: SondeHub (CC BY-SA)');
+                    if (Array.isArray(p.ruta)) {
+                        L.polyline(p.ruta.filter(t => Array.isArray(t) && position(t[0], t[1])).map(t => [t[0], t[1]]),
+                            {color: '#6a1b9a', weight: 2, dashArray: '6 6'}).addTo(sondasLayer);
+                    }
+                }
+            });
+            sondasStatus = vivas ? 'Radiosondas: ' + vivas : '';
+        } catch (e) {
+            if (sondasLayer) sondasLayer.clearLayers();
+            sondasStatus = '';
+            console.error('BricoHams radiosondas:', e);
+        }
+        return true;
+    }
+
     // Logo de BricoHams en la cabecera del mapa (nginx ya lo cambia; esto cubre el acceso sin nginx)
     function marca() {
         const original = document.querySelector('.webrx-top-logo:not(.bh-marca-logo)');
@@ -547,6 +617,10 @@
             if (await pollAis() !== false) setTimeout(aisTick, 15000);
         }
         aisTick();
+        async function sondasTick() {
+            if (await pollSondas() !== false) setTimeout(sondasTick, 20000);
+        }
+        sondasTick();
     }
     start();
 })();

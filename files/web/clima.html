@@ -29,6 +29,10 @@ footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><ma
 
 <h2>📶 Balizas WSPR (24 h)</h2><div class="card" id="wspr"><span class="dim">Cargando…</span></div>
 
+<h2>🎈 Radiosondas (AEMET)</h2>
+<div class="card"><div class="dim" id="sondasestado">Cargando…</div><table><thead><tr><th>Sonda</th><th>Tipo</th><th>Frec.</th><th>Altitud</th><th>V. vertical</th><th>Temp.</th><th>Aterrizaje previsto</th><th>Hace</th></tr></thead><tbody id="sondas"></tbody></table>
+<div class="dim" id="sondasmqtt"></div><div class="nota" id="sondasatrib"></div></div>
+
 <h2>🗓️ Próximos pases que se grabarán</h2>
 <div class="card"><div class="dim" id="planestado"></div><table><thead><tr><th>AOS (hora local)</th><th>Satélite</th><th>Elev. máx.</th><th>Duración</th><th>Frecuencia</th><th>Acción</th></tr></thead><tbody id="plan"></tbody></table></div>
 
@@ -109,6 +113,24 @@ footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><ma
         }).catch(function () { $('wspr').innerHTML = '<span class="dim">Sin resumen WSPR (systemctl status bricohams-wspr.timer).</span>'; });
     }
 
+    function sondas() {
+        json('meteo/sondas.json').then(function (d) {
+            var l = d.sondas || [], m = d.mqtt || {}, hayPred = false;
+            $('sondasestado').innerHTML = esc(d.sitio ? d.sitio.nombre + ' (' + d.sitio.id + ')' : 'AEMET') + ': lanzamientos a las 00 y 12 UTC · próximo ' + esc(hora(d.proximo_lanzamiento)) +
+                ' · ' + esc(l.length) + ' sonda(s) en seguimiento';
+            if (!l.length) vacio('sondas', 8, 'Ninguna sonda recibida ahora mismo (las de Murcia suben a las 00 y 12 UTC; 403,4 MHz).');
+            else $('sondas').innerHTML = l.map(function (s) {
+                var p = s.prediccion;
+                if (p) hayPred = true;
+                return '<tr><td>' + esc(s.serie) + (s.activa ? ' <span class="b ok">activa</span>' : '') + '</td><td>' + esc(s.modelo || '—') + '</td><td>' + (typeof s.freq === 'number' ? num(s.freq, 3) + ' MHz' : '—') +
+                    '</td><td>' + num(s.alt, 0) + ' m' + (s.burst ? ' · reventó a ' + num(s.burst.alt, 0) + ' m' : '') + '</td><td>' + num(s.vel_v, 1) + ' m/s</td><td>' + num(s.temp, 1) + ' °C</td><td>' +
+                    (p ? num(p.lat, 3) + ', ' + num(p.lon, 3) : '—') + '</td><td>' + (typeof s.visto === 'number' ? esc(hace(s.visto)) : '—') + '</td></tr>';
+            }).join('');
+            $('sondasmqtt').textContent = m.activo ? 'MQTT activo: ' + m.host + ':' + m.puerto + ' · tema ' + m.tema + (m.conectado ? ' (conectado)' : ' (sin conexión)') : 'MQTT desactivado.';
+            $('sondasatrib').innerHTML = hayPred ? 'Predicción de aterrizaje: datos de <a href="https://sondehub.org" target="_blank" rel="noopener">SondeHub</a> (CC BY-SA 4.0).' : '';
+        }).catch(function () { $('sondasestado').textContent = 'Servicio no disponible o desactivado (SONDAS_ENABLE; systemctl status bricohams-sondas).'; });
+    }
+
     function campo(n, v) { return '<input type="hidden" name="' + n + '" value="' + esc(v) + '">'; }
     function amsat(f) {
         if (!f) return '<span class="dim">—</span>';
@@ -142,7 +164,7 @@ footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><ma
         });
     }
 
-    function todo() { sensor(); wx(); wspr(); sat(); }
+    function todo() { sensor(); wx(); wspr(); sondas(); sat(); }
     todo();
     setInterval(todo, 60000);
 })();

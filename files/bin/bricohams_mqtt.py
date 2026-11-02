@@ -27,10 +27,12 @@ def _longitud(n):
 
 
 class Publicador:
-    def __init__(self, host='127.0.0.1', puerto=1883, cliente=None, usuario='', clave=''):
+    def __init__(self, host='127.0.0.1', puerto=1883, cliente=None, usuario='', clave='', testamento=None):
+        """testamento: (tema, texto, retener) que el broker publica si la conexión se pierde (LWT)."""
         self.host, self.puerto = host, int(puerto)
         self.cliente = cliente or 'bricohams-%d' % os.getpid()
         self.usuario, self.clave = usuario, clave
+        self.testamento = testamento
         self.sock, self.reintento, self.enviados = None, 0.0, 0
 
     def conectar(self):
@@ -39,8 +41,13 @@ class Publicador:
         try:
             s = socket.create_connection((self.host, self.puerto), timeout=5)
             flags = 0x02 | (0x80 if self.usuario else 0) | (0x40 if self.clave else 0)
+            will = b''
+            if self.testamento:
+                tema, texto, retener = self.testamento
+                flags |= 0x04 | (0x20 if retener else 0)
+                will = _cadena(tema) + struct.pack('!H', len(texto.encode('utf-8'))) + texto.encode('utf-8')
             var = _cadena('MQTT') + bytes([4, flags]) + struct.pack('!H', 60)
-            pay = _cadena(self.cliente) + (_cadena(self.usuario) if self.usuario else b'') + \
+            pay = _cadena(self.cliente) + will + (_cadena(self.usuario) if self.usuario else b'') + \
                 (_cadena(self.clave) if self.clave else b'')
             s.sendall(bytes([0x10]) + _longitud(len(var) + len(pay)) + var + pay)
             r = s.recv(4)
@@ -53,15 +60,16 @@ class Publicador:
             self.sock, self.reintento = None, time.time() + 30
             return False
 
-    def publicar(self, tema, datos):
-        """Publica JSON (QoS 0). Devuelve False si no hay broker (no bloquea más de 5 s)."""
+    def publicar(self, tema, datos, retener=False):
+        """Publica JSON (QoS 0; retener=True deja el último valor en el broker). Devuelve False si no hay
+        broker (no bloquea más de 5 s)."""
         if not self.conectar():
             return False
         carga = json.dumps(datos, ensure_ascii=False, separators=(',', ':')).encode('utf-8') \
             if not isinstance(datos, (bytes, str)) else (datos.encode('utf-8') if isinstance(datos, str) else datos)
         var = _cadena(tema)
         try:
-            self.sock.sendall(bytes([0x30]) + _longitud(len(var) + len(carga)) + var + carga)
+            self.sock.sendall(bytes([0x31 if retener else 0x30]) + _longitud(len(var) + len(carga)) + var + carga)
             self.enviados += 1
             return True
         except OSError:

@@ -54,6 +54,8 @@ fila "Pases satélites" bricohams-satpass.timer "cada 15 min" "-"
 fila "Grabación de pases" bricohams-satrec "MP3 en Files · pases.ics" "${DOM:+$PUB://$DOM/bricohams/clima.html}"
 fila "Clima en red (APRS)" bricohams-wx-red "APRS-IS solo lectura" "${DOM:+$PUB://$DOM/bricohams/clima.html}"
 fila "Resumen WSPR" bricohams-wspr.timer "cada 15 min (wspr.live)" "wspr.rocks"
+[ -f /etc/systemd/system/bricohams-sondas.service ] && fila "Radiosondas (receptor)" bricohams-sondas-rx "auto_rx en Docker · 127.0.0.1:5000" "-"
+[ -f /etc/systemd/system/bricohams-sondas.service ] && fila "Radiosondas (puente)" bricohams-sondas "UDP 127.0.0.1:55673 -> mapa y Tiempo" "${DOM:+$PUB://$DOM/bricohams/clima.html}"
 echo -e "${g}* v5.0: OpenWebRX+ (8073), tar1090 y AIS-catcher solo escuchan en 127.0.0.1: se entra por nginx (443).${n}"
 if [ "$MODO" = no ]; then puertos="80"; else puertos="80 y 443"; fi
 echo -e "${g}Router: abrir SOLO $puertos TCP hacia $IP (no 8073, 4403 ni 9443). Tareas automáticas: cat /etc/cron.d/bricohams${n}"

@@ -36,6 +36,8 @@
 #     vivo con aviones readsb y trazas APRS (tools/activar_mapa_local.sh); RadarBox/MLAT intactos.
 #   - Herramientas: bricohams-check, bricohams-sdr-serials, bricohams-lilygo,
 #     bricohams-servicios, bricohams-io, bricohams-ft2, owrx-clone.
+#   - v5.6: radiosondas AEMET (400-406 MHz) con radiosonde_auto_rx en Docker y un RTL-SDR propio:
+#     mapa y pestaña Tiempo, MQTT opcional (SONDAS_ENABLE; sudo bash install.sh --solo sondas; manual 51).
 #
 #  Uso:
 #    sudo bash install.sh                      # todo (vale aunque falte el permiso de ejecución)
@@ -65,7 +67,7 @@ OWRX_ETC=/etc/openwebrx
 ETC_BH=/etc/bricohams
 BOOTCFG=/boot/firmware/config.txt
 CMDLINE=/boot/firmware/cmdline.txt
-PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb ais meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
+PASOS=(comprobar base red arranque hat openwebrx rtlsdr sdrplay configuracion plugins meteo io sensor camara ventilacion adsb ais sondas meshtastic lilygo rak satelites ft2 tak monitorizacion web visitas herramientas banner importar tareas)
 BACKUP=""
 SOLO=""
 MODULO=""                       # --modulo satelites: solo ese módulo sobre un OpenWebRX+ existente
@@ -1079,7 +1081,7 @@ paso_plugins() {
     rsync -a --no-perms --no-owner --no-group \
         --exclude 'meteo/sensor.json' --exclude 'meteo/caja.json' \
         --exclude 'meteo/meteo.json' --exclude 'camara/snap/' --exclude 'satelites/pases.json' --exclude 'visitas/visitas.json' \
-        --exclude 'meteo/wx-red.json' --exclude 'meteo/wspr.json' --exclude 'satelites/grabaciones.json' --exclude 'satelites/pases.ics' \
+        --exclude 'meteo/wx-red.json' --exclude 'meteo/sondas.json' --exclude 'meteo/wspr.json' --exclude 'satelites/grabaciones.json' --exclude 'satelites/pases.ics' \
         "${guardar[@]}" "$FILES/htdocs/plugins/" "$HTDOCS/plugins/"
     local callsign_gate=no tone_detector=no callsign_anuncio=no p
     local -A pedido=([callsign_gate]="${PLUGIN_CALLSIGN_GATE:-yes}" [tone_detector]="${PLUGIN_TONE_DETECTOR:-no}")
@@ -1573,6 +1575,131 @@ EOF
     systemctl enable bricohams-ais >/dev/null 2>&1 || true
     systemctl restart bricohams-ais || aviso "No arranca AIS-catcher: journalctl -u bricohams-ais (¿está conectado el SDR ${serie}?)"
     bien "AIS local: AIS-catcher (SDR ${serie}) -> capa «AIS local» del mapa de OpenWebRX+"
+}
+
+# v5.6 · Radiosondas (ADR-72, manual 51): radiosonde_auto_rx en Docker con un RTL-SDR propio (400-406 MHz)
+# + puente bricohams-sondas (UDP 127.0.0.1:55673 -> sondas.json para el mapa y la pestaña Tiempo, MQTT opcional).
+# La consola de auto_rx solo escucha en 127.0.0.1:5000. El blacklist de dvb_usb_rtl28xxu lo pone paso_arranque.
+paso_sondas() {
+    if ! si "${SONDAS_ENABLE:-no}"; then
+        aviso "Radiosondas omitidas (SONDAS_ENABLE)"
+        systemctl disable --now bricohams-sondas bricohams-sondas-rx 2>/dev/null || true
+        command -v docker >/dev/null && docker rm -f bricohams-sondas-rx >/dev/null 2>&1 || true
+        return
+    fi
+    local serie=${SONDAS_SDR_SERIAL:-} fmin=${SONDAS_MIN_FREQ:-400.05} fmax=${SONDAS_MAX_FREQ:-406.0} f
+    local fijas=${SONDAS_ALWAYS_SCAN-403.4} ppm=${SONDAS_PPM:-0} ganancia=${SONDAS_GAIN:--1}
+    local mhost=${SONDAS_MQTT_HOST:-127.0.0.1} mpuerto=${SONDAS_MQTT_PORT:-1883} tema=${SONDAS_MQTT_TOPIC:-bricohams/sondas}
+    local imagen=ghcr.io/projecthorus/radiosonde_auto_rx:latest dk
+    [[ "$serie" =~ ^[A-Za-z0-9._-]+$ ]] || fallo "SONDAS_ENABLE=yes necesita SONDAS_SDR_SERIAL (serie del RTL-SDR de radiosondas: rtl_test lo muestra)"
+    [ "$serie" != "${SERIAL_ADSB:-}" ] || fallo "SONDAS_SDR_SERIAL no puede ser el mismo SDR que SERIAL_ADSB"
+    [ "$serie" != "${AIS_SDR_SERIAL:-}" ] || fallo "SONDAS_SDR_SERIAL no puede ser el mismo SDR que AIS_SDR_SERIAL"
+    for f in SERIAL_HAT SERIAL_MINI SERIAL_V3; do
+        [ -z "${!f:-}" ] || [ "$serie" != "${!f}" ] || fallo "SONDAS_SDR_SERIAL no puede ser el mismo SDR que $f"
+    done
+    [[ "$fmin" =~ ^[0-9]{3}(\.[0-9]{1,3})?$ ]] && [[ "$fmax" =~ ^[0-9]{3}(\.[0-9]{1,3})?$ ]] \
+        || fallo "SONDAS_MIN_FREQ / SONDAS_MAX_FREQ deben ser MHz (p. ej. 400.05 y 406.0)"
+    awk -v a="$fmin" -v b="$fmax" 'BEGIN{exit !(a>=400.05 && b<=406.0 && a<b)}' \
+        || fallo "SONDAS_MIN_FREQ/MAX_FREQ: la banda de radiosondas es 400.05-406.0 MHz y MIN debe ser menor que MAX"
+    if [ -n "$fijas" ]; then
+        [[ "$fijas" =~ ^[0-9.]+(,[0-9.]+)*$ ]] || fallo "SONDAS_ALWAYS_SCAN: lista de MHz separada por comas (p. ej. 403.4)"
+        for f in ${fijas//,/ }; do
+            [[ "$f" =~ ^[0-9]{3}(\.[0-9]{1,3})?$ ]] && awk -v a="$f" 'BEGIN{exit !(a>=400.05 && a<=406.0)}' \
+                || fallo "SONDAS_ALWAYS_SCAN: $f MHz fuera de la banda 400.05-406.0"
+        done
+    fi
+    [[ "$ppm" =~ ^-?[0-9]{1,3}$ ]] && [ "$ppm" -ge -200 ] && [ "$ppm" -le 200 ] || fallo "SONDAS_PPM debe ser un entero entre -200 y 200"
+    [[ "$ganancia" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && awk -v g="$ganancia" 'BEGIN{exit !(g>=-1 && g<=50)}' \
+        || fallo "SONDAS_GAIN debe estar entre 0 y 50 dB (o -1 = automática)"
+    for f in SONDAS_SONDEHUB SONDAS_PREDICCION SONDAS_MQTT; do
+        [[ "${!f:-}" =~ ^(yes|no|si|true|false|1|0)?$ ]] || fallo "$f debe ser yes o no"
+    done
+    {
+        [[ "$mhost" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || fallo "SONDAS_MQTT_HOST no es un nombre o IP válido"
+        [[ "$mpuerto" =~ ^[0-9]{1,5}$ ]] && [ "$mpuerto" -ge 1 ] && [ "$mpuerto" -le 65535 ] || fallo "SONDAS_MQTT_PORT debe estar entre 1 y 65535"
+        [[ "$tema" =~ ^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$ ]] || fallo "SONDAS_MQTT_TOPIC no puede llevar comodines (+ #), espacios ni barras al principio o al final"
+        [[ "${SONDAS_MQTT_USER:-}" != *$'\n'* && "${SONDAS_MQTT_PASS:-}" != *$'\n'* ]] || fallo "SONDAS_MQTT_USER/PASS no pueden llevar saltos de línea"
+    }
+    command -v docker >/dev/null || apt_i docker.io
+    systemctl enable --now docker >/dev/null 2>&1 || true
+    dk=$(command -v docker) || fallo "Docker no ha quedado instalado (necesario para radiosonde_auto_rx)"
+    install -d -m 755 "$ETC_BH" "$ETC_BH/sondas" /usr/local/lib/bricohams
+    install -d -m 755 /var/lib/bricohams/sondas-log
+    install -m 755 "$FILES/bin/bricohams-sondas.py" /usr/local/bin/bricohams-sondas
+    install -m 644 "$FILES/bin/bricohams_mqtt.py" /usr/local/lib/bricohams/bricohams_mqtt.py
+    "$dk" pull "$imagen" >/dev/null 2>&1 || aviso "No pude bajar $imagen (¿sin red?); uso la imagen local si existe"
+    # plantilla oficial (todas las claves que exige el analizador de auto_rx) sacada de la propia imagen
+    "$dk" run --rm --entrypoint cat "$imagen" /opt/auto_rx/station.cfg.example >"$ETC_BH/sondas/station.cfg.example" 2>/dev/null \
+        && [ -s "$ETC_BH/sondas/station.cfg.example" ] \
+        || { rm -f "$ETC_BH/sondas/station.cfg.example"; fallo "No pude extraer station.cfg.example de $imagen (¿sin red y sin imagen local?)"; }
+    # station.cfg generado desde la plantilla y bricohams.env (lleva la posición de la estación: solo root lo lee)
+    ( umask 077
+      env SONDAS_SDR_SERIAL="$serie" SONDAS_MIN_FREQ="$fmin" SONDAS_MAX_FREQ="$fmax" SONDAS_ALWAYS_SCAN="$fijas" \
+          SONDAS_PPM="$ppm" SONDAS_GAIN="$ganancia" SONDAS_SONDEHUB="${SONDAS_SONDEHUB:-no}" \
+          STATION_LAT="${STATION_LAT:-0}" STATION_LON="${STATION_LON:-0}" STATION_ASL="${STATION_ASL:-0}" \
+          CALLSIGN="${CALLSIGN:-N0CALL}" /usr/local/bin/bricohams-sondas --station-cfg "$ETC_BH/sondas/station.cfg.example" >"$ETC_BH/sondas/station.cfg.nuevo" ) \
+        || { rm -f "$ETC_BH/sondas/station.cfg.nuevo"; fallo "No pude generar station.cfg de radiosondas (revisa SONDAS_*)"; }
+    chmod 600 "$ETC_BH/sondas/station.cfg.nuevo"
+    mv -f "$ETC_BH/sondas/station.cfg.nuevo" "$ETC_BH/sondas/station.cfg"
+    # credenciales MQTT: solo root y 600; el servicio las recibe por LoadCredential (nunca en la unidad ni en el JSON)
+    ( umask 077
+      { envl SONDAS_MQTT_USER "${SONDAS_MQTT_USER:-}"; envl SONDAS_MQTT_PASS "${SONDAS_MQTT_PASS:-}"; } >"$ETC_BH/sondas.env" )
+    chmod 600 "$ETC_BH/sondas.env"; chown root:root "$ETC_BH/sondas.env"
+    install -d -m 755 -o openwebrx "$HTDOCS/plugins/receiver/meteo" 2>/dev/null || install -d -m 755 "$HTDOCS/plugins/receiver/meteo"
+    cat >/etc/systemd/system/bricohams-sondas-rx.service <<EOF
+[Unit]
+Description=BricoHams: radiosondas (radiosonde_auto_rx en Docker, SDR ${serie}) consola solo en 127.0.0.1:5000
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+ExecStartPre=-${dk} rm -f bricohams-sondas-rx
+ExecStart=${dk} run --rm --name bricohams-sondas-rx --network=host --device=/dev/bus/usb --security-opt=no-new-privileges --cap-drop=ALL -v ${ETC_BH}/sondas/station.cfg:/opt/auto_rx/station.cfg:ro -v /var/lib/bricohams/sondas-log:/opt/auto_rx/log ${imagen}
+ExecStop=${dk} stop -t 20 bricohams-sondas-rx
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    # el puente solo necesita UDP local, MQTT y HTTPS (AF_UNIX: resolución de nombres) y escribir su estado y sondas.json
+    cat >/etc/systemd/system/bricohams-sondas.service <<EOF
+[Unit]
+Description=BricoHams: puente de radiosondas (UDP 127.0.0.1:55673 -> sondas.json y MQTT opcional)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=openwebrx
+StateDirectory=bricohams/sondas
+StateDirectoryMode=0700
+LoadCredential=sondas.env:${ETC_BH}/sondas.env
+Environment="SONDAS_OUT=${HTDOCS}/plugins/receiver/meteo/sondas.json" "SONDAS_PREDICCION=${SONDAS_PREDICCION:-yes}"
+Environment="SONDAS_MQTT=${SONDAS_MQTT:-no}" "SONDAS_MQTT_HOST=${mhost}" "SONDAS_MQTT_PORT=${mpuerto}" "SONDAS_MQTT_TOPIC=${tema}"
+ExecStart=/usr/local/bin/bricohams-sondas
+Restart=always
+RestartSec=10
+ProtectSystem=strict
+ReadWritePaths=-${HTDOCS}/plugins/receiver/meteo
+ProtectHome=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable bricohams-sondas-rx bricohams-sondas >/dev/null 2>&1 || true
+    systemctl restart bricohams-sondas || aviso "No arranca el puente: journalctl -u bricohams-sondas"
+    systemctl restart bricohams-sondas-rx || aviso "No arranca radiosonde_auto_rx: journalctl -u bricohams-sondas-rx (¿está conectado el SDR ${serie}?)"
+    bien "Radiosondas: auto_rx (SDR ${serie}, ${fmin}-${fmax} MHz) -> capa «Radiosondas» del mapa y pestaña Tiempo"
 }
 
 # v5.1 · map.flights como destino ADICIONAL a RadarBox (manual 04): conector Beast de readsb

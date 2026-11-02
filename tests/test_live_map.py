@@ -85,4 +85,15 @@ pos = rak.aprs_mapa('EA1AAA>APRS,TCPIP*:!4213.75N/00842.50W>moving', origen='APR
 assert pos['source'] == 'EA1AAA' and 'freq' not in pos and 'APRS-IS' in pos['comment']
 assert 'LoRa' not in pos['comment']
 assert rak.aprs_mapa('EA1AAA>APRS:') is None
+
+# v5.6 · capa de radiosondas: lee sondas.json y todo texto entra por textContent (nada de innerHTML con datos)
+with open(os.path.join(ROOT, 'files', 'htdocs', 'plugins', 'map', 'bricohams_live', 'bricohams_live.js'),
+          encoding='utf-8') as f:
+    live = f.read()
+assert "static/plugins/receiver/meteo/sondas.json" in live and "'Radiosondas (AEMET)'" in live
+assert 'async function pollSondas' in live and 'sondasTick()' in live
+bloque = live[live.index('function textoSonda'):live.index('// Logo de BricoHams')]
+assert 'innerHTML' not in bloque and 'bindPopup(div)' in bloque and 'textContent' in bloque
+assert 'burst' in bloque and 'prediccion' in bloque and 'sitio' in bloque and 'position(s.lat, s.lon)' in bloque
+assert 'SondeHub' in bloque
 print('OK: ADS-B, APRS-IS, deduplicacion de chat y flags MQTT')

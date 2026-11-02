@@ -42,6 +42,7 @@ La lista de módulos creados, la historia de desarrollo de cada uno y los plugin
 | 2947 | gpsd | 127.0.0.1 |
 | 8504 | lighttpd (tar1090, solo si no hay configuración nginx oficial) | 127.0.0.1 |
 | 8100 | AIS-catcher (`bricohams-ais`, `/api/ships.json`) | 127.0.0.1 |
+| 5000 / UDP 55673 | radiosonde_auto_rx (`bricohams-sondas-rx`, consola) / paquetes `PAYLOAD_SUMMARY` hacia `bricohams-sondas` | 127.0.0.1 |
 | 8554 / 8889 / 8888 / 9997 | MediaMTX RTSP / WebRTC / HLS / API | LAN / LAN / 127.0.0.1 / 127.0.0.1 |
 | 8081 | OpenTAKServer (API y web) | 127.0.0.1 |
 | 8089 / 8445–8447 | OpenTAKServer (CoT TLS, enrolamiento) | LAN |
@@ -117,6 +118,8 @@ La lista de módulos creados, la historia de desarrollo de cada uno y los plugin
 - **Pruebas adicionales:** `test_mapflights_api.py`.
 - **AIS local (v5.0):** paso `ais`, servicio `bricohams-ais` (AIS-catcher en `127.0.0.1:8100`), API `/bricohams/api/barcos` (404 si `AIS_ENABLE` no es `yes`) y capa «AIS local» en `/map`. Necesita un SDR propio (`AIS_SDR_SERIAL`).
 - **Pruebas AIS:** `test_politicas_mapa_local.py`.
+- **Radiosondas (v5.6):** paso `sondas`, servicios `bricohams-sondas-rx` (radiosonde_auto_rx en Docker, consola en `127.0.0.1:5000`) y `bricohams-sondas` (puente UDP `127.0.0.1:55673` → `sondas.json` y MQTT opcional), capa «Radiosondas (AEMET)» en `/map` y sección 🎈 en `/bricohams/clima.html`. Necesita un RTL-SDR propio (`SONDAS_SDR_SERIAL`, distinto del de ADS-B/AIS) y Docker. Manual 51.
+- **Pruebas radiosondas:** `test_sondas.py`, `test_clima_web.py`, `test_live_map.py`, `test_systemd_unidades.py`.
 - **Manuales:** 04, 14, 40.
 
 ### 9. Meteorología y sensores

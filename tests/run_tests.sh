@@ -56,6 +56,7 @@ python3 tests/test_owrx_clone_docker.py
 python3 tests/test_instalador_perfil.py
 python3 tests/test_rak_aprs.py
 python3 tests/test_wx_red.py
+python3 tests/test_sondas.py
 python3 tests/test_wspr.py
 python3 tests/test_satrec.py
 python3 tests/test_rotor.py

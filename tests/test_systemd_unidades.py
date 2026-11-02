@@ -28,6 +28,16 @@ for unidad, extra in re.findall(r"s/\^After=network-online\.target\$/After=netwo
     unidades.setdefault(extra, {}).setdefault('After', []).append(unidad)
 assert 'bricohams-io.service' in unidades['bricohams-wx.service']['After']
 
+# v5.6 · radiosondas: el contenedor depende de docker y el puente va endurecido, solo con sockets IP/UNIX
+assert 'docker.service' in unidades['bricohams-sondas-rx.service']['After']
+sondas = re.search(r"/etc/systemd/system/bricohams-sondas\.service\s*<<'?(\w+)'?\n(.*?)\n\1\n", S, re.S).group(2)
+for k in ('ProtectSystem=strict', 'NoNewPrivileges=yes', 'CapabilityBoundingSet=', 'PrivateDevices=yes',
+          'RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX', 'StateDirectory=bricohams/sondas',
+          'LoadCredential=sondas.env:${ETC_BH}/sondas.env', 'ProtectHome=yes'):
+    assert k in sondas, k
+rx = re.search(r"/etc/systemd/system/bricohams-sondas-rx\.service\s*<<'?(\w+)'?\n(.*?)\n\1\n", S, re.S).group(2)
+assert '--network=host' in rx and 'station.cfg:/opt/auto_rx/station.cfg:ro' in rx and 'Restart=always' in rx
+
 # grafo «X va después de Y»
 despues = {}
 for u, c in unidades.items():

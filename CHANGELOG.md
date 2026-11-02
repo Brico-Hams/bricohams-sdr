@@ -2,6 +2,11 @@
 
 ## Sin publicar · 2026-10-28
 
+- Radiosondas AEMET (`SONDAS_ENABLE`, módulo `sondas`, ADR-72, manual 51): `radiosonde_auto_rx` en Docker con un
+  RTL-SDR propio (400-406 MHz; Murcia 08430 en 403,4 MHz) y el puente `bricohams-sondas` (UDP local → `sondas.json`,
+  trazas, reventón, predicción de SondeHub limitada a 1 consulta/5 min y MQTT opcional). Capa «Radiosondas (AEMET)»
+  en el mapa y sección 🎈 en la pestaña Tiempo. Subida a SondeHub apagada por defecto. `bricohams_mqtt.py`: `retener`
+  y testamento opcionales.
 - Idioma 1.1.0: el botón ES/EN también cambia los textos propios marcados con `data-lang="es"`/`"en"`
   (descripción del receptor, avisos), aunque lleguen después de cargar la página. Manual 40.
 - Hermes Lite 2 (`HF_HERMES`, manual 50): receptor HPSDR por Ethernet con perfiles de 384 kHz de 160 a 10 m y

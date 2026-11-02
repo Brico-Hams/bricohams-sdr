@@ -42,6 +42,7 @@ capturas está en la guía visual; aquí se documenta el desarrollo.
 | 21 | [Hardware y documentación generada](#21-hardware-y-documentación-generada) | diseño/documentación | `tools/` | integrado |
 | 22 | [Registro voluntario de oyentes](#22-registro-voluntario-de-oyentes) | web/privacidad | `web` | integrado en el kit, no desplegado |
 | 23 | [Solo HTTPS, mapa local ADS-B/AIS, políticas, idioma y logo](#23-solo-https-mapa-local-ads-bais-políticas-idioma-y-logo) | web/mapa/privacidad | `web`, `ais`, `configuracion`, `plugins` | integrado; AIS opcional |
+| 24 | [Radiosondas meteorológicas (AEMET)](#24-radiosondas-meteorológicas-aemet) | recepción/mapa/MQTT | `sondas` | integrado; opcional |
 
 **Leyenda de estado:** *integrado* = incluido en el kit y cubierto por pruebas;
 *opcional* = solo actúa si se habilita en `bricohams.env`; *generado, no
@@ -688,4 +689,32 @@ Copia esta plantilla al final de este documento y complétala antes de desplegar
   AIS, logo), `test_instalador_docker.py`, `test_ssl_admin.py`,
   `test_mesh_admin.py`.
 - **Estado:** integrado en ambos kits; AIS opcional (requiere un SDR de 162 MHz).
+
+## 24. Radiosondas meteorológicas (AEMET)
+
+- **Objetivo:** ver en el mapa de OpenWebRX+ y en la pestaña Tiempo las radiosondas
+  que lanza AEMET (Murcia 08430, 00 y 12 UTC, 403,4 MHz), con posición, traza,
+  reventón y aterrizaje previsto, y publicarlas opcionalmente por MQTT.
+- **Desarrollo:** se reutilizó el patrón de `paso_ais` (SDR propio elegido por
+  serie, consola local, se niega a repetir el SDR de ADS-B) y de `bricohams-wx-red`
+  (servicio Python estándar que escribe un JSON atómico para la web). El
+  decodificador es `radiosonde_auto_rx` en Docker; como no tiene MQTT, un puente
+  propio recibe sus paquetes UDP y hace validación, duplicados, trazas, reventón,
+  predicción de SondeHub (1 consulta/5 min por sonda) y MQTT con el `Publicador`
+  existente (ampliado con `retener` y testamento). Ver ADR-72.
+- **Diseño:** `paso_sondas` valida `SONDAS_*`, genera `/etc/bricohams/sondas/station.cfg`
+  (`bricohams-sondas --station-cfg`), escribe `/etc/bricohams/sondas.env` (600,
+  `LoadCredential`), crea `bricohams-sondas-rx` (contenedor, `Restart=always`) y
+  `bricohams-sondas` (puente endurecido) y, con `SONDAS_ENABLE="no"`, los desactiva y
+  borra el contenedor. Se repite con `sudo bash install.sh --solo sondas`.
+- **Ficheros:** `files/bin/bricohams-sondas.py`, `files/bin/bricohams_mqtt.py`,
+  `files/web/clima.html`, `files/htdocs/plugins/map/bricohams_live/bricohams_live.js`,
+  `files/bin/bricohams-check`, `files/bin/bricohams-servicios`.
+- **Configuración:** `SONDAS_ENABLE`, `SONDAS_SDR_SERIAL`, `SONDAS_MIN_FREQ`,
+  `SONDAS_MAX_FREQ`, `SONDAS_ALWAYS_SCAN`, `SONDAS_PPM`, `SONDAS_GAIN`,
+  `SONDAS_SONDEHUB`, `SONDAS_PREDICCION`, `SONDAS_MQTT*`.
+- **Pruebas:** `test_sondas.py`, `test_clima_web.py`, `test_live_map.py`,
+  `test_systemd_unidades.py`, `test_mesh_owrx.py` (el publicador MQTT sigue igual).
+- **Estado:** integrado en el kit; opcional (requiere un RTL-SDR propio y Docker).
+- **Documentación:** [51](manuales/51_RADIOSONDAS.md), ADR-72 en [ARQUITECTURA](ARQUITECTURA.md).
 - **Documentación:** [40](manuales/40_HTTPS_MAPA_LOCAL_POLITICAS.md), [23](manuales/23_WEB_SSL_SERVICIOS.md), [34](manuales/34_BLINDAJE_SEGURIDAD.md), [COMPONENTES](COMPONENTES.md).

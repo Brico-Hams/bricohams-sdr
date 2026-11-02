@@ -76,12 +76,30 @@ def main():
     assert 'action="https://www.amsat.org/status/submit.php"' in html and sr.AMSAT_URL == 'https://www.amsat.org/status/submit.php'
     assert "'Heard', 'Telemetry Only', 'Not Heard'" in html
 
+    # v5.6 · radiosondas: sondas.json no se pisa al reinstalar y la página lo lee
+    assert "--exclude 'meteo/sondas.json'" in plug
+    assert "json('meteo/sondas.json')" in html and '🎈 Radiosondas (AEMET)' in html and 'sondehub.org' in html
+    m = re.search(r'function sondas\(\) \{.*?\n    \}\n', html, re.S).group(0)
+    assert 'mqtt.user' not in m and 'mqtt.pass' not in m and 'm.host' in m and 'm.tema' in m
+    sondas = funcion(ins, 'paso_sondas')
+    assert 'install -m 755 "$FILES/bin/bricohams-sondas.py" /usr/local/bin/bricohams-sondas' in sondas
+    assert 'SONDAS_OUT=${HTDOCS}/plugins/receiver/meteo/sondas.json' in sondas
+    assert 'LoadCredential=sondas.env:${ETC_BH}/sondas.env' in sondas and 'chmod 600 "$ETC_BH/sondas.env"' in sondas
+    assert not re.search(r'SONDAS_MQTT_(USER|PASS)=|Environment=.*PASS', sondas.split('cat >/etc/systemd')[1]), \
+        'credenciales MQTT fuera de las unidades'
+
     # .env.example documenta las claves nuevas
     ej = leer('bricohams.env.example')
     for k in ('SATREC_ENABLE', 'SATREC_MIN_EL', 'SATREC_EXCLUIR', 'SATREC_METEOR', 'SATREC_DIAS', 'SATREC_MAX_MB',
-              'AMSAT_REPORT', 'WSPR_CALLSIGN', 'WXRED_ENABLE', 'WXRED_RADIO_KM'):
+              'AMSAT_REPORT', 'WSPR_CALLSIGN', 'WXRED_ENABLE', 'WXRED_RADIO_KM',
+              'SONDAS_ENABLE', 'SONDAS_SDR_SERIAL', 'SONDAS_MIN_FREQ', 'SONDAS_MAX_FREQ', 'SONDAS_ALWAYS_SCAN',
+              'SONDAS_PPM', 'SONDAS_GAIN', 'SONDAS_SONDEHUB', 'SONDAS_PREDICCION', 'SONDAS_MQTT', 'SONDAS_MQTT_HOST',
+              'SONDAS_MQTT_PORT', 'SONDAS_MQTT_USER', 'SONDAS_MQTT_PASS', 'SONDAS_MQTT_TOPIC'):
         assert re.search(r'^%s=' % k, ej, re.M), k
     assert re.search(r'^AMSAT_REPORT="no"', ej, re.M)
+    for k in ('SONDAS_ENABLE="no"', 'SONDAS_SONDEHUB="no"', 'SONDAS_MQTT="no"', 'SONDAS_MQTT_USER=""',
+              'SONDAS_MQTT_PASS=""', 'SONDAS_ALWAYS_SCAN="403.4"'):
+        assert re.search(r'^%s' % re.escape(k), ej, re.M), k
 
     # JavaScript de la página sin errores de sintaxis (si hay node)
     if shutil.which('node'):
