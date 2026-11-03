@@ -69,7 +69,9 @@ En una instalación ya hecha se puede cambiar a mano en
   del usuario de servicio `openwebrx`.
 - Campos: identificador, tipo (indicativo/nombre), fecha Unix y versión del
   consentimiento. **No se guarda IP, geolocalización, frecuencia, audio ni chat**
-  en esta base de datos.
+  en esta base de datos. El vínculo IP→identidad vive aparte, solo interno
+  (`conexiones-ip.sqlite`, 0600, borrado a los `VISITAS_IP_DIAS`; manual 51), y sirve para
+  mostrar la identidad en el aviso «Nuevo oyente» y en la tarjeta propia; no se publica.
 - El identificador se conserva hasta 180 días. La API purga vencidos al iniciar
   y al recibir nuevas entradas; además limita el archivo a 100.000 registros.
 - **v5.0 · Aviso por Telegram.** Cada registro se avisa al grupo privado de los

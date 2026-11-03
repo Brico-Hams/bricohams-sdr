@@ -1,5 +1,15 @@
 # Historial
 
+## Sin publicar · 2026-11-03
+
+- Banner del receptor raíz de OpenWebRX+ (junto a la presentación del proyecto, no solo `/bricohams/`): visitas totales, IP propia
+  enmascarada, país aproximado y la identidad registrada. Reutiliza `/bricohams/api/visitas` (una sola cuenta por pestaña, misma clave
+  `bh_visita` que la portada) y `/bricohams/api/mi-ip`, que añade `pais` (ISO) solo con la base GeoIP local ya instalada por
+  `bricohams-visitas` (`python3-maxminddb`, sin red); sin base se omite y el banner dice «no disponible».
+- Paleta oficial BricoHams (manual de color 1.1): naranja `#F26B1D`, grafito `#23272B`, enlaces `#AA410B` (claro) y `#FFA06A` (oscuro),
+  superficies/bordes/foco del manual en portada, políticas, clima y plugins propios. Colores funcionales de RF y logos intactos.
+  `tests/test_banner_visitas.py`.
+
 ## Sin publicar · 2026-10-28
 
 - Radiosondas AEMET (`SONDAS_ENABLE`, módulo `sondas`, ADR-72, manual 51): `radiosonde_auto_rx` en Docker con un
@@ -7,6 +17,12 @@
   trazas, reventón, predicción de SondeHub limitada a 1 consulta/5 min y MQTT opcional). Capa «Radiosondas (AEMET)»
   en el mapa y sección 🎈 en la pestaña Tiempo. Subida a SondeHub apagada por defecto. `bricohams_mqtt.py`: `retener`
   y testamento opcionales.
+- Contador de visitas: la IP completa validada se guarda solo de forma interna (`visitas-ip.sqlite` y `conexiones-ip.sqlite`, 0600, borrado a los
+  `VISITAS_IP_DIAS`, 14 por defecto) y nunca sale por la API ni la web. La tarjeta «Tu conexión» muestra solo la IP propia enmascarada
+  (`/bricohams/api/mi-ip`: IPv4 `82.160.x.x`, IPv6 tres primeros grupos) y la identidad que el propio oyente eligió. La IP solo se acepta de
+  `X-Forwarded-For` desde un proxy de confianza (nginx local, que la sobrescribe).
+  El aviso de Telegram «Nuevo oyente» incluye el indicativo, apodo o nombre elegido; si llega después se edita ese mismo aviso (sin duplicar llegada).
+  Privacidad, consentimiento del plugin y manuales 24, 39 y 51 actualizados; `tests/test_contador_visitas.py` y `tests/test_conexiones_ip.py`.
 - Idioma 1.1.0: el botón ES/EN también cambia los textos propios marcados con `data-lang="es"`/`"en"`
   (descripción del receptor, avisos), aunque lleguen después de cargar la página. Manual 40.
 - Hermes Lite 2 (`HF_HERMES`, manual 50): receptor HPSDR por Ethernet con perfiles de 384 kHz de 160 a 10 m y

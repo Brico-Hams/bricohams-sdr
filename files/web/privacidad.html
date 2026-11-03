@@ -22,7 +22,7 @@ gratuito para la comunidad de radioaficionados. Contacto: <b>__CONTACTO__</b>.</
 <h2>Qué se registra cuando escuchas</h2>
 <ul>
 <li>Fecha y hora de conexión y desconexión.</li>
-<li>Tu dirección IP <b>truncada</b> (por ejemplo <code>83.45.x.x</code>). La IP completa no se guarda en disco.</li>
+<li>Tu dirección IP <b>truncada</b> (por ejemplo <code>83.45.x.x</code>) en el registro de visitas. La IP completa solo se conserva de forma interna y temporal (ver «Contador de visitas»).</li>
 <li>País y ciudad <b>aproximados</b>, calculados en el propio servidor con una base de datos GeoIP local
 (DB-IP City Lite, CC BY 4.0). Tu IP no se envía a ningún servicio externo.</li>
 <li>Si usas el chat de la web, el nombre que pongas y el mensaje (también se reenvían al grupo de Telegram de los operadores).</li>
@@ -40,11 +40,20 @@ técnicos habituales de una petición web. Abrir el enlace MAP.FLIGHTS es opcion
 <p>Al entrar puedes elegir compartir tu indicativo o nombre. Solo se guarda si marcas la casilla de consentimiento y pulsas
 «Acceder». Si continúas sin identificarte, no se crea este registro. Se guarda el identificador y la fecha de la visita,
 nunca la IP, durante un máximo de 180 días. El registro no se publica en la web y solo lo consulta el operador en la estación.
+Además, mientras dure la retención de la IP (ver «Contador de visitas»), el servidor vincula internamente tu IP completa con la identidad que elijas
+(indicativo, apodo o nombre) para mostrarla en el aviso de Telegram de los operadores y en tu propia tarjeta «Tu conexión»; esa identidad nunca se publica en estadísticas ni en la API pública.
 La preferencia de consentimiento se conserva en el almacenamiento local de tu navegador; puedes borrarla desde los datos del sitio.</p>
+<h2>Contador de visitas de la portada</h2>
+<p>La portada del servicio suma una visita por pestaña y muestra el total y el de hoy. En el contador agregado solo se guardan dos números por día.
+Además, el servidor guarda de forma interna y restringida (fichero legible solo por el servicio, nunca publicado ni devuelto por la API)
+tu <b>dirección IP completa</b>, validada y tomada solo del proxy de la propia estación, durante un máximo de <b>__IP_DIAS__ días</b>;
+pasado ese plazo se borra automáticamente. No se guarda agente de usuario ni identificador. En «Tu conexión» solo ves <b>tu propia IP enmascarada</b>
+(IPv4 con solo los dos primeros octetos, p. ej. <code>82.160.x.x</code>; IPv6 solo los tres primeros grupos) y, si te has identificado, la identidad que elegiste; nadie más la ve. El navegador, el sistema y el idioma los calcula tu propio
+navegador y no se envían al servidor; tampoco se consulta ningún servicio externo de geolocalización.</p>
 <h2>Para qué</h2>
 <p>Seguridad y buen uso del servidor (detectar abusos y conexiones automáticas) y estadísticas anónimas de uso
 (número de oyentes y países, que se muestran en la web sin IPs). Base jurídica: interés legítimo del operador.
-Los operadores reciben por Telegram un aviso de cada nueva conexión con la ciudad, el país y la IP truncada.</p>
+Los operadores reciben por Telegram un aviso de cada nueva conexión con la ciudad, el país, la IP enmascarada y, si te identificas (antes o después de conectar), tu indicativo, apodo o nombre.</p>
 <h2>Cuánto tiempo</h2>
 <p>El registro de visitas se borra a los <b>__DIAS__ días</b>. Se conservan solo contadores diarios por país, que no identifican a nadie.
 El registro voluntario de indicativo/nombre se borra a los <b>180 días</b>.</p>

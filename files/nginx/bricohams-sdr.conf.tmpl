@@ -22,6 +22,7 @@ map $request_method $bh_login_key {
 }
 limit_req_zone $bh_login_key zone=bh_login_post:10m rate=12r/m;
 limit_req_zone $binary_remote_addr zone=bh_oyentes:10m rate=5r/m;
+limit_req_zone $binary_remote_addr zone=bh_visitas:10m rate=30r/m;
 
 server {
     listen 80;

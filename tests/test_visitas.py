@@ -15,7 +15,7 @@ vis = importlib.util.module_from_spec(spec)
 loader.exec_module(vis)
 
 assert vis.ip_parcial('83.45.12.7') == '83.45.x.x'
-assert vis.ip_parcial('2a01:4f8:1:2::3') == '2a01:4f8:…'
+assert vis.ip_parcial('2a01:4f8:1:2::3') == '2a01:4f8:1:x:x:x:x:x'
 assert vis.bandera('ES') == '🇪🇸' and vis.bandera('') == '🏳️'
 
 

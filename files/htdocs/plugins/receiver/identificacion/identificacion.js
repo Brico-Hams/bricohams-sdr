@@ -191,11 +191,11 @@ Plugins.identificacion.init = function () {
         if (!chat || cambiar) input.value = chatIdentidad();
         consentText.textContent = chat
             ? (spanish
-                ? 'Además, acepto que se guarde en el registro de oyentes del receptor durante un máximo de 180 días (opcional, sin IP).'
-                : 'I also agree to be stored in the receiver listener log for up to 180 days (optional, no IP address).')
+                ? 'Además, acepto que se guarde en el registro de oyentes del receptor durante un máximo de 180 días (opcional). Mi IP completa solo se conserva internamente unos días para asociarla a esta identidad.'
+                : 'I also agree to be stored in the receiver listener log for up to 180 days (optional). My full IP address is only kept internally for a few days to link it to this identity.')
             : (spanish
-                ? 'Acepto guardar el identificador y la fecha de esta visita durante un máximo de 180 días y que se avise de ello a los operadores de la estación. No se guardará mi IP.'
-                : 'I agree to store my identifier and visit date for up to 180 days and to notify the station operators. My IP address will not be stored.');
+                ? 'Acepto guardar el identificador y la fecha de esta visita durante un máximo de 180 días y que se avise de ello a los operadores de la estación. Mi IP completa solo se conserva internamente unos días y nunca se publica.'
+                : 'I agree to store my identifier and visit date for up to 180 days and to notify the station operators. My full IP address is only kept internally for a few days and is never published.');
         if (chat && !registroDisponible) checkbox.parentNode.style.display = 'none';
         submit.textContent = chat ? (spanish ? 'Entrar al chat' : 'Join the chat') : (spanish ? 'Acceder / Enter' : 'Enter');
         submit.disabled = true;
@@ -256,6 +256,7 @@ Plugins.identificacion.init = function () {
                     aceptado: Date.now()
                 }));
                 storageSet(sessionStorage, sessionKey, 'sent');
+                document.dispatchEvent(new CustomEvent('bh:identidad'));
                 if (!chat) chatGuardar(input.value);
                 close();
             } catch (e) {
@@ -284,6 +285,7 @@ Plugins.identificacion.init = function () {
         }).then(function (response) {
             if (!response.ok) throw new Error('HTTP ' + response.status);
             storageSet(sessionStorage, sessionKey, 'sent');
+            document.dispatchEvent(new CustomEvent('bh:identidad'));
         }).catch(function (e) {
             console.error('No se pudo guardar la sesión del oyente', e);
         });

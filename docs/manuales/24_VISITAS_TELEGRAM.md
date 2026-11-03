@@ -21,8 +21,8 @@
 1. **OpenWebRX+** publica cada conexión y desconexión, con la IP del oyente, en un **MQTT local** (mosquitto, solo 127.0.0.1). Hace falta `mqtt_enabled`, que el instalador activa con `VISITAS_ENABLE="yes"`.
 2. **`bricohams-visitas`** recibe esos avisos:
    - calcula país y ciudad con una **base GeoIP local** (DB-IP City Lite, CC BY 4.0, actualizada cada mes). **La IP no se manda a ningún servicio externo.**
-   - guarda en `/var/lib/bricohams/visitas.sqlite` solo la **IP truncada** (`83.45.x.x`), el país y la ciudad. **La IP completa no se escribe en disco.**
-   - avisa por Telegram como mucho **una vez por IP cada 10 min**, para que no se repita en cada recarga. No avisa de las conexiones desde casa.
+   - guarda en `/var/lib/bricohams/visitas.sqlite` solo la **IP truncada** (`83.45.x.x`; IPv6 tres primeros grupos), el país y la ciudad. La IP completa solo se guarda, validada, en `conexiones-ip.sqlite` (0600, `VISITAS_IP_DIAS`) para unirla a la identidad elegida; nunca sale por web ni Telegram.
+   - avisa por Telegram como mucho **una vez por IP cada 10 min**, para que no se repita en cada recarga. No avisa de las conexiones desde casa. Si el oyente se identifica (registro o nombre del chat), el aviso lleva `👤 identidad` y, si llega después, **se edita ese mismo mensaje** (sin segunda llegada). Los textos se sanean y se escapan en HTML.
    - reenvía el **chat** de la web a Telegram (`VISITAS_CHAT`).
    - permite publicar una respuesta desde el grupo con `/chat@NombreDelBot texto`
      (o `/chat texto` si el bot recibe comandos sin mención). Se publica en el chat

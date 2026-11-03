@@ -53,6 +53,7 @@ Plugins.bricohams.init = function () {
         '#bricohams-gh{bottom:48px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
         '#bricohams-theme{bottom:84px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
         '#bricohams-tg:hover,#bricohams-gh:hover,#bricohams-theme:hover{opacity:1;text-decoration:underline}' +
+        '#bricohams-tg:focus-visible,#bricohams-gh:focus-visible,#bricohams-theme:focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:2px}' +
         '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
     // v4: la foto de cabecera abierta no tapa media pantalla
     css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';

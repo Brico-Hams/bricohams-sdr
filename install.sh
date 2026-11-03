@@ -327,6 +327,8 @@ instalar_env() {   # el temporal también es 600: lleva todas las claves
 # NOMBRE='valor' para los .env derivados (systemd EnvironmentFile y bash los leen igual)
 sq() { local s=${1//\'/\'\\\'\'}; printf "'%s'" "$s"; }
 envl() { printf '%s=%s\n' "$1" "$(sq "${2-}")"; }
+# Días de retención de la IP completa de las visitas: entero 1-30, 14 por defecto
+ip_dias() { local d=${VISITAS_IP_DIAS:-14}; case "$d" in ''|*[!0-9]*) d=14 ;; esac; [ "$d" -lt 1 ] && d=1; [ "$d" -gt 30 ] && d=30; echo "$d"; }
 # nginx_sitio MODO DOMINIO CERT KEY < plantilla: activa o borra las líneas «#@X@» de la plantilla
 nginx_sitio() {
     local m=$1 dom=$2 cert=$3 key=$4 e=()
@@ -1111,9 +1113,6 @@ paso_plugins() {
         for carpeta in meteo visitas satelites; do
             chown root:root "$R/$carpeta"; chmod 755 "$R/$carpeta"
             chown root:root "$R/$carpeta/$carpeta.js"; chmod 644 "$R/$carpeta/$carpeta.js"
-            if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
-                install -o root -g root -m 644 "$R/$carpeta/$carpeta.js" "/usr/local/share/bricohams-static/$carpeta.js"
-            fi
         done
         for dato in meteo/{meteo,sensor,wx-red,wspr,caja}.json visitas/visitas.json satelites/{pases.json,grabaciones.json,pases.ics}; do
             [ "$(readlink "$R/$dato")" = "/var/lib/bricohams/web/$dato" ] \
@@ -1127,6 +1126,16 @@ paso_plugins() {
         owrx_owner
     else
         install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
+    fi
+    # nginx sirve estos JS desde copias protegidas (alias): se actualizan siempre que exista el snippet y se verifican,
+    # para que un despliegue no deje un visitas.js antiguo en producción
+    if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
+        local carpeta_alias
+        for carpeta_alias in meteo visitas satelites; do
+            install -o root -g root -m 644 "$R/$carpeta_alias/$carpeta_alias.js" "/usr/local/share/bricohams-static/$carpeta_alias.js"
+            cmp -s "$R/$carpeta_alias/$carpeta_alias.js" "/usr/local/share/bricohams-static/$carpeta_alias.js" \
+                || fallo "La copia protegida de $carpeta_alias.js no coincide con el plugin instalado"
+        done
     fi
     bien "plugins: rig_skin (DX), solar, meteo, cámara, BricoHams y los de 0xAF"
 }
@@ -2689,7 +2698,7 @@ DP
 }
 
 paso_web() {
-    apt_i nginx certbot openssl
+    apt_i nginx certbot openssl python3-maxminddb
     install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
     install -m 755 "$FILES/bin/bricohams-oyentes" /usr/local/bin/bricohams-oyentes
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios
@@ -2711,7 +2720,7 @@ paso_web() {
     local op_sed qth_sed
     op_sed=$(sed_esc "${CALLSIGN:-N0CALL}"); qth_sed=$(sed_esc "${STATION_QTH:-}")
     sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
-        -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/privacidad.html" >/var/www/bricohams/privacidad.html
+        -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" -e "s#__IP_DIAS__#$(ip_dias)#g" "$FILES/web/privacidad.html" >/var/www/bricohams/privacidad.html
     sed -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__CONTACTO__#${ADMIN_EMAIL:-t.me/bricohams}#g" \
         -e "s#__DIAS__#${VISITAS_DIAS:-90}#g" "$FILES/web/politicas.html" >/var/www/bricohams/politicas.html
     sed -e "s#__LAN__#${ip}#g" -e "s#__WX_CALL__#${WX_APRS_CALLSIGN:-N0CALL-13}#g" -e "s#__OPERADOR__#${op_sed}#g" -e "s#__QTH__#${qth_sed}#g" -e "s#__RADARBOX_ID__#${RADARBOX_STATION_ID:-}#g" \
@@ -2828,10 +2837,13 @@ paso_web() {
         envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
         envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"
         envl OYENTES_TELEGRAM "${OYENTES_TELEGRAM:-yes}"
+        # Retención de la IP completa de las visitas (1-30 días); la API aplica el mismo límite
+        envl VISITAS_IP_DIAS "$(ip_dias)"
     } >/etc/bricohams/api.env
     chown root:openwebrx /etc/bricohams/api.env; chmod 640 /etc/bricohams/api.env
     install -d /usr/local/lib/bricohams
     install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/lib/bricohams/bricohams_telegram.py
+    install -m 644 "$FILES/bin/bricohams_conexiones.py" /usr/local/lib/bricohams/bricohams_conexiones.py
     cat >/etc/systemd/system/bricohams-api.service <<'EOF'
 [Unit]
 Description=BricoHams: API de indicativos (HamQTH/RadioID/QRZ)
@@ -2844,6 +2856,14 @@ EnvironmentFile=/etc/bricohams/api.env
 ExecStart=/usr/local/bin/bricohams-api
 Restart=always
 RestartSec=10
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
 
 [Install]
 WantedBy=multi-user.target
@@ -2968,12 +2988,14 @@ EOF
     install -m 755 "$FILES/bin/bricohams-visitas.py" /usr/local/bin/bricohams-visitas
     install -m 755 "$FILES/bin/bricohams-telegram" /usr/local/bin/bricohams-telegram
     install -m 644 "$FILES/bin/bricohams_telegram.py" /usr/local/bin/bricohams_telegram.py
+    install -m 644 "$FILES/bin/bricohams_conexiones.py" /usr/local/bin/bricohams_conexiones.py
     install -d -o openwebrx -g openwebrx "$HTDOCS/plugins/receiver/visitas"
     {
         envl TELEGRAM_TOKEN "${TELEGRAM_TOKEN:-}"
         envl TELEGRAM_CHAT_ID "${TELEGRAM_CHAT_ID:-}"
         envl CHAT_TELEGRAM_NICK "${CHAT_TELEGRAM_NICK:-${CALLSIGN:-BricoHams}}"
         echo "VISITAS_DIAS=${VISITAS_DIAS:-90}"
+        envl VISITAS_IP_DIAS "$(ip_dias)"
         echo "VISITAS_CHAT=${VISITAS_CHAT:-yes}"
         echo "VISITAS_AVISAR_LAN=${VISITAS_AVISAR_LAN:-no}"
         echo "VISITAS_AVISAR_DESCONEXION=${VISITAS_AVISAR_DESCONEXION:-no}"
