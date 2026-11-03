@@ -11,12 +11,50 @@
 #    estado    dice qué hay instalado
 #    probar    decodifica el WAV de prueba del kit
 #  Uso: sudo bricohams-ft2 compilar && sudo bricohams-ft2 activar
+#
+#  Versión fijada: la fuente de Decodium se compila SIEMPRE desde FT2_DECODIUM_REF
+#  (commit completo o etiqueta), nunca desde «main». Para actualizar:
+#    sudo FT2_DECODIUM_REF=<commit-o-etiqueta> bricohams-ft2 compilar
+#  y, si va bien, cambia el valor por defecto (FT2_DECODIUM_REF en bricohams.env).
+#  Código de Decodium © Martino Merola IU8LMC (GPLv3, uso permitido por el autor);
+#  protocolos y algoritmos de WSJT-X © Joe Taylor K1JT y colaboradores (GPLv3).
 # =====================================================================
 set -euo pipefail
 REPO="${DECODIUM_REPO:-https://github.com/iu8lmc/Decodium-4.0-Core-Shannon}"
+# Commit de Decodium-4.0-Core-Shannon con el que se probó este kit
+REF="${FT2_DECODIUM_REF:-3d4b0b0190d60399949b3fe047526a22c934cc3c}"
 SRC=/opt/bricohams/src/decodium
 KIT=/opt/bricohams/kit
 HOOK=/etc/apt/apt.conf.d/99bricohams-ft2
+VERSION_FILE=/var/lib/bricohams/ft2-decodium.ref
+
+bien()  { printf '  ✔ %s\n' "$*"; }
+aviso() { printf '  ! %s\n' "$*"; }
+fallo() { printf '✘ %s\n' "$*" >&2; exit 1; }
+
+# Deja $SRC exactamente en $REF y comprueba que el commit es el esperado
+fijar_fuente() {
+    local obtenido esperado=""
+    [[ "$REF" =~ ^[0-9a-f]{40}$ ]] && esperado="$REF"
+    if [ ! -d "$SRC/.git" ]; then
+        git init -q "$SRC" && git -C "$SRC" remote add origin "$REPO" || fallo "No pude preparar $SRC"
+    fi
+    git -C "$SRC" remote set-url origin "$REPO"
+    if git -C "$SRC" fetch -q --depth 1 origin "$REF"; then
+        obtenido="$(git -C "$SRC" rev-parse 'FETCH_HEAD^{commit}')"
+        [ -z "$esperado" ] || [ "$obtenido" = "$esperado" ] || fallo "El commit descargado ($obtenido) no coincide con FT2_DECODIUM_REF ($esperado)"
+        git -C "$SRC" checkout -q -f --detach "$obtenido" || fallo "No pude situar el código en $obtenido"
+    elif [ -n "$esperado" ] && [ "$(git -C "$SRC" rev-parse HEAD 2>/dev/null)" = "$esperado" ]; then
+        aviso "Sin red: uso la copia local, que ya está en $esperado"
+    else
+        fallo "No pude descargar Decodium en la versión $REF (¿red? ¿FT2_DECODIUM_REF correcto?). No se compila otra versión"
+    fi
+    obtenido="$(git -C "$SRC" rev-parse HEAD)"
+    [ -z "$esperado" ] || [ "$obtenido" = "$esperado" ] || fallo "Verificación fallida: $obtenido ≠ $esperado"
+    install -d /var/lib/bricohams
+    printf '%s %s\n' "$obtenido" "$REF" >"$VERSION_FILE"
+    bien "Decodium fijado en $obtenido (FT2_DECODIUM_REF=$REF)"
+}
 
 compilar() {
     apt-get install -y --no-install-recommends git cmake ninja-build g++ pkg-config libboost-log-dev libfftw3-dev \
@@ -24,7 +62,7 @@ compilar() {
         qt6-serialport-dev qt6-websockets-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools \
         qt6-5compat-dev qt6-shadertools-dev
     install -d /opt/bricohams/src
-    if [ -d "$SRC/.git" ]; then git -C "$SRC" pull --ff-only || true; else git clone --depth 1 "$REPO" "$SRC"; fi
+    fijar_fuente
     # Qt < 6.5 (Bookworm trae 6.4) no tiene QTimeZone::UTC: se cambia por QTimeZone::utc(), que vale en todas
     grep -rl 'QTimeZone::UTC' "$SRC" --include='*.cpp' --include='*.hpp' --include='*.h' 2>/dev/null \
         | xargs -r sed -i 's/QTimeZone::UTC\b/QTimeZone::utc()/g'
@@ -56,12 +94,15 @@ estado() {
     command -v decodium-rx >/dev/null && echo "✔ decodium-rx: $(command -v decodium-rx)" || echo "✘ decodium-rx no instalado"
     grep -q BRICOHAMS-FT2 /usr/lib/python3/dist-packages/owrx/modes.py 2>/dev/null && echo "✔ modo FT2 en OpenWebRX+" || echo "✘ modo FT2 no activo"
     [ -f "$HOOK" ] && echo "✔ se reaplica tras actualizar" || echo "· sin hook de apt"
+    [ -f "$VERSION_FILE" ] && echo "✔ Decodium compilado: $(cut -d' ' -f1 "$VERSION_FILE") (fijado: $REF)" || echo "· versión de Decodium sin registrar"
+    [ -f /var/log/bricohams-ft2.log ] && echo "· trozos saltados recientes: $(tail -n 200 /var/log/bricohams-ft2.log | grep -c saltado)"
+    return 0
 }
 
 probar() {
     local w=/tmp/ft2-prueba-261004_120015.wav
     cp "$KIT/tests/datos/ft2_261004_120015.wav" "$w"
-    bricohams-ft2-decode -d 3 "$w"
+    bricohams-ft2-decode -d 3 -t 60 "$w"   # sin el tope de 3,5 s del servicio: aquí importa que decodifique
     rm -f "$w"
 }
 
