@@ -73,7 +73,7 @@
 - **0xAF plugins (doppler, show_band_plan, listeners):** https://github.com/0xAF/openwebrxplus-plugins
 - **Pases de satélites:** CelesTrak GP/OMM https://celestrak.org/NORAD/documentation/gp-data-formats.php · python-sgp4 https://pypi.org/project/sgp4/
 - **SatDump:** https://github.com/SatDump/SatDump · METEOR-M LRPT 137,9 MHz.
-- **FT2 / Decodium:** https://github.com/iu8lmc/Decodium-3.0-Codename-Raptor · https://ft2.it/
+- **FT2 / Decodium (el que compila el kit):** https://github.com/iu8lmc/Decodium-4.0-Core-Shannon · https://ft2.it/ (GPLv3; © Martino Merola IU8LMC, con su permiso expreso)
 - **Indicativos:** HamQTH API https://www.hamqth.com/developers · RadioID https://radioid.net/api · QRZ XML https://www.qrz.com/docs/xml/current_spec.html
 - **GeoIP:** DB-IP IP to City Lite (CC BY 4.0) https://db-ip.com/db/download/ip-to-city-lite — la web lleva la atribución.
 - **Telegram Bot API:** https://core.telegram.org/bots/api

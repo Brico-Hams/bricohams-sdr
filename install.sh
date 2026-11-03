@@ -2479,9 +2479,23 @@ paso_ft2() {
     install -m 755 "$FILES/bin/bricohams-ft2" /usr/local/bin/bricohams-ft2
     install -m 755 "$FILES/bin/bricohams-ft2-decode" /usr/local/bin/bricohams-ft2-decode
     install -m 755 "$FILES/bin/bricohams-ft2-patch.py" /usr/local/sbin/bricohams-ft2-patch
-    if ! command -v decodium-rx >/dev/null; then
+    # Ajustes que lee el adaptador (OpenWebRX+ lo lanza sin las variables del instalador)
+    local ft2call="${CALLSIGN:-}"; [ "$ft2call" = N0CALL ] && ft2call=""
+    install -d -m 755 "$ETC_BH"
+    cat >"$ETC_BH/ft2.conf" <<EOF
+# Generado por install.sh (paso ft2). Lo lee bricohams-ft2-decode.
+FT2_CALL="${ft2call}"             # tu indicativo: activa la decodificación AP de Decodium
+FT2_LOW_HZ="${FT2_LOW_HZ:-200}"
+FT2_HIGH_HZ="${FT2_HIGH_HZ:-5000}"      # como el ancho de audio de OpenWebRX+
+FT2_TIMEOUT="${FT2_TIMEOUT:-3.5}"       # s; siempre menor que el ciclo de 3,75 s
+EOF
+    chmod 644 "$ETC_BH/ft2.conf"
+    [ -n "$ft2call" ] || aviso "FT2 sin indicativo (CALLSIGN): se decodifica sin AP"
+    local ref="${FT2_DECODIUM_REF:-}" ref_hecha=""
+    [ -f /var/lib/bricohams/ft2-decodium.ref ] && ref_hecha="$(cut -d' ' -f2 /var/lib/bricohams/ft2-decodium.ref)"
+    if ! command -v decodium-rx >/dev/null || { [ -n "$ref" ] && [ "$ref" != "$ref_hecha" ]; }; then
         info "Compilando decodium-rx (20–40 min la primera vez)…"
-        /usr/local/bin/bricohams-ft2 compilar || { aviso "No pude compilar decodium-rx. Inténtalo luego: sudo bricohams-ft2 compilar && sudo bricohams-ft2 activar"; return; }
+        FT2_DECODIUM_REF="$ref" /usr/local/bin/bricohams-ft2 compilar || { aviso "No pude compilar decodium-rx. Inténtalo luego: sudo bricohams-ft2 compilar && sudo bricohams-ft2 activar"; return; }
     fi
     /usr/local/bin/bricohams-ft2 activar && bien "modo FT2 en OpenWebRX+ (experimental)" \
         || aviso "No pude activar FT2 (¿cambió OpenWebRX+?). sudo bricohams-ft2 estado"

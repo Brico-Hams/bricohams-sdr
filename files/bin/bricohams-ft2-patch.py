@@ -11,6 +11,7 @@
 #  Uso: bricohams-ft2-patch [--quitar] [--raiz /usr/lib/python3/dist-packages] [--silencioso]
 # =====================================================================
 import os
+import re
 import shutil
 import sys
 
@@ -81,6 +82,20 @@ def f_js(s, quitar):
     return s.replace(JS_ANCLA, JS_LINEA) if JS_ANCLA in s else None
 
 
+def revisar_chopper(raiz):
+    # El troceador de audio de OpenWebRX+ debe aceptar un intervalo no entero (3,75 s).
+    # No está confirmado en todas las versiones: si ve un int() sobre el intervalo, avisa.
+    # La estación no depende de ello: bricohams-ft2-decode usa la hora del nombre del
+    # fichero (HHMMSS) y decodium-rx rellena o recorta el audio a un ciclo completo.
+    ruta = os.path.join(raiz, 'owrx/audio/chopper.py')
+    if not os.path.exists(ruta):
+        return 'no se pudo comprobar el intervalo de 3,75 s (falta owrx/audio/chopper.py)'
+    s = open(ruta, encoding='utf-8').read()
+    if re.search(r'int\(\s*(?:self\.)?(?:profile\.)?(?:getInterval\(\)|interval\b)', s) or re.search(r'//\s*(?:self\.)?interval\b', s):
+        return 'el troceador parece convertir el intervalo a entero: el ciclo de 3,75 s podría desalinearse (ver manual 28)'
+    return None
+
+
 def main(argv):
     raiz = '/usr/lib/python3/dist-packages'
     if '--raiz' in argv:
@@ -95,6 +110,10 @@ def main(argv):
     if '--silencioso' not in argv or mal:
         for k, v in res.items():
             print('ft2: %-28s %s' % (k, v))
+    if not quitar:
+        av = revisar_chopper(raiz)
+        if av:
+            print('ft2: aviso: %s' % av, file=sys.stderr)
     return 1 if mal else 0
 
 
