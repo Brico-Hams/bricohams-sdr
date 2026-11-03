@@ -1,9 +1,21 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacidad · BricoHams SDR __OPERADOR__</title>
-<style>body{font:16px/1.55 system-ui,sans-serif;max-width:760px;margin:2em auto;padding:0 16px;color:#222;background:#fafafa}
-h1{color:#A6192E}h2{color:#F26B21;font-size:1.15em;margin-top:1.6em}code{background:#eee;padding:0 4px;border-radius:3px}
-@media (prefers-color-scheme:dark){body{background:#17181b;color:#ddd}code{background:#333}}</style></head><body>
+<script>try{var t=localStorage.getItem('bh_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>:root{color-scheme:light;--brand-ink:#23272B;--brand-orange:#F26B1D;--on-accent:#23272B;--bg:#FFFFFF;--surface:#F6F7F8;
+--text:#23272B;--text-muted:#59636B;--border:#DCE1E5;--link:#AA410B;--focus:#F26B1D}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;
+--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}
+body{font:16px/1.55 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;max-width:760px;margin:2em auto;padding:0 16px;color:var(--text);background:var(--bg)}
+a{color:var(--link)}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+h1{color:var(--text);font-family:Montserrat,Inter,system-ui,sans-serif;font-weight:800}h2{color:var(--text);font-size:1.15em;margin-top:1.6em;border-left:4px solid var(--brand-orange);padding-left:8px}
+code{background:var(--surface);border:1px solid var(--border);padding:0 4px;border-radius:3px}
+.tema{font:inherit;font-size:.9em;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
+.logo{display:inline-block;background:#FFFFFF;border-radius:10px;padding:6px 10px;line-height:0}.logo img{height:44px;width:auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}</style></head><body>
+<div class="top"><span class="logo"><img src="/static/plugins/receiver/marca/bricohams-logo.png" alt="BricoHams · Radioafición · Hazlo tú mismo"></span>
+<label>Tema <select class="tema" id="bh-tema"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></div>
 <h1>🔒 Aviso de privacidad</h1>
 <p>Este receptor SDR multiusuario lo mantiene <b>__OPERADOR__</b> (BricoHams, __QTH__) como servicio
 gratuito para la comunidad de radioaficionados. Contacto: <b>__CONTACTO__</b>.</p>
@@ -45,4 +57,8 @@ o supresión de registros ya guardados, escribe a <b>__CONTACTO__</b>; también 
 <p style="opacity:.7">El receptor solo muestra señales de radio que se pueden recibir legalmente; no se publican marcadores de
 comunicaciones privadas (servicios de emergencia, policía, taxis…).</p>
 <p><a href="/">← Volver al receptor</a></p>
+<script>(function(){var s=document.getElementById('bh-tema');if(!s)return;var t='system';try{t=localStorage.getItem('bh_theme')||'system'}catch(e){}
+s.value=t==='light'||t==='dark'?t:'system';s.addEventListener('change',function(){var v=s.value;
+if(v==='light'||v==='dark'){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('bh_theme',v)}catch(e){}}
+else{document.documentElement.removeAttribute('data-theme');try{localStorage.removeItem('bh_theme')}catch(e){}}})})();</script>
 </body></html>

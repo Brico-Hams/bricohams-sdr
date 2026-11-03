@@ -53,7 +53,7 @@
                 markerLabel.textContent = u.callsign + ' (' + u.mode + ')';
                 const lineLabel = document.createElement('span');
                 lineLabel.textContent = markerLabel.textContent;
-                const color = u.mode === 'AIS' ? '#1769aa' : '#e87524';
+                const color = u.mode === 'AIS' ? '#AA410B' : '#F26B1D';
                 const marker = u.mode === 'AIS'
                     ? L.marker([p.lat, p.lon], {
                         icon: L.divIcon({className: 'bricohams-ais-target', html: '&#128674;', iconSize: [22, 22]})
@@ -140,7 +140,7 @@
         }
         if (ficha.foto && !tercerosAceptados()) {
             const aviso = document.createElement('div');
-            aviso.style.cssText = 'font-size:11px;color:#555;margin:6px 0';
+            aviso.style.cssText = 'font-size:11px;color:var(--text-muted,#59636B);margin:6px 0';
             aviso.append(document.createTextNode('Foto externa no cargada (solo cookies necesarias). '));
             const ver = document.createElement('a');
             ver.href = ficha.enlace || ficha.foto;
@@ -179,7 +179,7 @@
             } else {
                 cr.textContent = ficha.credito || '';
             }
-            cr.style.cssText = 'font-size:10px;color:#666';
+            cr.style.cssText = 'font-size:10px;color:var(--text-muted,#59636B)';
             caja.append(cr);
         }
         const datos = document.createElement('div');
@@ -274,7 +274,7 @@
         if (ficha.pOrigen) tramos.push([ficha.pOrigen, [aqui.lat, aqui.lng]]);
         if (ficha.pDestino) tramos.push([[aqui.lat, aqui.lng], ficha.pDestino]);
         if (!tramos.length) return;
-        marker.bhRuta = L.polyline(tramos, {color: '#1f6fd1', weight: 2, dashArray: '6 6', interactive: false})
+        marker.bhRuta = L.polyline(tramos, {color: '#23272B', weight: 2, dashArray: '6 6', interactive: false})
             .addTo(aircraftLayer);
     }
 
@@ -563,7 +563,7 @@
         const control = L.control({position: 'bottomright'});
         control.onAdd = function () {
             status = L.DomUtil.create('div', 'leaflet-control bricohams-live-status');
-            status.style.cssText = 'background:white;color:#222;padding:5px 8px;font:12px sans-serif';
+            status.style.cssText = 'background:var(--surface,#F6F7F8);color:var(--text,#23272B);padding:5px 8px;font:12px sans-serif';
             status.textContent = 'Conectando ADS-B local...';
             return status;
         };
@@ -576,7 +576,7 @@
             enlace.href = 'https://map.flights';
             enlace.target = '_blank';
             enlace.rel = 'noopener noreferrer';
-            enlace.style.cssText = 'display:flex;align-items:center;gap:5px;color:#0f172a;text-decoration:none;font-weight:600';
+            enlace.style.cssText = 'display:flex;align-items:center;gap:5px;color:var(--link,#AA410B);text-decoration:none;font-weight:600';
             const logo = document.createElement('img');
             logo.src = 'https://map.flights/favicon.svg';
             logo.alt = 'map.flights';

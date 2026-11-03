@@ -27,12 +27,12 @@ Plugins.dvficha.init = function () {
 
     $('<style>').text(
         '#bh-dvficha{position:fixed;left:12px;bottom:64px;z-index:9998;display:none;min-width:230px;max-width:320px;' +
-        'background:rgba(20,22,26,.94);color:#eee;border:1px solid #F26B21;border-radius:10px;padding:10px 12px;' +
-        'font:13px/1.35 sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5)}' +
+        'background:var(--surface,#1C2329);color:var(--text,#F6F8FA);border:1px solid var(--brand-orange,#F26B1D);border-radius:12px;padding:10px 12px;' +
+        'font:13px/1.35 var(--bh-font-ui,system-ui,sans-serif);box-shadow:0 4px 16px rgba(0,0,0,.5)}' +
         '#bh-dvficha .f{display:flex;gap:10px;align-items:center}' +
-        '#bh-dvficha img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:#333}' +
-        '#bh-dvficha .c{font:700 17px/1.1 monospace;color:#fff}#bh-dvficha .c a{color:#fff;text-decoration:none}' +
-        '#bh-dvficha .m{opacity:.8;font-size:12px}#bh-dvficha .modo{float:right;font-size:11px;color:#F26B21}'
+        '#bh-dvficha img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--border,#38434C)}' +
+        '#bh-dvficha .c{font:700 17px/1.1 monospace;color:var(--text,#F6F8FA)}#bh-dvficha .c a{color:var(--text,#F6F8FA);text-decoration:none}' +
+        '#bh-dvficha .m{color:var(--text-muted,#BAC4CC);font-size:12px}#bh-dvficha .modo{float:right;font-size:11px;color:var(--link,#FFA06A)}'
     ).appendTo('head');
     var $f = $('<div id="bh-dvficha"></div>').appendTo('body');
 

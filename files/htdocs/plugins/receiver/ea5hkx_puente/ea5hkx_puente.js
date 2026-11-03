@@ -32,7 +32,7 @@ Plugins.ea5hkx_puente.init = function () {
         a.href = href;
         a.target = '_blank';
         a.rel = 'noopener';
-        a.style.cssText = 'color:#8ab4f8;text-decoration:none';
+        a.style.cssText = 'color:var(--link,#FFA06A);text-decoration:none';
         a.textContent = texto;
         return a;
     }
@@ -61,7 +61,7 @@ Plugins.ea5hkx_puente.init = function () {
         }
         var pie = document.createElement('p');
         pie.className = 'bh-ea5hkx-pie';
-        pie.style.cssText = 'margin:14px 0 0;color:#888;font-size:12px;line-height:1.5;text-align:center';
+        pie.style.cssText = 'margin:14px 0 0;color:var(--text-muted,#BAC4CC);font-size:12px;line-height:1.5;text-align:center';
         pie.appendChild(document.createTextNode(spanish
             ? 'Se guarda solo en este navegador durante 14 días. '
             : 'Stored only in this browser for 14 days. '));

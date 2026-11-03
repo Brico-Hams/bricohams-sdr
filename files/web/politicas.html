@@ -1,12 +1,24 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Políticas de seguridad, datos y cookies · BricoHams SDR __OPERADOR__</title>
-<style>body{font:16px/1.55 system-ui,sans-serif;max-width:860px;margin:2em auto;padding:0 16px;color:#222;background:#fafafa}
-h1{color:#A6192E}h2{color:#F26B21;font-size:1.15em;margin-top:1.6em}code{background:#eee;padding:0 4px;border-radius:3px}
-table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.95em}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
-th{background:#f0f0f0}nav a{margin-right:12px}.nota{opacity:.75;font-size:.92em}
-button{font:600 15px system-ui,sans-serif;padding:8px 14px;border:0;border-radius:6px;background:#2868d7;color:#fff;cursor:pointer}
-@media (prefers-color-scheme:dark){body{background:#17181b;color:#ddd}code{background:#333}th{background:#25272b}th,td{border-color:#444}a{color:#8ab4f8}}</style></head><body>
+<script>try{var t=localStorage.getItem('bh_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>:root{color-scheme:light;--brand-ink:#23272B;--brand-orange:#F26B1D;--on-accent:#23272B;--bg:#FFFFFF;--surface:#F6F7F8;
+--text:#23272B;--text-muted:#59636B;--border:#DCE1E5;--link:#AA410B;--focus:#F26B1D}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;
+--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}
+body{font:16px/1.55 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;max-width:860px;margin:2em auto;padding:0 16px;color:var(--text);background:var(--bg)}
+a{color:var(--link)}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+h1{color:var(--text);font-family:Montserrat,Inter,system-ui,sans-serif;font-weight:800}h2{color:var(--text);font-size:1.15em;margin-top:1.6em;border-left:4px solid var(--brand-orange);padding-left:8px}
+code{background:var(--surface);border:1px solid var(--border);padding:0 4px;border-radius:3px}
+table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.95em}th,td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--surface)}nav a{margin-right:12px}.nota{color:var(--text-muted);font-size:.92em}
+button{font:600 15px Inter,system-ui,sans-serif;padding:8px 14px;border:0;border-radius:6px;background:var(--brand-orange);color:var(--on-accent);cursor:pointer}
+.tema{font:inherit;font-size:.9em;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
+.logo{display:inline-block;background:#FFFFFF;border-radius:10px;padding:6px 10px;line-height:0}.logo img{height:44px;width:auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}</style></head><body>
+<div class="top"><span class="logo"><img src="/static/plugins/receiver/marca/bricohams-logo.png" alt="BricoHams · Radioafición · Hazlo tú mismo"></span>
+<label>Tema <select class="tema" id="bh-tema"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></div>
 <h1>🛡️ Políticas de seguridad, compartición de datos y cookies</h1>
 <nav><a href="#seguridad">Seguridad</a><a href="#datos">Datos compartidos</a><a href="#cookies">Cookies</a><a href="#mapa">Mapa local</a><a href="/bricohams/privacidad.html">Aviso de privacidad</a></nav>
 <p>Este receptor SDR lo mantiene <b>__OPERADOR__</b> (BricoHams, __QTH__) como servicio gratuito para la comunidad de
@@ -72,5 +84,9 @@ document.getElementById('bh-cambiar-cookies').addEventListener('click', function
     try { localStorage.removeItem('bh_consent'); } catch (e) { /* sin almacenamiento */ }
     location.href = '/#cookies';
 });
+(function(){var s=document.getElementById('bh-tema');if(!s)return;var t='system';try{t=localStorage.getItem('bh_theme')||'system'}catch(e){}
+s.value=t==='light'||t==='dark'?t:'system';s.addEventListener('change',function(){var v=s.value;
+if(v==='light'||v==='dark'){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('bh_theme',v)}catch(e){}}
+else{document.documentElement.removeAttribute('data-theme');try{localStorage.removeItem('bh_theme')}catch(e){}}})})();
 </script>
 </body></html>

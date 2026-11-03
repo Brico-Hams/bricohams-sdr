@@ -1,5 +1,5 @@
 .bricohams-aircraft {
-    color: #165da0;
+    color: var(--link, #AA410B);
     font: 26px/24px sans-serif;
     text-align: center;
     text-shadow: 0 0 3px white;

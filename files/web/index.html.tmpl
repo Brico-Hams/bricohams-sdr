@@ -1,15 +1,26 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BricoHams SDR · servicios</title>
-<style>:root{--bg:#f6f6f7;--fg:#1d2733;--card:#fff;--acc:#F26B21;--cr:#A6192E}
-@media (prefers-color-scheme:dark){:root{--bg:#141518;--fg:#e8e8e8;--card:#1f2125}}
-body{font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:24px 16px}
-main{max-width:900px;margin:auto}h1{margin:.2em 0;color:var(--cr)}p.s{opacity:.75;margin-top:0}
+<script>try{var t=localStorage.getItem('bh_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>:root{color-scheme:light;--brand-ink:#23272B;--brand-orange:#F26B1D;--on-accent:#23272B;--bg:#FFFFFF;--surface:#F6F7F8;
+--text:#23272B;--text-muted:#59636B;--border:#DCE1E5;--link:#AA410B;--focus:#F26B1D;--ok:#1B5E20;
+--font-ui:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--font-head:Montserrat,Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--plate:transparent}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;
+--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F;--ok:#7BD88F;--plate:#FFFFFF}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F;--ok:#7BD88F;--plate:#FFFFFF}
+body{font:16px/1.5 var(--font-ui);background:var(--bg);color:var(--text);margin:0;padding:24px 16px}
+a{color:var(--link)}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+main{max-width:900px;margin:auto}h1{margin:.2em 0;color:var(--text);font-family:var(--font-head);font-weight:800}p.s{color:var(--text-muted);margin-top:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{display:inline-block;background:var(--plate);border-radius:10px;padding:6px 10px;line-height:0}.logo img{height:48px;width:auto}
+.tema{font:inherit;font-size:.9em;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
 .g{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:18px}
-a.c{display:block;background:var(--card);border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit;
-border-left:5px solid var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.12)}a.c:hover{transform:translateY(-1px)}
-a.c b{display:block;font-size:1.08em}a.c span{opacity:.75;font-size:.92em}.lan{border-left-color:#607d8b!important}.gh{border-left-color:#2da44e!important}
-footer{margin-top:24px;opacity:.65;font-size:.9em}</style></head><body><main>
+a.c{display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;text-decoration:none;color:var(--text);
+border-left:5px solid var(--brand-orange)}a.c:hover{border-color:var(--brand-orange)}
+a.c b{display:block;font-size:1.08em}a.c span{color:var(--text-muted);font-size:.92em}.lan{border-left-color:var(--text-muted)!important}.gh{border-left-color:var(--ok)!important}
+footer{margin-top:24px;color:var(--text-muted);font-size:.9em}</style></head><body><main>
+<div class="top"><span class="logo"><img src="/static/plugins/receiver/marca/bricohams-logo.png" alt="BricoHams · Radioafición · Hazlo tú mismo"></span>
+<label class="s">Tema <select class="tema" id="bh-tema"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></div>
 <h1>📡 BricoHams SDR · __OPERADOR__</h1><p class="s">__QTH__ · estación SDR multiusuario de la comunidad</p>
 <div class="g">
 <a class="c" href="/"><b>🎧 Receptor OpenWebRX+</b><span>4 receptores simultáneos: satélites, radioaficionados, aire/mar/FM/HF y ADS-B</span></a>
@@ -25,4 +36,8 @@ footer{margin-top:24px;opacity:.65;font-size:.9em}</style></head><body><main>
 <a class="c" href="/bricohams/politicas.html"><b>🛡️ Políticas y cookies</b><span>Seguridad, datos compartidos y cookies</span></a>
 </div>
 <footer>BricoHams · Radioafición · Hazlo tú mismo · <a href="https://t.me/bricohams">t.me/bricohams</a></footer>
-</main></body></html>
+</main>
+<script>(function(){var s=document.getElementById('bh-tema');if(!s)return;var t='system';try{t=localStorage.getItem('bh_theme')||'system'}catch(e){}
+s.value=t==='light'||t==='dark'?t:'system';s.addEventListener('change',function(){var v=s.value;
+if(v==='light'||v==='dark'){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('bh_theme',v)}catch(e){}}
+else{document.documentElement.removeAttribute('data-theme');try{localStorage.removeItem('bh_theme')}catch(e){}}})})();</script></body></html>

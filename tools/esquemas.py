@@ -19,8 +19,8 @@ OUT = os.path.join(RAIZ, 'docs', 'esquemas')
 ENV = dict(re.findall(r'^([A-Z0-9_]+)="([^"]*)"', open(os.path.join(RAIZ, 'bricohams.env.example')).read(), re.M))
 
 FONT = "font-family='DejaVu Sans, Arial, sans-serif'"
-C = {'bg': '#ffffff', 'ink': '#1d2733', 'mute': '#5f6b78', 'line': '#9aa6b2',
-     'or': '#F26B21', 'cr': '#A6192E', 'pi': '#2e7d32', 'sdr': '#1565c0', 'rf': '#6a1b9a',
+C = {'bg': '#ffffff', 'ink': '#23272B', 'mute': '#59636B', 'line': '#9aa6b2',
+     'or': '#F26B1D', 'cr': '#AA410B', 'pi': '#2e7d32', 'sdr': '#1565c0', 'rf': '#6a1b9a',
      'lora': '#00838f', 'gps': '#ef6c00', 'i2c': '#2e7d32', 'pwr': '#c62828', 'gnd': '#37474f',
      'spi': '#6a1b9a', 'uart': '#ef6c00', 'free': '#eceff1', 'cam': '#455a64', 'net': '#00695c'}
 

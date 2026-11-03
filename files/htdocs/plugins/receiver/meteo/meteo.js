@@ -32,33 +32,34 @@ Plugins.meteo.init = function () {
         '#bh-meteo-button{position:relative}' +
         '#bh-meteo-button svg{width:18px;height:18px}' +
         '#bh-meteo{position:fixed;top:90px;left:460px;z-index:1002;width:440px;max-width:calc(100vw - 16px);' +
-            'display:none;flex-direction:column;padding:8px;border-radius:8px;color:#cfd4d9;font:12px roboto-mono,monospace;' +
-            'background:linear-gradient(#2a2e33,#17191d);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #060708,0 6px 18px rgba(0,0,0,.65)}' +
+            'display:none;flex-direction:column;padding:8px;border-radius:12px;color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif);' +
+            'background:var(--surface,#1C2329);border:1px solid var(--border,#38434C);box-shadow:0 6px 18px rgba(0,0,0,.45)}' +
         '#bh-meteo.open{display:flex}' +
         '#bh-meteo .mt-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#bh-meteo .mt-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#bh-meteo .mt-time{color:#6b7782;font-size:11px}' +
-        '#bh-meteo .mt-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
-        '#bh-meteo .mt-btn:hover{color:#fff}' +
-        '#bh-meteo .mt-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
-        '#bh-meteo .mt-st{background:#10161b;border-radius:4px;padding:8px;box-shadow:0 0 0 1px #1d242b;margin-bottom:6px}' +
-        '#bh-meteo .mt-st.near{box-shadow:0 0 0 1px #A6192E}' +
+        '#bh-meteo .mt-title{flex:1;color:var(--text-muted,#BAC4CC);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-meteo .mt-time{color:var(--text-muted,#BAC4CC);font-size:11px}' +
+        '#bh-meteo .mt-btn{cursor:pointer;color:var(--text-muted,#BAC4CC);padding:0 4px;font-size:15px;line-height:1}' +
+        '#bh-meteo .mt-btn:hover{color:var(--text,#F6F8FA)}' +
+        '#bh-meteo .mt-lcd{overflow:auto;min-height:0;border-radius:8px;padding:8px;background:var(--bg,#111518);border:1px solid var(--border,#38434C)}' +
+        '#bh-meteo .mt-st{background:var(--surface,#1C2329);border-radius:8px;padding:8px;box-shadow:0 0 0 1px var(--border,#38434C);margin-bottom:6px}' +
+        '#bh-meteo .mt-st.near{box-shadow:0 0 0 1px var(--brand-orange,#F26B1D)}' +
         '#bh-meteo .mt-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}' +
-        '#bh-meteo .mt-name{color:#e8edf1;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#bh-meteo .mt-sub{color:#6b7782;font-size:10px;white-space:nowrap}' +
+        '#bh-meteo .mt-name{color:var(--text,#F6F8FA);font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-meteo .mt-sub{color:var(--text-muted,#BAC4CC);font-size:10px;white-space:nowrap}' +
         '#bh-meteo .mt-body{display:flex;gap:10px;align-items:center;margin-top:4px}' +
-        '#bh-meteo .mt-temp{font-size:28px;color:#fff;min-width:92px}' +
-        '#bh-meteo .mt-temp small{font-size:11px;color:#93a0ab;display:block}' +
+        '#bh-meteo .mt-temp{font-size:28px;color:var(--text,#F6F8FA);min-width:92px}' +
+        '#bh-meteo .mt-temp small{font-size:11px;color:var(--text-muted,#BAC4CC);display:block}' +
         '#bh-meteo .mt-kv{display:grid;grid-template-columns:auto auto;gap:1px 10px;font-size:11px;flex:1}' +
-        '#bh-meteo .mt-kv span:nth-child(odd){color:#6b7782}' +
+        '#bh-meteo .mt-kv span:nth-child(odd){color:var(--text-muted,#BAC4CC)}' +
         '#bh-meteo .mt-arrow{display:inline-block;transition:transform .3s}' +
         '#bh-meteo canvas{width:100%;height:46px;display:block;margin-top:4px}' +
-        '#bh-meteo .mt-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
+        '#bh-meteo .mt-h{color:var(--text-muted,#BAC4CC);letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
         '#bh-meteo .mt-days{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
-        '#bh-meteo .mt-day{background:#10161b;border-radius:4px;padding:6px;text-align:center;box-shadow:0 0 0 1px #1d242b}' +
+        '#bh-meteo .mt-day{background:var(--surface,#1C2329);border-radius:8px;padding:6px;text-align:center;box-shadow:0 0 0 1px var(--border,#38434C)}' +
         '#bh-meteo .mt-day b{font-size:20px;display:block}' +
-        '#bh-meteo .mt-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
-        '#bh-meteo a{color:#64b5f6}' +
+        '#bh-meteo .mt-note{color:var(--text-muted,#BAC4CC);font-size:10px;margin-top:6px;line-height:1.4}' +
+        '#bh-meteo a{color:var(--link,#FFA06A)}' +
+        '#bh-meteo :focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}' +
         '@media (max-width:600px){#bh-meteo{left:8px!important;top:60px!important}}';
     var st = document.createElement('style');
     st.textContent = css;
@@ -79,8 +80,8 @@ Plugins.meteo.init = function () {
         return ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'][Math.round(deg / 22.5) % 16];
     }
     function tempColor(t) {
-        if (typeof t !== 'number') return '#fff';
-        return t >= 35 ? '#f44336' : t >= 28 ? '#ff9800' : t >= 20 ? '#ffc107' : t >= 10 ? '#8bc34a' : t >= 0 ? '#64b5f6' : '#b39ddb';
+        if (typeof t !== 'number') return 'var(--text,#F6F8FA)';
+        return t >= 35 ? 'var(--err,#FF8A80)' : t >= 28 ? 'var(--warn,#FFC857)' : 'var(--text,#F6F8FA)';
     }
     // códigos WMO de Open-Meteo
     function wmo(code) {
@@ -205,10 +206,14 @@ Plugins.meteo.init = function () {
             $btn.attr('title', sensor.name + ': ' + num(sensor.ta) + ' °C' + (typeof sensor.hr === 'number' ? ', ' + num(sensor.hr, 0) + ' % HR' : '') + ', ' + num(sensor.pres_nmar) + ' hPa');
         }
         $btn.find('.mt-label').text(typeof t === 'number' ? t.toFixed(1) + '°' : 'METEO')
-            .css('color', typeof t === 'number' ? tempColor(t) : '');
+            .css('color', typeof t === 'number' && t >= 28 ? tempColor(t) : '');
         if (n && !fresco(sensor)) $btn.attr('title', n.name + ': ' + num(n.ta) + ' °C, ' + num(n.hr, 0) + ' % HR, viento ' + num(n.vv_kmh, 0) + ' km/h ' + compass(n.dv) + ' (' + fmtTime(n.time) + ')');
     }
 
+    function tok(name, fallback) {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v || fallback;
+    }
     function spark(cv, hist) {
         var pts = (hist || []).filter(function (h) { return typeof h.ta === 'number'; });
         var dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 380, H = cv.clientHeight || 46;
@@ -221,15 +226,15 @@ Plugins.meteo.init = function () {
         var lo = Math.floor(Math.min.apply(null, v)) - 1, hi = Math.ceil(Math.max.apply(null, v)) + 1;
         function X(t) { return 2 + (Date.parse(t) - t0) / Math.max(1, t1 - t0) * (W - 34); }
         function Y(val) { return H - 4 - (val - lo) / (hi - lo) * (H - 8); }
-        var g = x.createLinearGradient(0, 0, 0, H);
-        g.addColorStop(0, 'rgba(242,107,33,.35)'); g.addColorStop(1, 'rgba(242,107,33,0)');
+        var oc = tok('--brand-orange', '#F26B1D'), g = x.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, oc + '59'); g.addColorStop(1, oc + '00');
         x.beginPath(); x.moveTo(X(pts[0].t), H);
         pts.forEach(function (p) { x.lineTo(X(p.t), Y(p.ta)); });
         x.lineTo(X(pts[pts.length - 1].t), H); x.closePath(); x.fillStyle = g; x.fill();
         x.beginPath();
         pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.ta)); else x.moveTo(X(p.t), Y(p.ta)); });
-        x.strokeStyle = '#F26B21'; x.lineWidth = 1.5; x.stroke();
-        x.fillStyle = '#6b7782'; x.font = '10px roboto-mono, monospace';
+        x.strokeStyle = oc; x.lineWidth = 1.5; x.stroke();
+        x.fillStyle = tok('--text-muted', '#BAC4CC'); x.font = '10px ' + tok('--bh-font-ui', 'sans-serif');
         x.fillText(hi + '°', W - 28, 10); x.fillText(lo + '°', W - 28, H - 2);
     }
 
@@ -240,10 +245,10 @@ Plugins.meteo.init = function () {
         var h = '';
         if (sensor) {
             var ok = fresco(sensor);
-            h += '<div class="mt-st near" style="box-shadow:0 0 0 1px #F26B21">' +
+            h += '<div class="mt-st near">' +
                 '<div class="mt-top"><span class="mt-name">🏠 ' + esc(sensor.name) + '</span>' +
                 '<span class="mt-sub">' + esc(sensor.chip || '') + (sensor.aprs ? ' · APRS ' + esc(sensor.aprs) : '') + ' · ' + fmtTime(sensor.updated) + '</span></div>';
-            if (!ok) h += '<div class="mt-note" style="color:#ff9800">Sin datos recientes del sensor (systemctl status bricohams-wx)</div>';
+            if (!ok) h += '<div class="mt-note" style="color:var(--warn,#FFC857)">Sin datos recientes del sensor (systemctl status bricohams-wx)</div>';
             h += '<div class="mt-body"><div class="mt-temp" style="color:' + tempColor(sensor.ta) + '">' + num(sensor.ta) + '°' +
                 '<small>' + (typeof sensor.dew === 'number' ? 'rocío ' + num(sensor.dew) + '°' : '&nbsp;') + '</small></div><div class="mt-kv">' +
                 (typeof sensor.hr === 'number' ? '<span>Humedad</span><span>' + num(sensor.hr, 0) + ' %</span>' : '') +
@@ -254,7 +259,7 @@ Plugins.meteo.init = function () {
                 (sensor.lluvia ? '<span>Lluvia</span><span>' + num(sensor.lluvia['1h'], 1) + ' mm/h · hoy ' + num(sensor.lluvia.hoy, 1) + ' mm</span>' : '') +
                 '</div></div><canvas data-sensor="1"></canvas>' +
                 (caja && typeof caja.ciclo === 'number' ? '<div class="mt-note">📦 Caja: ' + (typeof caja.t_caja === 'number' ? num(caja.t_caja) + ' °C' : '—') +
-                    ' · CPU ' + num(caja.t_cpu, 0) + ' °C · ventiladores ' + caja.ciclo + ' %' + (caja.alarma ? ' · <b style="color:#ff5252">ventilador ' + esc(caja.alarma) + ' parado</b>' : '') + '</div>' : '') +
+                    ' · CPU ' + num(caja.t_cpu, 0) + ' °C · ventiladores ' + caja.ciclo + ' %' + (caja.alarma ? ' · <b style="color:var(--err,#FF8A80)">ventilador ' + esc(caja.alarma) + ' parado</b>' : '') + '</div>' : '') +
                 '</div>';
         }
         var n = nearest();
@@ -282,7 +287,7 @@ Plugins.meteo.init = function () {
         if (m && m.current) {
             var c = m.current, w = wmo(c.weather_code);
             h += '<div class="mt-h">AHORA EN EL QTH (modelo) · ' + w[0] + ' ' + esc(w[1]) + '</div>' +
-                '<div class="mt-note" style="margin-top:0;color:#cfd4d9">' + num(c.temperature_2m) + ' °C (sensación ' + num(c.apparent_temperature) + ' °C) · ' +
+                '<div class="mt-note" style="margin-top:0;color:var(--text,#F6F8FA)">' + num(c.temperature_2m) + ' °C (sensación ' + num(c.apparent_temperature) + ' °C) · ' +
                 num(c.relative_humidity_2m, 0) + ' % · viento ' + num(c.wind_speed_10m, 0) + ' km/h ' + compass(c.wind_direction_10m) +
                 ' (racha ' + num(c.wind_gusts_10m, 0) + ') · nubes ' + num(c.cloud_cover, 0) + ' %</div>';
         }
@@ -293,7 +298,7 @@ Plugins.meteo.init = function () {
                 var dd = new Date(d.date + 'T12:00:00');
                 h += '<div class="mt-day"><div>' + esc(dd.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' })) + '</div>' +
                     '<b title="' + esc(w[1]) + '">' + w[0] + '</b>' +
-                    '<span style="color:#ff9800">' + num(d.tmax, 0) + '°</span> / <span style="color:#64b5f6">' + num(d.tmin, 0) + '°</span>' +
+                    '<span>' + num(d.tmax, 0) + '°</span> / <span>' + num(d.tmin, 0) + '°</span>' +
                     '<div class="mt-note" style="margin-top:2px">💧 ' + num(d.precip_prob, 0) + ' %</div></div>';
             });
             h += '</div>';

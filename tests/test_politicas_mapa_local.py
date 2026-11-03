@@ -88,7 +88,7 @@ assert 'fotos de aviones' in consent_js and 'recepción local' in consent_js
 assert "'bh_idioma'" in idioma_js and "'Settings': 'Ajustes'" in idioma_js
 assert "querySelectorAll('[data-lang]')" in idioma_js and 'bilingue(raiz)' in idioma_js   # textos propios ES/EN
 assert "static/plugins/receiver/marca/bricohams-logo.png" in marca_js and '.webrx-top-logo' in marca_js
-assert '#openwebrx-bookmarks-container .bookmark' in marca_js and 'color:#111 !important' in marca_js, 'etiquetas legibles'
+assert '#openwebrx-bookmarks-container .bookmark' in marca_js and 'color:var(--on-accent,#23272B) !important' in marca_js, 'etiquetas legibles (grafito de marca sobre naranja)'
 with open(os.path.join(PLUG, 'marca/bricohams-logo.png'), 'rb') as f:
     assert f.read(8) == b'\x89PNG\r\n\x1a\n'
 

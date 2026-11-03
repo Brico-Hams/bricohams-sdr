@@ -21,9 +21,10 @@ Plugins.load('bricohams_live');
         css.textContent =
             '#bricohams-map{position:fixed;left:12px;bottom:28px;z-index:1000;display:flex;gap:8px}' +
             '#bricohams-map a{display:flex;gap:6px;align-items:center;padding:6px 12px;border-radius:999px;' +
-            'color:#fff;font:600 13px/1 sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}' +
-            '#bricohams-map .tg{background:#F26B21}#bricohams-map .tg:hover{background:#229ED9}' +
-            '#bricohams-map .rx{background:#23262B}' +
+            'color:var(--on-accent,#23272B);font:600 13px/1 var(--bh-font-ui,system-ui,sans-serif);text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}' +
+            '#bricohams-map .tg{background:var(--brand-orange,#F26B1D)}#bricohams-map a:hover{text-decoration:underline}' +
+            '#bricohams-map a:focus-visible{outline:3px solid var(--focus,#F26B1D);outline-offset:3px}' +
+            '#bricohams-map .rx{background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
             '@media (max-width:600px){#bricohams-map span{display:none}}';
         document.head.appendChild(css);
         const box = document.createElement('div');

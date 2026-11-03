@@ -1,20 +1,30 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BricoHams SDR · Clima en red y satélites</title>
-<style>:root{--bg:#141518;--fg:#e8e8e8;--card:#1f2125;--lin:#2e3238;--acc:#F26B21;--cr:#ff6b6b;--ok:#4caf50;--sat:#b388ff;--net:#64b5f6;--rf:#81c784;--dim:#9aa4ae}
-body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:20px 12px}
-main{max-width:1100px;margin:auto}h1{margin:.1em 0;color:var(--acc)}h2{margin:26px 0 8px;font-size:1.15em;color:var(--acc)}
-p.s,.dim{color:var(--dim)}a{color:#ffb380}nav a{margin-right:14px}
-.card{background:var(--card);border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.35);overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.93em}th,td{padding:5px 7px;border-bottom:1px solid var(--lin);text-align:left;white-space:nowrap}
-th{color:var(--dim);font-weight:600}tr.propia td{background:rgba(242,107,33,.12)}
-.b{display:inline-block;border-radius:9px;padding:1px 8px;font-size:.82em;font-weight:600;color:#111}
-.b.rf{background:var(--rf)}.b.satelite{background:var(--sat)}.b.internet{background:var(--net)}.b.ok{background:var(--ok)}.b.no{background:#78909c}.b.err{background:var(--cr)}
-.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.kv div{background:#26292e;border-radius:8px;padding:8px 10px}
-.kv b{display:block;font-size:1.35em}.nota{font-size:.88em;color:#ffcc80;margin-top:8px}
-button,select{background:#2b2f35;color:var(--fg);border:1px solid #444;border-radius:6px;padding:3px 8px;font:inherit;font-size:.9em}
-button{cursor:pointer;border-color:var(--acc)}form{margin:0;display:flex;gap:6px;align-items:center}
-footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><main>
+<script>try{var t=localStorage.getItem('bh_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>:root{color-scheme:light;--brand-ink:#23272B;--brand-orange:#F26B1D;--on-accent:#23272B;--bg:#FFFFFF;--surface:#F6F7F8;
+--text:#23272B;--text-muted:#59636B;--border:#DCE1E5;--link:#AA410B;--focus:#F26B1D;--ok:#1B5E20;--err:#B3261E;--warn:#7A4F00;--plate:transparent}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;
+--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F;--ok:#7BD88F;--err:#FF8A80;--warn:#FFC857;--plate:#FFFFFF}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F;--ok:#7BD88F;--err:#FF8A80;--warn:#FFC857;--plate:#FFFFFF}
+body{font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:20px 12px}
+main{max-width:1100px;margin:auto}h1{margin:.1em 0;color:var(--text);font-family:Montserrat,Inter,system-ui,sans-serif;font-weight:800}
+h2{margin:26px 0 8px;font-size:1.15em;color:var(--text);border-left:4px solid var(--brand-orange);padding-left:8px}
+p.s,.dim{color:var(--text-muted)}a{color:var(--link)}nav a{margin-right:14px}:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{display:inline-block;background:var(--plate);border-radius:10px;padding:6px 10px;line-height:0}.logo img{height:44px;width:auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.93em}th,td{padding:5px 7px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{color:var(--text-muted);font-weight:600}tr.propia td{font-weight:600}tr.propia td:first-child{box-shadow:inset 4px 0 0 var(--brand-orange)}
+.b{display:inline-block;border-radius:9px;padding:1px 8px;font-size:.82em;font-weight:600;color:var(--brand-ink)}
+.b.rf,.b.ok{background:#7BD88F}.b.satelite{background:#CDBBF5}.b.internet{background:#A9CCE8}.b.no{background:#BAC4CC}.b.err{background:#FF8A80}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.kv div{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:1.35em}.nota{font-size:.88em;color:var(--text-muted);margin-top:8px}.err-t{color:var(--err)}
+button,select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font:inherit;font-size:.9em}
+button{cursor:pointer;border-color:var(--brand-orange)}form{margin:0;display:flex;gap:6px;align-items:center}
+footer{margin-top:28px;color:var(--text-muted);font-size:.88em}</style></head><body><main>
+<div class="top"><span class="logo"><img src="/static/plugins/receiver/marca/bricohams-logo.png" alt="BricoHams · Radioafición · Hazlo tú mismo"></span>
+<label class="dim">Tema <select id="bh-tema"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select></label></div>
 <h1>🌦️ Clima en red y satélites</h1>
 <p class="s">Estación __OPERADOR__ · tiempo de nuestro sensor, estaciones WX cercanas por APRS (radio, satélite e internet), balizas WSPR oídas y pases de satélite grabados</p>
 <nav><a href="/bricohams/">← Portal</a><a href="/">Receptor</a><a href="/files">Ficheros (Files)</a><a id="ics" href="/static/plugins/receiver/satelites/pases.ics" download>📅 Pases en tu calendario (.ics)</a></nav>
@@ -69,7 +79,7 @@ footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><ma
                 (s.viento ? '<div><span class="dim">Viento</span><b>' + num(s.viento.vel_ms * 3.6, 0) + ' km/h ' + rosa(s.viento.dir) + '</b></div>' : '') +
                 (s.lluvia ? '<div><span class="dim">Lluvia hoy</span><b>' + num(s.lluvia.hoy) + ' mm</b></div>' : '') +
                 '</div><div class="nota">' + esc(s.name || '') + (s.chip ? ' · ' + esc(s.chip) : '') + (s.aprs ? ' · en APRS como ' + esc(s.aprs) : '') +
-                (viejo ? ' · <b style="color:#ff5252">sin datos recientes</b>' : ' · ' + new Date(s.updated).toLocaleTimeString('es-ES')) +
+                (viejo ? ' · <b class="err-t">sin datos recientes</b>' : ' · ' + new Date(s.updated).toLocaleTimeString('es-ES')) +
                 '<br>Si el sensor está dentro de la caja del equipo, la temperatura es la de la caja (más alta que la del aire); la presión y la humedad sí valen.</div>';
         }).catch(function () { $('sensor').innerHTML = '<span class="dim">Sin sensor propio o sin datos (bricohams-wx).</span>'; });
     }
@@ -168,5 +178,9 @@ footer{margin-top:28px;color:var(--dim);font-size:.88em}</style></head><body><ma
     todo();
     setInterval(todo, 60000);
 })();
+(function(){var s=document.getElementById('bh-tema');if(!s)return;var t='system';try{t=localStorage.getItem('bh_theme')||'system'}catch(e){}
+s.value=t==='light'||t==='dark'?t:'system';s.addEventListener('change',function(){var v=s.value;
+if(v==='light'||v==='dark'){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('bh_theme',v)}catch(e){}}
+else{document.documentElement.removeAttribute('data-theme');try{localStorage.removeItem('bh_theme')}catch(e){}}})})();
 </script>
 </body></html>

@@ -178,9 +178,8 @@ Plugins.dsp_audio.init = async function () {
     $('<div class="bha-sec"><h4>PUERTA DE RUIDO Y AGC</h4></div>').append($('<div class="bha-row"></div>').append(swP.$el), sU.$el,
         $('<div class="bha-row"><label>AGC</label></div>').append(agc.$el)).appendTo($c);
 
-    var barra = function () { return $('<div style="flex:1;height:8px;background:#0b0d10;border-radius:4px;overflow:hidden"><div style="height:100%;width:0;background:#39d353"></div></div>'); };
-    var $bN = barra(), $bR = barra();
-    var $nivel = $bN.children(), $red = $bR.children().css('background', '#f26b21');
+    var barra = function () { return $('<div style="flex:1;height:8px;    background:var(--bg,#111518);border:1px solid var(--border,#38434C);border-radius:4px;overflow:hidden"><div style="height:100%;width:0;background:var(--ok,#7BD88F)"></div></div>'); };    var $bN = barra(), $bR = barra();
+    var $nivel = $bN.children(), $red = $bR.children().css('background', 'var(--brand-orange,#F26B1D)');
     var $nivelTxt = $('<div class="bha-nota"></div>'), $redTxt = $('<div class="bha-nota"></div>');
     $('<div class="bha-sec"><h4>MEDIDORES</h4></div>').append($('<div class="bha-row"><label>Entrada</label></div>').append($bN), $nivelTxt,
         $('<div class="bha-row"><label>Compresión</label></div>').append($bR), $redTxt,

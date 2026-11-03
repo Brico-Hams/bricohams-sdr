@@ -373,11 +373,19 @@ AYUDA_CONFIG = '''Dónde se configura el acceso de administradores (manual 46, d
 
 PAGINA = '''<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>BricoHams · acceso</title><style>body{font-family:system-ui,sans-serif;background:#10161d;color:#e8edf2;
+<title>BricoHams · acceso</title><script>try{var t=localStorage.getItem('bh_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<style>:root{color-scheme:light;--brand-ink:#23272B;--brand-orange:#F26B1D;--on-accent:#23272B;--bg:#FFFFFF;--surface:#F6F7F8;
+--text:#23272B;--text-muted:#59636B;--border:#DCE1E5;--link:#AA410B;--focus:#F26B1D}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;
+--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#111518;--surface:#1C2329;--text:#F6F8FA;--text-muted:#BAC4CC;--border:#38434C;--link:#FFA06A;--focus:#FFC18F}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);
 display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}main{max-width:30rem;padding:2rem;
-background:#1b2530;border-radius:12px}a{color:#7cc4ff}h1{font-size:1.3rem}</style></head><body><main>
+background:var(--surface);border:1px solid var(--border);border-radius:12px}a{color:var(--link)}
+h1{font-family:Montserrat,Inter,system-ui,sans-serif;font-weight:800;font-size:1.3rem}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px}</style></head><body><main>
 <h1>%s</h1><p>%s</p><p><a href="%s/login?rd=%%2Fsettings">Entrar con otra cuenta de Google</a> · <a href="/login">Usuario local</a> · <a href="/">Receptor</a></p>
-<p style="font-size:.8rem;color:#9fb0c0">Administradores: el acceso (usuarios locales y cuentas de Google autorizadas) se configura en
+<p style="font-size:.8rem;color:var(--text-muted)">Administradores: el acceso (usuarios locales y cuentas de Google autorizadas) se configura en
 <i>Ajustes → Seguridad → Métodos de acceso de administradores</i> (manual 46 del kit BricoHams).</p>
 </main></body></html>'''
 

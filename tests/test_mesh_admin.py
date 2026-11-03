@@ -676,7 +676,12 @@ try:
     assert 'settings/bricohams/aprs' in open(plant, encoding='utf-8').read(), 'plantilla rara: antes de </body>'
     # tema oscuro: el mismo CSS en admin.css de OpenWebRX+ y en línea en los paneles
     assert B.TEMA_OSCURO == M.TEMA_OSCURO, 'el tema de botones y el de mesh-admin deben coincidir'
-    assert 'select,textarea{background-color:#2b2b2b' in M.TEMA_OSCURO and 'select option' in M.TEMA_OSCURO
+    assert 'select,textarea{background-color:var(--surface)' in M.TEMA_OSCURO and 'select option' in M.TEMA_OSCURO
+    for token in ('--bg:#111518', '--surface:#1C2329', '--link:#FFA06A', '--focus:#FFC18F', '--brand-orange:#F26B1D',
+                  '--on-accent:#23272B', ':focus-visible{outline:3px solid var(--focus)'):
+        assert token in M.TEMA_OSCURO, token
+    for viejo in ('#f26b21', '#f7941d', '#1e1e1e', '#8cc8ff', '#2d2d2d'):
+        assert viejo not in M.TEMA_OSCURO.lower(), viejo
     h = M.con_tema('<html><head><title>x</title></head><body></body></html>')
     assert h.count('id="bricohams-tema"') == 1 and h.index('bricohams-tema') < h.index('</head>')
     assert M.con_tema(h) == h, 'idempotente'
@@ -694,10 +699,10 @@ try:
     for nombre, esperado in hojas.items():
         hoja = open(os.path.join(tmp, 'css', nombre), encoding='utf-8').read()
         assert hoja.startswith(css_orig) and hoja.count(B.CSS_INI) == 1 and esperado in hoja
-    assert 'html,body{background-color:#1e1e1e!important' in B.LOGIN_OSCURO
-    assert '.login{background-color:#2d2d2d!important' in B.LOGIN_OSCURO
+    assert 'html,body{background-color:var(--bg)!important' in B.LOGIN_OSCURO
+    assert '.login{background-color:var(--surface)!important' in B.LOGIN_OSCURO
     assert 'width:calc(100% - 32px)' in B.LOGIN_OSCURO
-    assert '.webrx-top-bar{background:#242424!important}' in B.CABECERA
+    assert '.webrx-top-bar{background:var(--surface)!important}' in B.CABECERA
     assert 'background-image:none' not in B.CABECERA, 'se conserva la foto del banner expandido'
     assert B.main(['-q', '--quitar']) == 0 and open(acss, encoding='utf-8').read() == css_orig
     for nombre in hojas:

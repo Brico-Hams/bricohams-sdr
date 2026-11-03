@@ -52,36 +52,37 @@ Plugins.solar.init = function () {
     var css =
         '#bh-solar-button{position:relative}' +
         '#bh-solar-button svg{width:18px;height:18px}' +
-        '#bh-solar-button .sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#555;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
+        '#bh-solar-button .sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#BAC4CC;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
         '#bh-solar{position:fixed;top:90px;left:420px;z-index:1002;width:430px;max-width:calc(100vw - 16px);max-height:calc(100vh - 20px);' +
-            'display:none;flex-direction:column;padding:8px;border-radius:8px;color:#cfd4d9;font:12px roboto-mono,monospace;' +
-            'background:linear-gradient(#2a2e33,#17191d);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #060708,0 6px 18px rgba(0,0,0,.65)}' +
+            'display:none;flex-direction:column;padding:8px;border-radius:12px;color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif);' +
+            'background:var(--surface,#1C2329);border:1px solid var(--border,#38434C);box-shadow:0 6px 18px rgba(0,0,0,.45)}' +
         '#bh-solar.open{display:flex}' +
         '#bh-solar .sol-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#bh-solar .sol-title{flex:1;color:#93a0ab;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#bh-solar .sol-time{color:#6b7782;font-size:11px}' +
-        '#bh-solar .sol-btn{cursor:pointer;color:#93a0ab;padding:0 4px;font-size:15px;line-height:1}' +
-        '#bh-solar .sol-btn:hover{color:#fff}' +
+        '#bh-solar .sol-title{flex:1;color:var(--text-muted,#BAC4CC);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-solar .sol-time{color:var(--text-muted,#BAC4CC);font-size:11px}' +
+        '#bh-solar .sol-btn{cursor:pointer;color:var(--text-muted,#BAC4CC);padding:0 4px;font-size:15px;line-height:1}' +
+        '#bh-solar .sol-btn:hover{color:var(--text,#F6F8FA)}' +
         '#bh-solar .sol-tabs{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}' +
-        '#bh-solar .sol-chip{cursor:pointer;padding:2px 7px;border-radius:3px;background:#10161b;color:#93a0ab;box-shadow:0 0 0 1px #1d242b;font-size:11px}' +
-        '#bh-solar .sol-chip.on{color:#0f0;box-shadow:0 0 0 1px #2e7d32}' +
-        '#bh-solar .sol-lcd{overflow:auto;min-height:0;border-radius:5px;padding:8px;background:#0b0f12;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),inset 0 0 2px #000}' +
+        '#bh-solar .sol-chip{cursor:pointer;padding:2px 7px;border-radius:6px;background:var(--bg,#111518);color:var(--text-muted,#BAC4CC);box-shadow:0 0 0 1px var(--border,#38434C);font-size:11px}' +
+        '#bh-solar .sol-chip.on{background:var(--brand-orange,#F26B1D);color:var(--on-accent,#23272B);box-shadow:none}' +
+        '#bh-solar .sol-lcd{overflow:auto;min-height:0;border-radius:8px;padding:8px;background:var(--bg,#111518);border:1px solid var(--border,#38434C)}' +
         '#bh-solar .sol-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}' +
-        '#bh-solar .sol-tile{background:#10161b;border-radius:4px;padding:6px;box-shadow:0 0 0 1px #1d242b;min-width:0}' +
-        '#bh-solar .sol-k{color:#6b7782;font-size:10px;letter-spacing:1px;text-transform:uppercase}' +
-        '#bh-solar .sol-v{font-size:19px;color:#e8edf1;margin:2px 0 1px;white-space:nowrap}' +
-        '#bh-solar .sol-s{font-size:10px;color:#93a0ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-        '#bh-solar .sol-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #161d23}' +
-        '#bh-solar .sol-h{color:#93a0ab;letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
-        '#bh-solar canvas{width:100%;height:150px;display:block;background:#0b0f12}' +
+        '#bh-solar .sol-tile{background:var(--surface,#1C2329);border-radius:8px;padding:6px;box-shadow:0 0 0 1px var(--border,#38434C);min-width:0}' +
+        '#bh-solar .sol-k{color:var(--text-muted,#BAC4CC);font-size:10px;letter-spacing:1px;text-transform:uppercase}' +
+        '#bh-solar .sol-v{font-size:19px;color:var(--text,#F6F8FA);margin:2px 0 1px;white-space:nowrap}' +
+        '#bh-solar .sol-s{font-size:10px;color:var(--text-muted,#BAC4CC);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-solar .sol-row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--border,#38434C)}' +
+        '#bh-solar .sol-h{color:var(--text-muted,#BAC4CC);letter-spacing:1px;margin:8px 0 4px;font-size:11px}' +
+        '#bh-solar canvas{width:100%;height:150px;display:block;background:var(--bg,#111518)}' +
         '#bh-solar img{max-width:100%;display:block;margin:0 auto 6px;border-radius:3px}' +
         '#bh-solar table{width:100%;border-collapse:collapse}' +
-        '#bh-solar td,#bh-solar th{padding:3px 4px;text-align:center;border-bottom:1px solid #161d23}' +
-        '#bh-solar th{color:#6b7782;font-weight:normal;font-size:10px;letter-spacing:1px}' +
+        '#bh-solar td,#bh-solar th{padding:3px 4px;text-align:center;border-bottom:1px solid var(--border,#38434C)}' +
+        '#bh-solar th{color:var(--text-muted,#BAC4CC);font-weight:normal;font-size:10px;letter-spacing:1px}' +
         '#bh-solar td:first-child{text-align:left}' +
-        '#bh-solar .c-good{color:#4caf50}#bh-solar .c-fair{color:#ffc107}#bh-solar .c-poor{color:#f44336}' +
-        '#bh-solar .sol-note{color:#6b7782;font-size:10px;margin-top:6px;line-height:1.4}' +
-        '#bh-solar a{color:#64b5f6}' +
+        '#bh-solar .c-good{color:var(--ok,#7BD88F)}#bh-solar .c-fair{color:var(--warn,#FFC857)}#bh-solar .c-poor{color:var(--err,#FF8A80)}' +
+        '#bh-solar .sol-note{color:var(--text-muted,#BAC4CC);font-size:10px;margin-top:6px;line-height:1.4}' +
+        '#bh-solar a{color:var(--link,#FFA06A)}' +
+        '#bh-solar :focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}' +
         '@media (max-width:600px){#bh-solar{left:8px!important;top:60px!important}#bh-solar .sol-grid{grid-template-columns:repeat(2,1fr)}}';
     var st = document.createElement('style');
     st.textContent = css;
@@ -109,16 +110,19 @@ Plugins.solar.init = function () {
         if (e > 4) return 'X' + (f / 1e-4).toFixed(1);
         return L[e] + (f / Math.pow(10, e - 8)).toFixed(1);
     }
+    function tok(name, fallback) {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v || fallback;
+    }
     function xcolor(c) {
         switch ((c || '')[0]) {
-            case 'X': return '#f44336';
-            case 'M': return '#ff9800';
-            case 'C': return '#ffc107';
-            default: return '#4caf50';
+            case 'X': return 'var(--err,#FF8A80)';
+            case 'M': case 'C': return 'var(--warn,#FFC857)';
+            default: return 'var(--ok,#7BD88F)';
         }
     }
-    function scaleColor(n) { n = +n || 0; return ['#4caf50', '#ffeb3b', '#ffc107', '#ff9800', '#f44336', '#b71c1c'][Math.min(n, 5)]; }
-    function kpColor(k) { return k >= 7 ? '#f44336' : k >= 5 ? '#ff9800' : k >= 4 ? '#ffc107' : '#4caf50'; }
+    function scaleColor(n) { n = +n || 0; return ['var(--ok,#7BD88F)', 'var(--ok,#7BD88F)', 'var(--warn,#FFC857)', 'var(--warn,#FFC857)', 'var(--err,#FF8A80)', 'var(--err,#FF8A80)'][Math.min(n, 5)]; }
+    function kpColor(k) { return k >= 5 ? 'var(--err,#FF8A80)' : k >= 4 ? 'var(--warn,#FFC857)' : 'var(--ok,#7BD88F)'; }
     function sScale(p) { return p >= 1e5 ? 5 : p >= 1e4 ? 4 : p >= 1e3 ? 3 : p >= 100 ? 2 : p >= 10 ? 1 : 0; }
 
     // elevación del Sol en el QTH (grados)
@@ -300,7 +304,7 @@ Plugins.solar.init = function () {
     function updateDot() {
         var c = current();
         var worst = Math.max(c.R || 0, c.S || 0, c.G || 0);
-        $btn.find('.sol-dot').css('background', (c.R === null || c.R === undefined) ? '#555' : scaleColor(worst));
+        $btn.find('.sol-dot').css('background', (c.R === null || c.R === undefined) ? '#BAC4CC' : scaleColor(worst));
         $btn.attr('title', 'Radiación solar y propagación · NOAA R' + (c.R || 0) + ' S' + (c.S || 0) + ' G' + (c.G || 0) +
             (c.flare ? ' · rayos X ' + c.flare.current_class : ''));
     }
@@ -313,7 +317,7 @@ Plugins.solar.init = function () {
             '<div class="sol-v"' + (color ? ' style="color:' + color + '"' : '') + '>' + v + '</div>' +
             '<div class="sol-s">' + (s || '&nbsp;') + '</div></div>';
     }
-    var ND = '<span style="color:#6b7782">s/d</span>';
+    var ND = '<span style="color:var(--text-muted,#BAC4CC)">s/d</span>';
 
     function renderDatos() {
         var c = current();
@@ -324,8 +328,8 @@ Plugins.solar.init = function () {
         h += tile('Protones', (c.p10 !== undefined) ? (c.p10 < 10 ? c.p10.toFixed(2) : Math.round(c.p10)) : ND,
             '≥10 MeV (pfu) · S' + sScale(c.p10 || 0), scaleColor(sScale(c.p10 || 0)));
         h += tile('Índice Kp', (c.kp !== undefined) ? c.kp.toFixed(1) : ND, (c.a !== undefined) ? 'A = ' + c.a : 'planetario', kpColor(c.kp || 0));
-        h += tile('Viento solar', c.wind ? Math.round(c.wind) : ND, 'km/s', c.wind >= 600 ? '#ff9800' : null);
-        h += tile('Bz / Bt', (c.bz !== undefined) ? c.bz + ' / ' + c.bt : ND, 'nT (GSM)', c.bz <= -10 ? '#f44336' : c.bz < 0 ? '#ffc107' : null);
+        h += tile('Viento solar', c.wind ? Math.round(c.wind) : ND, 'km/s', c.wind >= 600 ? 'var(--warn,#FFC857)' : null);
+        h += tile('Bz / Bt', (c.bz !== undefined) ? c.bz + ' / ' + c.bt : ND, 'nT (GSM)', c.bz <= -10 ? 'var(--err,#FF8A80)' : c.bz < 0 ? 'var(--warn,#FFC857)' : null);
         h += '</div>';
 
         // escalas NOAA hoy y previsión
@@ -363,11 +367,11 @@ Plugins.solar.init = function () {
         if (!data.xray || !data.proton) { load(true); return; }
         var xl = data.xray.filter(function (r) { return r.energy === '0.1-0.8nm'; });
         var xs = data.xray.filter(function (r) { return r.energy === '0.05-0.4nm'; });
-        chart($lcd.find('canvas.cx')[0], [{ pts: xl, color: '#ffc107' }, { pts: xs, color: '#64b5f6', dash: true }], -9, -3,
+        chart($lcd.find('canvas.cx')[0], [{ pts: xl, color: tok('--brand-orange', '#F26B1D') }, { pts: xs, color: tok('--text-muted', '#BAC4CC'), dash: true }], -9, -3,
             [[-8, 'A'], [-7, 'B'], [-6, 'C'], [-5, 'M'], [-4, 'X']]);
         var p10 = data.proton.filter(function (r) { return r.energy === '>=10 MeV'; });
         var p100 = data.proton.filter(function (r) { return r.energy === '>=100 MeV'; });
-        chart($lcd.find('canvas.cp')[0], [{ pts: p10, color: '#ef5350' }, { pts: p100, color: '#ab47bc', dash: true }], -2, 4,
+        chart($lcd.find('canvas.cp')[0], [{ pts: p10, color: tok('--err', '#FF8A80') }, { pts: p100, color: tok('--text-muted', '#BAC4CC'), dash: true }], -2, 4,
             [[1, 'S1'], [2, 'S2'], [3, 'S3'], [4, 'S4']]);
     }
 
@@ -379,7 +383,7 @@ Plugins.solar.init = function () {
         var padL = 26, padR = 6, padT = 6, padB = 16, w = W - padL - padR, h = H - padT - padB;
         var all = [];
         series.forEach(function (s) { s.pts.forEach(function (p) { all.push(Date.parse(p.time_tag)); }); });
-        if (!all.length) { x.fillStyle = '#6b7782'; x.fillText('sin datos', padL + 8, padT + 16); return; }
+        if (!all.length) { x.fillStyle = tok('--text-muted', '#BAC4CC'); x.fillText('sin datos', padL + 8, padT + 16); return; }
         var t0 = Math.min.apply(null, all), t1 = Math.max.apply(null, all);
         function X(t) { return padL + (t - t0) / Math.max(1, t1 - t0) * w; }
         function Y(v) { var l = Math.log10(Math.max(v, Math.pow(10, lo))); return padT + h - (Math.min(l, hi) - lo) / (hi - lo) * h; }
@@ -387,15 +391,15 @@ Plugins.solar.init = function () {
         x.textBaseline = 'middle';
         marks.forEach(function (m) {
             var y = Y(Math.pow(10, m[0]));
-            x.strokeStyle = '#1d262e'; x.lineWidth = 1; x.beginPath(); x.moveTo(padL, y); x.lineTo(W - padR, y); x.stroke();
-            x.fillStyle = '#6b7782'; x.fillText(m[1], 4, y);
+            x.strokeStyle = tok('--border', '#38434C'); x.lineWidth = 1; x.beginPath(); x.moveTo(padL, y); x.lineTo(W - padR, y); x.stroke();
+            x.fillStyle = tok('--text-muted', '#BAC4CC'); x.fillText(m[1], 4, y);
         });
         // horas
         x.textBaseline = 'alphabetic';
         for (var t = Math.ceil(t0 / 3600000) * 3600000; t <= t1; t += 3600000) {
             var xx = X(t);
-            x.strokeStyle = '#141b21'; x.beginPath(); x.moveTo(xx, padT); x.lineTo(xx, padT + h); x.stroke();
-            x.fillStyle = '#6b7782'; x.fillText(hhmm(new Date(t)).slice(0, 2) + 'h', xx - 8, H - 3);
+            x.strokeStyle = tok('--border', '#38434C'); x.beginPath(); x.moveTo(xx, padT); x.lineTo(xx, padT + h); x.stroke();
+            x.fillStyle = tok('--text-muted', '#BAC4CC'); x.fillText(hhmm(new Date(t)).slice(0, 2) + 'h', xx - 8, H - 3);
         }
         series.forEach(function (s) {
             x.strokeStyle = s.color; x.lineWidth = 1.4; x.setLineDash(s.dash ? [4, 3] : []);
@@ -428,7 +432,7 @@ Plugins.solar.init = function () {
                 var bold = function (cond, isNow) { return '<td class="c-' + cond + '">' + (isNow ? '<b>▸ ' : '') + COND_TXT[cond] + (isNow ? '</b>' : '') + '</td>'; };
                 h += '<tr><td>' + g[0] + '</td>' + bold(d, !night) + bold(n, night) + '</tr>';
             });
-            h += '<tr><td>6 m</td><td colspan="2" style="color:#93a0ab">Esporádica E / TEP: mira el DX cluster</td></tr></table>';
+            h += '<tr><td>6 m</td><td colspan="2" style="color:var(--text-muted,#BAC4CC)">Esporádica E / TEP: mira el DX cluster</td></tr></table>';
             h += '<div class="sol-note">Estimación a partir de SFI ' + Math.round(c.sfi) + ', Kp ' + c.kp.toFixed(1) +
                 ' y R' + (c.R || 0) + '. Orientativa: lo que manda es lo que se oye en la cascada.</div>';
         }
@@ -437,7 +441,7 @@ Plugins.solar.init = function () {
             '<img loading="lazy" alt="Mapa D-RAP de absorción" src="' + IMG.drap + '?t=' + Math.floor(Date.now() / 300000) + '"></a>' +
             '<div class="sol-h">MUF EN VIVO (KC2G)</div>' +
             '<a href="https://prop.kc2g.com/" target="_blank" rel="noopener">' +
-            '<img loading="lazy" alt="Mapa de MUF" style="background:#fff" src="' + IMG.muf + '?t=' + Math.floor(Date.now() / 900000) + '"></a>';
+            '<img loading="lazy" alt="Mapa de MUF" style="background:#FFFFFF" src="' + IMG.muf + '?t=' + Math.floor(Date.now() / 900000) + '"></a>';
         $lcd.html(h);
     }
 

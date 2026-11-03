@@ -89,12 +89,14 @@ Plugins.consentimiento.init = function () {
         banner.setAttribute('aria-label', spanish ? 'Cookies y privacidad' : 'Cookies and privacy');
         banner.innerHTML =
             '<style>#bh-consentimiento{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:10030;box-sizing:border-box;' +
-            'width:min(680px,calc(100vw - 24px));padding:16px 18px;border:1px solid #383838;border-radius:10px;background:#111;color:#ddd;' +
-            'font:14px/1.5 system-ui,sans-serif;box-shadow:0 10px 40px #000}' +
-            '#bh-consentimiento h2{margin:0 0 6px;font-size:17px;color:#fff}#bh-consentimiento p{margin:0 0 10px;color:#bbb}' +
-            '#bh-consentimiento a{color:#8ab4f8}#bh-consentimiento .bh-c-btns{display:flex;flex-wrap:wrap;gap:8px}' +
-            '#bh-consentimiento button{flex:1 1 180px;padding:10px;border:0;border-radius:7px;font:600 14px system-ui,sans-serif;cursor:pointer}' +
-            '#bh-consentimiento .bh-c-si{background:#2868d7;color:#fff}#bh-consentimiento .bh-c-no{background:#272727;color:#ddd}</style>' +
+            'width:min(680px,calc(100vw - 24px));padding:16px 18px;border:1px solid var(--border,#38434C);border-radius:12px;background:var(--surface,#1C2329);color:var(--text,#F6F8FA);' +
+            'font:14px/1.5 var(--bh-font-ui,system-ui,sans-serif);box-shadow:0 10px 40px rgba(0,0,0,.5)}' +
+            '#bh-consentimiento h2{margin:0 0 6px;font:800 17px/1.3 var(--bh-font-head,system-ui,sans-serif);color:var(--text,#F6F8FA)}#bh-consentimiento p{margin:0 0 10px;color:var(--text-muted,#BAC4CC)}' +
+            '#bh-consentimiento a{color:var(--link,#FFA06A)}#bh-consentimiento .bh-c-btns{display:flex;flex-wrap:wrap;gap:8px}' +
+            '#bh-consentimiento button{flex:1 1 180px;padding:10px;border:0;border-radius:7px;font:600 14px var(--bh-font-ui,system-ui,sans-serif);cursor:pointer}' +
+            '#bh-consentimiento button:focus-visible,#bh-consentimiento a:focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}' +
+            '#bh-consentimiento .bh-c-si{background:var(--brand-orange,#F26B1D);color:var(--on-accent,#23272B)}' +
+            '#bh-consentimiento .bh-c-no{background:var(--bg,#111518);color:var(--text,#F6F8FA);border:1px solid var(--border,#38434C)}</style>' +
             '<h2></h2><p class="bh-c-txt"></p><p class="bh-c-links"><a target="_blank" rel="noopener"></a> · <a target="_blank" rel="noopener"></a></p>' +
             '<div class="bh-c-btns"><button type="button" class="bh-c-si"></button><button type="button" class="bh-c-no"></button></div>';
         banner.querySelector('h2').textContent = spanish ? '🍪 Cookies y privacidad' : '🍪 Cookies and privacy';

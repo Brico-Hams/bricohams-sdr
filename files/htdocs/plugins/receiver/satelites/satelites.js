@@ -27,14 +27,14 @@ Plugins.satelites.init = function () {
 
     $('<style>').text(
         '#bh-sat-franja{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9997;display:none;gap:8px;align-items:center;' +
-        'background:rgba(20,22,26,.92);color:#eee;border:1px solid #2e7d32;border-top:0;border-radius:0 0 10px 10px;padding:4px 12px;' +
-        'font:13px/1.3 sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.5);white-space:nowrap}' +
-        '#bh-sat-franja.vivo{border-color:#e53935}#bh-sat-franja button,#bh-sat-lista button{background:#2e7d32;color:#fff;border:0;border-radius:6px;' +
-        'padding:2px 8px;cursor:pointer;font-weight:600}#bh-sat-franja .x{background:none;color:#aaa;padding:0 2px}' +
-        '#bh-sat-lista{position:fixed;top:60px;right:12px;z-index:9998;display:none;max-height:70vh;overflow:auto;background:rgba(20,22,26,.96);' +
-        'color:#eee;border:1px solid #2e7d32;border-radius:10px;padding:8px;font:12px/1.4 sans-serif}' +
+        'background:var(--surface,#1C2329);color:var(--text,#F6F8FA);border:1px solid var(--brand-orange,#F26B1D);border-top:0;border-radius:0 0 12px 12px;padding:4px 12px;' +
+        'font:13px/1.3 var(--bh-font-ui,system-ui,sans-serif);box-shadow:0 2px 10px rgba(0,0,0,.5);white-space:nowrap}' +
+        '#bh-sat-franja.vivo{border-color:var(--err,#FF8A80)}#bh-sat-franja button,#bh-sat-lista button{background:var(--brand-orange,#F26B1D);color:var(--on-accent,#23272B);border:0;border-radius:6px;' +
+        'padding:2px 8px;cursor:pointer;font-weight:600}#bh-sat-franja .x{background:none;color:var(--text-muted,#BAC4CC);padding:0 2px}' +
+        '#bh-sat-lista{position:fixed;top:60px;right:12px;z-index:9998;display:none;max-height:70vh;overflow:auto;background:var(--surface,#1C2329);' +
+        'color:var(--text,#F6F8FA);border:1px solid var(--brand-orange,#F26B1D);border-radius:12px;padding:8px;font:12px/1.4 var(--bh-font-ui,system-ui,sans-serif)}' +
         '#bh-sat-lista table{border-collapse:collapse}#bh-sat-lista td,#bh-sat-lista th{padding:2px 6px;text-align:left}' +
-        '#bh-sat-lista tr.vivo{color:#ff8a80}#bh-sat-lista th{color:#9ccc65}'
+        '#bh-sat-lista tr.vivo{color:var(--err,#FF8A80)}#bh-sat-lista th{color:var(--text-muted,#BAC4CC)}'
     ).appendTo('head');
     var $franja = $('<div id="bh-sat-franja"></div>').appendTo('body');
     var $lista = $('<div id="bh-sat-lista"></div>').appendTo('body');

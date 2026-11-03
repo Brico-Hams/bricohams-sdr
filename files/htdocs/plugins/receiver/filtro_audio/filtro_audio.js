@@ -189,7 +189,7 @@ Plugins.filtro_audio.init = async function () {
     var sQ = C.ui.deslizador('Estrechez', 3, 40, 1, cfg.notchQ, function (v) { return 'Q ' + v; }, function (v) { cfg.notchQ = v; guardar(); aplicar(); });
     $sec2.append($('<div class="bha-row"></div>').append(swAuto.$el, $estadoAuto), $('<div class="bha-row"></div>').append(swN.$el), sN.$el, sQ.$el);
 
-    var $cv = $('<canvas width="320" height="70" style="width:100%;height:70px;background:#0b0d10;border-radius:4px"></canvas>');
+    var $cv = $('<canvas width="320" height="70" style="width:100%;height:70px;background:var(--bg,#111518);border:1px solid var(--border,#38434C);border-radius:4px"></canvas>');
     $('<div class="bha-sec"><h4>ESPECTRO DEL AUDIO 0–4 kHz</h4></div>').append($cv,
         '<div class="bha-nota">Solo cambia lo que oyes tú. La grabación (REC) y los decodificadores usan el audio original.</div>').appendTo($c);
 
@@ -204,19 +204,20 @@ Plugins.filtro_audio.init = async function () {
         $cortes.text('Pasa de ' + c.bajo + ' a ' + c.alto + ' Hz');
         $esperando.toggle(!n);
     }
+    function tok(n, f) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f; }
     function dibujar(db, hzBin, c) {
         var g = $cv[0].getContext('2d'), W = $cv[0].width, H = $cv[0].height, fmax = 4000;
         g.clearRect(0, 0, W, H);
-        g.fillStyle = 'rgba(242,107,33,.15)';
+        g.fillStyle = 'rgba(242,107,29,.15)';
         g.fillRect(c.bajo / fmax * W, 0, (Math.min(c.alto, fmax) - c.bajo) / fmax * W, H);
-        g.strokeStyle = '#39d353'; g.beginPath();
+        g.strokeStyle = tok('--ok', '#7BD88F'); g.beginPath();
         for (var x = 0; x < W; x++) {
             var v = db[Math.min(db.length - 1, Math.round(x / W * fmax / hzBin))];
             var y = H - (Math.max(-110, Math.min(-20, v)) + 110) / 90 * H;
             if (x) g.lineTo(x, y); else g.moveTo(x, y);
         }
         g.stroke();
-        [[cfg.notch && cfg.notchHz, '#ffb74d'], [auto.hz, '#ff5252']].forEach(function (m) {
+        [[cfg.notch && cfg.notchHz, tok('--warn', '#FFC857')], [auto.hz, tok('--err', '#FF8A80')]].forEach(function (m) {
             if (!m[0]) return;
             g.strokeStyle = m[1]; g.beginPath(); g.moveTo(m[0] / fmax * W, 0); g.lineTo(m[0] / fmax * W, H); g.stroke();
         });

@@ -23,11 +23,11 @@ Plugins.visitas.init = function () {
     function n(x) { return (x || 0).toLocaleString('es-ES'); }
 
     $('<style>').text(
-        '#bh-visitas{display:inline-block;margin-left:10px;padding:1px 8px;border-radius:999px;background:rgba(255,255,255,.08);' +
-        'font:600 12px/1.6 sans-serif;color:#eee;cursor:pointer;vertical-align:middle}' +
-        '#bh-visitas-pop{position:fixed;top:60px;left:12px;z-index:9998;display:none;background:rgba(20,22,26,.96);color:#eee;' +
-        'border:1px solid #F26B21;border-radius:10px;padding:8px 12px;font:12px/1.5 sans-serif;max-height:60vh;overflow:auto}' +
-        '#bh-visitas-pop a{color:#F26B21}'
+        '#bh-visitas{display:inline-block;margin-left:10px;padding:1px 8px;border-radius:999px;background:var(--surface,#1C2329);border:1px solid var(--border,#38434C);' +
+        'font:600 12px/1.6 var(--bh-font-ui,system-ui,sans-serif);color:var(--text,#F6F8FA);cursor:pointer;vertical-align:middle}' +
+        '#bh-visitas-pop{position:fixed;top:60px;left:12px;z-index:9998;display:none;background:var(--surface,#1C2329);color:var(--text,#F6F8FA);' +
+        'border:1px solid var(--brand-orange,#F26B1D);border-radius:12px;padding:8px 12px;font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);max-height:60vh;overflow:auto}' +
+        '#bh-visitas-pop a{color:var(--link,#FFA06A)}'
     ).appendTo('head');
     var $b = $('<span id="bh-visitas" title="Oyentes conectados y visitas">👥 …</span>');
     var $t = $('.webrx-rx-title').first();

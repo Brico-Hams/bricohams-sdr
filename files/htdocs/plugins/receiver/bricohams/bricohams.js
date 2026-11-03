@@ -22,7 +22,7 @@ Plugins.bricohams.no_css = true;
 Plugins.bricohams.init = function () {
     var cfg = window.bricohams_config || {};
     var TG = cfg.telegram || 'https://t.me/bricohams';
-    var CR = '#A6192E', OR = '#F26B21', GOLD = '#E7B416';
+    var CR = '#A6192E', GOLD = '#E7B416';   // bandera oficial de la Región de Murcia (no es paleta de interfaz)
 
     // bandera de la Región de Murcia: 4 castillos y 7 coronas (1-3-2-1)
     function flag(w) {
@@ -43,17 +43,16 @@ Plugins.bricohams.init = function () {
     }
 
     var css =
-        '.webrx-top-container{border-bottom:3px solid ' + OR + ';box-shadow:0 2px 0 0 ' + CR + '}' +
+        '.webrx-top-container{border-bottom:3px solid var(--brand-orange,#F26B1D)}' +
         '#bh-murcia-flag{display:inline-block;vertical-align:middle;margin-right:6px;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}' +
         '#bh-murcia-flag svg{display:block}' +
-        '#bricohams-tg{position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;gap:6px;align-items:center;' +
-            'padding:6px 12px;border-radius:999px;background:' + OR + ';color:#fff;font:600 13px/1 sans-serif;' +
-            'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
-        '#bricohams-tg:hover{opacity:1;background:#229ED9}' +
-        '#bricohams-gh{position:fixed;right:12px;bottom:48px;z-index:9999;display:flex;gap:6px;align-items:center;' +
-            'padding:6px 12px;border-radius:999px;background:#24292f;color:#fff;font:600 13px/1 sans-serif;' +
-            'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
-        '#bricohams-gh:hover{opacity:1;background:#2da44e}' +
+        '#bricohams-tg,#bricohams-gh,#bricohams-theme{position:fixed;right:12px;z-index:9999;display:flex;gap:6px;align-items:center;' +
+            'padding:6px 12px;border-radius:999px;font:600 13px/1 var(--bh-font-ui,system-ui,sans-serif);' +
+            'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.92;cursor:pointer}' +
+        '#bricohams-tg{bottom:12px;background:var(--brand-orange,#F26B1D);color:var(--on-accent,#23272B);border:1px solid var(--brand-orange,#F26B1D)}' +
+        '#bricohams-gh{bottom:48px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
+        '#bricohams-theme{bottom:84px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
+        '#bricohams-tg:hover,#bricohams-gh:hover,#bricohams-theme:hover{opacity:1;text-decoration:underline}' +
         '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
     // v4: la foto de cabecera abierta no tapa media pantalla
     css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';
@@ -95,6 +94,21 @@ Plugins.bricohams.init = function () {
         gs.textContent = 'Monta la tuya';
         g.appendChild(gs);
         document.body.appendChild(g);
+    }
+    // selector de tema claro / oscuro / sistema (los tokens y el almacenamiento los gestiona el plugin marca)
+    if (window.BricoHamsTheme && !document.getElementById('bricohams-theme')) {
+        var NOMBRES = { system: 'Sistema', light: 'Claro', dark: 'Oscuro' }, SIG = { system: 'light', light: 'dark', dark: 'system' };
+        var tb = document.createElement('button');
+        tb.id = 'bricohams-theme';
+        tb.type = 'button';
+        var pintar = function () {
+            var t = window.BricoHamsTheme.get();
+            tb.textContent = '🌗 Tema: ' + NOMBRES[t];
+            tb.title = 'Cambiar tema (claro, oscuro o el del sistema)';
+        };
+        tb.addEventListener('click', function () { window.BricoHamsTheme.set(SIG[window.BricoHamsTheme.get()]); pintar(); });
+        pintar();
+        document.body.appendChild(tb);
     }
     // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
     try {
