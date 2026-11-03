@@ -1113,9 +1113,6 @@ paso_plugins() {
         for carpeta in meteo visitas satelites; do
             chown root:root "$R/$carpeta"; chmod 755 "$R/$carpeta"
             chown root:root "$R/$carpeta/$carpeta.js"; chmod 644 "$R/$carpeta/$carpeta.js"
-            if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
-                install -o root -g root -m 644 "$R/$carpeta/$carpeta.js" "/usr/local/share/bricohams-static/$carpeta.js"
-            fi
         done
         for dato in meteo/{meteo,sensor,wx-red,wspr,caja}.json visitas/visitas.json satelites/{pases.json,grabaciones.json,pases.ics}; do
             [ "$(readlink "$R/$dato")" = "/var/lib/bricohams/web/$dato" ] \
@@ -1129,6 +1126,16 @@ paso_plugins() {
         owrx_owner
     else
         install -d -o openwebrx -g openwebrx "$R/meteo" "$R/camara/snap" "$R/satelites" "$R/visitas"
+    fi
+    # nginx sirve estos JS desde copias protegidas (alias): se actualizan siempre que exista el snippet y se verifican,
+    # para que un despliegue no deje un visitas.js antiguo en producción
+    if [ -f /etc/nginx/snippets/bricohams-static-seguro.conf ]; then
+        local carpeta_alias
+        for carpeta_alias in meteo visitas satelites; do
+            install -o root -g root -m 644 "$R/$carpeta_alias/$carpeta_alias.js" "/usr/local/share/bricohams-static/$carpeta_alias.js"
+            cmp -s "$R/$carpeta_alias/$carpeta_alias.js" "/usr/local/share/bricohams-static/$carpeta_alias.js" \
+                || fallo "La copia protegida de $carpeta_alias.js no coincide con el plugin instalado"
+        done
     fi
     bien "plugins: rig_skin (DX), solar, meteo, cámara, BricoHams y los de 0xAF"
 }

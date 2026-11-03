@@ -9,7 +9,7 @@ Alcance: cambios solo en el repositorio. No se ha tocado ninguna infraestructura
 | API | `files/bin/bricohams-api.py` (`ContadorVisitas`) | `GET /bricohams/api/visitas` → `{"total","hoy"}`; `POST` suma una visita (mismo origen) |
 | Datos | `/var/lib/bricohams/visitas-web.sqlite` (0600) | tabla `visitas_dia(dia, n)`: solo dos números por día |
 | IP interna | `/var/lib/bricohams/visitas-ip.sqlite` (0600, usuario del servicio) | tabla `visitas_ip(dia, ip, n)`: IP completa validada, borrada a los `VISITAS_IP_DIAS` (1-30, 14 por defecto) |
-| Tarjeta | `GET /bricohams/api/mi-ip` | `{"ip":"203.0.x.x","identidad":"EA5ABC"}`: solo la IP del propio visitante, enmascarada (IPv4 con exactamente los dos primeros octetos; IPv6 tres primeros grupos y `x:x:x:x:x`), más la identidad que él eligió si existe (`identidad` se omite si no) y el país ISO aproximado (`pais`, de la base GeoIP local; se omite si no hay base o la IP no es pública). El banner del receptor raíz (plugin `visitas`) lo usa junto a `/bricohams/api/visitas` |
+| Tarjeta | `GET /bricohams/api/mi-ip` | `{"ip":"203.0.x.x","pais":"ES"}`: solo la IP del propio visitante, enmascarada (IPv4 con exactamente los dos primeros octetos; IPv6 tres primeros grupos y `x:x:x:x:x`) y el país ISO aproximado (`pais`, de la base GeoIP local; se omite si no hay base o la IP no es pública). Nunca devuelve identidad. El banner del receptor raíz (plugin `visitas`) lo usa junto a `/bricohams/api/visitas` |
 | Identidad↔IP | `/var/lib/bricohams/conexiones-ip.sqlite` (0600, `files/bin/bricohams_conexiones.py`) | tabla `conexion(ip, visto, identidad, tipo, aviso_msg, aviso_base)`: la escriben la API (registro de oyentes) y `bricohams-visitas` (nombre del chat); mismos `VISITAS_IP_DIAS` de retención y tope de 5000 filas |
 | Telegram | `bricohams-visitas.py` | el aviso «🟢 Nuevo oyente» lleva `👤 identidad` si ya se conocía; si el oyente se identifica después, el aviso ya enviado se **edita** (`editMessageText`), sin mandar otra llegada |
 | Portada | `files/web/index.html.tmpl` | dos tarjetas: visitas y «Tu conexión» (navegador, sistema, idioma, IP enmascarada) |
@@ -23,7 +23,7 @@ orientativo, no antifraude.
 
 **Identidad.** Se reutiliza el flujo existente (`POST /bricohams/api/oyentes` con consentimiento, o el nombre del chat de OpenWebRX+); no hay registro nuevo.
 El texto se normaliza (NFKC), se le quitan controles y caracteres de formato (bidi, ancho cero), se acota a 80 caracteres y se escapa en HTML para Telegram.
-No aparece en `visitas.json`, `/api/visitas` ni estadísticas. Limitación: varios oyentes tras la misma IP (CGNAT/oficina) comparten identidad mientras dure la retención;
+No aparece en `visitas.json`, `/api/visitas`, `/api/mi-ip` ni estadísticas: la tarjeta/banner solo muestra la identidad guardada en el propio navegador (`Plugins.identificacion.chat.identidad()`), nunca la deducida de la IP, para que otro visitante tras la misma IP (CGNAT/oficina) no la vea. El vínculo IP↔identidad sigue siendo interno (avisos de Telegram);
 el último que se identifica prevalece. Si Telegram rechaza la edición (mensaje antiguo, red) se ignora: no se manda un aviso nuevo.
 
 **Origen fiable de la IP.** La API solo lee `X-Forwarded-For` si el socket de la conexión está en `API_PROXIES_CONFIABLES`

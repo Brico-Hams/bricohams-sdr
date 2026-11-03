@@ -15,8 +15,9 @@
 #        127.0.0.1:8100, solo con AIS_ENABLE=yes)
 #    GET  /bricohams/api/visitas -> {"total","hoy"} contador agregado de la portada
 #    POST /bricohams/api/visitas -> suma una visita (mismo origen) y devuelve lo mismo
-#    GET  /bricohams/api/mi-ip -> {"ip": "203.0.x.x", "identidad": "EA5ABC"?} solo la IP del propio visitante, enmascarada
-#         (dos primeros octetos; IPv6 tres primeros grupos), su país ISO ("pais", solo con la base GeoIP local; si no, se omite), y la identidad que él mismo eligió si la hay
+#    GET  /bricohams/api/mi-ip -> {"ip": "203.0.x.x", "pais": "ES"?} solo la IP del propio visitante, enmascarada
+#         (dos primeros octetos; IPv6 tres primeros grupos) y su país ISO ("pais", solo con la base GeoIP local; si no, se omite).
+#         Nunca devuelve identidad: no se deduce de la IP (puede ser compartida)
 #    GET /bricohams/api/salud  -> {"ok": true}
 #  La IP completa solo se lee de X-Forwarded-For si el socket viene de un proxy de confianza (nginx local),
 #  se guarda en un fichero 0600 aparte con retención corta y no sale nunca por la API.
@@ -853,10 +854,8 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas=None, ips=None,
                 pais = geo.pais(propia)
                 if pais:
                     cuerpo['pais'] = pais
-                if oyentes.conexiones is not None:
-                    elegida = oyentes.conexiones.identidad(propia)
-                    if elegida:
-                        cuerpo['identidad'] = elegida[0]
+                # Sin identidad: la IP puede ser compartida (CGNAT/oficina) y revelaría quién se registró a otro visitante.
+                # La identidad propia la lee el navegador de su almacenamiento local.
                 return self._json(200, cuerpo, 'private, no-store')
             if u.path == '/bricohams/api/salud':
                 return self._json(200, {'ok': True, 'hamqth': bool(hamqth.u), 'qrz': bool(qrz.u)})

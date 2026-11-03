@@ -40,8 +40,12 @@ for name in ("sensor", "caja"):
 assert 'readlink "$R/$dato"' in installer
 assert '"/var/lib/bricohams/web/$dato"' in installer
 assert 'chown root:root "$R/$carpeta"; chmod 755 "$R/$carpeta"' in installer
+assert 'install -o root -g root -m 644 "$R/$carpeta_alias/$carpeta_alias.js" "/usr/local/share/bricohams-static/$carpeta_alias.js"' in installer
+assert 'cmp -s "$R/$carpeta_alias/$carpeta_alias.js"' in installer, 'la copia del alias nginx se verifica'
+alias_sync = installer.index('for carpeta_alias in meteo visitas satelites')
+assert alias_sync > installer.index('"$R/$carpeta/$carpeta.js"; chmod 644'), 'sincronización fuera del if de web-data.env'
+assert 'if [ -f "$ETC_BH/web-data.env" ]; then' in installer.split('for carpeta_alias')[0].rsplit('paso_plugins()', 1)[1]
 assert 'if [ ! -f "$ETC_BH/web-data.env" ]; then' in installer
-assert 'install -o root -g root -m 644 "$R/$carpeta/$carpeta.js"' in installer
 assert re.search(r'if \[ -f /etc/nginx/snippets/bricohams-static-seguro.conf \]; then\s+'
                  r"printf .*include /etc/nginx/snippets/bricohams-static-seguro.conf;", installer)
 assert 'python3 "$FILES/bin/bricohams-nginx-hsts.py"' in installer

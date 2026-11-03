@@ -11,7 +11,7 @@
  * Incluye el enlace al aviso de privacidad (obligatorio al registrar visitas).
  */
 
-Plugins.visitas._version = '1.1.0';
+Plugins.visitas._version = '1.2.0';
 Plugins.visitas._author='BricoHams';
 Plugins.visitas.no_css = true;
 
@@ -68,7 +68,7 @@ Plugins.visitas.init = function () {
             return '<tr><td>' + flag(p.cc) + ' ' + $('<i>').text(p.pais || p.cc).html() + '</td><td style="text-align:right">' + n(p.n) + '</td></tr>';
         }).join('');
         $pop.html('<b>👥 Oyentes · BricoHams SDR</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-visitas-pop\').hide()">✕</span><br>' +
-            'Ahora: <b>' + n(resumen.ahora) + '</b> · Hoy: <b>' + n(resumen.hoy) + '</b> · Total: <b>' + n(total === null ? resumen.total : total) + '</b><br>' +
+            'Ahora: <b>' + n(resumen.ahora) + '</b> · Hoy: <b>' + n(resumen.hoy) + '</b> · Total: <b>' + n(typeof resumen.total === 'number' ? resumen.total : total) + '</b><br>' +
             '<table style="margin-top:4px">' + filas + '</table>' +
             '<div style="opacity:.8;margin-top:6px">Visitas de los últimos 30 días por país. <a href="' + PRIV + '" target="_blank">Privacidad</a></div>');
         $pop.append($('<div>').append($info.contents().clone()));
@@ -76,6 +76,7 @@ Plugins.visitas.init = function () {
     function abrirResumen() {
         pintarResumen();
         $pop.toggle();
+        $b.attr('aria-expanded', $pop.is(':visible') ? 'true' : 'false');
     }
     $b.on('click', function (e) { e.stopPropagation(); abrirResumen(); })
       .on('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirResumen(); } });
@@ -84,8 +85,10 @@ Plugins.visitas.init = function () {
         return $('<span>').append(document.createTextNode(etiqueta + ' '), $('<b>').text(valor));
     }
     function pintarInfo() {
-        var t = total !== null ? total : (datos && datos.total);
+        // «Visitas» = conexiones al receptor (visitas.json, histórico); el contador de la portada es otro, y se muestra aparte
+        var t = datos && typeof datos.total === 'number' ? datos.total : total;
         var partes = [parte('👥 Visitas', t === null || t === undefined ? 'no disponible' : n(t))];
+        if (total) partes.push(parte('🏠 Portal', n(total)));
         if (propia && propia.ip) {
             partes.push(parte('🌐 Tu IP', propia.ip));
             if (propia.pais) partes.push(parte(flag(propia.pais) + ' País', nombrePais(propia.pais) + ' (' + propia.pais + ')'));
@@ -93,10 +96,9 @@ Plugins.visitas.init = function () {
         } else if (propia === false) {
             partes.push(parte('🌐 Tu IP', 'no disponible'));
         }
-        var id = propia && propia.identidad;
-        if (!id) {
-            try { id = Plugins.identificacion && Plugins.identificacion.chat && Plugins.identificacion.chat.identidad(); } catch (e) { id = ''; }
-        }
+        // Solo la identidad registrada en este navegador: la API no la deduce de la IP (puede compartirse)
+        var id = '';
+        try { id = Plugins.identificacion && Plugins.identificacion.chat && Plugins.identificacion.chat.identidad(); } catch (e) { id = ''; }
         if (typeof id === 'string' && id && id !== '?' && id !== 'Anonymous') partes.push(parte('👤', id));
         $info.empty();
         partes.forEach(function (p, i) {

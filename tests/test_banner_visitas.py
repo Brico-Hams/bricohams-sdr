@@ -88,6 +88,10 @@ assert '/bricohams/api/mi-ip' in js and '/bricohams/api/visitas' in js, 'reutili
 assert "'bh_visita'" in js and "'bh_visita'" in leer('files', 'web', 'index.html.tmpl').replace('"', "'"), 'misma clave anti-duplicado que la portada'
 assert 'webrx-rx-desc' in js and 'webrx-rx-title' in js and 'bh:identidad' in js
 assert 'no disponible' in js and 'identidad' in js and 'aria-live' in js
+assert 'role="button"' in js and 'id="bh-visitas-pop"' in js and 'id="bh-banner-info"' in js
+assert 'propia.identidad' not in js, 'la identidad no viene de la API por IP (IP compartida)'
+assert "datos && typeof datos.total === 'number' ? datos.total : total" in js, 'API en 0 no pisa el histórico de visitas.json'
+assert "_version = '1.2.0'" in js
 assert 'bh:identidad' in leer('files', 'htdocs', 'plugins', 'receiver', 'identificacion', 'identificacion.js')
 assert re.search(r'https?://', js) is None, 'sin servicios de terceros'
 

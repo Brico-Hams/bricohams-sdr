@@ -158,9 +158,10 @@ try:
     assert pedir(srv, 'POST', '/bricohams/api/oyentes', '203.0.113.77',
                  {'identificador': 'ea5xyz', 'consentimiento': True})[0] == 201
     estado, cuerpo = pedir(srv, 'GET', '/bricohams/api/mi-ip', '203.0.113.77')
-    assert estado == 200 and json.loads(cuerpo) == {'ip': '203.0.x.x', 'identidad': 'EA5XYZ'}
-    assert '203.0.113.77' not in cuerpo
+    assert estado == 200 and json.loads(cuerpo) == {'ip': '203.0.x.x'}, 'mi-ip nunca devuelve identidad (IP compartida)'
+    assert '203.0.113.77' not in cuerpo and 'EA5XYZ' not in cuerpo
     assert json.loads(pedir(srv, 'GET', '/bricohams/api/mi-ip', '203.0.113.78')[1]) == {'ip': '203.0.x.x'}, 'otra IP no ve la identidad'
+    assert c2.identidad('203.0.113.77')[0] == 'EA5XYZ', 'el vínculo interno para Telegram se conserva'
     # Socket no confiable: la IP afirmada se ignora (no se vincula ni se muestra)
     assert pedir(srv2, 'POST', '/bricohams/api/oyentes', '203.0.113.99',
                  {'identificador': 'EA5ZZZ', 'consentimiento': True})[0] == 201
