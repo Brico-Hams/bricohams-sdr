@@ -62,15 +62,20 @@ Plugins.visitas.init = function () {
     colocar(20);
     var datos = null, total = null, propia = null;
 
-    function abrirResumen() {
-        if (!datos) return;
-        var filas = (datos.paises_30d || []).slice(0, 25).map(function (p) {
+    function pintarResumen() {
+        var resumen = datos || {};
+        var filas = (resumen.paises_30d || []).slice(0, 25).map(function (p) {
             return '<tr><td>' + flag(p.cc) + ' ' + $('<i>').text(p.pais || p.cc).html() + '</td><td style="text-align:right">' + n(p.n) + '</td></tr>';
         }).join('');
         $pop.html('<b>👥 Oyentes · BricoHams SDR</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-visitas-pop\').hide()">✕</span><br>' +
-            'Ahora: <b>' + n(datos.ahora) + '</b> · Hoy: <b>' + n(datos.hoy) + '</b> · Total: <b>' + n(datos.total) + '</b><br>' +
+            'Ahora: <b>' + n(resumen.ahora) + '</b> · Hoy: <b>' + n(resumen.hoy) + '</b> · Total: <b>' + n(total === null ? resumen.total : total) + '</b><br>' +
             '<table style="margin-top:4px">' + filas + '</table>' +
-            '<div style="opacity:.8;margin-top:6px">Visitas de los últimos 30 días por país. <a href="' + PRIV + '" target="_blank">Privacidad</a></div>').toggle();
+            '<div style="opacity:.8;margin-top:6px">Visitas de los últimos 30 días por país. <a href="' + PRIV + '" target="_blank">Privacidad</a></div>');
+        $pop.append($('<div>').append($info.contents().clone()));
+    }
+    function abrirResumen() {
+        pintarResumen();
+        $pop.toggle();
     }
     $b.on('click', function (e) { e.stopPropagation(); abrirResumen(); })
       .on('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirResumen(); } });
@@ -98,6 +103,7 @@ Plugins.visitas.init = function () {
             if (i) $info.append('<span class="bh-sep" aria-hidden="true">·</span>');
             $info.append(p);
         });
+        if ($pop.is(':visible')) pintarResumen();
     }
 
     function visitaApi() {
