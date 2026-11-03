@@ -51,6 +51,29 @@ def enviar_mensaje(token, chat, texto, formato_html=True):
     return resultado['result']
 
 
+def editar_mensaje(token, chat, mensaje_id, texto):
+    """Reemplaza el texto (HTML) de un mensaje ya enviado. «message is not modified» no es un error."""
+    if not token or not chat:
+        raise ValueError('Telegram sin configurar (token o destino ausente).')
+    campos = {'chat_id': chat, 'message_id': int(mensaje_id), 'text': texto,
+              'disable_web_page_preview': 'true', 'parse_mode': 'HTML'}
+    try:
+        with urllib.request.urlopen('https://api.telegram.org/bot%s/editMessageText' % token,
+                                    urllib.parse.urlencode(campos).encode(), timeout=20) as respuesta:
+            resultado = json.load(respuesta)
+    except urllib.error.HTTPError as ex:
+        try:
+            resultado = json.load(ex)
+        except (ValueError, OSError) as lectura:
+            raise RuntimeError('Telegram HTTP %s; respuesta no válida.' % ex.code) from lectura
+    except OSError as ex:
+        raise RuntimeError('Telegram: fallo de conexión (%s).' % type(ex).__name__) from None
+    if not resultado.get('ok') and 'not modified' not in str(resultado.get('description', '')):
+        detalle = str(resultado.get('description', 'Respuesta sin confirmación')).replace(token, '***')[:250]
+        raise RuntimeError('Telegram %s: %s' % (resultado.get('error_code', ''), detalle))
+    return True
+
+
 def obtener_actualizaciones(token, offset=None, timeout=25):
     """Lee mensajes nuevos del bot por long polling, ocultando el token en errores."""
     if not token:

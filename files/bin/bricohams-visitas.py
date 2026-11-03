@@ -7,8 +7,9 @@
 #     de X-Forwarded-For) y los mensajes del chat.
 #   - La IP se localiza con una base GeoIP LOCAL (DB-IP City Lite, CC BY 4.0,
 #     se descarga cada mes); no se manda a ningún servicio externo.
-#   - Se guarda país, ciudad e IP PARCIAL (83.45.x.x). La IP completa no se
-#     escribe en disco (decisión del usuario, RGPD: minimización).
+#   - Se guarda país, ciudad e IP PARCIAL (83.45.x.x) en visitas.sqlite. La IP completa solo vive, validada, en
+#     conexiones-ip.sqlite (0600, borrado a los VISITAS_IP_DIAS días) para unirla a la identidad que el oyente elige;
+#     nunca sale por web, API pública ni Telegram.
 #   - Telegram: aviso de cada conexión (como mucho 1 por IP cada 10 min),
 #     chat opcional y resumen diario (--resumen).
 #   - Web: plugins/receiver/visitas/visitas.json (solo totales y países).
@@ -45,6 +46,12 @@ try:
 except ImportError:
     maxminddb = None
 
+sys.path[:0] = [os.path.dirname(os.path.realpath(globals().get('__file__', '.'))), '/usr/local/lib/bricohams']
+try:
+    import bricohams_conexiones as conex
+except ImportError:                                # sin el módulo: avisos de llegada sin identidad
+    conex = None
+
 ESTADO = os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams')
 DB = os.path.join(ESTADO, 'visitas.sqlite')
 GEO = os.path.join(ESTADO, 'dbip-city-lite.mmdb')
@@ -65,7 +72,7 @@ def si(v):
 
 
 def ip_parcial(ip):
-    """83.45.12.7 -> 83.45.x.x · 2a01:4f8:1:2::3 -> 2a01:4f8:…"""
+    """83.45.12.7 -> 83.45.x.x · 2a01:4f8:1:2::3 -> 2a01:4f8:1:x:x:x:x:x (misma máscara que la tarjeta web)."""
     try:
         a = ipaddress.ip_address(ip)
     except ValueError:
@@ -73,8 +80,7 @@ def ip_parcial(ip):
     if a.version == 4:
         p = str(a).split('.')
         return '%s.%s.x.x' % (p[0], p[1])
-    g = a.exploded.split(':')
-    return '%s:%s:…' % (g[0].lstrip('0') or '0', g[1].lstrip('0') or '0')
+    return ':'.join([x.lstrip('0') or '0' for x in a.exploded.split(':')[:3]] + ['x'] * 5)
 
 
 def bandera(cc):
@@ -122,9 +128,12 @@ def abrir_db(ruta=DB):
 
 
 class Visitas:
-    def __init__(self, db, geo, telegram=None, ahora=time.time, moderador=None):
+    def __init__(self, db, geo, telegram=None, ahora=time.time, moderador=None,
+                 conexiones=None, enviar_id=None, editar=None):
         self.db, self.geo, self.tg, self.ahora = db, geo, telegram, ahora
         self.moderador = moderador
+        # conexiones: vínculo interno IP->identidad; enviar_id(texto, callback(id)); editar(id, texto)
+        self.con, self.enviar_id, self.editar = conexiones, enviar_id, editar
         self.activas = {}            # clave interna (ip completa, solo en memoria) -> fila
         self.ultimo_aviso = {}
         self.clientes = 0
@@ -147,6 +156,7 @@ class Visitas:
                 ok, _ = self.moderador.revisar(ip, m.get('name', '?'), m.get('message', ''))
                 if not ok:
                     return None
+            self.identificado(ip, m.get('name'))
             if self.tg and si(env('VISITAS_CHAT', 'yes')):
                 self.tg('💬 <b>%s</b>: %s' % (esc(m.get('name', '?')), esc(m.get('message', ''))))
         return None
@@ -171,10 +181,38 @@ class Visitas:
         self.tg('📡 <b>APRS</b> (OpenWebRX+%s) <b>%s</b> → <b>%s</b>: %s' % (frec, esc(de), esc(para), esc(texto)))
         return clave
 
+    def identificado(self, ip, nombre):
+        """El nombre del chat identifica a la conexión si aún no eligió otra identidad (indicativo/nombre registrado)."""
+        if not self.con or not conex or not ip:
+            return False
+        nombre = conex.limpiar_identidad(nombre)
+        if not nombre or nombre in ('?', 'Anonymous') or self.con.identidad(ip):
+            return False
+        return conex.reflejar(self.con, ip, nombre, 'nombre', self.editar)
+
+    def aviso_llegada(self, ip, base):
+        """Envía el aviso de llegada con la identidad ya conocida y recuerda su id para completarlo si llega después."""
+        previa = self.con.identidad(ip) if self.con and conex else None
+        if not (self.con and conex and self.enviar_id):
+            return self.tg(conex.texto_aviso(base, previa[0] if previa else '') if conex else base.replace('\x1f', ''))
+
+        def guardado(mensaje_id):
+            if not self.con.guardar_aviso(ip, mensaje_id, base):
+                return
+            actual = self.con.identidad(ip)
+            if actual and (not previa or actual[0] != previa[0]) and self.editar:
+                try:
+                    self.editar(mensaje_id, conex.texto_aviso(base, actual[0]))
+                except Exception as e:             # noqa: BLE001 — mejor esfuerzo
+                    print('visitas: editar aviso: %s' % type(e).__name__, file=sys.stderr)
+        return self.enviar_id(conex.texto_aviso(base, previa[0] if previa else ''), guardado)
+
     def conectado(self, ip):
         t = self.ahora()
         g = self.geo.buscar(ip)
         fila = {'ts': t, 'ip': ip_parcial(ip), **g}
+        if self.con:
+            self.con.visto(ip)
         with self.lock:
             self.activas.setdefault(ip, []).append(fila)
             cur = self.db.execute('INSERT INTO visitas (ts, fin, ip, cc, pais, ciudad) VALUES (?,?,?,?,?,?)',
@@ -187,8 +225,8 @@ class Visitas:
         avisar = self.tg and (g['cc'] != 'LAN' or si(env('VISITAS_AVISAR_LAN', 'no')))
         if avisar and t - self.ultimo_aviso.get(ip, 0) > 600:
             self.ultimo_aviso[ip] = t
-            donde = ', '.join(x for x in (g['ciudad'], g['pais']) if x)
-            self.tg('🟢 <b>Nuevo oyente</b> %s %s · <code>%s</code> · %d conectado%s' % (
+            donde = ', '.join(x for x in (g['ciudad'], g['pais']) if x).replace('\x1f', '')
+            self.aviso_llegada(ip, '🟢 <b>Nuevo oyente</b> %s %s · <code>%s</code>\x1f · %d conectado%s' % (
                 bandera(g['cc']) if g['cc'] != 'LAN' else '🏠', esc(donde or '?'), fila['ip'],
                 self.clientes, '' if self.clientes == 1 else 's'))
         return fila
@@ -363,6 +401,26 @@ def telegram_envio():
     return enviar
 
 
+def telegram_conexion():
+    """(enviar_id, editar) para el aviso de llegada: enviar_id(texto, callback(id_mensaje)) y editar(id, texto)."""
+    from bricohams_telegram import enviar_mensaje, editar_mensaje
+    tok, chat = env('TELEGRAM_TOKEN'), env('TELEGRAM_CHAT_ID')
+    if not tok or not chat:
+        return None, None
+
+    def enviar_id(texto, callback):
+        def _t():
+            try:
+                callback(enviar_mensaje(tok, chat, texto)['message_id'])
+            except (RuntimeError, ValueError, KeyError, TypeError) as e:
+                print('visitas: Telegram: %s' % e, file=sys.stderr)
+        threading.Thread(target=_t, daemon=True).start()
+
+    def editar(mensaje_id, texto):
+        editar_mensaje(tok, chat, mensaje_id, texto)
+    return enviar_id, editar
+
+
 class PuenteTelegram:
     """Reenvía /chat del grupo autorizado al chat web por MQTT."""
 
@@ -486,7 +544,9 @@ def servicio():
         return 1
     tg = telegram_envio()
     mod = ModeradorChat(tg=tg if si(env('CHATBOT_AVISAR', 'yes')) else None) if si(env('CHATBOT_ENABLE', 'yes')) else None
-    v = Visitas(abrir_db(), Geo(), tg, moderador=mod)
+    enviar_id, editar = telegram_conexion() if tg else (None, None)
+    con = conex.Conexiones(os.path.join(ESTADO, 'conexiones-ip.sqlite')) if conex else None
+    v = Visitas(abrir_db(), Geo(), tg, moderador=mod, conexiones=con, enviar_id=enviar_id, editar=editar)
     tema = env('MQTT_TOPIC', 'openwebrx') + '/CLIENT'
     tema_aprs = env('MQTT_TOPIC', 'openwebrx') + '/APRS'
 

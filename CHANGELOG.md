@@ -7,6 +7,12 @@
   trazas, reventón, predicción de SondeHub limitada a 1 consulta/5 min y MQTT opcional). Capa «Radiosondas (AEMET)»
   en el mapa y sección 🎈 en la pestaña Tiempo. Subida a SondeHub apagada por defecto. `bricohams_mqtt.py`: `retener`
   y testamento opcionales.
+- Contador de visitas: la IP completa validada se guarda solo de forma interna (`visitas-ip.sqlite` y `conexiones-ip.sqlite`, 0600, borrado a los
+  `VISITAS_IP_DIAS`, 14 por defecto) y nunca sale por la API ni la web. La tarjeta «Tu conexión» muestra solo la IP propia enmascarada
+  (`/bricohams/api/mi-ip`: IPv4 `82.160.x.x`, IPv6 tres primeros grupos) y la identidad que el propio oyente eligió. La IP solo se acepta de
+  `X-Forwarded-For` desde un proxy de confianza (nginx local, que la sobrescribe).
+  El aviso de Telegram «Nuevo oyente» incluye el indicativo, apodo o nombre elegido; si llega después se edita ese mismo aviso (sin duplicar llegada).
+  Privacidad, consentimiento del plugin y manuales 24, 39 y 51 actualizados; `tests/test_contador_visitas.py` y `tests/test_conexiones_ip.py`.
 - Idioma 1.1.0: el botón ES/EN también cambia los textos propios marcados con `data-lang="es"`/`"en"`
   (descripción del receptor, avisos), aunque lleguen después de cargar la página. Manual 40.
 - Hermes Lite 2 (`HF_HERMES`, manual 50): receptor HPSDR por Ethernet con perfiles de 384 kHz de 160 a 10 m y

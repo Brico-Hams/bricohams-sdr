@@ -9,8 +9,20 @@ main{max-width:900px;margin:auto}h1{margin:.2em 0;color:var(--cr)}p.s{opacity:.7
 a.c{display:block;background:var(--card);border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit;
 border-left:5px solid var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.12)}a.c:hover{transform:translateY(-1px)}
 a.c b{display:block;font-size:1.08em}a.c span{opacity:.75;font-size:.92em}.lan{border-left-color:#607d8b!important}.gh{border-left-color:#2da44e!important}
-footer{margin-top:24px;opacity:.65;font-size:.9em}</style></head><body><main>
+footer{margin-top:24px;opacity:.65;font-size:.9em}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:12px}
+.k section{background:var(--card);border-radius:12px;padding:12px 16px;border-left:5px solid var(--cr);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.k h2{font-size:1.02em;margin:0 0 6px}.k dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0}
+.k dt{opacity:.75}.k dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+a:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){a.c:hover{transform:none}}</style></head><body><main>
 <h1>📡 BricoHams SDR · __OPERADOR__</h1><p class="s">__QTH__ · estación SDR multiusuario de la comunidad</p>
+<div class="k" aria-label="Visitas y conexión actual">
+<section aria-labelledby="bh-vt"><h2 id="bh-vt">👥 Visitas</h2><dl aria-live="polite">
+<dt>Total</dt><dd id="bh-v-total">…</dd><dt>Hoy</dt><dd id="bh-v-hoy">…</dd></dl></section>
+<section aria-labelledby="bh-ct"><h2 id="bh-ct">🖥️ Tu conexión</h2><dl>
+<dt>Navegador</dt><dd id="bh-c-nav">…</dd><dt>Sistema</dt><dd id="bh-c-so">…</dd><dt>Idioma</dt><dd id="bh-c-idi">…</dd><dt>Tu IP</dt><dd id="bh-c-ip">…</dd><dt>Identidad</dt><dd id="bh-c-id">…</dd></dl></section>
+</div>
 <div class="g">
 <a class="c" href="/"><b>🎧 Receptor OpenWebRX+</b><span>4 receptores simultáneos: satélites, radioaficionados, aire/mar/FM/HF y ADS-B</span></a>
 <a class="c" href="/tar1090/"><b>✈️ Mapa de aviones (tar1090)</b><span>ADS-B 1090 MHz en directo desde __QTH__</span></a>
@@ -24,5 +36,28 @@ footer{margin-top:24px;opacity:.65;font-size:.9em}</style></head><body><main>
 <a class="c" href="/bricohams/privacidad.html"><b>🔒 Privacidad</b><span>Qué se registra y por qué</span></a>
 <a class="c" href="/bricohams/politicas.html"><b>🛡️ Políticas y cookies</b><span>Seguridad, datos compartidos y cookies</span></a>
 </div>
-<footer>BricoHams · Radioafición · Hazlo tú mismo · <a href="https://t.me/bricohams">t.me/bricohams</a></footer>
-</main></body></html>
+<footer>BricoHams · Radioafición · Hazlo tú mismo · <a href="https://t.me/bricohams">t.me/bricohams</a><br>
+Visitas: contadores agregados; navegador, sistema e idioma se calculan en tu equipo y de tu IP solo se muestra una versión enmascarada. <a href="/bricohams/privacidad.html">Privacidad</a></footer>
+</main><script>
+(function(){
+var nav=navigator,ua=nav.userAgent||'',$=function(i){return document.getElementById(i)};
+function navegador(){var m=[[/Edg(?:e|A|iOS)?\/([\d.]+)/,'Edge'],[/OPR\/([\d.]+)/,'Opera'],[/(?:Firefox|FxiOS)\/([\d.]+)/,'Firefox'],
+[/(?:Chrome|CriOS)\/([\d.]+)/,'Chrome'],[/Version\/([\d.]+).*Safari/,'Safari']];
+for(var i=0;i<m.length;i++){var r=m[i][0].exec(ua);if(r)return m[i][1]+' '+r[1].split('.')[0]}return 'Desconocido'}
+function sistema(){var p=(nav.userAgentData&&nav.userAgentData.platform)||'',t=ua;
+if(/Android/.test(t))return 'Android';if(/iPhone|iPad|iPod/.test(t))return 'iOS';
+if(/Windows/.test(t)||p==='Windows')return 'Windows';if(/Mac OS X|Macintosh/.test(t)||p==='macOS')return 'macOS';
+if(/CrOS/.test(t))return 'ChromeOS';if(/Linux|X11/.test(t)||p==='Linux')return 'Linux';return p||'Desconocido'}
+$('bh-c-nav').textContent=navegador();$('bh-c-so').textContent=sistema();
+$('bh-c-idi').textContent=(nav.languages&&nav.languages[0])||nav.language||'Desconocido';
+var f=new Intl.NumberFormat(nav.language||'es');
+function pintar(d){$('bh-v-total').textContent=f.format(d.total);$('bh-v-hoy').textContent=f.format(d.hoy)}
+function fallo(){$('bh-v-total').textContent='No disponible';$('bh-v-hoy').textContent='No disponible'}
+var contada=false;try{contada=sessionStorage.getItem('bh_visita')==='1'}catch(e){}
+fetch('/bricohams/api/visitas',{method:contada?'GET':'POST',headers:{'Content-Type':'application/json'},body:contada?undefined:'{}',cache:'no-store',credentials:'same-origin'})
+.then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){pintar(d);try{sessionStorage.setItem('bh_visita','1')}catch(e){}}).catch(fallo);
+fetch('/bricohams/api/mi-ip',{cache:'no-store',credentials:'same-origin'}).then(function(r){if(!r.ok)throw 0;return r.json()})
+.then(function(d){$('bh-c-ip').textContent=d.ip||'No disponible';$('bh-c-id').textContent=(typeof d.identidad==='string'&&d.identidad)||'Sin identificar'})
+.catch(function(){$('bh-c-ip').textContent='No disponible';$('bh-c-id').textContent='Sin identificar'});
+})();
+</script></body></html>

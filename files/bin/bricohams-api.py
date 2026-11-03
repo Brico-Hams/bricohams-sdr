@@ -13,8 +13,15 @@
 #        principal, adsbdb/Planespotters de respaldo, caché 6 h)
 #    GET /bricohams/api/barcos -> {"ships": [...]} AIS local (AIS-catcher en
 #        127.0.0.1:8100, solo con AIS_ENABLE=yes)
+#    GET  /bricohams/api/visitas -> {"total","hoy"} contador agregado de la portada
+#    POST /bricohams/api/visitas -> suma una visita (mismo origen) y devuelve lo mismo
+#    GET  /bricohams/api/mi-ip -> {"ip": "203.0.x.x", "identidad": "EA5ABC"?} solo la IP del propio visitante, enmascarada
+#         (dos primeros octetos; IPv6 tres primeros grupos), y la identidad que él mismo eligió si la hay
 #    GET /bricohams/api/salud  -> {"ok": true}
+#  La IP completa solo se lee de X-Forwarded-For si el socket viene de un proxy de confianza (nginx local),
+#  se guarda en un fichero 0600 aparte con retención corta y no sale nunca por la API.
 # =====================================================================
+import ipaddress
 import json
 import math
 import os
@@ -34,6 +41,10 @@ try:
     import bricohams_telegram
 except ImportError:                                    # sin el módulo: el registro funciona, sin aviso
     bricohams_telegram = None
+try:
+    import bricohams_conexiones
+except ImportError:                                    # sin el módulo: no se vincula identidad a la conexión
+    bricohams_conexiones = None
 
 ESTADO = os.environ.get('STATE_DIRECTORY', '/var/lib/bricohams')
 UA = {'User-Agent': 'BricoHams-SDR N0CALL (+https://t.me/bricohams)'}
@@ -43,6 +54,46 @@ ADSB_JSON = os.environ.get('ADSB_JSON', '/run/readsb/aircraft.json')
 OWRX_SETTINGS_FILE = os.environ.get('OWRX_SETTINGS_FILE', '/var/lib/openwebrx/settings.json')
 RETENCION_OYENTES_DIAS = 180
 MAX_REGISTROS_OYENTES = 100000
+
+
+def _dias_ip(valor):
+    try:
+        return max(1, min(30, int(valor)))
+    except (TypeError, ValueError):
+        return 14
+
+
+# Retención de la IP completa de las visitas (1-30 días; 14 por defecto). Documentada en la política de privacidad.
+RETENCION_IP_DIAS = _dias_ip(os.environ.get('VISITAS_IP_DIAS', '14'))
+# Solo estos sockets pueden afirmar la IP del visitante vía X-Forwarded-For (nginx local por defecto).
+PROXIES_CONFIABLES = frozenset(
+    p.strip() for p in os.environ.get('API_PROXIES_CONFIABLES', '127.0.0.1,::1').split(',') if p.strip())
+
+
+def ip_valida(texto):
+    """IP canónica de un valor de cabecera, o None. Rechaza listas, zonas, loopback, no especificadas y multicast."""
+    if not isinstance(texto, str):
+        return None
+    texto = texto.strip()
+    if not texto or len(texto) > 45 or any(c in texto for c in ', %\t'):
+        return None
+    try:
+        ip = ipaddress.ip_address(texto)
+    except ValueError:
+        return None
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    if ip.is_unspecified or ip.is_multicast or ip.is_loopback:
+        return None
+    return str(ip)
+
+
+def enmascarar_ip(ip):
+    """IPv4: solo los dos primeros octetos (82.160.x.x); IPv6: solo los tres primeros grupos (2a01:4f8:1:x:x:x:x:x)."""
+    ip = ipaddress.ip_address(ip)
+    if ip.version == 4:
+        return '.'.join(str(ip).split('.')[:2]) + '.x.x'
+    return ':'.join(['%x' % int(g, 16) for g in ip.exploded.split(':')[:3]] + ['x'] * 5)
 NOMBRE_RE = re.compile(r"^[^\W\d_][\w .'-]{1,79}$", re.UNICODE)
 
 
@@ -550,8 +601,10 @@ def validar_registro_oyente(datos):
 
 
 class RegistroOyentes:
-    def __init__(self, ruta, reloj=time.time, aviso=None):
-        self.aviso = aviso
+    """`conexiones` (opcional): vínculo interno IP->identidad; `editar(id, texto)`: edita el aviso de llegada ya enviado."""
+
+    def __init__(self, ruta, reloj=time.time, aviso=None, conexiones=None, editar=None):
+        self.aviso, self.conexiones, self.editar = aviso, conexiones, editar
         os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
         mascara = os.umask(0o077)
         try:
@@ -585,7 +638,7 @@ class RegistroOyentes:
                        (MAX_REGISTROS_OYENTES,))
         self.c.commit()
 
-    def registrar(self, datos):
+    def registrar(self, datos, ip=None):
         identificacion = validar_registro_oyente(datos)
         if identificacion is None:
             return False
@@ -596,6 +649,11 @@ class RegistroOyentes:
                 'INSERT INTO registro_oyentes (identificador, tipo, creado, consentimiento) VALUES (?, ?, ?, ?)',
                 (valor, tipo, ahora, 'v1'))
             self._limpiar()
+        if ip and self.conexiones is not None and bricohams_conexiones:
+            try:                                   # la identidad elegida se refleja en el aviso de llegada, sin otro nuevo
+                bricohams_conexiones.reflejar(self.conexiones, ip, valor, tipo, self.editar)
+            except Exception as e:                 # noqa: BLE001 — nunca debe romper el registro
+                print('api oyentes: identidad: %s' % type(e).__name__, file=sys.stderr, flush=True)
         if self.aviso:
             try:
                 self.aviso(valor, tipo)
@@ -611,8 +669,93 @@ class RegistroOyentes:
                 (limite,)).fetchall()
 
 
-def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
+class ContadorVisitas:
+    """Contador agregado de visitas: solo totales por día, sin IP, agente de usuario ni identificadores."""
+
+    def __init__(self, ruta, reloj=time.time):
+        os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
+        mascara = os.umask(0o077)
+        try:
+            self.c = sqlite3.connect(ruta, check_same_thread=False)
+        finally:
+            os.umask(mascara)
+        try:
+            os.chmod(ruta, 0o600)
+        except OSError:
+            pass                                   # p. ej. sistemas de ficheros sin permisos POSIX
+        self.reloj = reloj
+        self.lock = threading.Lock()
+        self.c.execute('CREATE TABLE IF NOT EXISTS visitas_dia (dia TEXT PRIMARY KEY, n INTEGER NOT NULL)')
+        self.c.commit()
+
+    def _dia(self):
+        return time.strftime('%Y-%m-%d', time.gmtime(self.reloj()))
+
+    def resumen(self):
+        with self.lock:
+            total = self.c.execute('SELECT COALESCE(SUM(n), 0) FROM visitas_dia').fetchone()[0]
+            hoy = self.c.execute('SELECT n FROM visitas_dia WHERE dia = ?', (self._dia(),)).fetchone()
+        return {'total': total, 'hoy': hoy[0] if hoy else 0}
+
+    def registrar(self):
+        with self.lock:
+            self.c.execute('INSERT INTO visitas_dia (dia, n) VALUES (?, 1) '
+                           'ON CONFLICT(dia) DO UPDATE SET n = n + 1', (self._dia(),))
+            self.c.commit()
+        return self.resumen()
+
+
+class IpVisitas:
+    """IP completa de las visitas: uso interno del operador, fichero 0600 propio, borrado tras `dias` días.
+    Ninguna ruta HTTP la devuelve; el esquema no guarda agente de usuario ni identificadores."""
+
+    def __init__(self, ruta, reloj=time.time, dias=RETENCION_IP_DIAS):
+        os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
+        mascara = os.umask(0o077)
+        try:
+            self.c = sqlite3.connect(ruta, check_same_thread=False)
+        finally:
+            os.umask(mascara)
+        try:
+            os.chmod(ruta, 0o600)
+        except OSError:
+            pass
+        self.reloj = reloj
+        self.dias = _dias_ip(dias)
+        self.lock = threading.Lock()
+        self.c.execute('CREATE TABLE IF NOT EXISTS visitas_ip '
+                       '(dia TEXT NOT NULL, ip TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (dia, ip))')
+        self.purgar()
+
+    def _dia(self, t):
+        return time.strftime('%Y-%m-%d', time.gmtime(t))
+
+    def purgar(self):
+        with self.lock:
+            self.c.execute('DELETE FROM visitas_ip WHERE dia <= ?', (self._dia(self.reloj() - self.dias * 86400),))
+            self.c.commit()
+
+    def registrar(self, ip):
+        ip = ip_valida(ip)
+        if ip is None:
+            return False
+        self.purgar()
+        with self.lock:
+            self.c.execute('INSERT INTO visitas_ip (dia, ip, n) VALUES (?, ?, 1) '
+                           'ON CONFLICT(dia, ip) DO UPDATE SET n = n + 1', (self._dia(self.reloj()), ip))
+            self.c.commit()
+        return True
+
+
+def crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas=None, ips=None, proxies=PROXIES_CONFIABLES):
     class H(BaseHTTPRequestHandler):
+        def _ip_cliente(self):
+            """IP del visitante: solo si el socket es un proxy de confianza y X-Forwarded-For trae un único valor válido."""
+            if self.client_address[0] not in proxies:
+                return None
+            valores = self.headers.get_all('X-Forwarded-For') or []
+            return ip_valida(valores[0]) if len(valores) == 1 else None
+
         def _json(self, code, obj, cache_control='public, max-age=3600'):
             b = json.dumps(obj, ensure_ascii=False).encode()
             self.send_response(code)
@@ -621,6 +764,15 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
             self.send_header('Content-Length', str(len(b)))
             self.end_headers()
             self.wfile.write(b)
+
+        def _mismo_origen(self):
+            origen = self.headers.get('Origin')
+            if not origen:
+                return True
+            try:
+                return urllib.parse.urlsplit(origen).netloc.lower() == self.headers.get('Host', '').lower()
+            except ValueError:
+                return False
 
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
@@ -654,7 +806,21 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
                                                      clave_mapflights=clave_mapflights),
                     variante=variante)
                 return self._json(200, ficha or {}, 'public, max-age=21600')
-            if u.path.endswith('/salud'):
+            if u.path == '/bricohams/api/visitas':
+                if visitas is None:
+                    return self._json(404, {'error': 'contador no activo'}, 'no-store')
+                return self._json(200, visitas.resumen(), 'no-store')
+            if u.path == '/bricohams/api/mi-ip':
+                propia = self._ip_cliente()
+                if propia is None:
+                    return self._json(404, {'error': 'IP no disponible'}, 'private, no-store')
+                cuerpo = {'ip': enmascarar_ip(propia)}
+                if oyentes.conexiones is not None:
+                    elegida = oyentes.conexiones.identidad(propia)
+                    if elegida:
+                        cuerpo['identidad'] = elegida[0]
+                return self._json(200, cuerpo, 'private, no-store')
+            if u.path == '/bricohams/api/salud':
                 return self._json(200, {'ok': True, 'hamqth': bool(hamqth.u), 'qrz': bool(qrz.u)})
             if u.path.endswith('/indicativo'):
                 call = urllib.parse.parse_qs(u.query).get('call', [''])[0]
@@ -664,6 +830,14 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
 
         def do_POST(self):
             u = urllib.parse.urlparse(self.path)
+            if u.path == '/bricohams/api/visitas' and visitas is not None:
+                if not self._mismo_origen():
+                    return self._json(403, {'error': 'origen no permitido'}, 'no-store')
+                if ips is not None:
+                    propia = self._ip_cliente()
+                    if propia is not None:
+                        ips.registrar(propia)
+                return self._json(201, visitas.registrar(), 'no-store')
             if u.path != '/bricohams/api/oyentes':
                 return self._json(404, {'error': 'no existe'}, 'no-store')
             origen = self.headers.get('Origin')
@@ -686,7 +860,7 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes):
                 datos = json.loads(self.rfile.read(longitud))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return self._json(400, {'error': 'JSON no válido'}, 'no-store')
-            if not oyentes.registrar(datos):
+            if not oyentes.registrar(datos, self._ip_cliente()):
                 return self._json(400, {'error': 'identificación o consentimiento no válido'}, 'no-store')
             self._json(201, {'ok': True}, 'no-store')
 
@@ -715,14 +889,36 @@ def avisador_oyentes():
     return lambda valor, tipo: tg.avisar(aviso_oyente_telegram(valor, tipo))
 
 
+def editor_avisos():
+    """Función (mensaje_id, texto_html) que edita el aviso de llegada ya enviado, o None sin Telegram."""
+    if not bricohams_telegram:
+        return None
+    token, chat = os.environ.get('TELEGRAM_TOKEN', '').strip(), os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+    if not token or not chat or not bricohams_telegram.activo(os.environ.get('OYENTES_TELEGRAM'), 'yes'):
+        return None
+    def editar(mensaje_id, texto):
+        def _t():
+            try:
+                bricohams_telegram.editar_mensaje(token, chat, mensaje_id, texto)
+            except (RuntimeError, ValueError) as e:
+                print('api oyentes: editar aviso: %s' % e, file=sys.stderr, flush=True)
+        threading.Thread(target=_t, daemon=True).start()
+    return editar
+
+
 def servidor(host='127.0.0.1', puerto=8075):
     cache = Cache(os.path.join(ESTADO, 'indicativos.sqlite'))
     aviso = avisador_oyentes()
-    oyentes = RegistroOyentes(os.path.join(ESTADO, 'oyentes.sqlite'), aviso=aviso)
+    conexiones = bricohams_conexiones.Conexiones(os.path.join(ESTADO, 'conexiones-ip.sqlite')) \
+        if bricohams_conexiones else None
+    oyentes = RegistroOyentes(os.path.join(ESTADO, 'oyentes.sqlite'), aviso=aviso,
+                              conexiones=conexiones, editar=editor_avisos())
     hamqth = HamQTH(os.environ.get('HAMQTH_USER', ''), os.environ.get('HAMQTH_PASS', ''))
     qrz = Qrz(os.environ.get('QRZ_USER', ''), os.environ.get('QRZ_PASS', ''))
     fichas = CacheFichas()
-    httpd = ThreadingHTTPServer((host, puerto), crear_manejador(cache, hamqth, qrz, fichas, oyentes))
+    visitas = ContadorVisitas(os.path.join(ESTADO, 'visitas-web.sqlite'))
+    ips = IpVisitas(os.path.join(ESTADO, 'visitas-ip.sqlite'))
+    httpd = ThreadingHTTPServer((host, puerto), crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas, ips))
     print('api: http://%s:%d/bricohams/api/ (HamQTH %s, QRZ %s, registro->Telegram %s)' %
           (host, puerto, 'sí' if hamqth.u else 'no', 'sí' if qrz.u else 'no', 'sí' if aviso else 'no'), flush=True)
     httpd.serve_forever()
