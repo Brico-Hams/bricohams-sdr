@@ -22,7 +22,7 @@ Plugins.bricohams.no_css = true;
 Plugins.bricohams.init = function () {
     var cfg = window.bricohams_config || {};
     var TG = cfg.telegram || 'https://t.me/bricohams';
-    var CR = '#A6192E', OR = '#F26B21', GOLD = '#E7B416';
+    var CR = '#A6192E', OR = '#F26B1D', GOLD = '#E7B416';
 
     // bandera de la Región de Murcia: 4 castillos y 7 coronas (1-3-2-1)
     function flag(w) {
@@ -47,13 +47,14 @@ Plugins.bricohams.init = function () {
         '#bh-murcia-flag{display:inline-block;vertical-align:middle;margin-right:6px;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}' +
         '#bh-murcia-flag svg{display:block}' +
         '#bricohams-tg{position:fixed;right:12px;bottom:12px;z-index:9999;display:flex;gap:6px;align-items:center;' +
-            'padding:6px 12px;border-radius:999px;background:' + OR + ';color:#fff;font:600 13px/1 sans-serif;' +
+            'padding:6px 12px;border-radius:999px;background:' + OR + ';color:#23272B;font:600 13px/1 sans-serif;' +
             'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
-        '#bricohams-tg:hover{opacity:1;background:#229ED9}' +
+        '#bricohams-tg:hover{opacity:1;background:#FFA06A}' +
         '#bricohams-gh{position:fixed;right:12px;bottom:48px;z-index:9999;display:flex;gap:6px;align-items:center;' +
-            'padding:6px 12px;border-radius:999px;background:#24292f;color:#fff;font:600 13px/1 sans-serif;' +
+            'padding:6px 12px;border-radius:999px;background:#23272B;border:1px solid #38434C;color:#F6F8FA;font:600 13px/1 sans-serif;' +
             'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.9}' +
-        '#bricohams-gh:hover{opacity:1;background:#2da44e}' +
+        '#bricohams-gh:hover{opacity:1;background:#1C2329;border-color:#F26B1D}' +
+        '#bricohams-tg:focus-visible,#bricohams-gh:focus-visible{outline:3px solid #FFC18F;outline-offset:2px}' +
         '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
     // v4: la foto de cabecera abierta no tapa media pantalla
     css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';

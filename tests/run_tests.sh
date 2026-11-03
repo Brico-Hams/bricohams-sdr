@@ -37,6 +37,7 @@ python3 tests/test_api.py
 python3 tests/test_registro_oyentes.py
 python3 tests/test_contador_visitas.py
 python3 tests/test_conexiones_ip.py
+python3 tests/test_banner_visitas.py
 python3 tests/test_chat_registro.py
 python3 tests/test_plugins_ea5hkx.py
 python3 tests/test_politicas_mapa_local.py

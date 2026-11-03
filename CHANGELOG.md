@@ -1,5 +1,15 @@
 # Historial
 
+## Sin publicar · 2026-11-03
+
+- Banner del receptor raíz de OpenWebRX+ (junto a la presentación del proyecto, no solo `/bricohams/`): visitas totales, IP propia
+  enmascarada, país aproximado y la identidad registrada. Reutiliza `/bricohams/api/visitas` (una sola cuenta por pestaña, misma clave
+  `bh_visita` que la portada) y `/bricohams/api/mi-ip`, que añade `pais` (ISO) solo con la base GeoIP local ya instalada por
+  `bricohams-visitas` (`python3-maxminddb`, sin red); sin base se omite y el banner dice «no disponible».
+- Paleta oficial BricoHams (manual de color 1.1): naranja `#F26B1D`, grafito `#23272B`, enlaces `#AA410B` (claro) y `#FFA06A` (oscuro),
+  superficies/bordes/foco del manual en portada, políticas, clima y plugins propios. Colores funcionales de RF y logos intactos.
+  `tests/test_banner_visitas.py`.
+
 ## Sin publicar · 2026-10-28
 
 - Radiosondas AEMET (`SONDAS_ENABLE`, módulo `sondas`, ADR-72, manual 51): `radiosonde_auto_rx` en Docker con un

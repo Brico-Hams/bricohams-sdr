@@ -222,13 +222,13 @@ Plugins.meteo.init = function () {
         function X(t) { return 2 + (Date.parse(t) - t0) / Math.max(1, t1 - t0) * (W - 34); }
         function Y(val) { return H - 4 - (val - lo) / (hi - lo) * (H - 8); }
         var g = x.createLinearGradient(0, 0, 0, H);
-        g.addColorStop(0, 'rgba(242,107,33,.35)'); g.addColorStop(1, 'rgba(242,107,33,0)');
+        g.addColorStop(0, 'rgba(242,107,29,.35)'); g.addColorStop(1, 'rgba(242,107,29,0)');
         x.beginPath(); x.moveTo(X(pts[0].t), H);
         pts.forEach(function (p) { x.lineTo(X(p.t), Y(p.ta)); });
         x.lineTo(X(pts[pts.length - 1].t), H); x.closePath(); x.fillStyle = g; x.fill();
         x.beginPath();
         pts.forEach(function (p, i) { if (i) x.lineTo(X(p.t), Y(p.ta)); else x.moveTo(X(p.t), Y(p.ta)); });
-        x.strokeStyle = '#F26B21'; x.lineWidth = 1.5; x.stroke();
+        x.strokeStyle = '#F26B1D'; x.lineWidth = 1.5; x.stroke();
         x.fillStyle = '#6b7782'; x.font = '10px roboto-mono, monospace';
         x.fillText(hi + '°', W - 28, 10); x.fillText(lo + '°', W - 28, H - 2);
     }
@@ -240,7 +240,7 @@ Plugins.meteo.init = function () {
         var h = '';
         if (sensor) {
             var ok = fresco(sensor);
-            h += '<div class="mt-st near" style="box-shadow:0 0 0 1px #F26B21">' +
+            h += '<div class="mt-st near" style="box-shadow:0 0 0 1px #F26B1D">' +
                 '<div class="mt-top"><span class="mt-name">🏠 ' + esc(sensor.name) + '</span>' +
                 '<span class="mt-sub">' + esc(sensor.chip || '') + (sensor.aprs ? ' · APRS ' + esc(sensor.aprs) : '') + ' · ' + fmtTime(sensor.updated) + '</span></div>';
             if (!ok) h += '<div class="mt-note" style="color:#ff9800">Sin datos recientes del sensor (systemctl status bricohams-wx)</div>';

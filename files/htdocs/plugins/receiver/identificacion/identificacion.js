@@ -255,6 +255,7 @@ Plugins.identificacion.init = function () {
                     aceptado: Date.now()
                 }));
                 storageSet(sessionStorage, sessionKey, 'sent');
+                document.dispatchEvent(new CustomEvent('bh:identidad'));
                 if (!chat) chatGuardar(input.value);
                 close();
             } catch (e) {
@@ -283,6 +284,7 @@ Plugins.identificacion.init = function () {
         }).then(function (response) {
             if (!response.ok) throw new Error('HTTP ' + response.status);
             storageSet(sessionStorage, sessionKey, 'sent');
+            document.dispatchEvent(new CustomEvent('bh:identidad'));
         }).catch(function (e) {
             console.error('No se pudo guardar la sesión del oyente', e);
         });

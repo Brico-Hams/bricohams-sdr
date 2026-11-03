@@ -2691,7 +2691,7 @@ DP
 }
 
 paso_web() {
-    apt_i nginx certbot openssl
+    apt_i nginx certbot openssl python3-maxminddb
     install -m 755 "$FILES/bin/bricohams-api.py" /usr/local/bin/bricohams-api
     install -m 755 "$FILES/bin/bricohams-oyentes" /usr/local/bin/bricohams-oyentes
     install -m 755 "$FILES/bin/bricohams-servicios" /usr/local/bin/bricohams-servicios

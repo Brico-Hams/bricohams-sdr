@@ -22,7 +22,7 @@ Plugins.load('bricohams_live');
             '#bricohams-map{position:fixed;left:12px;bottom:28px;z-index:1000;display:flex;gap:8px}' +
             '#bricohams-map a{display:flex;gap:6px;align-items:center;padding:6px 12px;border-radius:999px;' +
             'color:#fff;font:600 13px/1 sans-serif;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}' +
-            '#bricohams-map .tg{background:#F26B21}#bricohams-map .tg:hover{background:#229ED9}' +
+            '#bricohams-map .tg{background:#F26B1D;color:#23272B}#bricohams-map .tg:hover{background:#229ED9}' +
             '#bricohams-map .rx{background:#23262B}' +
             '@media (max-width:600px){#bricohams-map span{display:none}}';
         document.head.appendChild(css);

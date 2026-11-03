@@ -121,15 +121,15 @@ Plugins.audio_cadena.no_css = true;
             'box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 0 0 1px #060708,0 6px 18px rgba(0,0,0,.65)}' +
         '.bha-win.open{display:flex}' +
         '.bha-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '.bha-title{flex:1;font-weight:bold;letter-spacing:.5px;color:#f26b21}' +
+        '.bha-title{flex:1;font-weight:bold;letter-spacing:.5px;color:#F26B1D}' +
         '.bha-x{cursor:pointer;padding:0 6px;font-size:15px}.bha-x:hover{color:#fff}' +
         '.bha-sec{margin:4px 0;padding:6px;border-radius:6px;background:rgba(0,0,0,.25)}' +
-        '.bha-sec h4{margin:0 0 4px;font-size:11px;color:#9aa6b2;font-weight:normal;letter-spacing:.5px}' +
-        '.bha-row{display:flex;align-items:center;gap:6px;margin:3px 0}.bha-row label{width:92px;color:#9aa6b2}' +
-        '.bha-row input[type=range]{flex:1;accent-color:#f26b21}.bha-row output{width:62px;text-align:right}' +
+        '.bha-sec h4{margin:0 0 4px;font-size:11px;color:#BAC4CC;font-weight:normal;letter-spacing:.5px}' +
+        '.bha-row{display:flex;align-items:center;gap:6px;margin:3px 0}.bha-row label{width:92px;color:#BAC4CC}' +
+        '.bha-row input[type=range]{flex:1;accent-color:#F26B1D}.bha-row output{width:62px;text-align:right}' +
         '.bha-chips{display:flex;flex-wrap:wrap;gap:4px}' +
         '.bha-chip{padding:2px 7px;border-radius:10px;background:#33383e;cursor:pointer;border:1px solid #444}' +
-        '.bha-chip.on{background:#f26b21;color:#111;border-color:#f26b21}' +
+        '.bha-chip.on{background:#F26B1D;color:#23272B;border-color:#F26B1D}' +
         '.bha-sw{display:inline-flex;align-items:center;gap:6px;cursor:pointer}' +
         '.bha-sw i{width:30px;height:16px;border-radius:8px;background:#555;position:relative;display:inline-block}' +
         '.bha-sw i:after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#ccc;transition:left .15s}' +

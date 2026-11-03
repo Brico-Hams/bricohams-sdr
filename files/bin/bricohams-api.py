@@ -16,7 +16,7 @@
 #    GET  /bricohams/api/visitas -> {"total","hoy"} contador agregado de la portada
 #    POST /bricohams/api/visitas -> suma una visita (mismo origen) y devuelve lo mismo
 #    GET  /bricohams/api/mi-ip -> {"ip": "203.0.x.x", "identidad": "EA5ABC"?} solo la IP del propio visitante, enmascarada
-#         (dos primeros octetos; IPv6 tres primeros grupos), y la identidad que él mismo eligió si la hay
+#         (dos primeros octetos; IPv6 tres primeros grupos), su país ISO ("pais", solo con la base GeoIP local; si no, se omite), y la identidad que él mismo eligió si la hay
 #    GET /bricohams/api/salud  -> {"ok": true}
 #  La IP completa solo se lee de X-Forwarded-For si el socket viene de un proxy de confianza (nginx local),
 #  se guarda en un fichero 0600 aparte con retención corta y no sale nunca por la API.
@@ -94,6 +94,40 @@ def enmascarar_ip(ip):
     if ip.version == 4:
         return '.'.join(str(ip).split('.')[:2]) + '.x.x'
     return ':'.join(['%x' % int(g, 16) for g in ip.exploded.split(':')[:3]] + ['x'] * 5)
+
+
+class PaisLocal:
+    """País (ISO 3166-1 alfa-2) de una IP pública desde la base GeoIP local ya instalada por bricohams-visitas.
+    Sin red, sin módulo maxminddb o sin base: devuelve None y la API omite el país."""
+
+    def __init__(self, ruta=None):
+        self.ruta = ruta or os.path.join(ESTADO, 'dbip-city-lite.mmdb')
+        self.lector = None
+        self.cerrado = False
+        self.lock = threading.Lock()
+
+    def _abrir(self):
+        with self.lock:
+            if self.lector is None and not self.cerrado:
+                try:
+                    import maxminddb
+                    self.lector = maxminddb.open_database(self.ruta)
+                except (ImportError, OSError, ValueError):
+                    self.cerrado = True
+            return self.lector
+
+    def pais(self, ip):
+        try:
+            a = ipaddress.ip_address(ip)
+            if not a.is_global:
+                return None
+            lector = self._abrir()
+            cc = ((lector.get(str(a)) or {}).get('country') or {}).get('iso_code') if lector else None
+        except (ValueError, TypeError, AttributeError):
+            return None
+        return cc if isinstance(cc, str) and re.fullmatch(r'[A-Z]{2}', cc) else None
+
+
 NOMBRE_RE = re.compile(r"^[^\W\d_][\w .'-]{1,79}$", re.UNICODE)
 
 
@@ -747,7 +781,8 @@ class IpVisitas:
         return True
 
 
-def crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas=None, ips=None, proxies=PROXIES_CONFIABLES):
+def crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas=None, ips=None, proxies=PROXIES_CONFIABLES, geo=None):
+    geo = geo if geo is not None else PaisLocal()
     class H(BaseHTTPRequestHandler):
         def _ip_cliente(self):
             """IP del visitante: solo si el socket es un proxy de confianza y X-Forwarded-For trae un único valor válido."""
@@ -815,6 +850,9 @@ def crear_manejador(cache, hamqth, qrz, fichas, oyentes, visitas=None, ips=None,
                 if propia is None:
                     return self._json(404, {'error': 'IP no disponible'}, 'private, no-store')
                 cuerpo = {'ip': enmascarar_ip(propia)}
+                pais = geo.pais(propia)
+                if pais:
+                    cuerpo['pais'] = pais
                 if oyentes.conexiones is not None:
                     elegida = oyentes.conexiones.identidad(propia)
                     if elegida:

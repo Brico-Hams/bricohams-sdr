@@ -61,7 +61,7 @@ def main():
     assert "var B = '/static/plugins/receiver/'" in html
     assert 'href="/static/plugins/receiver/satelites/pases.ics"' in html
     assert '__OPERADOR__' in html and '__FUENTES__' in html
-    assert 'background:#fff' not in html.replace(' ', '') and '--bg:#141518' in html, 'tema oscuro: nada de fondo blanco'
+    assert 'background:#fff' not in html.replace(' ', '') and '--bg:#111518' in html, 'tema oscuro: nada de fondo blanco'
     assert html.count('esc(') > 30, 'todo lo que llega de APRS/WSPR debe escaparse'
 
     # el formulario de la página manda exactamente los campos que prepara el grabador
