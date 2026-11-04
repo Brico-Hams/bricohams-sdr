@@ -56,7 +56,13 @@ Plugins.bricohams.init = function () {
         '#bricohams-tg:focus-visible,#bricohams-gh:focus-visible,#bricohams-theme:focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:2px}' +
         '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
     // v4: la foto de cabecera abierta no tapa media pantalla
-    css += '.openwebrx-description-container.expanded{height:210px!important;max-height:210px!important}';
+    // (altura adaptable: con 210px fijos se recortaban descripción, logo y enlaces; si no cabe, desplaza dentro)
+    css += '.openwebrx-description-container.expanded{height:auto!important;min-height:210px;max-height:min(60vh,420px)!important;' +
+        'overflow-y:auto;box-sizing:border-box;padding-bottom:12px}' +
+        '.webrx-top-container{overflow:visible}' +
+        '.webrx-top-bar{flex-wrap:wrap;min-width:0}.webrx-rx-texts{min-width:0;overflow-wrap:anywhere}' +
+        '.webrx-top-logo{max-width:100%;flex-shrink:0}' +
+        '@media (max-width:600px){.openwebrx-description-container.expanded{min-height:0;max-height:55vh!important}}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
