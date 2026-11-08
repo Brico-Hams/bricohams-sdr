@@ -139,7 +139,7 @@ const PluginsOpcionales = [
     // audio_cadena va antes que filtro_audio y dsp_audio (es su base común)
     // ea5hkx_puente va antes que callsign_gate (adapta su ventana y filtra su anuncio en el chat)
     const externoActivo = { callsign_gate: window.ea5hkx_config.callsign_gate, tone_detector: window.ea5hkx_config.tone_detector };
-    for (const name of ['idioma', 'marca', 'consentimiento', 'solar', 'meteo', 'camara', 'bricohams', 'banderas', 'dvficha',
+    for (const name of ['idioma', 'marca', 'consentimiento', 'solar', 'meteo', 'camara', 'panel_visitas', 'bricohams', 'banderas', 'dvficha',
                         'satelites', 'visitas', 'identificacion', 'ea5hkx_puente', 'callsign_gate',
                         'audio_cadena', 'filtro_audio', 'dsp_audio', 'tone_detector']) {
         if (externoActivo[name] === false) continue;

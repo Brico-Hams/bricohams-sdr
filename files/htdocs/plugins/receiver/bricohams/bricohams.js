@@ -88,7 +88,7 @@ Plugins.bricohams.init = function () {
         document.body.appendChild(a);
     }
     // v5.0 · «¿Quieres una estación como esta?» → fuentes del kit
-    var FU = typeof cfg.fuentes === 'string' ? cfg.fuentes : '';
+    var FU = 'https://github.com/Brico-Hams/bricohams-sdr';
     if (/^https:\/\/[^\s'"<>]+$/.test(FU) && !document.getElementById('bricohams-gh')) {
         var g = document.createElement('a');
         g.id = 'bricohams-gh';
@@ -98,7 +98,7 @@ Plugins.bricohams.init = function () {
         g.title = '¿Quieres una estación como esta? Instalador, caja 3D, manuales y código';
         g.textContent = '🛠️';
         var gs = document.createElement('span');
-        gs.textContent = 'Monta la tuya';
+        gs.textContent = 'Hazlo tú mismo';
         g.appendChild(gs);
         document.body.appendChild(g);
     }

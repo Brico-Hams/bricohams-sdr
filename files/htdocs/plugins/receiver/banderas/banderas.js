@@ -16,8 +16,8 @@ Plugins.banderas._author='BricoHams';
 Plugins.banderas.no_css = true;
 
 Plugins.banderas.bandera = function (cc) {
-    if (!cc || cc.length !== 2) return '';
-    if (typeof Lookup !== 'undefined' && Lookup.ccode2flag) return Lookup.ccode2flag(cc);
+    // Lookup.ccode2flag devuelve entidades HTML (&#127466;…) que .text() mostraría literales: se genera el emoji aquí
+    if (!/^[A-Za-z]{2}$/.test(cc || '')) return '';
     var A = 0x1F1E6, c = cc.toUpperCase();
     return String.fromCodePoint(A + c.charCodeAt(0) - 65, A + c.charCodeAt(1) - 65);
 };
