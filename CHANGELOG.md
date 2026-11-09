@@ -2,6 +2,7 @@
 
 ## Sin publicar · 2026-11-03
 
+- Manual 52 de montaje de las 110 piezas impresas (caja v2, caja v3, antenas y anclajes) con tabla maestra y nueve diagramas nuevos (31-39) en `tools/esquemas.py`.
 - Banner del receptor raíz de OpenWebRX+ (junto a la presentación del proyecto, no solo `/bricohams/`): visitas totales, IP propia
   enmascarada, país aproximado y la identidad registrada. Reutiliza `/bricohams/api/visitas` (una sola cuenta por pestaña, misma clave
   `bh_visita` que la portada) y `/bricohams/api/mi-ip`, que añade `pais` (ISO) solo con la base GeoIP local ya instalada por

@@ -983,6 +983,427 @@ def lora_owrx():
     return svg(W, H, b, 'LoRa APRS y Meshtastic en OpenWebRX+ (v4.5)')
 
 
+# ---------------------------------------------------------------------
+#  31-39: montaje de las piezas impresas en 3D (manual 52).
+#  Cotas y tornillería salen de los .scad de hardware/ y de los manuales;
+#  lo que no está en ellos se marca como PENDIENTE DE CONFIRMAR.
+# ---------------------------------------------------------------------
+def _montaje(titulo, pasos, capas, dims):
+    # left: numbered step list; right: exploded layers (top to bottom) + dimensions
+    n, m = len(pasos), len(capas)
+    dy = 84 + m * 70
+    H = max(90 + n * 74, dy + len(dims) * 16 + 36) + 30
+    b = markers([C['or']])
+    for i, (t, l1, l2) in enumerate(pasos):
+        y0 = 90 + i * 74
+        b += (f"<circle cx='44' cy='{y0 + 31}' r='15' fill='{C['or']}' stroke='{C['cr']}' stroke-width='1.5'/>"
+              + txt(44, y0 + 36, i + 1, 14, C['ink'], True, 'middle'))
+        b += f"<rect x='70' y='{y0}' width='700' height='62' rx='6' fill='#f7f9fb' stroke='{C['ink']}' stroke-width='1.8'/>"
+        b += txt(84, y0 + 20, t, 11.5, C['ink'], True) + txt(84, y0 + 37, l1, 10.5) + txt(84, y0 + 52, l2, 10, C['mute'])
+        if i < n - 1:
+            b += arrow(44, y0 + 46, 44, y0 + 90, C['or'])
+    for k, (num, t, sub, col, lab) in enumerate(capas):
+        y = 90 + k * 70
+        b += f"<rect x='820' y='{y}' width='300' height='44' rx='6' fill='#f7f9fb' stroke='{col}' stroke-width='1.8'/>"
+        b += (f"<circle cx='800' cy='{y + 22}' r='12' fill='{C['or']}' stroke='{C['cr']}' stroke-width='1.5'/>"
+              + txt(800, y + 27, num, 12, C['ink'], True, 'middle'))
+        b += txt(970, y + 19, t, 11.5, col, True, 'middle') + txt(970, y + 35, sub, 9.5, C['mute'], False, 'middle')
+        if k < m - 1:
+            b += arrow(970, y + 44, 970, y + 70, C['or'], lab)
+    b += f"<rect x='820' y='{dy}' width='656' height='{len(dims) * 16 + 36}' rx='8' fill='#ffffff' stroke='{C['or']}' stroke-width='2'/>"
+    b += txt(832, dy + 20, 'Cotas del .scad', 12, C['cr'], True)
+    for i, d in enumerate(dims):
+        b += txt(832, dy + 40 + i * 16, d, 11)
+    return svg(1500, H, b, titulo)
+
+
+def montaje_caja_v2():
+    pasos = [
+        ('Insertos roscados en cuerpo, soportes de mástil y tejadillo',
+         'M4 ×20: 8 orejas (y = 22, 84, 148, 210), 8 de los soportes de mástil y 4 pilares del tejadillo',
+         'Soldador a 230-245 °C, de fuera hacia dentro y a ras. M3 ×16: 8 placas, 4 tapa interior, 2 visera y 2 soporte de cámara'),
+        ('Pasamuros en la pared: 9 SMA, PG7 WX, M20 LAN y PG9 230 V',
+         'SMA: SAT, HAM, VHF, HF, ADSB, 868, GPS, M433, IG433 (paso 15 mm, z = 26), agujero de 6,6 mm',
+         'Junta tórica por fuera y latiguillo RG316 de 20 cm en cada SMA'),
+        ('Compartimento de potencia: placa_potencia sobre sus 4 bosses',
+         '4 × M3×8 · separación 10 mm · placa de 3 mm · 230 V por PG9 a 2 × WAGO 221-412',
+         'Sin tensión y con diferencial de 30 mA aguas arriba'),
+        ('tapa_potencia interior sobre 4 insertos M3',
+         '4 × M3×8 (2 en y = 30 y 2 en y = 200) · altura CP_Z = 56 mm · pasamuros_usb en el hueco del tabique',
+         'Tabique con hueco de 18 × 34 mm para los conectores USB'),
+        ('placa_electronica con Pi 5, dongles y LilyGO',
+         '4 × M3×8 a los bosses (30,6), (110,6), (30,204), (110,204) · Pi 5: 4 × M2.5×6 autorroscantes (58 × 49)',
+         'LilyGO sobre la tapa interior de potencia'),
+        ('Cámara: junta_ventana, policarbonato, soporte_camara y visera',
+         'PC 86 × 36 × 2 + junta 1,5 mm · soporte_camara 2 × M3×35 y espuma de 1 mm · visera 2 × M3×8',
+         'Ventana de 76 × 26 mm en (160, 196) · separador_ir opcional con Camera Module 3 Wide · cable CSI con holgura'),
+        ('junta_tapa (TPU) en la ranura y cierre de la tapa',
+         '8 × M4×12 con arandela, en cruz, hasta que la tapa toque las orejas',
+         'Junta 4,4 × 4 mm en ranura de 4,2 mm (compresión ≈ 25 %); no aprietes de más'),
+        ('2 × soporte_mastil en la trasera',
+         '4 × M4×20 por soporte (y = 45 e y = 187; separación 30 × 19 mm) · 2 abrazaderas de 12 mm cada uno',
+         'Mástil de 40 mm'),
+        ('tejadillo y garita',
+         'Pilares (12,20), (212,20), (12,70), (212,70): M4×30 (traseros) y M4×25 (delanteros) con arandelas de goma',
+         'Garita: 3 varillas M4×140 con 6 tuercas ciegas · 2 M2 para el sensor'),
+    ]
+    capas = [
+        (9, 'tejadillo', '4 pilares con insertos M4', C['cr'], '2 × M4×30 + 2 × M4×25 + arandela de goma'),
+        (7, 'tapa + junta_tapa', '8 × M4×12 en cruz', C['sdr'], '8 × M4×12 con arandela'),
+        (6, 'visera + cámara + soporte_camara', 'M3×8 ×2 · M3×35 ×2', C['cam'], 'M3 a insertos de la tapa'),
+        (5, 'placa_electronica 138 × 210', '4 bosses M3 · Pi 5 M2.5', C['pi'], '4 × M3×8'),
+        (4, 'tapa_potencia + placa_potencia', '4 + 4 × M3×8 · CP_Z = 56 mm', C['pwr'], '4 × M3×8 a los insertos'),
+        (1, 'cuerpo 224 × 232 × 90', 'insertos · SMA, PG7, M20, PG9', C['ink'], '4 × M4×20 por soporte'),
+        (8, 'soporte_mastil ×2', 'y = 45 · y = 187', C['gnd'], ''),
+    ]
+    dims = ['Exterior 224 × 232 × 90 mm (ancho × alto × fondo) · pared 3,2 mm · tapa 4 mm',
+            'Junta TPU 4,4 × 4 mm · ranura 4,2 mm',
+            'Orejas M4 en y = 22, 84, 148, 210 (4 por lado)',
+            'Placa electrónica 138 × 210 · placa de potencia 58 × 210 · separación 10 · espesor 3 mm',
+            'Ventana de cámara 76 × 26 en (160, 196) · PC 86,5 × 36,5 × 2 · junta 1,5 mm',
+            'Inserto M3: agujero 4,0 × 6 · M4: agujero 5,6 × 8,5']
+    return _montaje('Montaje de la caja v2: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_caja_v3_electronica():
+    pasos = [
+        ('Insertos: M4 en orejas y pilares, M3 en la rejilla',
+         'Soldador a 220 °C · M4: orejas en y = 24, 92, 148, 216 y 4 pilares del tejadillo · M5 en la trasera',
+         'M3 en cada nudo de la placa_rejilla (paso 20 mm) · insertos a ras'),
+        ('junta_tapa (TPU) en la ranura de la tapa',
+         'TPU 5,6 × 4 mm en ranura de 5,8 mm · 4 puntos de cianoacrilato',
+         'Ranura limpia, sin rebabas de impresión'),
+        ('Pasamuros N, tapon_n y prensaestopas',
+         'Agujeros N de 16,2 mm en filas z = 26, 56 y 86 (paso 27) · z = 116: M25 PWR, M20 LAN, PG7 ×4',
+         'tapon_n y tapon_pg (TPU) en los que queden libres'),
+        ('Ventiladores de 60 mm: entrada a la izquierda, salida a la derecha',
+         'rejilla_ventilador + malla inox 1 mm entre ventilador y pared · capota fuera, boca hacia abajo',
+         'Agujero 57 mm · tornillos a 50 mm (3,6 mm) · entrada (y 55, z 60) · salida (y 190, z 68)'),
+        ('placa_rejilla sobre sus 5 bosses',
+         '5 × M3 (4 esquinas + centro) · separación 8 mm · placa de 3 mm',
+         'Soportes (dongle, hub, SDRplay, WAGO) con M3 o bridas: PENDIENTE DE CONFIRMAR'),
+        ('6 × poste_bandeja + bandeja_sdr',
+         'bandeja_sdr 167 × 170 a DECK_H = 38 mm · postes de 38 mm',
+         'Tornillos de los postes: PENDIENTE DE CONFIRMAR · SDR con bridas'),
+        ('6 × poste_medio + bandeja_sdr2',
+         'bandeja_sdr2 a DECK2_H = 82 mm · postes de 41 mm',
+         'Tornillos: PENDIENTE DE CONFIRMAR'),
+        ('4 × poste_superior + bandeja (Pi 5 + HAT)',
+         'bandeja 170 × 92 a BAND_H = 131 mm · Pi 5 en (8,10) con M2.5 autorroscante (agujero 2,4; 58 × 49)',
+         'soporte_lilygo en x = 98 · soporte_rak en (129,12) · postes de 46 mm'),
+        ('Fijación, cierre y tejadillo',
+         'M5 en los insertos traseros (WALL_Y = 40 y 200) · tapa con 8 × M4×16 en cruz · tejadillo al final',
+         'Lazos de goteo en cada cable · sudo bricohams-check'),
+    ]
+    capas = [
+        (9, 'electronica_tejadillo', '4 pilares con insertos M4', C['cr'], 'M4 + arandela de goma (longitud PENDIENTE)'),
+        (9, 'electronica_tapa + junta_tapa', '8 orejas M4 · M4×16 en cruz', C['sdr'], '8 × M4×16'),
+        (8, 'electronica_bandeja', '4 × poste_superior', C['pi'], 'tornillos PENDIENTES'),
+        (7, 'electronica_bandeja_sdr2', '6 × poste_medio', C['sdr'], 'M3 (PENDIENTE)'),
+        (6, 'electronica_bandeja_sdr', '6 × poste_bandeja', C['sdr'], 'M3 (PENDIENTE)'),
+        (5, 'electronica_placa_rejilla', '5 bosses M3 · 8 mm', C['gnd'], '5 × M3'),
+        (1, 'electronica_cuerpo', 'N, PG/M, ventiladores, M5 trasera', C['ink'], ''),
+    ]
+    dims = ['Exterior 228 × 240 × 192 mm · pared 4,8 mm · tapa 5,2 mm',
+            'Junta TPU 5,6 × 4 mm · ranura 5,8 mm',
+            'Orejas M4 en y = 24, 92, 148, 216 · pilares del tejadillo M4',
+            'Rejilla: espesor 3,2 mm · separación 8 mm · paso 20 mm · M3 en cada nudo',
+            'Scad: DECK_H 38 · DECK2_H 82 · BAND_H 131 mm (manual 17: 30 / 71 mm, PENDIENTE DE CONFIRMAR)',
+            'Ventilador 60 mm: agujero 57 mm, tornillos a 50 mm (3,6 mm) · N: agujero 16,2 mm',
+            'Inserto M3: 4,0 × 6 · M4: 5,6 × 8,5 · M5: agujero 7,0 mm',
+            'Cámara opcional (Camera Module 3 Wide): ventana 20 × 16 en (W/2, 210) · cajeado 27 × 26']
+    return _montaje('Montaje de la caja v3 electrónica: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_caja_v3_potencia_sai():
+    pasos = [
+        ('Insertos M4 y M5 y junta_tapa (TPU) en la ranura',
+         'Potencia 170 × 200 × 112: orejas M4 en y = 24, 100, 176 · M5 trasera en y = 40 y 160',
+         'SAI 228 × 240 × 140: orejas en y = 24, 92, 148, 216 · M5 trasera en y = 40 y 200'),
+        ('Prensaestopas de la potencia: PG9 230 V, M25 A ELECTRONICA y PG7 VENT',
+         'Salida con manguera 4 × 0,75 H07RN-F · PG7 VENT con membrana ePTFE (tapon_pg con respiradero)',
+         'tapon_pg en los PG sobrantes'),
+        ('potencia: soporte_schuko y brida_cargador sobre la placa_rejilla',
+         'Schuko de superficie ≈ 80 × 80 × 42: M4 a ±30 mm + 4 × M3 · brida 110 × 16 × 40 con 2 × M3',
+         'Cadena: disparador PD, fusible y WAGO (manual 17)'),
+        ('SAI: soporte_bateria y 2 × guia_pcb sobre la placa_rejilla',
+         'BAT (50,4) · PCB (6,6) · guías en y = 18 y 168 · ranura 2,2 mm con M3 prisionero',
+         'Batería sujeta con correas por ventanas de correa (22 mm en el .scad)'),
+        ('SAI: pletina_trafo, 2 × soporte_filtro y soporte_wago',
+         'TRAFO (50,118) con ranuras M5 · EMI_OUT (138,118) y EMI_IN (176,118) con ranuras M4',
+         'DC en (50,194) · WAGO con soporte_wago'),
+        ('SAI: fusible ATO 15 A en BAT+ y PE a los filtros EMI',
+         'Fusible a ≤ 10 cm del borne · ventilas superior e inferior abiertas (hidrógeno)',
+         'SAI desenchufado y batería desconectada; espera 5 minutos'),
+        ('Prensaestopas del SAI y cierre de ambas cajas',
+         'SAI: PG9 RED, PG9 SALIDA, PG7 DATOS · tapa con M4×16 en cruz (6 en potencia, 8 en SAI)',
+         'Lazos de goteo · tapon_pg en los PG libres'),
+        ('Fijación: pletina_pared ×2 (4 tacos) o soporte_mastil ×2 con U M8',
+         'M5 en los insertos traseros · módulo de potencia más bajo que la electrónica · tejadillo al final',
+         'Longitud de los M5 y de las U: PENDIENTE DE CONFIRMAR'),
+    ]
+    capas = [
+        (8, 'potencia_tejadillo / sai_tejadillo', '4 pilares con insertos M4 cada uno', C['cr'], 'M4 (longitud PENDIENTE)'),
+        (7, '*_tapa + *_junta_tapa', 'M4×16 en cruz', C['sdr'], '6 (potencia) · 8 (SAI) × M4×16'),
+        (4, 'sai: bateria, guia_pcb, trafo, filtro', 'soporte_wago · fusible ATO 15 A', C['pwr'], 'M3 / M4 / M5 ranurados'),
+        (3, 'potencia: soporte_schuko, brida_cargador', 'M4 a ±30 · M3', C['pwr'], '4 × M3 + 2 × M3'),
+        (3, '*_placa_rejilla', 'sobre bosses M3 del cuerpo', C['gnd'], 'M3'),
+        (1, 'potencia_cuerpo / sai_cuerpo', 'M4, M5, PG9, M25, PG7', C['ink'], 'M5 a pared o mástil'),
+        (8, '*_pletina_pared / *_soporte_mastil', 'M5 trasera · U M8', C['gnd'], ''),
+    ]
+    dims = ['Potencia 170 × 200 × 112 mm · SAI 228 × 240 × 140 mm',
+            'Pared 4,8 mm · tapa 5,2 mm · junta TPU 5,6 × 4 mm · ranura 5,8 mm',
+            'Orejas M4: potencia y = 24, 100, 176 · SAI y = 24, 92, 148, 216',
+            'M5 trasera: y = 40 y 160 (potencia) · y = 40 y 200 (SAI) · x al 25 % y 75 % del ancho',
+            'SAI (x,y): BAT 50,4 · PCB 6,6 · TRAFO 50,118 · EMI_OUT 138,118 · EMI_IN 176,118 · DC 50,194']
+    return _montaje('Montaje de la caja v3 de potencia y del SAI: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_quad():
+    pasos = [
+        ('quad_buje_2m ×2 y quad_buje_70 ×2 en el boom',
+         'Boom cuadrado 20 × 20 (BOOM 20,4) · marcas a 0, 248, 372 y 510 mm · 2 prisioneros M5 por buje (8 en total)',
+         'Cola de 500 mm tras el reflector de 2 m (manual 12)'),
+        ('Varillas Ø8 en los bujes',
+         'Cortadas a cruceta − 25 mm · M3 autorroscante · quad_puntera_8 ×7 en las puntas',
+         'Longitudes Ø8: 378 y 345 mm (manual 12)'),
+        ('Varillas Ø6 y puntas',
+         'quad_puntera_6 ×8 · quad_clip_70 ×3 a 127 mm del centro (brazos arriba, abajo y −Y)',
+         'Longitudes Ø6: 108 y 95 mm'),
+        ('Hilo de cobre Ø2 por punteras y bujes',
+         'Recorrido del hilo: manual 12',
+         'Hilo Ø2 mm'),
+        ('quad_alim_2m (en la punta +Y) y quad_alim_70 (en lugar del clip +Y)',
+         '2 insertos M3 de latón como terminales, a 12 mm entre sí',
+         'Alimentación de 2 m con RG-59 de λ/4 = 341 mm; la de 70 cm con RG-58 o RG-316'),
+        ('quad_abrazadera en la cola del boom',
+         'U M8 al mástil y U M6 al boom · pieza de 80 × 22 con ranura cuadrada',
+         'Tamaño exacto de las U: PENDIENTE DE CONFIRMAR · alternativa v4: cruceta_mastil_quad (manual 21)'),
+        ('Montaje en el mástil a 0,95 m con rumbo 205°',
+         'Cola de 500 mm · comprobación de ROE antes de izar: manual 12',
+         'Cable con lazo de goteo y separador_coax'),
+    ]
+    capas = [
+        (3, 'quad_puntera_8 ×7 · quad_puntera_6 ×8', 'extremos de varilla', C['rf'], ''),
+        (2, 'varillas Ø8 y Ø6', 'M3 autorroscante', C['gnd'], 'M3 en el buje'),
+        (1, 'quad_buje_2m ×2 · quad_buje_70 ×2', 'boom 20 × 20 · 8 prisioneros M5', C['rf'], '2 insertos M3'),
+        (5, 'quad_alim_2m · quad_alim_70', 'terminales a 12 mm', C['pwr'], 'U M8 + U M6'),
+        (6, 'quad_abrazadera', 'U M8 mástil · U M6 boom', C['ink'], ''),
+    ]
+    dims = ['Varillas Ø8: 378 y 345 mm · Ø6: 108 y 95 mm (manual 12)',
+            'Boom 20 × 20 (BOOM 20,4 mm): marcas a 0, 248, 372 y 510 mm · cola de 500 mm',
+            'Espira de hilo Ø2 mm · RG-59 λ/4: 341 mm · rumbo 205°',
+            'quad_abrazadera 80 × 22 mm · mástil de 0,95 m']
+    return _montaje('Montaje del quad 2 m / 70 cm: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_discone_adsb():
+    pasos = [
+        ('discone_aislador: insertos M4',
+         'Ø50 × 20 mm · 3 insertos M4 arriba y 3 abajo',
+         'Insertos a ras'),
+        ('Disco: 12 varillas Ø4 con rosca M4 al cubo',
+         'Cubo de aluminio Ø70 × 12 · discone_plantilla_disco (12 agujeros) · varillas de 327 mm',
+         'Cubo al aislador con 3 × M4'),
+        ('Cono: 12 varillas de 1010 mm al otro cubo',
+         'discone_plantilla_cono (semiángulo 30°) · cubo al aislador con 3 × M4 (M4×10 en el manual 13)',
+         'Hueco entre disco y cono: 20 mm'),
+        ('tapon_varilla ×12 en las puntas',
+         'En las 12 puntas del cono · agujero Ø2,5 para cordino',
+         'Modo de fijación: PENDIENTE DE CONFIRMAR'),
+        ('discone_adaptador_mastil al cubo',
+         '60 mm de alto · 4 × M4 al cubo · 2 × M6 pasantes al mástil (z = 12 y z = 32)',
+         'Par de apriete: PENDIENTE DE CONFIRMAR'),
+        ('discone_capuchon',
+         'Sobre el cubo del disco, con silicona neutra en el borde (manual 13)',
+         'Fijación del capuchón: PENDIENTE DE CONFIRMAR'),
+        ('ADS-B: adsb_base con el LNA',
+         'LNA 72 × 34 × 20 · SMA de panel de 6,6 mm · PG7 de 12,7 mm · 4 tornillos de 2,8 mm para la brida',
+         'Oreja para la sujeción al brazo'),
+        ('adsb_tapa y adsb_radomo',
+         'adsb_tapa con 4 × M3 + junta TPU de 1 mm · elemento de 62 mm y 4 radiales de 68 mm a 45° (latón Ø2)',
+         'Radomo: silicona neutra (manual 14); tornillos: PENDIENTE DE CONFIRMAR'),
+    ]
+    capas = [
+        (6, 'discone_capuchon', 'manual 13', C['rf'], ''),
+        (4, 'tapon_varilla ×12', 'puntas del cono', C['rf'], ''),
+        (2, 'disco: 12 varillas + plantilla', 'Ø4 · 327 mm', C['gnd'], '3 × M4'),
+        (1, 'discone_aislador Ø50 × 20', '3 M4 arriba + 3 abajo', C['ink'], '3 × M4'),
+        (3, 'cono: 12 varillas + plantilla', 'Ø4 · 1010 mm · 30°', C['gnd'], '4 × M4'),
+        (5, 'discone_adaptador_mastil', 'M4 ×4 · M6 ×2 pasantes', C['ink'], ''),
+        (7, 'adsb_base + adsb_tapa + adsb_radomo', 'LNA 72 × 34 × 20 · 4 × M3 · junta 1 mm', C['gps'], ''),
+    ]
+    dims = ['Aislador Ø50 × 20 mm · 3 + 3 insertos M4',
+            'Cubos de aluminio Ø70 × 12 mm · varillas Ø4 con rosca M4',
+            'Cono: 12 × 1010 mm, semiángulo 30° · disco: 12 × 327 mm',
+            'Adaptador: 60 mm de alto · M4 ×4 al cubo · M6 ×2 pasantes (z = 12 y z = 32)',
+            'ADS-B: LNA 72 × 34 × 20 · SMA 6,6 · PG7 12,7 · 4 radiales de 68 mm']
+    return _montaje('Montaje del discone y de la antena ADS-B: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_mla_gps():
+    pasos = [
+        ('mla_caja_base: 4 bosses M3 en las esquinas',
+         'Interior de 90 × 60 × 36 mm (MLA_CAJA) · medias cañas laterales para los extremos del lazo',
+         'PG7 para la salida del cable'),
+        ('mla_junta (TPU, 1,6 mm) entre base y tapa',
+         'mla_caja_tapa con 4 × M3 en los bosses (M3 × 12 inox, manual 15)',
+         'Sellar las medias cañas con silicona neutra'),
+        ('mla_cruz en el poste',
+         'Varillas de fibra Ø10 · U M6 al poste · M3 en los brazos',
+         'Poste no metálico · MLA a ≥ 5 m del mástil'),
+        ('mla_clip_lazo ×4 sobre el lazo',
+         'Para coaxial Ø7 (MLA_COAX)',
+         'Un clip en la punta de cada brazo de la cruz'),
+        ('funda_sma y funda_n (TPU) con cinta autoamalgamante',
+         'funda_sma: interior 9,5 × 40 mm · funda_n: 17 × 50 mm',
+         'Cinta autoamalgamante sobre la funda, de abajo arriba'),
+        ('GPS: gps_soporte',
+         'Puck de 48 × 40 × 15 mm · 4 agujeros Ø6,6 (M6) en x = ±16,5 e y = ±27',
+         'Tornillería del puck: PENDIENTE DE CONFIRMAR'),
+        ('soporte_fibra para la antena de fibra',
+         'Brazo Ø25 ↔ fibra Ø26 · 64 × 20 mm · M6',
+         'Tuercas y arandelas: PENDIENTE DE CONFIRMAR'),
+        ('brazo_mastil, tapon_brazo, separador_coax y clip_filtro',
+         'Mástil Ø40 ↔ brazo Ø25 · 80 × 22 mm · M8 al mástil y M6 al brazo',
+         'separador_coax cada 50 cm, a 30 mm del mástil, con brida'),
+    ]
+    capas = [
+        (2, 'mla_caja_tapa', '4 × M3 · PG7', C['sdr'], '4 × M3'),
+        (2, 'mla_junta (TPU 1,6)', 'entre base y tapa', C['gnd'], ''),
+        (1, 'mla_caja_base', 'bosses M3 · 90 × 60 × 36', C['ink'], ''),
+        (3, 'mla_cruz + mla_clip_lazo ×4', 'varillas Ø10 · U M6 · coaxial Ø7', C['rf'], ''),
+        (5, 'funda_sma · funda_n', 'TPU + cinta autoamalgamante', C['lora'], ''),
+        (6, 'gps_soporte · soporte_fibra', 'puck 48 × 40 × 15 · Ø25 ↔ Ø26', C['gps'], ''),
+        (8, 'brazo_mastil · tapon_brazo', 'separador_coax · clip_filtro', C['gnd'], ''),
+    ]
+    dims = ['Caja MLA: interior 90 × 60 × 36 mm · junta TPU 1,6 mm · 4 bosses M3',
+            'mla_cruz: varillas Ø10 · U M6 · mla_clip_lazo para coaxial Ø7',
+            'funda_sma: interior 9,5 × 40 · funda_n: 17 × 50 (TPU)',
+            'gps_soporte: puck 48 × 40 × 15 · 4 × Ø6,6 · tubo Ø25',
+            'brazo_mastil: mástil Ø40 y brazo Ø25 · 80 × 22 · M8 al mástil y M6 al brazo',
+            'separador_coax: coaxial Ø7,5 · a 30 mm del mástil']
+    return _montaje('Montaje de la MLA-30, GPS y accesorios RF: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_crucetas():
+    pasos = [
+        ('Elige la cruceta según el par de tubos',
+         'mastil_brazo (Ø40,6 / Ø25,4) · mastil_quad (Ø40,6 / boom 20,4) · brazo_fibra (Ø25,4 / Ø26) · brazo_tubo',
+         'Cada cruceta = cuerpo + 2 tapas (brazo_tubo: tapa ×2)'),
+        ('Tuercas hexagonales M6 en el cuerpo',
+         'Tuerca de 11,3 × 5,4 mm en su alojamiento · 4 por cruceta',
+         'Canales en gota: se imprimen sin soportes'),
+        ('Tubo inferior en el semicanal del cuerpo',
+         'Mástil Ø40,6 o brazo Ø25,4',
+         'Apriete de diseño: 1 mm'),
+        ('Tapa B (tubo inferior) con los tornillos desde abajo',
+         '2 × M6×50 (lado mástil) o M6×40 · tuerca capturada cerca del extremo superior',
+         '4 arandelas por cruceta'),
+        ('Tubo superior y tapa A',
+         '2 × M6 con arandela · tuercas capturadas cerca de la base',
+         'Brazo, boom, fibra o tubo'),
+        ('Tornillo autotaladrante antigiro',
+         'Autotaladrante Ø4,8 × 19 · agujero de 5,2 mm en la tapa a x = L/4',
+         '2 por cruceta'),
+        ('Apriete final y comprobación',
+         'Aprieta alternando los tornillos de cada tapa',
+         'Par de apriete: PENDIENTE DE CONFIRMAR'),
+    ]
+    capas = [
+        (5, 'tapa A (tubo superior)', 'tuercas M6 cerca de la base', C['sdr'], '2 × M6 + arandela'),
+        (5, 'tubo superior', 'brazo / boom / fibra / tubo', C['gnd'], ''),
+        (2, 'cuerpo de la cruceta', '4 tuercas hex M6 · canales en gota', C['ink'], ''),
+        (3, 'tubo inferior', 'mástil Ø40,6 / brazo Ø25,4', C['gnd'], 'desde abajo'),
+        (4, 'tapa B (tubo inferior)', 'M6 desde abajo · tuerca arriba', C['sdr'], ''),
+    ]
+    dims = ['MAST_D 40,6 · ARM_D 25,4 · FIBRA_D 26 · BOOM 20,4 mm',
+            'Agujero M6 6,6 mm · tuerca hex 11,3 × 5,4 mm · apriete 1 mm',
+            'Altura del cuerpo = prof(dA) + prof(dB) + 8 · longitud = max(dA, dB) + 44',
+            'Antigiro: autotaladrante Ø4,8 · agujero 5,2 en x = L/4',
+            'Tornillería: 4 × M6×50 (lado mástil) o M6×40 (boom, fibra, tubo) · 4 tuercas · 4 arandelas']
+    return _montaje('Montaje de las crucetas de anclaje: secuencia y despiece', pasos, capas, dims)
+
+
+def montaje_sensores_pico():
+    pasos = [
+        ('sensor_viento_brida: tuercas en sus alojamientos',
+         'Patrón A: 4 × Ø6,4 sobre Ø47,1 con tuerca M5 (Ø9,4) · patrón B: 4 × Ø4,8 sobre Ø68 con M4 (Ø8,1)',
+         'Se imprime volteada'),
+        ('Brida sobre el tubo del brazo',
+         '2 prisioneros M5 · marca N hacia el norte geográfico',
+         'Veleta y anemómetro con su patrón'),
+        ('Sensor sobre la brida',
+         '4 tornillos M5 o M4 según el patrón',
+         'Longitud: PENDIENTE DE CONFIRMAR'),
+        ('pluvio_vaso sobre el poste de Ø40',
+         '3 insertos M5 a r = 40 mm · 2 prisioneros M5',
+         'Se imprime volteado'),
+        ('pluvio_plataforma sobre el vaso',
+         '160 × 70 × 6 mm · 3 × M5×40 de nivelación con muelle · 3 × M3 en ranuras',
+         'Nivelación con los 3 M5'),
+        ('pico_soporte a la rejilla de la caja v3',
+         '80 × 100 × 3 mm · 4 × M3×8 a la rejilla de 20 mm',
+         'Pico y placa perforada con 8 × M2×6'),
+        ('Cableado del Pico',
+         'GP4 SDA · GP5 SCL · GP22 DS18B20 · GP15 lluvia · GP16/17 PWM · GP18/19 TACH',
+         'Los pines del Pico no toleran 5 V (esquema 16)'),
+    ]
+    capas = [
+        (3, 'anemómetro / veleta', 'sobre la brida', C['i2c'], '4 × M5 o M4'),
+        (2, 'sensor_viento_brida ×2', 'D92 · marca N', C['ink'], '2 prisioneros M5'),
+        (5, 'pluvio_plataforma', '160 × 70 × 6', C['sdr'], '3 × M5×40 + muelles'),
+        (4, 'pluvio_vaso', '3 insertos M5 · poste Ø40', C['sdr'], ''),
+        (6, 'Pico + placa perforada', '8 × M2×6', C['pi'], '4 × M3×8'),
+        (6, 'pico_soporte 80 × 100 × 3', 'rejilla M3 de 20 mm', C['ink'], ''),
+    ]
+    dims = ['Brida: D92 · patrón A 4 × Ø6,4 en Ø47,1 (M5) · patrón B 4 × Ø4,8 en Ø68 (M4)',
+            'Vaso: poste Ø40 · 3 insertos M5 a r = 40 · 2 prisioneros M5',
+            'Plataforma 160 × 70 × 6 mm · 3 × M5 de nivelación con muelle · 3 ranuras M3',
+            'pico_soporte 80 × 100 × 3 · separadores M2 de 47 × 11,4 · placa 46 × 66 con M2',
+            'El Pico no tolera 5 V · pines: manual 20 y esquema 16']
+    return _montaje('Montaje de sensores de viento, lluvia y soporte del Pico: secuencia y despiece', pasos, capas, dims)
+
+
+def mapa_piezas_mastil():
+    W, H = 1500, 898
+    b = markers([C['or']])
+    b += f"<rect x='296' y='76' width='8' height='700' fill='{C['line']}'/>"
+    filas = [
+        ('2,9 m', 'Punta: discone', C['rf'],
+         ['discone_aislador · discone_plantilla_disco y _cono · discone_adaptador_mastil · discone_capuchon · tapon_varilla ×12',
+          'Manual 13 · esquema 35']),
+        ('2,0 m', 'Collar de vientos (sin pieza impresa)', C['gnd'],
+         ['3 cables de acero Ø3 (manual 11)']),
+        ('1,7 m', 'Brazo E/O', C['sdr'],
+         ['cruceta_mastil_brazo · brazo_mastil · tapon_brazo',
+          'E: ADS-B (adsb_base, adsb_tapa, adsb_radomo) a 0,8 m y GPS (gps_soporte) a 0,4 m · O: fibra 433 (soporte_fibra) a 0,8 m',
+          'Esquemas 35, 36 y 37']),
+        ('1,5 m', 'Brazo N/S', C['i2c'],
+         ['cruceta_mastil_brazo · 2 × cruceta_brazo_tubo (cuerpo + 2 tapas cada una)',
+          'N: anemómetro · S: veleta · sensor_viento_brida ×2 (marca N al norte geográfico) · esquema 38']),
+        ('0,95 m', 'Quad 2 m / 70 cm', C['cr'],
+         ['quad_abrazadera o cruceta_mastil_quad · boom con rumbo 205°',
+          'quad_buje_2m ×2 · quad_buje_70 ×2 · punteras · clips · alimentadores · esquema 34']),
+        ('0,2 m', 'Brazo N/S', C['sdr'],
+         ['cruceta_mastil_brazo · 2 × cruceta_brazo_tubo',
+          'N: Bigsignal 868 · S: iGate 433 · esquema 37']),
+        ('0,05 m', 'Garita meteorológica (caja v2)', C['pi'],
+         ['garita_base · garita_plato ×6 · garita_tapa · 3 varillas M4×140',
+          'Sensor GYBMEP (M2 ×2) · esquema 31']),
+    ]
+    for k, (h, t, col, lin) in enumerate(filas):
+        y0 = 80 + k * 100
+        b += txt(288, y0 + 48, 'h = ' + h, 12, C['ink'], True, 'end')
+        b += arrow(300, y0 + 44, 340, y0 + 44, C['or'])
+        b += box(340, y0, 1136, 88, t, lin, col)
+    b += box(340, 780, 1136, 88, 'Cajas y piezas fuera del mástil', [
+        'Cajas: v2 con soporte_mastil ×2 (M4×20) · v3 con soporte_mastil ×2 (M5 + U M8) o pletina_pared ×2 · esquemas 31, 32 y 33',
+        'Fuera del mástil: MLA-30 (≥ 5 m, poste no metálico) y pluviómetro en poste Ø40 a 1 m (pluvio_vaso + pluvio_plataforma)',
+        'Mástil Ø40 a tierra con 16 mm² · lazos de goteo y separador_coax cada 50 cm'], C['cr'])
+    return svg(W, H, b, 'Mapa de piezas impresas en el mástil')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -997,7 +1418,14 @@ def main():
                      ('18_red_servicios', red_servicios), ('19_actualizar', actualizar),
                      ('20_audio_navegador', audio_navegador), ('21_clonar_openwebrx', clonar_openwebrx),
                      ('22_zona_locator', zona_locator), ('23_openwebrx_docker', openwebrx_docker),
-                     ('24_blindaje', blindaje), ('25_lora_owrx', lora_owrx)]:
+                     ('24_blindaje', blindaje), ('25_lora_owrx', lora_owrx),
+                     ('31_montaje_caja_v2', montaje_caja_v2),
+                     ('32_montaje_caja_v3_electronica', montaje_caja_v3_electronica),
+                     ('33_montaje_caja_v3_potencia_sai', montaje_caja_v3_potencia_sai),
+                     ('34_montaje_quad', montaje_quad), ('35_montaje_discone_adsb', montaje_discone_adsb),
+                     ('36_montaje_mla_gps', montaje_mla_gps), ('37_montaje_crucetas', montaje_crucetas),
+                     ('38_montaje_sensores_pico', montaje_sensores_pico),
+                     ('39_mapa_piezas_mastil', mapa_piezas_mastil)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:

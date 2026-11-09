@@ -199,6 +199,7 @@ El paso a paso completo está en [docs/manuales/](docs/manuales/). La caja del m
 - v5.0: [42 Clima en red, WSPR, grabación de pases y AMSAT](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md)
 - v5.4: Meshtastic dual 433/868 y puente USB ([35](docs/manuales/35_LORA_APRS_MESHTASTIC.md)), acceso y administración ([24](docs/manuales/24_VISITAS_TELEGRAM.md), [34](docs/manuales/34_BLINDAJE_SEGURIDAD.md)), agendas de satélites y grabador ([26](docs/manuales/26_SATELITES.md), [42](docs/manuales/42_CLIMA_RED_SATELITES_GRABACION.md)) y despliegues acotados con copia de seguridad.
 - v5.5: [46 Acceso de administradores: usuarios locales y Google](docs/manuales/46_ACCESO_GOOGLE.md)
+- [52 Montaje de las piezas impresas en 3D](docs/manuales/52_MONTAJE_PIEZAS_IMPRESAS.md)
 - [Canales y frecuencias](docs/CANALES_Y_FRECUENCIAS.md): Radio Club, CB, PMR, FM, DAB+, digitales, aviación y marina.
 
 > **¿`sudo: ./install.sh: command not found`?** Se han perdido los permisos al copiar el kit. Usa `sudo bash install.sh …` ([manual 02](docs/manuales/02_INSTALACION.md)).
