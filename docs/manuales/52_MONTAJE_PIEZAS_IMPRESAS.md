@@ -44,6 +44,7 @@ la RF y la puesta en marcha; este explica **cómo se ensamblan las piezas**.
 12. [Mapa de piezas en el mástil y montaje final](#12-mapa-de-piezas-en-el-mástil-y-montaje-final)
 13. [Lista de comprobación antes de subir al mástil](#13-lista-de-comprobación-antes-de-subir-al-mástil)
 14. [Valores pendientes de confirmar](#14-valores-pendientes-de-confirmar)
+15. [Cómo regenerar las imágenes](#15-cómo-regenerar-las-imágenes)
 
 | Diagrama | Grupo |
 |---|---|
@@ -99,24 +100,24 @@ antenas: manuales [12](12_QUAD_2M70.md) y [13](13_DISCONES.md); anclajes: [manua
 
 PETG blanco con 8 perímetros, gyroide al 25 % y borde de 5 mm en `cuerpo` y `tapa` ([manual 10](10_CAJA_3D.md)).
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `cuerpo.stl` | A | 1 | PETG blanco | Trasera sobre la cama ([render](../../hardware/caja/render/cuerpo_impresion.png)) | No | Insertos M4 (8 orejas y 8 de soportes de mástil), M3 en bosses; 9 SMA, PG7, M20, PG9 |
-| `tapa.stl` | A | 1 | PETG blanco | Cara exterior sobre la cama | No | 8 × M4×12 con arandela; ranura para `junta_tapa` |
-| `tapa_potencia.stl` | A | 1 | PETG | Como exportada | No | 4 insertos M3 · 4 × M3×8 |
-| `placa_electronica.stl` | A | 1 | PETG | Como exportada | No | 4 × M3×8 a bosses · Pi 5: 4 × M2.5×6 autorroscantes |
-| `placa_potencia.stl` | A | 1 | PETG | Como exportada | No | 4 × M3×8 a bosses |
-| `tejadillo.stl` | A | 1 | PETG blanco | Como exportada | No | 4 insertos M4 · 2 × M4×30 (traseros) + 2 × M4×25 (delanteros) con arandelas de goma |
-| `visera.stl` | A | 1 | PETG blanco | Como exportada | No | 2 insertos M3 · 2 × M3×8 |
-| `soporte_camara.stl` | A | 1 | PETG negro | Como exportada | No | 2 insertos M3 · 2 × M3×35; espuma de 1 mm |
-| `soporte_mastil.stl` | A | 2 | PETG | Como exportada | No | 4 × M4×20 por soporte · abrazaderas de 12 mm |
-| `garita_base.stl` | A | 1 | PETG blanco | Como exportada | No | 3 varillas M4×140 · tuercas ciegas · 2 × M2×8 (sensor) |
-| `garita_plato.stl` | A | 6 | PETG blanco | Como exportada | No | 3 varillas M4×140 (comunes) |
-| `garita_tapa.stl` | A | 1 | PETG blanco | Como exportada | No | Tuercas ciegas M4 |
-| `junta_tapa.stl` | A | 1 | TPU 95A | Como exportada | No | Va en la ranura de la tapa (4,4 × 4 mm) |
-| `junta_ventana.stl` | A | 1 | TPU 95A | Como exportada | No | Con policarbonato; junta de 1,5 mm |
-| `separador_ir.stl` | A | 1 | TPU 95A negro | Como exportada | No | Opcional / no necesario con Camera Module 3 Wide (evita reflejos de los LED IR de la WPI408) |
-| `pasamuros_usb.stl` | A | 1 | TPU 95A | Como exportada | No | Paso del tabique (hueco de 18 × 34 mm), 5 pasos de cable |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/caja/render/piezas/cuerpo.png" width="90"> | `cuerpo.stl` | A | 1 | PETG blanco | Trasera sobre la cama ([render](../../hardware/caja/render/cuerpo_impresion.png)) | No | Insertos M4 (8 orejas y 8 de soportes de mástil), M3 en bosses; 9 SMA, PG7, M20, PG9 |
+| <img src="../../hardware/caja/render/piezas/tapa.png" width="90"> | `tapa.stl` | A | 1 | PETG blanco | Cara exterior sobre la cama | No | 8 × M4×12 con arandela; ranura para `junta_tapa` |
+| <img src="../../hardware/caja/render/piezas/tapa_potencia.png" width="90"> | `tapa_potencia.stl` | A | 1 | PETG | Como exportada | No | 4 insertos M3 · 4 × M3×8 |
+| <img src="../../hardware/caja/render/piezas/placa_electronica.png" width="90"> | `placa_electronica.stl` | A | 1 | PETG | Como exportada | No | 4 × M3×8 a bosses · Pi 5: 4 × M2.5×6 autorroscantes |
+| <img src="../../hardware/caja/render/piezas/placa_potencia.png" width="90"> | `placa_potencia.stl` | A | 1 | PETG | Como exportada | No | 4 × M3×8 a bosses |
+| <img src="../../hardware/caja/render/piezas/tejadillo.png" width="90"> | `tejadillo.stl` | A | 1 | PETG blanco | Como exportada | No | 4 insertos M4 · 2 × M4×30 (traseros) + 2 × M4×25 (delanteros) con arandelas de goma |
+| <img src="../../hardware/caja/render/piezas/visera.png" width="90"> | `visera.stl` | A | 1 | PETG blanco | Como exportada | No | 2 insertos M3 · 2 × M3×8 |
+| <img src="../../hardware/caja/render/piezas/soporte_camara.png" width="90"> | `soporte_camara.stl` | A | 1 | PETG negro | Como exportada | No | 2 insertos M3 · 2 × M3×35; espuma de 1 mm |
+| <img src="../../hardware/caja/render/piezas/soporte_mastil.png" width="90"> | `soporte_mastil.stl` | A | 2 | PETG | Como exportada | No | 4 × M4×20 por soporte · abrazaderas de 12 mm |
+| <img src="../../hardware/caja/render/piezas/garita_base.png" width="90"> | `garita_base.stl` | A | 1 | PETG blanco | Como exportada | No | 3 varillas M4×140 · tuercas ciegas · 2 × M2×8 (sensor) |
+| <img src="../../hardware/caja/render/piezas/garita_plato.png" width="90"> | `garita_plato.stl` | A | 6 | PETG blanco | Como exportada | No | 3 varillas M4×140 (comunes) |
+| <img src="../../hardware/caja/render/piezas/garita_tapa.png" width="90"> | `garita_tapa.stl` | A | 1 | PETG blanco | Como exportada | No | Tuercas ciegas M4 |
+| <img src="../../hardware/caja/render/piezas/junta_tapa.png" width="90"> | `junta_tapa.stl` | A | 1 | TPU 95A | Como exportada | No | Va en la ranura de la tapa (4,4 × 4 mm) |
+| <img src="../../hardware/caja/render/piezas/junta_ventana.png" width="90"> | `junta_ventana.stl` | A | 1 | TPU 95A | Como exportada | No | Con policarbonato; junta de 1,5 mm |
+| <img src="../../hardware/caja/render/piezas/separador_ir.png" width="90"> | `separador_ir.stl` | A | 1 | TPU 95A negro | Como exportada | No | Opcional / no necesario con Camera Module 3 Wide (evita reflejos de los LED IR de la WPI408) |
+| <img src="../../hardware/caja/render/piezas/pasamuros_usb.png" width="90"> | `pasamuros_usb.stl` | A | 1 | TPU 95A | Como exportada | No | Paso del tabique (hueco de 18 × 34 mm), 5 pasos de cable |
 
 ### 2.2 Caja v3 (`hardware/caja_v3/stl/`, 48 piezas)
 
@@ -130,66 +131,66 @@ Orientación: cuerpo boca arriba; tapa con la cara exterior sobre la cama; el re
 
 **Electrónica (25)**
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `electronica_cuerpo.stl` | B | 1 | ASA | Boca arriba | No | Insertos M4 (orejas y pilares), M5 traseros; N 16,2 mm; M25, M20, PG7 |
-| `electronica_tapa.stl` | B | 1 | ASA | Cara exterior sobre la cama | No | 8 × M4×16 (8 orejas en el `.scad`) |
-| `electronica_junta_tapa.stl` | B | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm; 4 puntos de cianoacrilato |
-| `electronica_tejadillo.stl` | B | 1 | ASA | Como exportada | No | 4 insertos M4; M4 (longitud PENDIENTE DE CONFIRMAR) |
-| `electronica_placa_rejilla.stl` | B | 1 | ASA, 40 % | Como exportada | No | Insertos M3 en cada nudo; 5 × M3 a bosses |
-| `electronica_poste_bandeja.stl` | B | 6 | ASA | Como exportada | No | M3: longitud PENDIENTE DE CONFIRMAR |
-| `electronica_bandeja_sdr.stl` | B | 1 | ASA, 40 % | Como exportada | No | Sobre 6 postes; bridas |
-| `electronica_poste_medio.stl` | B | 6 | ASA | Como exportada | No | M3: PENDIENTE DE CONFIRMAR |
-| `electronica_bandeja_sdr2.stl` | B | 1 | ASA, 40 % | Como exportada | No | Sobre 6 postes medios |
-| `electronica_poste_superior.stl` | B | 4 | ASA | Como exportada | No | M3: PENDIENTE DE CONFIRMAR |
-| `electronica_bandeja.stl` | B | 1 | ASA, 40 % | Como exportada | No | Pi 5: M2.5 autorroscante (agujero 2,4 mm) |
-| `electronica_soporte_dongle.stl` | B | 3 (fila de la rejilla; más en la segunda bandeja: PENDIENTE DE CONFIRMAR) | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
-| `electronica_soporte_hub.stl` | B | 1 | ASA, 40 % | Como exportada | No | Dos ranuras para bridas |
-| `electronica_soporte_sdrplay.stl` | B | 1 | ASA, 40 % | Como exportada | No | Fijación: PENDIENTE DE CONFIRMAR |
-| `electronica_soporte_lilygo.stl` | B | 1 | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
-| `electronica_soporte_rak.stl` | B | 1 | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
-| `electronica_soporte_wago.stl` | B | 1 | ASA, 40 % | Como exportada | No | Para 3 WAGO 221-415; fijación PENDIENTE DE CONFIRMAR |
-| `electronica_rejilla_ventilador.stl` | B | 2 | ASA, 30 % | Como exportada | No | Malla inox 1 mm; tornillos del ventilador a 50 mm (3,6 mm) |
-| `electronica_capota.stl` | B | 2 | ASA, 30 % | Como exportada | No | Boca hacia abajo; fijación PENDIENTE DE CONFIRMAR |
-| `electronica_tapon_n.stl` | B | Los N libres | TPU 95A | Como exportada | No | A presión en agujero de 16,2 mm: PENDIENTE DE CONFIRMAR |
-| `electronica_tapon_pg.stl` | B | Los PG libres (y el respiradero VENT) | TPU 95A | Como exportada | No | En PG7; con respiradero (membrana ePTFE) para VENT |
-| `electronica_soporte_camara.stl` | B | 1 (opcional) | ASA, 30 % | Como exportada | No | 4 × M2 autorroscantes o insertos M2 · 2 insertos M3 de collar |
-| `electronica_visera.stl` | B | 1 (opcional) | ASA, 30 % | Como exportada | No | 2 × M3 |
-| `electronica_pletina_pared.stl` | B | 2 | ASA, 60 % | Como exportada | No | M5 (longitud PENDIENTE DE CONFIRMAR) + 4 tacos |
-| `electronica_soporte_mastil.stl` | B | 2 (alternativa a la pletina) | ASA, 60 % | Como exportada | No | M5 + U M8 |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/caja_v3/render/piezas/electronica_cuerpo.png" width="90"> | `electronica_cuerpo.stl` | B | 1 | ASA | Boca arriba | No | Insertos M4 (orejas y pilares), M5 traseros; N 16,2 mm; M25, M20, PG7 |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_tapa.png" width="90"> | `electronica_tapa.stl` | B | 1 | ASA | Cara exterior sobre la cama | No | 8 × M4×16 (8 orejas en el `.scad`) |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_junta_tapa.png" width="90"> | `electronica_junta_tapa.stl` | B | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm; 4 puntos de cianoacrilato |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_tejadillo.png" width="90"> | `electronica_tejadillo.stl` | B | 1 | ASA | Como exportada | No | 4 insertos M4; M4 (longitud PENDIENTE DE CONFIRMAR) |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_placa_rejilla.png" width="90"> | `electronica_placa_rejilla.stl` | B | 1 | ASA, 40 % | Como exportada | No | Insertos M3 en cada nudo; 5 × M3 a bosses |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_poste_bandeja.png" width="90"> | `electronica_poste_bandeja.stl` | B | 6 | ASA | Como exportada | No | M3: longitud PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_bandeja_sdr.png" width="90"> | `electronica_bandeja_sdr.stl` | B | 1 | ASA, 40 % | Como exportada | No | Sobre 6 postes; bridas |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_poste_medio.png" width="90"> | `electronica_poste_medio.stl` | B | 6 | ASA | Como exportada | No | M3: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_bandeja_sdr2.png" width="90"> | `electronica_bandeja_sdr2.stl` | B | 1 | ASA, 40 % | Como exportada | No | Sobre 6 postes medios |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_poste_superior.png" width="90"> | `electronica_poste_superior.stl` | B | 4 | ASA | Como exportada | No | M3: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_bandeja.png" width="90"> | `electronica_bandeja.stl` | B | 1 | ASA, 40 % | Como exportada | No | Pi 5: M2.5 autorroscante (agujero 2,4 mm) |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_dongle.png" width="90"> | `electronica_soporte_dongle.stl` | B | 3 (fila de la rejilla; más en la segunda bandeja: PENDIENTE DE CONFIRMAR) | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_hub.png" width="90"> | `electronica_soporte_hub.stl` | B | 1 | ASA, 40 % | Como exportada | No | Dos ranuras para bridas |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_sdrplay.png" width="90"> | `electronica_soporte_sdrplay.stl` | B | 1 | ASA, 40 % | Como exportada | No | Fijación: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_lilygo.png" width="90"> | `electronica_soporte_lilygo.stl` | B | 1 | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_rak.png" width="90"> | `electronica_soporte_rak.stl` | B | 1 | ASA, 40 % | Como exportada | No | M3 o bridas: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_wago.png" width="90"> | `electronica_soporte_wago.stl` | B | 1 | ASA, 40 % | Como exportada | No | Para 3 WAGO 221-415; fijación PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_rejilla_ventilador.png" width="90"> | `electronica_rejilla_ventilador.stl` | B | 2 | ASA, 30 % | Como exportada | No | Malla inox 1 mm; tornillos del ventilador a 50 mm (3,6 mm) |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_capota.png" width="90"> | `electronica_capota.stl` | B | 2 | ASA, 30 % | Como exportada | No | Boca hacia abajo; fijación PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_tapon_n.png" width="90"> | `electronica_tapon_n.stl` | B | Los N libres | TPU 95A | Como exportada | No | A presión en agujero de 16,2 mm: PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_tapon_pg.png" width="90"> | `electronica_tapon_pg.stl` | B | Los PG libres (y el respiradero VENT) | TPU 95A | Como exportada | No | En PG7; con respiradero (membrana ePTFE) para VENT |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_camara.png" width="90"> | `electronica_soporte_camara.stl` | B | 1 (opcional) | ASA, 30 % | Como exportada | No | 4 × M2 autorroscantes o insertos M2 · 2 insertos M3 de collar |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_visera.png" width="90"> | `electronica_visera.stl` | B | 1 (opcional) | ASA, 30 % | Como exportada | No | 2 × M3 |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_pletina_pared.png" width="90"> | `electronica_pletina_pared.stl` | B | 2 | ASA, 60 % | Como exportada | No | M5 (longitud PENDIENTE DE CONFIRMAR) + 4 tacos |
+| <img src="../../hardware/caja_v3/render/piezas/electronica_soporte_mastil.png" width="90"> | `electronica_soporte_mastil.stl` | B | 2 (alternativa a la pletina) | ASA, 60 % | Como exportada | No | M5 + U M8 |
 
 **Potencia (10)**
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `potencia_cuerpo.stl` | C | 1 | ASA | Boca arriba | No | Insertos M4 (orejas y pilares), M5 traseros; PG9, M25 y PG7 VENT |
-| `potencia_tapa.stl` | C | 1 | ASA | Cara exterior sobre la cama | No | 6 × M4×16 (6 orejas en el `.scad`) |
-| `potencia_junta_tapa.stl` | C | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm |
-| `potencia_tejadillo.stl` | C | 1 | ASA | Como exportada | No | 4 insertos M4 |
-| `potencia_placa_rejilla.stl` | C | 1 | ASA, 40 % | Como exportada | No | Bosses M3 |
-| `potencia_soporte_schuko.stl` | C | 1 | ASA, 40 % | Como exportada | No | M4 a ±30 mm + 4 × M3 |
-| `potencia_brida_cargador.stl` | C | 1 | ASA, 40 % | Como exportada | No | 2 × M3 |
-| `potencia_pletina_pared.stl` | C | 2 | ASA, 60 % | Como exportada | No | M5 + 4 tacos |
-| `potencia_soporte_mastil.stl` | C | 2 (alternativa) | ASA, 60 % | Como exportada | No | M5 + U M8 |
-| `potencia_tapon_pg.stl` | C | Los PG libres | TPU 95A | Como exportada | No | A presión |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/caja_v3/render/piezas/potencia_cuerpo.png" width="90"> | `potencia_cuerpo.stl` | C | 1 | ASA | Boca arriba | No | Insertos M4 (orejas y pilares), M5 traseros; PG9, M25 y PG7 VENT |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_tapa.png" width="90"> | `potencia_tapa.stl` | C | 1 | ASA | Cara exterior sobre la cama | No | 6 × M4×16 (6 orejas en el `.scad`) |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_junta_tapa.png" width="90"> | `potencia_junta_tapa.stl` | C | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_tejadillo.png" width="90"> | `potencia_tejadillo.stl` | C | 1 | ASA | Como exportada | No | 4 insertos M4 |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_placa_rejilla.png" width="90"> | `potencia_placa_rejilla.stl` | C | 1 | ASA, 40 % | Como exportada | No | Bosses M3 |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_soporte_schuko.png" width="90"> | `potencia_soporte_schuko.stl` | C | 1 | ASA, 40 % | Como exportada | No | M4 a ±30 mm + 4 × M3 |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_brida_cargador.png" width="90"> | `potencia_brida_cargador.stl` | C | 1 | ASA, 40 % | Como exportada | No | 2 × M3 |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_pletina_pared.png" width="90"> | `potencia_pletina_pared.stl` | C | 2 | ASA, 60 % | Como exportada | No | M5 + 4 tacos |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_soporte_mastil.png" width="90"> | `potencia_soporte_mastil.stl` | C | 2 (alternativa) | ASA, 60 % | Como exportada | No | M5 + U M8 |
+| <img src="../../hardware/caja_v3/render/piezas/potencia_tapon_pg.png" width="90"> | `potencia_tapon_pg.stl` | C | Los PG libres | TPU 95A | Como exportada | No | A presión |
 
 **SAI (13)**
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `sai_cuerpo.stl` | C | 1 | ASA | Boca arriba | No | Insertos M4 y M5; PG9 ×2, PG7; ventilas superior e inferior |
-| `sai_tapa.stl` | C | 1 | ASA | Cara exterior sobre la cama | No | 8 × M4×16 (8 orejas en el `.scad`) |
-| `sai_junta_tapa.stl` | C | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm |
-| `sai_tejadillo.stl` | C | 1 | ASA | Como exportada | No | 4 insertos M4 |
-| `sai_placa_rejilla.stl` | C | 1 | ASA, 40 % | Como exportada | No | Bosses M3 |
-| `sai_soporte_bateria.stl` | C | 1 | ASA, 60 %, 6 perímetros | Como exportada | No | Correas por ventanas de correa (22 mm en el `.scad`; 20 mm en los manuales) |
-| `sai_guia_pcb.stl` | C | 2 | ASA, 50 % | Como exportada | No | M3 prisionero (ranura 2,2 mm) |
-| `sai_pletina_trafo.stl` | C | 1 | ASA, 50 % | Como exportada | No | Agujeros ranurados M5 |
-| `sai_soporte_filtro.stl` | C | 2 | ASA, 50 % | Como exportada | No | Ranuras M4 |
-| `sai_soporte_wago.stl` | C | 1 | ASA, 50 % | Como exportada | No | Fijación PENDIENTE DE CONFIRMAR |
-| `sai_pletina_pared.stl` | C | 2 | ASA, 60 % | Como exportada | No | M5 + 4 tacos |
-| `sai_soporte_mastil.stl` | C | 2 (alternativa) | ASA, 60 % | Como exportada | No | M5 + U M8 |
-| `sai_tapon_pg.stl` | C | Los PG libres | TPU 95A | Como exportada | No | A presión |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/caja_v3/render/piezas/sai_cuerpo.png" width="90"> | `sai_cuerpo.stl` | C | 1 | ASA | Boca arriba | No | Insertos M4 y M5; PG9 ×2, PG7; ventilas superior e inferior |
+| <img src="../../hardware/caja_v3/render/piezas/sai_tapa.png" width="90"> | `sai_tapa.stl` | C | 1 | ASA | Cara exterior sobre la cama | No | 8 × M4×16 (8 orejas en el `.scad`) |
+| <img src="../../hardware/caja_v3/render/piezas/sai_junta_tapa.png" width="90"> | `sai_junta_tapa.stl` | C | 1 | TPU 95A | Como exportada | No | Ranura de 5,8 mm |
+| <img src="../../hardware/caja_v3/render/piezas/sai_tejadillo.png" width="90"> | `sai_tejadillo.stl` | C | 1 | ASA | Como exportada | No | 4 insertos M4 |
+| <img src="../../hardware/caja_v3/render/piezas/sai_placa_rejilla.png" width="90"> | `sai_placa_rejilla.stl` | C | 1 | ASA, 40 % | Como exportada | No | Bosses M3 |
+| <img src="../../hardware/caja_v3/render/piezas/sai_soporte_bateria.png" width="90"> | `sai_soporte_bateria.stl` | C | 1 | ASA, 60 %, 6 perímetros | Como exportada | No | Correas por ventanas de correa (22 mm en el `.scad`; 20 mm en los manuales) |
+| <img src="../../hardware/caja_v3/render/piezas/sai_guia_pcb.png" width="90"> | `sai_guia_pcb.stl` | C | 2 | ASA, 50 % | Como exportada | No | M3 prisionero (ranura 2,2 mm) |
+| <img src="../../hardware/caja_v3/render/piezas/sai_pletina_trafo.png" width="90"> | `sai_pletina_trafo.stl` | C | 1 | ASA, 50 % | Como exportada | No | Agujeros ranurados M5 |
+| <img src="../../hardware/caja_v3/render/piezas/sai_soporte_filtro.png" width="90"> | `sai_soporte_filtro.stl` | C | 2 | ASA, 50 % | Como exportada | No | Ranuras M4 |
+| <img src="../../hardware/caja_v3/render/piezas/sai_soporte_wago.png" width="90"> | `sai_soporte_wago.stl` | C | 1 | ASA, 50 % | Como exportada | No | Fijación PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/caja_v3/render/piezas/sai_pletina_pared.png" width="90"> | `sai_pletina_pared.stl` | C | 2 | ASA, 60 % | Como exportada | No | M5 + 4 tacos |
+| <img src="../../hardware/caja_v3/render/piezas/sai_soporte_mastil.png" width="90"> | `sai_soporte_mastil.stl` | C | 2 (alternativa) | ASA, 60 % | Como exportada | No | M5 + U M8 |
+| <img src="../../hardware/caja_v3/render/piezas/sai_tapon_pg.png" width="90"> | `sai_tapon_pg.stl` | C | Los PG libres | TPU 95A | Como exportada | No | A presión |
 
 ### 2.3 Antenas (`hardware/antenas/stl/`, 30 piezas)
 
@@ -197,62 +198,62 @@ Material general: ASA o PETG blanco; fundas, junta y tapones en TPU 95A ([manual
 [13](13_DISCONES.md)). Perímetros, relleno y orientación de impresión no figuran en el `.scad`:
 se marcan **PENDIENTE DE CONFIRMAR**, salvo en las piezas con agujeros en gota.
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `quad_buje_2m.stl` | D | 2 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | No (agujeros en gota) | M3 autorroscante en varilla; 2 prisioneros M5 por buje |
-| `quad_buje_70.stl` | D | 2 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | No (agujeros en gota) | M3 autorroscante; 2 prisioneros M5 por buje |
-| `quad_puntera_8.stl` | D | 7 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre varilla Ø8 |
-| `quad_puntera_6.stl` | D | 8 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre varilla Ø6 |
-| `quad_clip_70.stl` | D | 3 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sin tornillería indicada |
-| `quad_alim_2m.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 2 insertos M3 de latón (terminales a 12 mm) |
-| `quad_alim_70.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 2 insertos M3 de latón (terminales a 12 mm) |
-| `quad_abrazadera.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | U M8 (mástil) y U M6 (boom): medidas PENDIENTE DE CONFIRMAR |
-| `discone_aislador.stl` | E | 1 por discone | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 3 insertos M4 arriba y 3 abajo |
-| `discone_plantilla_disco.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Herramienta, 12 agujeros |
-| `discone_plantilla_cono.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Herramienta, semiángulo 30° |
-| `discone_adaptador_mastil.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M4 al cubo; 2 × M6 pasantes |
-| `discone_capuchon.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre el cubo del disco, con silicona neutra ([manual 13](13_DISCONES.md)) |
-| `tapon_varilla.stl` | E | 12 | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Agujero Ø2,5 para cordino; fijación a la varilla PENDIENTE DE CONFIRMAR |
-| `adsb_base.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | SMA de panel 6,6 mm; PG7 12,7 mm; 4 agujeros de 2,8 mm |
-| `adsb_tapa.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3 + junta TPU de 1 mm |
-| `adsb_radomo.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Silicona neutra ([manual 14](14_ADSB_LNA.md)); tornillos PENDIENTE DE CONFIRMAR |
-| `mla_caja_base.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 bosses M3; PG7 |
-| `mla_caja_tapa.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3×12 inox ([manual 15](15_LAZO_MLA30.md)) |
-| `mla_junta.stl` | F | 1 | TPU 95A (1,6 mm) | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Entre base y tapa |
-| `mla_cruz.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | U M6; varillas Ø10 |
-| `mla_clip_lazo.stl` | F | 4 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Para coaxial Ø7 |
-| `gps_soporte.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 agujeros M6 (Ø6,6): tornillería PENDIENTE DE CONFIRMAR |
-| `soporte_fibra.stl` | F | 3 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | M6 (longitud PENDIENTE DE CONFIRMAR) |
-| `brazo_mastil.stl` | F | 4 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | M8 al mástil y M6 al brazo: medidas PENDIENTE DE CONFIRMAR |
-| `tapon_brazo.stl` | F | 6 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Fijación PENDIENTE DE CONFIRMAR |
-| `separador_coax.stl` | F | 15 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 1 brida (medida PENDIENTE DE CONFIRMAR); coaxial Ø7,5 |
-| `clip_filtro.stl` | F | PENDIENTE DE CONFIRMAR | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 1 brida (medida PENDIENTE DE CONFIRMAR); filtro de unos 13 × 13 mm |
-| `funda_sma.stl` | F | 6 (manual 11) | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Cinta autoamalgamante |
-| `funda_n.stl` | F | 12 (manual 11) | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Cinta autoamalgamante |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/antenas/render/piezas/quad_buje_2m.png" width="90"> | `quad_buje_2m.stl` | D | 2 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | No (agujeros en gota) | M3 autorroscante en varilla; 2 prisioneros M5 por buje |
+| <img src="../../hardware/antenas/render/piezas/quad_buje_70.png" width="90"> | `quad_buje_70.stl` | D | 2 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | No (agujeros en gota) | M3 autorroscante; 2 prisioneros M5 por buje |
+| <img src="../../hardware/antenas/render/piezas/quad_puntera_8.png" width="90"> | `quad_puntera_8.stl` | D | 7 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre varilla Ø8 |
+| <img src="../../hardware/antenas/render/piezas/quad_puntera_6.png" width="90"> | `quad_puntera_6.stl` | D | 8 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre varilla Ø6 |
+| <img src="../../hardware/antenas/render/piezas/quad_clip_70.png" width="90"> | `quad_clip_70.stl` | D | 3 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sin tornillería indicada |
+| <img src="../../hardware/antenas/render/piezas/quad_alim_2m.png" width="90"> | `quad_alim_2m.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 2 insertos M3 de latón (terminales a 12 mm) |
+| <img src="../../hardware/antenas/render/piezas/quad_alim_70.png" width="90"> | `quad_alim_70.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 2 insertos M3 de latón (terminales a 12 mm) |
+| <img src="../../hardware/antenas/render/piezas/quad_abrazadera.png" width="90"> | `quad_abrazadera.stl` | D | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | U M8 (mástil) y U M6 (boom): medidas PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/discone_aislador.png" width="90"> | `discone_aislador.stl` | E | 1 por discone | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 3 insertos M4 arriba y 3 abajo |
+| <img src="../../hardware/antenas/render/piezas/discone_plantilla_disco.png" width="90"> | `discone_plantilla_disco.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Herramienta, 12 agujeros |
+| <img src="../../hardware/antenas/render/piezas/discone_plantilla_cono.png" width="90"> | `discone_plantilla_cono.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Herramienta, semiángulo 30° |
+| <img src="../../hardware/antenas/render/piezas/discone_adaptador_mastil.png" width="90"> | `discone_adaptador_mastil.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M4 al cubo; 2 × M6 pasantes |
+| <img src="../../hardware/antenas/render/piezas/discone_capuchon.png" width="90"> | `discone_capuchon.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Sobre el cubo del disco, con silicona neutra ([manual 13](13_DISCONES.md)) |
+| <img src="../../hardware/antenas/render/piezas/tapon_varilla.png" width="90"> | `tapon_varilla.stl` | E | 12 | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Agujero Ø2,5 para cordino; fijación a la varilla PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/adsb_base.png" width="90"> | `adsb_base.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | SMA de panel 6,6 mm; PG7 12,7 mm; 4 agujeros de 2,8 mm |
+| <img src="../../hardware/antenas/render/piezas/adsb_tapa.png" width="90"> | `adsb_tapa.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3 + junta TPU de 1 mm |
+| <img src="../../hardware/antenas/render/piezas/adsb_radomo.png" width="90"> | `adsb_radomo.stl` | E | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Silicona neutra ([manual 14](14_ADSB_LNA.md)); tornillos PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/mla_caja_base.png" width="90"> | `mla_caja_base.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 bosses M3; PG7 |
+| <img src="../../hardware/antenas/render/piezas/mla_caja_tapa.png" width="90"> | `mla_caja_tapa.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3×12 inox ([manual 15](15_LAZO_MLA30.md)) |
+| <img src="../../hardware/antenas/render/piezas/mla_junta.png" width="90"> | `mla_junta.stl` | F | 1 | TPU 95A (1,6 mm) | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Entre base y tapa |
+| <img src="../../hardware/antenas/render/piezas/mla_cruz.png" width="90"> | `mla_cruz.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | U M6; varillas Ø10 |
+| <img src="../../hardware/antenas/render/piezas/mla_clip_lazo.png" width="90"> | `mla_clip_lazo.stl` | F | 4 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Para coaxial Ø7 |
+| <img src="../../hardware/antenas/render/piezas/gps_soporte.png" width="90"> | `gps_soporte.stl` | F | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 agujeros M6 (Ø6,6): tornillería PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/soporte_fibra.png" width="90"> | `soporte_fibra.stl` | F | 3 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | M6 (longitud PENDIENTE DE CONFIRMAR) |
+| <img src="../../hardware/antenas/render/piezas/brazo_mastil.png" width="90"> | `brazo_mastil.stl` | F | 4 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | M8 al mástil y M6 al brazo: medidas PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/tapon_brazo.png" width="90"> | `tapon_brazo.stl` | F | 6 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Fijación PENDIENTE DE CONFIRMAR |
+| <img src="../../hardware/antenas/render/piezas/separador_coax.png" width="90"> | `separador_coax.stl` | F | 15 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 1 brida (medida PENDIENTE DE CONFIRMAR); coaxial Ø7,5 |
+| <img src="../../hardware/antenas/render/piezas/clip_filtro.png" width="90"> | `clip_filtro.stl` | F | PENDIENTE DE CONFIRMAR | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 1 brida (medida PENDIENTE DE CONFIRMAR); filtro de unos 13 × 13 mm |
+| <img src="../../hardware/antenas/render/piezas/funda_sma.png" width="90"> | `funda_sma.stl` | F | 6 (manual 11) | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Cinta autoamalgamante |
+| <img src="../../hardware/antenas/render/piezas/funda_n.png" width="90"> | `funda_n.stl` | F | 12 (manual 11) | TPU 95A | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | Cinta autoamalgamante |
 
 ### 2.4 Anclajes (`hardware/anclajes/stl/`, 16 piezas)
 
 Material: ASA o PETG blanco ([manual 21](21_ANCLAJES.md)). Cada cruceta lleva 4 × M6×50 (lado mástil) o M6×40
 (boom, fibra, tubo), 4 tuercas M6, 4 arandelas y 2 tornillos autotaladrantes de 4,8 × 19 mm.
 
-| Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
-|---|---|---|---|---|---|---|
-| `cruceta_mastil_brazo_cuerpo.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 (11,3 × 5,4 mm) |
-| `cruceta_mastil_brazo_tapa_mastil.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 2 × M6×50 + 2 arandelas + 1 autotaladrante 4,8 × 19 |
-| `cruceta_mastil_brazo_tapa_brazo.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + 2 arandelas + 1 autotaladrante 4,8 × 19 |
-| `cruceta_mastil_quad_cuerpo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
-| `cruceta_mastil_quad_tapa_mastil.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×50 + autotaladrante |
-| `cruceta_mastil_quad_tapa_boom.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
-| `cruceta_brazo_fibra_cuerpo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
-| `cruceta_brazo_fibra_tapa_brazo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
-| `cruceta_brazo_fibra_tapa_fibra.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
-| `cruceta_brazo_tubo_cuerpo.stl` | G | 5 según uso (manual 21: ADS-B, 2 Bigsignal y 2 sensores de viento) | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
-| `cruceta_brazo_tubo_tapa.stl` | G | 2 por cuerpo | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
-| `adsb_tapa_tubo.stl` | G | 1 (alternativa a `adsb_tapa`) | ASA / PETG blanco | Volteada, brida sobre la cama | No | 4 × M3×12 + 2 prisioneros M5 |
-| `sensor_viento_brida.stl` | H | 2 | ASA / PETG blanco | Volteada | No | Patrón A: 4 tuercas M5 (Ø9,4); patrón B: 4 tuercas M4 (Ø8,1); 2 prisioneros M5 |
-| `pluvio_vaso.stl` | H | 1 | ASA / PETG blanco | Volteado | No | 3 insertos M5; 2 prisioneros M5 |
-| `pluvio_plataforma.stl` | H | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 3 × M5×40 con muelles; 3 × M3 en ranuras |
-| `pico_soporte.stl` | H | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3×8; 8 × M2×6 |
+| Vista | Archivo | Grupo | Cant. | Material | Orientación | Soportes | Tornillería / insertos / juntas |
+|---|---|---|---|---|---|---|---|
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_brazo_cuerpo.png" width="90"> | `cruceta_mastil_brazo_cuerpo.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 (11,3 × 5,4 mm) |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_brazo_tapa_mastil.png" width="90"> | `cruceta_mastil_brazo_tapa_mastil.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 2 × M6×50 + 2 arandelas + 1 autotaladrante 4,8 × 19 |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_brazo_tapa_brazo.png" width="90"> | `cruceta_mastil_brazo_tapa_brazo.stl` | G | 3 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + 2 arandelas + 1 autotaladrante 4,8 × 19 |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_quad_cuerpo.png" width="90"> | `cruceta_mastil_quad_cuerpo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_quad_tapa_mastil.png" width="90"> | `cruceta_mastil_quad_tapa_mastil.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×50 + autotaladrante |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_mastil_quad_tapa_boom.png" width="90"> | `cruceta_mastil_quad_tapa_boom.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_brazo_fibra_cuerpo.png" width="90"> | `cruceta_brazo_fibra_cuerpo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_brazo_fibra_tapa_brazo.png" width="90"> | `cruceta_brazo_fibra_tapa_brazo.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_brazo_fibra_tapa_fibra.png" width="90"> | `cruceta_brazo_fibra_tapa_fibra.stl` | G | 1 | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_brazo_tubo_cuerpo.png" width="90"> | `cruceta_brazo_tubo_cuerpo.stl` | G | 5 según uso (manual 21: ADS-B, 2 Bigsignal y 2 sensores de viento) | ASA / PETG blanco | Como exportada | No | 4 tuercas hex M6 |
+| <img src="../../hardware/anclajes/render/piezas/cruceta_brazo_tubo_tapa.png" width="90"> | `cruceta_brazo_tubo_tapa.stl` | G | 2 por cuerpo | ASA / PETG blanco | Como exportada | No | 2 × M6×40 + autotaladrante |
+| <img src="../../hardware/anclajes/render/piezas/adsb_tapa_tubo.png" width="90"> | `adsb_tapa_tubo.stl` | G | 1 (alternativa a `adsb_tapa`) | ASA / PETG blanco | Volteada, brida sobre la cama | No | 4 × M3×12 + 2 prisioneros M5 |
+| <img src="../../hardware/anclajes/render/piezas/sensor_viento_brida.png" width="90"> | `sensor_viento_brida.stl` | H | 2 | ASA / PETG blanco | Volteada | No | Patrón A: 4 tuercas M5 (Ø9,4); patrón B: 4 tuercas M4 (Ø8,1); 2 prisioneros M5 |
+| <img src="../../hardware/anclajes/render/piezas/pluvio_vaso.png" width="90"> | `pluvio_vaso.stl` | H | 1 | ASA / PETG blanco | Volteado | No | 3 insertos M5; 2 prisioneros M5 |
+| <img src="../../hardware/anclajes/render/piezas/pluvio_plataforma.png" width="90"> | `pluvio_plataforma.stl` | H | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 3 × M5×40 con muelles; 3 × M3 en ranuras |
+| <img src="../../hardware/anclajes/render/piezas/pico_soporte.png" width="90"> | `pico_soporte.stl` | H | 1 | ASA / PETG blanco | PENDIENTE DE CONFIRMAR | PENDIENTE DE CONFIRMAR | 4 × M3×8; 8 × M2×6 |
 
 ## 3. Convenciones comunes de montaje
 
@@ -302,6 +303,20 @@ Piezas sueltas: [tapa interior](../../hardware/caja/render/tapa_interior.png),
 
 Medidas: 224 × 232 × 90 mm, pared de 3,2 mm, tapa de 4 mm.
 
+**Despieces (antes de empezar)**
+
+![Despiece de la caja v2](../../hardware/caja/render/montaje/vista_despiece_caja_v2.png)
+
+*Caja v2: `tapa` y `junta_tapa` bajan sobre las orejas del `cuerpo` (eje de la tapa, 8 × M4 a los insertos); `placa_electronica`, `placa_potencia` y `tapa_potencia` entran por la boca a sus bosses (4 × M3 cada una); los 2 `soporte_mastil` se atornillan por detrás al `cuerpo` y el `tejadillo` sube sobre los 4 pilares.*
+
+![Despiece de la cámara de la caja v2](../../hardware/caja/render/montaje/vista_despiece_caja_v2_camara.png)
+
+*Cámara: `junta_ventana` y policarbonato se apoyan contra la ventana desde dentro; `soporte_camara` los presiona con 2 × M3 hacia los insertos del `cuerpo`; la `visera` se cierra por fuera con 2 × M3 en sentido opuesto.*
+
+![Despiece de la garita](../../hardware/caja/render/montaje/vista_despiece_garita.png)
+
+*Garita: `garita_base`, 6 × `garita_plato` y `garita_tapa` se apilan en vertical sobre las 3 varillas M4×140 y se cierran con tuercas ciegas.*
+
 > **Cámara.** El `.scad` y el [manual 10](10_CAJA_3D.md) de la caja v2 modelan la WPI408 (OV5647 con dos LED IR):
 > ventana de 76 × 26 mm en (160, 196), policarbonato de 86 × 36 × 2 mm y espuma de 1 mm contra las placas IR.
 > El kit público usa la **Raspberry Pi Camera Module 3 Wide** (IMX708, sin IR). Si se ajusta `soporte_camara`
@@ -339,6 +354,20 @@ Los pasos 1 a 17 corresponden a los 9 pasos del diagrama: 1→1; 2→2; 3-4→3;
 - La cámara ve a través de la ventana sin reflejos.
 - Cada SMA tiene su etiqueta y su latiguillo; los PG no tienen holgura.
 
+**Montaje terminado**
+
+![Caja v2 montada](../../hardware/caja/render/montaje/vista_montado_caja_v2.png)
+
+*Caja v2 cerrada: tapa y junta asentadas sobre las orejas, placas en sus bosses, soportes de mástil y tejadillo en su sitio.*
+
+![Cámara de la caja v2 montada](../../hardware/caja/render/montaje/vista_montado_caja_v2_camara.png)
+
+*Cámara montada: junta y policarbonato entre el soporte y la ventana; visera por fuera.*
+
+![Garita montada](../../hardware/caja/render/montaje/vista_montado_garita.png)
+
+*Garita montada: platos apilados entre la base y la tapa sobre las varillas.*
+
 **Errores frecuentes.**
 - Apretar de más los 8 × M4×12 y deformar la tapa.
 - Olvidar la junta tórica de un SMA.
@@ -357,6 +386,32 @@ Referencias: [manual 17](17_CAJA_V3.md), [ventilación](18_VENTILACION.md),
 [bandeja SDR 2](../../hardware/caja_v3/render/electronica_bandeja_sdr2.png).
 
 Medidas: 228 × 240 × 192 mm, pared de 4,8 mm, tapa de 5,2 mm.
+
+**Despieces (antes de empezar)**
+
+![Despiece de la caja v3 electrónica](../../hardware/caja_v3/render/montaje/vista_despiece_v3_electronica.png)
+
+*Cuerpo, junta y tapa: `electronica_junta_tapa` entra en la ranura de la tapa y la tapa baja sobre las orejas del `electronica_cuerpo` (8 × M4×16); el `electronica_tejadillo` sube sobre sus pilares y la `electronica_placa_rejilla` entra por la boca a sus bosses (5 × M3).*
+
+![Despiece de postes y bandejas](../../hardware/caja_v3/render/montaje/vista_despiece_v3_postes_bandejas.png)
+
+*Postes y bandejas: los postes se atornillan a la rejilla en vertical y cada bandeja (`bandeja_sdr`, `bandeja_sdr2`, `bandeja`) baja sobre sus postes.*
+
+![Despiece de los soportes](../../hardware/caja_v3/render/montaje/vista_despiece_v3_soportes.png)
+
+*Soportes: `soporte_dongle`, `soporte_hub` y `soporte_wago` bajan sobre la rejilla con M3 (otros soportes, `soporte_sdrplay`, `soporte_lilygo` y `soporte_rak`, se fijan igual: fijación PENDIENTE DE CONFIRMAR).*
+
+![Despiece de la ventilación](../../hardware/caja_v3/render/montaje/vista_despiece_v3_ventilacion.png)
+
+*Ventilación: la `electronica_rejilla_ventilador` entra por dentro de la pared con el ventilador y la `electronica_capota` se coloca por fuera con la boca hacia abajo.*
+
+![Despiece de la cámara](../../hardware/caja_v3/render/montaje/vista_despiece_v3_camara.png)
+
+*Cámara (opcional): el cristal se apoya en el cajeado exterior, `electronica_soporte_camara` sujeta el módulo por dentro y la `electronica_visera` se cierra por fuera con 2 × M3.*
+
+![Despiece de los tapones](../../hardware/caja_v3/render/montaje/vista_despiece_v3_tapones.png)
+
+*Tapones: `electronica_tapon_n` y `electronica_tapon_pg` entran a presión desde fuera en los agujeros libres.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -394,6 +449,32 @@ Medidas: 228 × 240 × 192 mm, pared de 4,8 mm, tapa de 5,2 mm.
 **Comprobación.** `sudo bricohams-check`; los dos ventiladores giran y el aire entra por la izquierda y sale por la
 derecha; prueba de manguera de 2 minutos con todo cerrado ([manual 17](17_CAJA_V3.md)).
 
+**Montaje terminado**
+
+![Caja v3 electrónica montada](../../hardware/caja_v3/render/montaje/vista_montado_v3_electronica.png)
+
+*Caja cerrada con junta, tapa, tejadillo y rejilla en su posición.*
+
+![Postes y bandejas montados](../../hardware/caja_v3/render/montaje/vista_montado_v3_postes_bandejas.png)
+
+*Postes y bandejas apilados sobre la rejilla.*
+
+![Soportes montados](../../hardware/caja_v3/render/montaje/vista_montado_v3_soportes.png)
+
+*Soportes de dongle, hub y WAGO sobre la rejilla.*
+
+![Ventilación montada](../../hardware/caja_v3/render/montaje/vista_montado_v3_ventilacion.png)
+
+*Rejilla de ventilador y capota en la pared.*
+
+![Cámara montada](../../hardware/caja_v3/render/montaje/vista_montado_v3_camara.png)
+
+*Soporte, cristal y visera de la cámara montados.*
+
+![Tapones montados](../../hardware/caja_v3/render/montaje/vista_montado_v3_tapones.png)
+
+*Tapones asentados en sus agujeros.*
+
 **Errores frecuentes.**
 - Ventilador invertido (entra por donde debe salir).
 - Capota con la boca hacia arriba: entra agua.
@@ -409,6 +490,16 @@ Referencias: [potencia, montaje](../../hardware/caja_v3/render/potencia_montaje.
 [interior](../../hardware/caja_v3/render/sai_interior.png). Medidas: potencia 170 × 200 × 112 mm; SAI 228 × 240 × 140 mm.
 
 ⚠ SAI desenchufado, batería desconectada y 5 minutos de espera. No modifiques la placa del SAI.
+
+**Despieces (antes de empezar)**
+
+![Despiece de la caja v3 potencia](../../hardware/caja_v3/render/montaje/vista_despiece_v3_potencia.png)
+
+*Potencia: `potencia_placa_rejilla` entra por la boca a los bosses del `potencia_cuerpo`; `potencia_soporte_schuko` y `potencia_brida_cargador` bajan sobre la rejilla con M3; `potencia_junta_tapa` y `potencia_tapa` cierran en cruz y el `potencia_tejadillo` sube sobre sus pilares.*
+
+![Despiece de la caja v3 SAI](../../hardware/caja_v3/render/montaje/vista_despiece_v3_sai.png)
+
+*SAI: `sai_soporte_bateria`, `sai_guia_pcb`, `sai_pletina_trafo`, `sai_soporte_filtro` y `sai_soporte_wago` bajan en vertical sobre la `sai_placa_rejilla`; después se cierran `sai_junta_tapa` y `sai_tapa`.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -442,6 +533,16 @@ Referencias: [potencia, montaje](../../hardware/caja_v3/render/potencia_montaje.
 - PE conectado a los filtros EMI y continuidad comprobada.
 - Prueba de manguera de 2 minutos ([manual 17](17_CAJA_V3.md)).
 
+**Montaje terminado**
+
+![Caja v3 potencia montada](../../hardware/caja_v3/render/montaje/vista_montado_v3_potencia.png)
+
+*Potencia con Schuko, brida del cargador, junta y tapa montados.*
+
+![Caja v3 SAI montada](../../hardware/caja_v3/render/montaje/vista_montado_v3_sai.png)
+
+*SAI con soportes, guías, pletina y WAGO asentados sobre la rejilla.*
+
 **Errores frecuentes.**
 - Tapar las ventilas del SAI.
 - Poner el fusible lejos del borne de la batería.
@@ -452,6 +553,20 @@ Referencias: [potencia, montaje](../../hardware/caja_v3/render/potencia_montaje.
 ![Diagrama de montaje del quad](../esquemas/34_montaje_quad.svg)
 
 Referencias: [manual 12](12_QUAD_2M70.md) y [piezas de antenas](../../hardware/antenas/render/piezas.png).
+
+**Despieces (antes de empezar)**
+
+![Despiece de los bujes del quad](../../hardware/antenas/render/montaje/vista_despiece_quad_buje.png)
+
+*Bujes: cada `quad_buje_*` se desliza por el boom en vertical y se fija con 2 prisioneros M5; las 4 varillas entran en horizontal por los agujeros del buje (M3 autorroscante) y llevan su puntera (y clip en 70 cm) en el extremo.*
+
+![Despiece de los alimentadores](../../hardware/antenas/render/montaje/vista_despiece_quad_alimentacion.png)
+
+*Alimentadores: la varilla entra en el bloque de `quad_alim_2m` / `quad_alim_70` y los 2 insertos M3 reciben los terminales desde arriba.*
+
+![Despiece de la abrazadera del quad](../../hardware/antenas/render/montaje/vista_despiece_quad_abrazadera.png)
+
+*Abrazadera: el boom cuadrado se aloja en la ranura superior (U M6 hacia abajo) y el mástil en el canal inferior (U M8 hacia arriba), con las tuercas en el lado contrario.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -473,6 +588,20 @@ Alternativa del [manual 21](21_ANCLAJES.md): `cruceta_mastil_quad` en lugar de `
 
 **Comprobación.** Mide con NanoVNA antes de izar ([manual 12](12_QUAD_2M70.md), [45](45_NANOVNA.md)); el boom no gira en la abrazadera.
 
+**Montaje terminado**
+
+![Bujes montados](../../hardware/antenas/render/montaje/vista_montado_quad_buje.png)
+
+*Bujes en el boom con varillas, punteras y clips colocados.*
+
+![Alimentadores montados](../../hardware/antenas/render/montaje/vista_montado_quad_alimentacion.png)
+
+*Alimentadores con la varilla pasante y los tornillos de los terminales.*
+
+![Abrazadera montada](../../hardware/antenas/render/montaje/vista_montado_quad_abrazadera.png)
+
+*Abrazadera cerrada sobre el mástil y el boom.*
+
 **Errores frecuentes.**
 - Mezclar los bujes de 2 m y de 70 cm.
 - Orientar el boom mal (rumbo 205°).
@@ -483,6 +612,20 @@ Alternativa del [manual 21](21_ANCLAJES.md): `cruceta_mastil_quad` en lugar de `
 ![Diagrama de montaje de discone y ADS-B](../esquemas/35_montaje_discone_adsb.svg)
 
 Referencias: [manual 13](13_DISCONES.md), [manual 14](14_ADSB_LNA.md) y [piezas de antenas](../../hardware/antenas/render/piezas.png).
+
+**Despieces (antes de empezar)**
+
+![Despiece del discone](../../hardware/antenas/render/montaje/vista_despiece_discone.png)
+
+*Discone, de abajo arriba sobre el eje del mástil: `discone_adaptador_mastil` (2 × M6 pasantes al mástil), cubo del cono, `discone_aislador` (3 × M4 arriba y abajo), cubo del disco y `discone_capuchon`.*
+
+![Despiece de las plantillas](../../hardware/antenas/render/montaje/vista_despiece_discone_plantillas.png)
+
+*Plantillas: el cubo de aluminio se apoya sobre `discone_plantilla_disco` y `discone_plantilla_cono` para roscar las varillas con el espaciado correcto.*
+
+![Despiece del ADS-B](../../hardware/antenas/render/montaje/vista_despiece_adsb.png)
+
+*ADS-B: `adsb_tapa` sube desde abajo (4 × M3), `adsb_radomo` baja desde arriba sobre la torreta de `adsb_base`, y el elemento y los radiales de latón entran por arriba.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -505,6 +648,20 @@ Alternativa para sujetar el ADS-B a un tubo: `adsb_tapa_tubo` ([grupo G](#10-gru
 **Comprobación.** Varillas con el espaciado de la plantilla; M6 del adaptador apretados sin ovalar el mástil; LNA alimentado solo tras
 verificar tensión y sentido ([manual 14](14_ADSB_LNA.md)).
 
+**Montaje terminado**
+
+![Discone montado](../../hardware/antenas/render/montaje/vista_montado_discone.png)
+
+*Discone ensamblado sobre el mástil.*
+
+![Plantillas montadas](../../hardware/antenas/render/montaje/vista_montado_discone_plantillas.png)
+
+*Cubos asentados en las plantillas.*
+
+![ADS-B montado](../../hardware/antenas/render/montaje/vista_montado_adsb.png)
+
+*ADS-B cerrado con tapa y radomo.*
+
 **Errores frecuentes.**
 - Varillas desiguales en el disco.
 - Faltan tapones.
@@ -515,6 +672,32 @@ verificar tensión y sentido ([manual 14](14_ADSB_LNA.md)).
 ![Diagrama de montaje de MLA, GPS y accesorios](../esquemas/36_montaje_mla_gps.svg)
 
 Referencias: [manual 15](15_LAZO_MLA30.md), [manual 11](11_MASTIL_Y_ANTENAS.md) y [piezas de antenas](../../hardware/antenas/render/piezas.png).
+
+**Despieces (antes de empezar)**
+
+![Despiece de la caja MLA](../../hardware/antenas/render/montaje/vista_despiece_mla.png)
+
+*Caja MLA: `mla_junta` se apoya sobre `mla_caja_base` y `mla_caja_tapa` baja (girada 180°) con 4 × M3×12 hacia los insertos de las esquinas.*
+
+![Despiece de la cruz MLA](../../hardware/antenas/render/montaje/vista_despiece_mla_cruz.png)
+
+*Cruz MLA: las 4 varillas entran en horizontal por los agujeros de `mla_cruz` (autorroscante desde arriba) y cada `mla_clip_lazo` se coloca en su extremo; la U M6 la sujeta al poste.*
+
+![Despiece del GPS](../../hardware/antenas/render/montaje/vista_despiece_gps.png)
+
+*GPS: `gps_soporte` se apoya sobre el brazo con 2 U M6 (tuercas arriba) y el puck se encaja desde arriba.*
+
+![Despiece del soporte de fibra](../../hardware/antenas/render/montaje/vista_despiece_soporte_fibra.png)
+
+*Fibra 433: `soporte_fibra` abraza el brazo Ø25 y la fibra con U M6 cuyas tuercas se aprietan por el lado opuesto.*
+
+![Despiece del brazo del mástil](../../hardware/antenas/render/montaje/vista_despiece_brazo_mastil.png)
+
+*Brazo: `brazo_mastil` une el mástil (U M8 hacia arriba) y el brazo (U M6 hacia abajo); `tapon_brazo` entra en el extremo del brazo en sentido horizontal.*
+
+![Despiece de fundas y accesorios](../../hardware/antenas/render/montaje/vista_despiece_fundas_tapones.png)
+
+*Accesorios: las fundas (`funda_sma`, `funda_n`) se deslizan sobre el cable; `clip_filtro` recibe el filtro; el coaxial entra en `separador_coax` por la ranura; `tapon_varilla` cubre la punta de la varilla.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -535,6 +718,32 @@ Referencias: [manual 15](15_LAZO_MLA30.md), [manual 11](11_MASTIL_Y_ANTENAS.md) 
 
 **Comprobación.** Junta de la MLA asentada y sin pellizcos; fundas sin burbujas; coaxial a 30 mm del mástil.
 
+**Montaje terminado**
+
+![Caja MLA montada](../../hardware/antenas/render/montaje/vista_montado_mla.png)
+
+*Caja MLA cerrada con junta y tapa.*
+
+![Cruz MLA montada](../../hardware/antenas/render/montaje/vista_montado_mla_cruz.png)
+
+*Cruz con varillas y clips de lazo.*
+
+![GPS montado](../../hardware/antenas/render/montaje/vista_montado_gps.png)
+
+*GPS sobre el brazo.*
+
+![Soporte de fibra montado](../../hardware/antenas/render/montaje/vista_montado_soporte_fibra.png)
+
+*Soporte de fibra cerrado.*
+
+![Brazo del mástil montado](../../hardware/antenas/render/montaje/vista_montado_brazo_mastil.png)
+
+*Brazo montado con su tapón.*
+
+![Fundas y accesorios montados](../../hardware/antenas/render/montaje/vista_montado_fundas_tapones.png)
+
+*Accesorios colocados en su sitio.*
+
 **Errores frecuentes.**
 - Usar poste metálico para la MLA.
 - Funda sin cinta.
@@ -553,6 +762,24 @@ Existen cuatro familias:
 - `cruceta_brazo_tubo` (brazo ↔ tubo), 5 según el manual 21.
 
 Cada cruceta se compone de un cuerpo y dos tapas. La tapa A abraza el tubo superior; la tapa B, el inferior.
+
+**Despieces (antes de empezar)**
+
+![Despiece cruceta mástil-brazo](../../hardware/anclajes/render/montaje/vista_despiece_cruceta_mastil_brazo.png)
+
+*Mástil ↔ brazo: la tapa del brazo baja en vertical desde arriba y la del mástil sube desde abajo hacia el cuerpo; los M6 atraviesan el cuerpo hasta las tuercas cautivas.*
+
+![Despiece cruceta mástil-quad](../../hardware/anclajes/render/montaje/vista_despiece_cruceta_mastil_quad.png)
+
+*Mástil ↔ quad: igual, con el boom cuadrado en el canal superior.*
+
+![Despiece cruceta brazo-fibra](../../hardware/anclajes/render/montaje/vista_despiece_cruceta_brazo_fibra.png)
+
+*Brazo ↔ fibra: tapa de la fibra arriba, tapa del brazo abajo; M6 y antigiro en el mismo sentido.*
+
+![Despiece cruceta brazo-tubo](../../hardware/anclajes/render/montaje/vista_despiece_cruceta_brazo_tubo.png)
+
+*Brazo ↔ tubo: la misma tapa sirve arriba y abajo.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -578,6 +805,24 @@ La alternativa `adsb_tapa_tubo` (impresa volteada, brida sobre la cama) sustituy
 
 **Comprobación.** El conjunto no gira ni resbala por el tubo; la separación entre tapa y cuerpo es de unos 1 mm (apriete de diseño); los autotaladrantes no atraviesan el tubo.
 
+**Montaje terminado**
+
+![Cruceta mástil-brazo montada](../../hardware/anclajes/render/montaje/vista_montado_cruceta_mastil_brazo.png)
+
+*Mástil ↔ brazo cerrada.*
+
+![Cruceta mástil-quad montada](../../hardware/anclajes/render/montaje/vista_montado_cruceta_mastil_quad.png)
+
+*Mástil ↔ quad cerrada.*
+
+![Cruceta brazo-fibra montada](../../hardware/anclajes/render/montaje/vista_montado_cruceta_brazo_fibra.png)
+
+*Brazo ↔ fibra cerrada.*
+
+![Cruceta brazo-tubo montada](../../hardware/anclajes/render/montaje/vista_montado_cruceta_brazo_tubo.png)
+
+*Brazo ↔ tubo cerrada.*
+
 **Errores frecuentes.**
 - Tuercas olvidadas o giradas.
 - Tapas intercambiadas (la de mástil lleva M6×50).
@@ -588,6 +833,24 @@ La alternativa `adsb_tapa_tubo` (impresa volteada, brida sobre la cama) sustituy
 ![Diagrama de montaje de sensores y Pico](../esquemas/38_montaje_sensores_pico.svg)
 
 Referencias: manuales [19](19_VIENTO_Y_LLUVIA.md), [20](20_PICO_IO.md) y [21](21_ANCLAJES.md); [esquema 16 del Pico](../esquemas/16_pico_io.png).
+
+**Despieces (antes de empezar)**
+
+![Despiece del sensor de viento](../../hardware/anclajes/render/montaje/vista_despiece_viento.png)
+
+*Viento: `sensor_viento_brida` baja sobre el tubo Ø25 (2 prisioneros M5) y el sensor se atornilla desde arriba con 4 tornillos a las tuercas de la brida.*
+
+![Despiece del pluviómetro](../../hardware/anclajes/render/montaje/vista_despiece_pluviometro.png)
+
+*Pluviómetro: `pluvio_vaso` baja sobre el poste Ø40 (2 prisioneros M5) y `pluvio_plataforma` se apoya encima con 3 × M5×40 y muelles que bajan a los insertos.*
+
+![Despiece del Pico](../../hardware/anclajes/render/montaje/vista_despiece_pico.png)
+
+*Pico: el Pico y la placa perforada bajan sobre los postes de `pico_soporte` (M2 desde arriba) y el soporte se fija a la rejilla de la caja con 4 × M3 desde abajo.*
+
+![Despiece del ADS-B en tubo](../../hardware/anclajes/render/montaje/vista_despiece_adsb_tubo.png)
+
+*ADS-B en tubo: `adsb_tapa_tubo` baja sobre el tubo Ø25 (2 prisioneros M5); la base de la antena se atornilla a la tapa con 4 × M3 desde arriba.*
 
 | Paso | Acción | Piezas | Tornillería / consumibles |
 |---|---|---|---|
@@ -606,6 +869,24 @@ Referencias: manuales [19](19_VIENTO_Y_LLUVIA.md), [20](20_PICO_IO.md) y [21](21
 ⚠ Los pines del Pico **no toleran 5 V**. Revisa el cableado con el [esquema 16](../esquemas/16_pico_io.png) y el [manual 20](20_PICO_IO.md).
 
 **Comprobación.** La marca N apunta al norte geográfico; la plataforma queda nivelada; `sudo bricohams-check` ve los sensores.
+
+**Montaje terminado**
+
+![Sensor de viento montado](../../hardware/anclajes/render/montaje/vista_montado_viento.png)
+
+*Brida sobre el tubo con el sensor atornillado.*
+
+![Pluviómetro montado](../../hardware/anclajes/render/montaje/vista_montado_pluviometro.png)
+
+*Vaso y plataforma nivelable sobre el poste.*
+
+![Pico montado](../../hardware/anclajes/render/montaje/vista_montado_pico.png)
+
+*Pico y placa perforada sobre su soporte.*
+
+![ADS-B en tubo montado](../../hardware/anclajes/render/montaje/vista_montado_adsb_tubo.png)
+
+*Antena ADS-B atornillada a su tapa en el tubo.*
 
 **Errores frecuentes.**
 - Mezclar patrones A y B de la brida.
@@ -668,3 +949,15 @@ Orden de montaje final ([manual 11](11_MASTIL_Y_ANTENAS.md)):
 - Diámetro del mástil del `soporte_mastil` de la v3 (`MAST_D` 50 en el `.scad`, «PENDIENTE de medir»).
 - Medida de la membrana ePTFE del respiradero VENT.
 - Ventanas de correa del `sai_soporte_bateria` (22 mm en el `.scad`, 20 mm en los manuales).
+
+## 15. Cómo regenerar las imágenes
+
+Las imágenes de `hardware/<grupo>/render/piezas/` (una por pieza) y `hardware/<grupo>/render/montaje/` (despieces `vista_despiece_*` y montajes `vista_montado_*`) se generan desde los `.scad` con OpenSCAD:
+
+```bash
+tools/render_montaje.sh            # todos los grupos
+tools/render_montaje.sh anclajes   # solo un grupo (caja, caja_v3, antenas, anclajes)
+OPENSCAD=/ruta/a/openscad tools/render_montaje.sh
+```
+
+Las vistas son solo de documentación: no modifican los STL exportados.

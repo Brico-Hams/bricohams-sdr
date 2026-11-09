@@ -556,3 +556,97 @@ else if (PART == "pasamuros_usb") pasamuros_usb();
 else if (PART == "garita_base") garita_base();
 else if (PART == "garita_plato") garita_plato();
 else if (PART == "garita_tapa") garita_tapa();
+// vistas de documentación (solo para render del manual 52; no afectan a los STL)
+else if (PART == "vista_despiece_caja_v2") v_caja2(V_EX);
+else if (PART == "vista_montado_caja_v2") v_caja2(0);
+else if (PART == "vista_despiece_caja_v2_camara") v_camara2(V_EX);
+else if (PART == "vista_montado_caja_v2_camara") v_camara2(0);
+else if (PART == "vista_despiece_garita") v_garita(V_EX);
+else if (PART == "vista_montado_garita") v_garita(0);
+
+// ---------------- VISTAS DE DOCUMENTACIÓN (solo lectura) ----------------
+V_ORANGE = "#F26B1D"; V_INK = "#23272B"; V_GREY = "#59636B"; V_LIGHT = "#C9CED3";
+V_EX = 50;          // separación del despiece (mm)
+function v_dir(a) = a == "x" ? [1, 0, 0] : a == "-x" ? [-1, 0, 0] : a == "y" ? [0, 1, 0] : a == "-y" ? [0, -1, 0] : a == "-z" ? [0, 0, -1] : [0, 0, 1];
+function v_rot(a) = a == "x" ? [0, 90, 0] : a == "-x" ? [0, -90, 0] : a == "y" ? [-90, 0, 0] : a == "-y" ? [90, 0, 0] : a == "-z" ? [180, 0, 0] : [0, 0, 0];
+// línea guía fina entre dos puntos
+module v_guia(a, b, d = 0.8) { color("dimgray") hull() { translate(a) sphere(d = d, $fn = 8); translate(b) sphere(d = d, $fn = 8); } }
+// tornillo: la punta queda en mate + off·out; el cuerpo y la cabeza se extienden hacia «out»
+module v_scr(mate, out, L, d, off = 0, head = true) {
+    p = mate + v_dir(out) * off;
+    color("silver") translate(p) rotate(v_rot(out)) {
+        cylinder(d = d, h = L, $fn = 16);
+        if (head) translate([0, 0, L]) cylinder(d = 1.75 * d, h = 0.8 * d, $fn = 24);
+    }
+    if (off > 0) v_guia(mate, p);
+}
+module v_nut(p, d, h) { color("silver") translate(p) rotate(30) cylinder(d = d, h = h, $fn = 6); }
+// tubo fantasma centrado en p con eje ax
+module v_tube(p, ax, d, l) { color("silver", 0.35) translate(p) rotate(v_rot(ax)) translate([0, 0, -l / 2]) cylinder(d = d - 0.6, h = l, $fn = 48); }
+
+// caja v2 completa: cuerpo, junta, tapa, placas, tapa interior, tejadillo, sillas de mástil y pasamuros
+module v_caja2(ex) {
+    sj = 0.5 * ex; sl = ex; sp = 0.3 * ex; sc = 0.7 * ex; sr = 0.5 * ex; sm = 0.5 * ex; sv = 1.3 * ex; sg = 0.8 * ex;
+    pz = T + STANDOFF + PLATE_T;
+    color(V_ORANGE) cuerpo();
+    color(V_INK) translate([0, 0, LID_Z0 - GASKET_H + sj]) junta_tapa();
+    color(V_GREY) translate([0, 0, sl]) tapa();
+    color(V_INK) translate([CAM_C[0], CAM_C[1], LID_Z0 + LID_T + sv]) visera();
+    color("darkseagreen") translate([PE[0], PE[1], T + STANDOFF + sp]) placa_electronica();
+    color("darkseagreen") translate([PP[0], PP[1], T + STANDOFF + sp]) placa_potencia();
+    color(V_LIGHT) translate([T + 0.5, T + 0.5, CP_Z + sc]) tapa_potencia();
+    color(V_GREY) translate([W + 8, H + sr, -2]) rotate([90, 0, 180]) tejadillo();
+    for (yc = MAST_Y) color(V_LIGHT) translate([W / 2, yc, -sm]) mirror([0, 0, 1]) soporte_mastil();
+    v_tube([W / 2, H / 2 + 20, -BRK_Z - MAST_OFF - sm], "y", MAST_D, H + 160);
+    color(V_INK) multmatrix([[0, 0, 1, XP - 1.5 - 1.6 - sg], [1, 0, 0, GROM_Y + GROM[0] / 2], [0, 1, 0, GROM_Z + GROM[1] / 2], [0, 0, 0, 1]]) pasamuros_usb();
+    // junta <-> ranura de la tapa
+    if (ex > 0) for (q = [[W / 2, T / 2], [W / 2, H - T / 2], [T / 2, H / 2], [W - T / 2, H / 2]])
+        v_guia([q[0], q[1], D], [q[0], q[1], LID_Z0 + sl - RIB_H]);
+    // tapa: M4 × 12 a las orejetas
+    for (y = EARS_Y, xs = [-1, 1]) {
+        x = xs < 0 ? -EAR_L / 2 - 0.5 : W + EAR_L / 2 + 0.5;
+        v_scr([x, y, LID_Z0 + LID_T - 12], "z", 12, 4, ex > 0 ? sl + 22 : 0);
+    }
+    // placas: M3 × 8 a los pilares
+    for (b = PE_BOSS) v_scr([PE[0] + b[0], PE[1] + b[1], pz - 8], "z", 8, 3, ex > 0 ? 18 + sp : 0);
+    for (b = PP_BOSS) v_scr([PP[0] + b[0], PP[1] + b[1], pz - 8], "z", 8, 3, ex > 0 ? 18 + sp : 0);
+    // tapa interior de potencia: M3 a los pilares
+    for (y = CP_BOSS_Y, x = [T + CP_BOSS_W / 2, XP - CP_BOSS_W / 2])
+        v_scr([x, y, CP_Z - INS_M3_L], "z", INS_M3_L + CP_T, 3, ex > 0 ? CP_T + sc + 16 : 0);
+    // tejadillo: M4 desde arriba (longitud derivada de la altura de cada pilar)
+    for (p = ROOF_PILLARS)
+        v_scr([p[0], H - 8.5, p[1]], "y", roof_z(p[1] + 2) + 4 + 8.5, 4, ex > 0 ? roof_z(p[1] + 2) + 4 + sr + 10 + 8.5 : 0);
+    // sillas de mástil: M4 × 20 desde atrás
+    for (yc = MAST_Y, sx = [-1, 1], sy = [-1, 1])
+        v_scr([W / 2 + sx * MAST_SCREW_DX, yc + sy * MAST_SCREW_DY, 8], "-z", 20, 4, ex > 0 ? 18 + sm + BRK_Z : 0);
+}
+
+// ventana de la cámara: tapa, junta, policarbonato, separador IR, módulo y soporte (de fuera hacia dentro)
+module v_camara2(ex) {
+    zl = LID_Z0; zs = zl - CAM_FRAME_H - CAM_MOD[2] - 3;
+    cx = CAM_C[0]; cy = CAM_C[1];
+    color(V_GREY, ex > 0 ? 0.8 : 1) tapa();
+    color(V_INK) translate([cx, cy, zl + LID_T + ex]) visera();
+    color(V_INK) translate([cx, cy, zl - 1.4 - 1.5 - 0.4 * ex]) junta_ventana();
+    color("lightblue", 0.45) translate([cx - (CAM_PC[0] - 0.5) / 2, cy - (CAM_PC[1] - 0.5) / 2, zl - 1.4 - 1.5 - 2 - 0.8 * ex]) cube([CAM_PC[0] - 0.5, CAM_PC[1] - 0.5, 2]);
+    color(V_INK) translate([cx, cy, zl - 1.4 - 1.5 - 2 - 6 - 1.2 * ex]) separador_ir();
+    color("black", 0.8) translate([cx - CAM_MOD[0] / 2, cy - CAM_MOD[1] / 2, zl - CAM_FRAME_H - CAM_MOD[2] - 1.6 * ex]) cube(CAM_MOD);
+    color(V_LIGHT) translate([cx, cy, zs - 2 * ex]) soporte_camara();
+    for (s = [-1, 1]) {
+        v_scr([cx + s * CAM_SX, cy + BRK_Y, zs + 35], "-z", 35, 3, ex > 0 ? 45 + 2 * ex : 0);      // M3 × 35 al inserto de la tapa
+        v_scr([cx + s * CAM_SX, cy + VIS_Y, zl + LID_T + 3 - 8], "z", 8, 3, ex > 0 ? ex + 18 : 0);  // M3 × 8 de la visera
+    }
+}
+
+// garita: base, 6 platos y tapa enhebrados en 3 varillas M4 × 140 (en el despiece las varillas se alargan)
+module v_garita(ex) {
+    g = 0.4 * ex; n = 6; zr0 = -(140 - (7 * G_STEP + 5)) / 2;
+    color(V_ORANGE) garita_base();
+    for (i = [1 : n]) color(V_LIGHT) translate([0, 0, G_STEP * i + i * g]) garita_plato();
+    color(V_GREY) translate([0, 0, 7 * G_STEP + 7 * g]) garita_tapa();
+    for (a = [0, 120, 240]) rotate(a) {
+        color("silver") translate([G_ROD_R, 0, zr0]) cylinder(d = 4, h = 140 + 7 * g, $fn = 16);
+        v_nut([G_ROD_R, 0, zr0 + 1], 8, 5);
+        v_nut([G_ROD_R, 0, zr0 + 140 + 7 * g - 6], 8, 5);
+    }
+}

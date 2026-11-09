@@ -779,3 +779,241 @@ else if (PART == "pletina_trafo") pletina_trafo();
 else if (PART == "soporte_filtro") soporte_filtro();
 else if (PART == "visera") visera();
 else if (PART == "soporte_camara") soporte_camara();
+// vistas de documentación (solo para render del manual 52; no afectan a los STL)
+else if (PART == "vista_despiece_v3_electronica") v3_caja(V_EX);
+else if (PART == "vista_montado_v3_electronica") v3_caja(0);
+else if (PART == "vista_despiece_v3_potencia") v3_potencia(V_EX);
+else if (PART == "vista_montado_v3_potencia") v3_potencia(0);
+else if (PART == "vista_despiece_v3_sai") v3_sai(V_EX);
+else if (PART == "vista_montado_v3_sai") v3_sai(0);
+else if (PART == "vista_despiece_v3_postes_bandejas") v3_postes(V_EX);
+else if (PART == "vista_montado_v3_postes_bandejas") v3_postes(0);
+else if (PART == "vista_despiece_v3_soportes") v3_soportes(V_EX);
+else if (PART == "vista_montado_v3_soportes") v3_soportes(0);
+else if (PART == "vista_despiece_v3_ventilacion") v3_ventilacion(V_EX);
+else if (PART == "vista_montado_v3_ventilacion") v3_ventilacion(0);
+else if (PART == "vista_despiece_v3_camara") v3_camara(V_EX);
+else if (PART == "vista_montado_v3_camara") v3_camara(0);
+else if (PART == "vista_despiece_v3_tapones") v3_tapones(V_EX);
+else if (PART == "vista_montado_v3_tapones") v3_tapones(0);
+
+// ---------------- VISTAS DE DOCUMENTACIÓN (solo lectura) ----------------
+V_ORANGE = "#F26B1D"; V_INK = "#23272B"; V_GREY = "#59636B"; V_LIGHT = "#C9CED3";
+V_EX = 50;          // separación del despiece (mm)
+function v_dir(a) = a == "x" ? [1, 0, 0] : a == "-x" ? [-1, 0, 0] : a == "y" ? [0, 1, 0] : a == "-y" ? [0, -1, 0] : a == "-z" ? [0, 0, -1] : [0, 0, 1];
+function v_rot(a) = a == "x" ? [0, 90, 0] : a == "-x" ? [0, -90, 0] : a == "y" ? [-90, 0, 0] : a == "-y" ? [90, 0, 0] : a == "-z" ? [180, 0, 0] : [0, 0, 0];
+// línea guía fina entre dos puntos
+module v_guia(a, b, d = 0.8) { color("dimgray") hull() { translate(a) sphere(d = d, $fn = 8); translate(b) sphere(d = d, $fn = 8); } }
+// tornillo: la punta queda en mate + off·out; el cuerpo y la cabeza se extienden hacia «out»
+module v_scr(mate, out, L, d, off = 0, head = true) {
+    p = mate + v_dir(out) * off;
+    color("silver") translate(p) rotate(v_rot(out)) {
+        cylinder(d = d, h = L, $fn = 16);
+        if (head) translate([0, 0, L]) cylinder(d = 1.75 * d, h = 0.8 * d, $fn = 24);
+    }
+    if (off > 0) v_guia(mate, p);
+}
+
+// cierre de la caja: cuerpo, junta, tapa, rejilla, tejadillo y pletinas de pared
+module v3_caja(ex) {
+    sj = 0.5 * ex; sl = ex; sp = 0.3 * ex; sr = 0.5 * ex; sg = 0.5 * ex;
+    color(V_ORANGE) cuerpo();
+    color(V_INK) translate([0, 0, LID_Z0 - GASKET_H + sj]) junta_tapa();
+    color(V_GREY) translate([0, 0, sl]) tapa();
+    color(V_LIGHT) translate([PL[0], PL[1], T + STANDOFF + sp]) placa_rejilla();
+    color(V_GREY) translate([W + 8, H + sr, -2]) rotate([90, 0, 180]) tejadillo();
+    // pletinas de pared: apoyan en los nervios de la espalda (6 mm) y se atornillan (M5) a sus insertos
+    for (y = WALL_Y) {
+        color(V_LIGHT) translate([W * 0.25, y, -14 - sg]) pletina_pared();
+        if (ex > 0) for (x = [W * 0.25, W * 0.75]) v_guia([x, y, -6], [x, y, -6 - sg]);
+    }
+    if (ex > 0) for (q = [[W / 2, T / 2], [W / 2, H - T / 2], [T / 2, H / 2], [W - T / 2, H / 2]])
+        v_guia([q[0], q[1], D], [q[0], q[1], LID_Z0 + sl - RIB_H]);   // junta <-> ranura
+    // tapa: M4 a las orejetas
+    for (y = EARS_Y, xs = [-1, 1]) {
+        x = xs < 0 ? -EAR_L / 2 - 0.5 : W + EAR_L / 2 + 0.5;
+        v_scr([x, y, LID_Z0 + LID_T - 16], "z", 16, 4, ex > 0 ? sl + 26 : 0);
+    }
+    // rejilla: M3 a los pilares (longitud = espesor + inserto)
+    for (b = PL_BOSS)
+        v_scr([PL[0] + b[0], PL[1] + b[1], T + STANDOFF - INS_M3_L], "z", PL_T + INS_M3_L, 3, ex > 0 ? PL_T + INS_M3_L + sp + 10 : 0);
+    // tejadillo: M4 desde arriba (longitud derivada de la altura de cada pilar)
+    for (p = ROOF_PILLARS)
+        v_scr([p[0], H - INS_M4_L, p[1]], "y", roof_z(p[1] + 2) + 4 + INS_M4_L, 4, ex > 0 ? roof_z(p[1] + 2) + 4 + sr + 10 + INS_M4_L : 0);
+}
+
+// envolvente de los módulos de potencia y SAI: cuerpo opaco; junta (30), tapa (60) y tejadillo (90) hacia +Z;
+// pletina de pared y silla de mástil hacia atrás (-Z) con sus M5; tapón PG del prensaestopas de reserva sobre su eje (-Y)
+module v3_envolvente(ex, gl, ip) {
+    sj = 0.6 * ex; sl = 1.2 * ex; sr = 1.8 * ex; sg = 0.5 * ex;
+    color(V_ORANGE) cuerpo();
+    color(V_INK) translate([0, 0, LID_Z0 - GASKET_H + sj]) junta_tapa();
+    color(V_GREY) translate([0, 0, sl]) tapa();
+    color(V_GREY) translate([W + 8, H, -2 + sr]) rotate([90, 0, 180]) tejadillo();
+    if (ex > 0) for (q = [[W / 2, T / 2], [W / 2, H - T / 2], [T / 2, H / 2], [W - T / 2, H / 2]])
+        v_guia([q[0], q[1], D], [q[0], q[1], LID_Z0 + sl - RIB_H]);   // junta <-> ranura
+    // tapa: M4 a las orejetas (la guía va del inserto de la orejeta al agujero de la tapa)
+    for (y = EARS_Y, xs = [-1, 1]) {
+        x = xs < 0 ? -EAR_L / 2 - 0.5 : W + EAR_L / 2 + 0.5;
+        v_scr([x, y, LID_Z0 + LID_T - 16], "z", 16, 4, ex > 0 ? sl + 26 : 0);
+    }
+    // tejadillo: M4 en sus agujeros, elevados con él; la guía baja hasta el inserto del pilar
+    for (p = ROOF_PILLARS) {
+        v_scr([p[0], H - INS_M4_L, p[1] + sr], "y", roof_z(p[1] + 2) + 4 + INS_M4_L, 4);
+        if (ex > 0) v_guia([p[0], H - INS_M4_L, p[1]], [p[0], H - INS_M4_L, p[1] + sr]);
+    }
+    // pletina de pared (y bajo) y silla de mástil (y alto) en los insertos M5 de la espalda
+    for (x = [W * 0.25, W * 0.75]) {
+        v_scr([x, WALL_Y[0], 4], "-z", 18, 5, ex > 0 ? sg + 24 : 0);
+        v_scr([x, WALL_Y[1], 4], "-z", 22, 5, ex > 0 ? sg + 44 : 0);
+    }
+    color(V_LIGHT) translate([W * 0.25, WALL_Y[0], -14 - sg]) pletina_pared();
+    color(V_GREY) translate([W / 2, WALL_Y[1], -6 - sg]) rotate([180, 0, 0]) soporte_mastil();
+    // tapón PG en el prensaestopas de reserva
+    tot = sum_w(gl, len(gl) - 1) + 8 * (len(gl) - 1);
+    gx = W / 2 - tot / 2 + sum_w(gl, ip - 1) + 8 * ip + gl[ip][1] / 2;
+    color(V_INK) translate([gx, -2 - ex, 40]) rotate([-90, 0, 0]) tapon_pg(gl[ip][1]);
+    if (ex > 0) v_guia([gx, -2, 40], [gx, -2 - ex, 40]);
+}
+
+// rejilla de fondo con sus M3 a los pilares del cuerpo; lp = elevación de la capa interior
+module v3_rejilla_capa(ex, lp) {
+    color(V_LIGHT) translate([PL[0], PL[1], T + STANDOFF + lp]) placa_rejilla();
+    for (b = PL_BOSS)
+        v_scr([PL[0] + b[0], PL[1] + b[1], T + STANDOFF - INS_M3_L], "z", PL_T + INS_M3_L, 3, ex > 0 ? lp + PL_T + INS_M3_L + 10 : 0);
+}
+
+// módulo de potencia: soporte Schuko con la base, brida del cargador, todo atornillado a la rejilla (M3)
+module v3_potencia(ex) {
+    lp = ex > 0 ? D + 1 - (T + STANDOFF) : 0;   // la capa interior sale por la boca abierta
+    s1 = 0.1 * ex; s2 = 0.2 * ex; pz = T + STANDOFF + PL_T + lp;
+    v3_envolvente(ex, GLANDS_P, 2);
+    v3_rejilla_capa(ex, lp);
+    cx = W / 2; cy = 30 + SCHUKO[1] / 2;
+    color(V_ORANGE) translate([cx, cy, pz + s1]) soporte_schuko();
+    color("white", 0.6) translate([cx - SCHUKO[0] / 2, 30, pz + 4 + s2]) cube(SCHUKO);
+    for (sx = [-1, 1], sy = [-1, 1])
+        v_scr([cx + sx * (SCHUKO[0] / 2 + 3), cy + sy * (SCHUKO[1] / 2 + 3), pz - PL_T], "z", 4 + PL_T, 3, ex > 0 ? s1 + 12 : 0);
+    if (ex > 0) for (sx = [-1, 1]) v_guia([cx + sx * 30, cy, pz + 4 + s1], [cx + sx * 30, cy, pz + 4 + s2]);   // tornillos de la base Schuko
+    // brida del cargador: delante de la base, fijada a la rejilla por los dos agujeros M3 de sus extremos
+    bo = [W / 2 - 55, 112];
+    color(V_GREY) translate([bo[0], bo[1], pz + 0.3 * ex]) brida_cargador();
+    if (ex > 0) for (x = [5, 105]) v_guia([bo[0] + x, bo[1] + 8, pz], [bo[0] + x, bo[1] + 8, pz + 0.3 * ex]);
+}
+
+// módulo SAI: soportes sobre la rejilla y componentes encima (disposición y longitud de tornillos orientativas)
+module v3_sai(ex) {
+    lp = ex > 0 ? D + 1 - (T + STANDOFF) : 0;   // la capa interior sale por la boca abierta
+    s1 = 0.1 * ex; s2 = 0.2 * ex; pz = T + STANDOFF + PL_T + lp;
+    v3_envolvente(ex, GLANDS_S, 2);
+    v3_rejilla_capa(ex, lp);
+    b = sai("BAT");
+    color(V_ORANGE) translate([PL[0] + b[1][0], PL[1] + b[1][1], pz + s1]) soporte_bateria();
+    color("dimgray", 0.6) translate([PL[0] + b[1][0] + 4, PL[1] + b[1][1] + 4, pz + 3 + s2]) cube(SAI_BAT);
+    translate([PL[0] + b[1][0], PL[1] + b[1][1], pz]) nudos(b[1], b[2][0], b[2][1]) v_scr([0, 0, 1.2 - 6], "z", 6, 3, ex > 0 ? s1 + 30 : 0);
+    p = sai("PCB");
+    for (gy = GUIA_Y) {
+        color(V_GREY) translate([PL[0] + p[1][0], PL[1] + gy, pz + s1]) guia_pcb();
+        for (x = [14, 34]) v_scr([PL[0] + p[1][0] + x, PL[1] + gy + 20, pz - PL_T], "z", 3 + PL_T, 3, ex > 0 ? s1 + 14 : 0);
+    }
+    color("darkgreen", 0.7) translate([PL[0] + p[1][0] + 5.2, PL[1] + 8, pz + 6 + s2]) cube([1.6, SAI_PCB[0], SAI_PCB[1]]);
+    if (ex > 0) for (gy = GUIA_Y) v_guia([PL[0] + p[1][0] + 6, PL[1] + gy + 20, pz + 6 + s1], [PL[0] + p[1][0] + 6, PL[1] + gy + 20, pz + 6 + s2]);
+    t = sai("TRAFO");
+    color(V_LIGHT) translate([PL[0] + t[1][0], PL[1] + t[1][1], pz + s1]) pletina_trafo();
+    color("sienna", 0.6) translate([PL[0] + t[1][0] + 2, PL[1] + t[1][1] + 5, pz + 5 + s2]) cube(SAI_TRAFO);
+    translate([PL[0] + t[1][0], PL[1] + t[1][1], pz]) nudos(t[1], t[2][0], t[2][1]) v_scr([0, 0, 3 - 6], "z", 6, 3, ex > 0 ? s1 + 30 : 0);
+    for (n = ["EMI_OUT", "EMI_IN"]) {
+        f = sai(n);
+        color(V_GREY) translate([PL[0] + f[1][0], PL[1] + f[1][1], pz + s1]) soporte_filtro();
+        color("silver", 0.6) translate([PL[0] + f[1][0], PL[1] + f[1][1] + 0.5, pz + 3 + s2]) cube([FILTRO[2], FILTRO[0], FILTRO[1]]);
+    }
+}
+
+// columnas de bandejas del módulo de electrónica (de la rejilla a la bandeja de la Pi)
+module v3_postes(ex) {
+    k = 0.45 * ex; pz = T + STANDOFF + PL_T; Ls = DECK_T + INS_M3_L; offs = ex > 0 ? DECK_T + k + 8 + INS_M3_L : 0;
+    color(V_LIGHT) translate([PL[0], PL[1], T + STANDOFF]) placa_rejilla();
+    for (p = deck_posts()) {
+        color(V_GREY) translate([p[0], p[1], pz + k]) cylinder(d = 10, h = DECK_H);
+        color(V_GREY) translate([p[0], p[1], pz + DECK_H + DECK_T + 3 * k]) cylinder(d = 10, h = DECK2_H - DECK_H - DECK_T);
+        if (ex > 0) v_guia([p[0], p[1], pz], [p[0], p[1], pz + DECK2_H + 4 * k + DECK_T]);
+        v_scr([p[0], p[1], pz + DECK_H - INS_M3_L + k], "z", Ls, 3, offs);
+        v_scr([p[0], p[1], pz + DECK2_H - INS_M3_L + 3 * k], "z", Ls, 3, offs);
+    }
+    // columna superior: solo bajo la bandeja de la Pi (4 postes)
+    for (p = BAND_POSTS) {
+        q = [PL[0] + 20 + p[0], PL[1] + BAND_Y + p[1]];
+        color(V_GREY) translate([q[0], q[1], pz + DECK2_H + DECK_T + 5 * k]) cylinder(d = 10, h = BAND_H - DECK2_H - DECK_T);
+        if (ex > 0) v_guia([q[0], q[1], pz + DECK2_H + DECK_T], [q[0], q[1], pz + BAND_H + 6 * k]);
+        v_scr([q[0], q[1], pz + BAND_H - INS_M3_L + 5 * k], "z", Ls, 3, offs);
+    }
+    color(V_ORANGE) translate([DECK_O[0], DECK_O[1], pz + DECK_H + 2 * k]) bandeja_sdr();
+    color(V_ORANGE) translate([DECK_O[0], DECK_O[1], pz + DECK2_H + 4 * k]) bandeja_sdr(SDR_DECK2);
+    color(V_ORANGE) translate([PL[0] + 20, PL[1] + BAND_Y, pz + BAND_H + 6 * k]) bandeja();
+}
+
+// cuna sobre la rejilla (o): dos M3 por los colisos de la base (l × w) hacia los insertos de la rejilla
+module v_sop(o, l, w, ex, c) {
+    pz = T + STANDOFF + PL_T;
+    color(c) translate([PL[0] + o[0], PL[1] + o[1], pz + ex]) children();
+    for (x = [10, l - 10]) v_scr([PL[0] + o[0] + x, PL[1] + o[1] + w / 2, pz - PL_T], "z", 3 + PL_T, 3, ex > 0 ? ex + 14 : 0);
+}
+
+// soportes de la rejilla del módulo de electrónica: dongles, hub USB y WAGO
+module v3_soportes(ex) {
+    color(V_ORANGE, 0.35) cuerpo();
+    color(V_LIGHT) translate([PL[0], PL[1], T + STANDOFF]) placa_rejilla();
+    v_sop(res("dongles")[1], 90, 42, 0.6 * ex, V_ORANGE) soporte_dongle(26, 90);
+    v_sop([HUB_O[0] - 2, HUB_O[1] - 4], HUB[0] + 4, HUB[1] + 8, 0.6 * ex, V_GREY) soporte_hub();
+    v_sop(res("wago")[1], 70, 26, 0.6 * ex, V_INK) soporte_wago();
+}
+
+// ventilación: capota (fuera) y filtro + ventilador (dentro) en la pared izquierda; la derecha es simétrica
+module v3_ventilacion(ex) {
+    color(V_ORANGE, 0.45) cuerpo();
+    for (lado = [-1, 1]) {
+        fy = lado < 0 ? FAN_IN[0] : FAN_OUT[0]; fz = lado < 0 ? FAN_IN[1] : FAN_OUT[1];
+        translate([lado < 0 ? 0 : W, 0, 0]) scale([lado < 0 ? 1 : -1, 1, 1]) {
+            color(V_GREY) translate([-30 - ex, fy, fz]) rotate([0, -90, 0]) rotate(90) translate([0, 0, -30]) capota();
+            color(V_LIGHT) translate([T + 0.5 * ex, fy, fz]) rotate([0, 90, 0]) rejilla_ventilador();
+            color("black", 0.6) translate([T + 2.4 + ex, fy - 30, fz - 30]) cube([25, 60, 60]);
+            for (sx = [-1, 1], sy = [-1, 1])
+                v_scr([T + 2.4 + 25 + ex, fy + sx * FAN_SCREW / 2, fz + sy * FAN_SCREW / 2], "-x", 3 + T + 2.4 + 25, 3, ex > 0 ? (T + 2.4 + 25 + ex) + 3 + ex + 10 : 0);
+        }
+    }
+}
+
+// cámara Module 3 Wide: tapa con cristal y visera (fuera); módulo y soporte (dentro)
+module v3_camara(ex) {
+    cx = CAM_C[0]; cy = CAM_C[1];
+    zs = LID_Z0 - CAM_FRAME_H - CAM_SOP_H;            // cara inferior del soporte
+    zb = LID_Z0 + CAM_LENS_Z - CAM_MOD[2];            // cara inferior de la placa de la cámara
+    Ls = CAM_SOP_H + INS_M3_L - 1;
+    color(V_GREY, ex > 0 ? 0.8 : 1) tapa();
+    color("lightblue", 0.5) translate([cx - (CAM_WIN[0] + 2 * CAM_LAP) / 2, cy - (CAM_WIN[1] + 2 * CAM_LAP) / 2, LID_Z0 + LID_T - CAM_VID_T + 0.5 * ex])
+        cube([CAM_WIN[0] + 2 * CAM_LAP, CAM_WIN[1] + 2 * CAM_LAP, CAM_VID_T]);
+    color(V_INK) translate([cx, cy, LID_Z0 + LID_T + ex]) visera();
+    color("black", 0.8) translate([cx - CAM_MOD[0] / 2, cy - CAM_MOD[1] / 2, zb - ex]) cube(CAM_MOD);
+    color(V_LIGHT) translate([cx, cy, zs - 2 * ex]) soporte_camara();
+    if (ex > 0) for (sx = [-1, 1], sy = [-1, 1])   // placa ↔ postes M2 del soporte
+        v_guia([cx + sx * CAM_HOLES[0] / 2, cy + sy * CAM_HOLES[1] / 2, zb - ex], [cx + sx * CAM_HOLES[0] / 2, cy + sy * CAM_HOLES[1] / 2, zb - 2 * ex]);
+    for (s = [-1, 1]) {
+        v_scr([cx + s * CAM_SX, cy + 8, zs + Ls], "-z", Ls, 3, ex > 0 ? 2 * ex + 18 : 0);                       // M3 al inserto del collar
+        v_scr([cx + s * CAM_SX, cy - 8, LID_Z0 + LID_T + 3 - 8], "z", 8, 3, ex > 0 ? ex + 18 : 0);            // M3 × 8 de la visera
+    }
+}
+
+// tapones de la cara inferior (y = 0): tapón N en los pasamuros N libres y tapón PG en el prensaestopas de reserva
+module v3_tapones(ex) {
+    pe = ex > 0 ? 40 : 0;   // recorrido del tapón sobre el eje del agujero (-Y)
+    color(V_ORANGE, 0.35) cuerpo();
+    r = N_ROWS[1]; n = len(r[1]); x0 = W / 2 - (n - 1) * N_PITCH / 2;
+    for (i = [4 : 6]) {
+        color(V_INK) translate([x0 + i * N_PITCH, -2 - pe, r[0]]) rotate([-90, 0, 0]) tapon_n();
+        if (ex > 0) v_guia([x0 + i * N_PITCH, -2, r[0]], [x0 + i * N_PITCH, -2 - pe, r[0]]);
+    }
+    tot = sum_w(GLANDS_E, len(GLANDS_E) - 1) + 8 * (len(GLANDS_E) - 1);
+    i = 5; gx = W / 2 - tot / 2 + sum_w(GLANDS_E, i - 1) + 8 * i + GLANDS_E[i][1] / 2;
+    color(V_INK) translate([gx, -2 - pe, GL_Z]) rotate([-90, 0, 0]) tapon_pg();
+    if (ex > 0) v_guia([gx, -2, GL_Z], [gx, -2 - pe, GL_Z]);
+}

@@ -226,3 +226,116 @@ else if (PART == "sensor_viento_brida") rotate([180, 0, 0]) sensor_viento_brida(
 else if (PART == "pluvio_vaso") rotate([180, 0, 0]) pluvio_vaso();   // impresa del revés: la brida en la cama
 else if (PART == "pluvio_plataforma") pluvio_plataforma();
 else if (PART == "pico_soporte") pico_soporte();
+// vistas de documentación (solo para render del manual 52; no afectan a los STL)
+else if (PART == "vista_despiece_cruceta_mastil_brazo") v_cruceta(ARM_D, MAST_D, false, V_EX, "MASTIL-BRAZO");
+else if (PART == "vista_montado_cruceta_mastil_brazo") v_cruceta(ARM_D, MAST_D, false, 0, "MASTIL-BRAZO");
+else if (PART == "vista_despiece_cruceta_mastil_quad") v_cruceta(BOOM, MAST_D, true, V_EX, "QUAD");
+else if (PART == "vista_montado_cruceta_mastil_quad") v_cruceta(BOOM, MAST_D, true, 0, "QUAD");
+else if (PART == "vista_despiece_cruceta_brazo_fibra") v_cruceta(FIBRA_D, ARM_D, false, V_EX, "FIBRA");
+else if (PART == "vista_montado_cruceta_brazo_fibra") v_cruceta(FIBRA_D, ARM_D, false, 0, "FIBRA");
+else if (PART == "vista_despiece_cruceta_brazo_tubo") v_cruceta(ARM_D, ARM_D, false, V_EX, "BRAZO-TUBO");
+else if (PART == "vista_montado_cruceta_brazo_tubo") v_cruceta(ARM_D, ARM_D, false, 0, "BRAZO-TUBO");
+else if (PART == "vista_despiece_pluviometro") v_pluvio(V_EX);
+else if (PART == "vista_montado_pluviometro") v_pluvio(0);
+else if (PART == "vista_despiece_viento") v_viento(V_EX);
+else if (PART == "vista_montado_viento") v_viento(0);
+else if (PART == "vista_despiece_pico") v_pico(V_EX);
+else if (PART == "vista_montado_pico") v_pico(0);
+else if (PART == "vista_despiece_adsb_tubo") v_adsb_tubo(V_EX);
+else if (PART == "vista_montado_adsb_tubo") v_adsb_tubo(0);
+
+// ---------------- VISTAS DE DOCUMENTACIÓN (solo lectura) ----------------
+V_ORANGE = "#F26B1D"; V_INK = "#23272B"; V_GREY = "#59636B"; V_LIGHT = "#C9CED3";
+V_EX = 50;          // separación del despiece (mm)
+V_GRUB_L = 12;      // longitud orientativa del prisionero
+function v_dir(a) = a == "x" ? [1, 0, 0] : a == "-x" ? [-1, 0, 0] : a == "y" ? [0, 1, 0] : a == "-y" ? [0, -1, 0] : a == "-z" ? [0, 0, -1] : [0, 0, 1];
+function v_rot(a) = a == "x" ? [0, 90, 0] : a == "-x" ? [0, -90, 0] : a == "y" ? [-90, 0, 0] : a == "-y" ? [90, 0, 0] : a == "-z" ? [180, 0, 0] : [0, 0, 0];
+// línea guía fina entre dos puntos
+module v_guia(a, b, d = 0.8) { color("dimgray") hull() { translate(a) sphere(d = d, $fn = 8); translate(b) sphere(d = d, $fn = 8); } }
+// tornillo: la punta queda en mate + off·out; el cuerpo y la cabeza se extienden hacia «out»
+module v_scr(mate, out, L, d, off = 0, head = true) {
+    p = mate + v_dir(out) * off;
+    color("silver") translate(p) rotate(v_rot(out)) {
+        cylinder(d = d, h = L, $fn = 16);
+        if (head) translate([0, 0, L]) cylinder(d = 1.75 * d, h = 0.8 * d, $fn = 24);
+    }
+    if (off > 0) v_guia(mate, p);
+}
+module v_nut(p, d, h) { color("silver") translate(p) rotate(30) cylinder(d = d, h = h, $fn = 6); }
+// tubo fantasma centrado en p con eje ax
+module v_tube(p, ax, d, l) { color("silver", 0.35) translate(p) rotate(v_rot(ax)) translate([0, 0, -l / 2]) cylinder(d = d - 0.6, h = l, $fn = 48); }
+
+module v_cruceta(dA, dB, cuadA, ex, txt) {
+    H = alto_cuerpo(dA, dB); L = largo_cruceta(dA, dB);
+    zA = H + 2 * APRIETE; zB = -2 * APRIETE;
+    tA = grosor_tapa(dA); tB = grosor_tapa(dB);
+    color(V_ORANGE, ex > 0 ? 0.7 : 1) cruceta_cuerpo(dA, dB, cuadA, false, txt);
+    color(V_GREY) translate([0, 0, zA + tA + ex]) mirror([0, 0, 1]) cruceta_tapa(dA, dB, cuadA);
+    color(V_LIGHT) translate([0, 0, zB - tB - ex]) rotate([0, 0, -90]) cruceta_tapa(dB, dA);
+    // tubos fantasma
+    if (cuadA) color("silver", 0.35) translate([-L, -dA / 2, H - prof(dA)]) cube([2 * L, dA, dA]);
+    else v_tube([0, 0, H + APRIETE], "x", dA, 2 * L);
+    v_tube([0, 0, -APRIETE], "y", dB, 2 * L);
+    offA = ex > 0 ? zA + tA + ex + 12 - 2.5 : 0;
+    offB = ex > 0 ? (H - 2.5) - (zB - tB - ex - 12) : 0;
+    for (p = torn(dA, L)) {
+        v_nut([p[0], p[1], 2.5], NUT6, NUT6_H);
+        v_scr([p[0], p[1], 2.5], "z", zA + tA - 4 - 2.5, 6, offA);
+    }
+    for (p = tornB(dB, L)) {
+        v_nut([p[0], p[1], H - 2.5 - NUT6_H], NUT6, NUT6_H);
+        v_scr([p[0], p[1], H - 2.5], "-z", H - 2.5 - (zB - tB + 4), 6, offB);
+    }
+    // antigiro 4,8 × 19 de cada tapa
+    v_scr([L / 4, 0, zA + tA - 19], "z", 19, 4.8, ex > 0 ? 19 + ex + 10 : 0);
+    v_scr([0, -L / 4, zB - tB + 19], "-z", 19, 4.8, ex > 0 ? 19 + ex + 10 : 0);
+}
+
+module v_pluvio(ex) {
+    sv = ex; sp = 2 * ex; zp = 63 + 21;   // hueco vaso-plataforma orientativo (M5 × 40 + muelle)
+    v_tube([0, 0, -4.5], "z", MAST_D, 111);
+    color(V_ORANGE, ex > 0 ? 0.8 : 1) translate([0, 0, sv]) pluvio_vaso();
+    color(V_LIGHT) translate([0, 0, zp + sp]) pluvio_plataforma();
+    if (ex > 0) v_guia([0, 0, 51], [0, 0, 51 + sv]);
+    for (a = [0 : 120 : 359]) {
+        px = 40 * cos(a); py = 40 * sin(a);
+        color("silver", 0.5) translate([px, py, 63 + sv + 0.5 * ex]) cylinder(d = 9, h = 21, $fn = 16);   // muelle
+        v_scr([px, py, 50 + sv], "z", 40, 5, ex > 0 ? (zp + sp + 6 + 15) - (50 + sv) : 0);
+    }
+    for (z = [14, 38]) v_scr([MAST_D / 2, 0, z + sv], "x", V_GRUB_L, 5, ex > 0 ? 25 : 0, false);
+}
+
+module v_viento(ex) {
+    sb = ex; ss = 2 * ex;
+    v_tube([0, 0, -60], "z", ARM_D, 112);
+    color(V_ORANGE, ex > 0 ? 0.8 : 1) translate([0, 0, sb]) sensor_viento_brida();
+    color(V_GREY, 0.6) translate([0, 0, 6 + ss]) cylinder(d = 65, h = 10, $fn = 48);   // sensor (esquemático)
+    if (ex > 0) v_guia([0, 0, -4], [0, 0, -4 + sb]);
+    for (a = [45 : 90 : 359]) {
+        px = 47.1 / 2 * cos(a); py = 47.1 / 2 * sin(a);
+        v_nut([px, py, -8 + sb], 9.4, 4);
+        v_scr([px, py, -8 + sb], "z", 25, 5, ex > 0 ? (16 + ss + 10) - (-8 + sb) : 0);
+    }
+    for (z = [-38, -16]) v_scr([ARM_D / 2, 0, z + sb], "x", V_GRUB_L, 5, ex > 0 ? 25 : 0, false);
+}
+
+module v_pico(ex) {
+    color(V_ORANGE) pico_soporte();
+    color("darkgreen", 0.85) translate([-25.5, 30 - 10.5, 8 + ex]) cube([51, 21, 1.6]);     // Pico
+    color("seagreen", 0.85) translate([-25, -50, 8 + ex]) cube([50, 70, 1.6]);              // placa perforada
+    for (sx = [-1, 1], sy = [-1, 1]) {
+        v_scr([sx * 23.5, 30 + sy * 5.7, 8 + 1.6 - 6], "z", 6, 2, ex > 0 ? ex + 10 + 6 : 0);
+        v_scr([sx * 33, -15 + sy * 23, 8 + 1.6 - 6], "z", 6, 2, ex > 0 ? ex + 10 + 6 : 0);
+    }
+    for (sx = [-1, 1], sy = [-2, -1, 1, 2]) v_scr([sx * 30, sy * 20, -5], "z", 8, 3, ex > 0 ? 12 + 0.6 * ex : 0);   // a la rejilla de la caja v3
+}
+
+module v_adsb_tubo(ex) {
+    w = LNA[1] + 12; l = LNA[0] + 14; sb = ex; sa = 2 * ex;
+    v_tube([0, 0, -70], "z", ARM_D, 132);
+    color(V_ORANGE, ex > 0 ? 0.8 : 1) translate([0, 0, sb]) adsb_tapa_tubo();
+    color(V_GREY, 0.5) translate([-w / 2, -l / 2, 4 + sa]) cube([w, l, LNA[2] + 16]);   // base de la antena (esquemática)
+    if (ex > 0) v_guia([0, 0, -4], [0, 0, -4 + sb]);
+    for (sx = [-1, 1], sy = [-1, 1]) v_scr([sx * (w / 2 - 4), sy * (l / 2 - 4), 12 + sa], "-z", 12, 3, ex > 0 ? 22 + ex : 0);
+    for (z = [-34, -14]) v_scr([ARM_D / 2, 0, z + sb], "x", V_GRUB_L, 5, ex > 0 ? 25 : 0, false);
+}

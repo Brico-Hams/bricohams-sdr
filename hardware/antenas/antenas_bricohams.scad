@@ -368,3 +368,207 @@ else if (PART == "mla_clip_lazo") mla_clip_lazo();
 else if (PART == "funda_sma") funda_conector(9.5, 40);
 else if (PART == "funda_n") funda_conector(17, 50);
 else if (PART == "clip_filtro") clip_filtro();
+// vistas de documentación (solo para render del manual 52; no afectan a los STL)
+else if (PART == "vista_despiece_quad_buje") v_quad_buje(V_EX);
+else if (PART == "vista_montado_quad_buje") v_quad_buje(0);
+else if (PART == "vista_despiece_quad_alimentacion") v_quad_alim(V_EX);
+else if (PART == "vista_montado_quad_alimentacion") v_quad_alim(0);
+else if (PART == "vista_despiece_quad_abrazadera") v_abraz(MAST_D, BOOM, 80, 22, HOLE_M8, HOLE_M6, true, V_EX);
+else if (PART == "vista_montado_quad_abrazadera") v_abraz(MAST_D, BOOM, 80, 22, HOLE_M8, HOLE_M6, true, 0);
+else if (PART == "vista_despiece_brazo_mastil") v_abraz(MAST_D, ARM_D, 80, 22, HOLE_M8, HOLE_M6, false, V_EX, true);
+else if (PART == "vista_montado_brazo_mastil") v_abraz(MAST_D, ARM_D, 80, 22, HOLE_M8, HOLE_M6, false, 0, true);
+else if (PART == "vista_despiece_soporte_fibra") v_abraz(ARM_D, FIBRA_D, 64, 20, HOLE_M6, HOLE_M6, false, V_EX);
+else if (PART == "vista_montado_soporte_fibra") v_abraz(ARM_D, FIBRA_D, 64, 20, HOLE_M6, HOLE_M6, false, 0);
+else if (PART == "vista_despiece_discone") v_discone(V_EX);
+else if (PART == "vista_montado_discone") v_discone(0);
+else if (PART == "vista_despiece_discone_plantillas") v_plantillas(V_EX);
+else if (PART == "vista_montado_discone_plantillas") v_plantillas(0);
+else if (PART == "vista_despiece_adsb") v_adsb(V_EX);
+else if (PART == "vista_montado_adsb") v_adsb(0);
+else if (PART == "vista_despiece_mla") v_mla(V_EX);
+else if (PART == "vista_montado_mla") v_mla(0);
+else if (PART == "vista_despiece_mla_cruz") v_mla_cruz(V_EX);
+else if (PART == "vista_montado_mla_cruz") v_mla_cruz(0);
+else if (PART == "vista_despiece_gps") v_gps(V_EX);
+else if (PART == "vista_montado_gps") v_gps(0);
+else if (PART == "vista_despiece_fundas_tapones") v_fundas(V_EX);
+else if (PART == "vista_montado_fundas_tapones") v_fundas(0);
+
+// ---------------- VISTAS DE DOCUMENTACIÓN (solo lectura) ----------------
+V_ORANGE = "#F26B1D"; V_INK = "#23272B"; V_GREY = "#59636B"; V_LIGHT = "#C9CED3";
+V_EX = 50;          // separación del despiece (mm)
+V_GRUB_L = 12;      // longitud orientativa de prisioneros y autorroscantes
+function v_dir(a) = a == "x" ? [1, 0, 0] : a == "-x" ? [-1, 0, 0] : a == "y" ? [0, 1, 0] : a == "-y" ? [0, -1, 0] : a == "-z" ? [0, 0, -1] : [0, 0, 1];
+function v_rot(a) = a == "x" ? [0, 90, 0] : a == "-x" ? [0, -90, 0] : a == "y" ? [-90, 0, 0] : a == "-y" ? [90, 0, 0] : a == "-z" ? [180, 0, 0] : [0, 0, 0];
+// línea guía fina entre dos puntos
+module v_guia(a, b, d = 0.8) { color("dimgray") hull() { translate(a) sphere(d = d, $fn = 8); translate(b) sphere(d = d, $fn = 8); } }
+// tornillo: la punta queda en mate + off·out; el cuerpo y la cabeza se extienden hacia «out»
+module v_scr(mate, out, L, d, off = 0, head = true) {
+    p = mate + v_dir(out) * off;
+    color("silver") translate(p) rotate(v_rot(out)) {
+        cylinder(d = d, h = L, $fn = 16);
+        if (head) translate([0, 0, L]) cylinder(d = 1.75 * d, h = 0.8 * d, $fn = 24);
+    }
+    if (off > 0) v_guia(mate, p);
+}
+module v_nut(p, d, h) { color("silver") translate(p) rotate(30) cylinder(d = d, h = h, $fn = 6); }
+// tubo fantasma centrado en p con eje ax
+module v_tube(p, ax, d, l) { color("silver", 0.35) translate(p) rotate(v_rot(ax)) translate([0, 0, -l / 2]) cylinder(d = d - 0.6, h = l, $fn = 48); }
+// U de varilla roscada: dos patas verticales en p1 y p2 unidas por un travesaño a la altura zbar; las patas acaban en zleg
+module v_ubolt(p1, p2, db, zbar, zleg) {
+    color("silver") {
+        for (p = [p1, p2]) translate([p[0], p[1], min(zbar, zleg)]) cylinder(d = db, h = abs(zleg - zbar), $fn = 16);
+        hull() { for (p = [p1, p2]) translate([p[0], p[1], zbar]) sphere(d = db, $fn = 12); }
+    }
+}
+
+// buje de boom con sus cuatro crucetas de fibra (fantasma), punteras, clips y tornillos
+module v_buje_set(rod, largo, h, txt, z0, ex, clips) {
+    s = BOOM + 12; xr = s / 2 + 4;
+    color(V_ORANGE, ex > 0 ? 0.85 : 1) translate([0, 0, z0]) buje(rod, largo, h, txt);
+    for (a = [0, 90, 180, 270]) rotate(a) {
+        color("silver", 0.35) translate([xr + 0.6 * ex, 0, z0 + h / 2]) rotate([0, 90, 0]) cylinder(d = rod - 0.3, h = largo + 60, $fn = 24);
+        color(V_GREY) translate([xr + largo + 60 - 17 + 1.4 * ex, 0, z0 + h / 2]) rotate([0, 90, 0]) puntera(rod);
+        if (clips) color(V_LIGHT) translate([xr + largo + 25 + ex, 0, z0 + h / 2]) rotate([0, 90, 0]) clip_cruceta(rod);
+        v_scr([s / 2 + largo - 8, 0, z0 + h / 2], "z", V_GRUB_L, 3, ex > 0 ? 25 : 0);
+    }
+    for (z = [10, h - 10]) v_scr([0, BOOM / 2, z0 + z], "y", V_GRUB_L, 5, ex > 0 ? 25 : 0, false);
+}
+module v_quad_buje(ex) {
+    color("silver", 0.35) translate([-BOOM / 2, -BOOM / 2, -140]) cube([BOOM, BOOM, 360]);   // boom
+    v_buje_set(ROD8, 40, 40, "2M", -0.4 * ex, ex, true);
+    v_buje_set(ROD6, 30, 32, "70", 80 + 0.4 * ex, ex, false);   // separación entre bujes orientativa
+}
+
+module v_quad_alim(ex) {
+    h = 16; d = 18;
+    for (s = [-1, 1]) v_scr([s * 6, 0, 0], "z", h, 3, ex > 0 ? ex : 0);
+    color(V_ORANGE) alimentacion(ROD8);
+    v_tube([0, 0, -3 - 0.8 * ex - 45], "z", ROD8, 90);          // cruceta entra por abajo
+    translate([80, 0, 0]) {
+        color(V_ORANGE) alimentacion(ROD8, false);
+        v_tube([0, -1.2 * ex, h / 2], "y", ROD8, 90);           // cruceta atraviesa el bloque
+        for (s = [-1, 1]) v_scr([s * 6, 0, 0], "z", h, 3, ex > 0 ? ex : 0);
+    }
+}
+
+// abrazadera cruzada con sus dos U de varilla roscada (mástil abajo, boom/brazo arriba)
+module v_abraz(d1, d2, l, t, b1, b2, cuad, ex, tapon = false) {
+    db1 = b1 - 0.6; db2 = b2 - 0.6; zm = -d1 / 2 + 5; zc = t + d2 / 2 - 6;
+    color(V_ORANGE, ex > 0 ? 0.8 : 1) abrazadera_cruzada(d1, d2, l, t, b1, b2, cuad);
+    v_tube([0, 0, zm], "y", d1, l + 80);
+    if (cuad) color("silver", 0.35) translate([-(l + 80) / 2, -d2 / 2, t - 6]) cube([l + 80, d2, d2]);
+    else v_tube([0, 0, zc], "x", d2, l + 80);
+    xl = d1 / 2 + b1 / 2 + 1; zt1 = t + 0.8 * db1 + 3;
+    for (yy = [-1, 1]) {
+        y = yy * (l / 2 - 12);
+        translate([0, 0, -ex]) v_ubolt([-xl, y], [xl, y], db1, zm - d1 / 2 - db1 / 2, zt1);
+        for (sx = [-1, 1]) {
+            v_nut([sx * xl, y, t + ex], 1.9 * db1, 0.8 * db1);
+            if (ex > 0) v_guia([sx * xl, y, zt1 - ex], [sx * xl, y, t + ex]);
+        }
+    }
+    yl = d2 / 2 + b2 / 2 + 1; zb2 = -(0.8 * db2 + 3);
+    for (xx = [-1, 1]) {
+        x = xx * (l / 2 - 10);
+        translate([0, 0, ex]) v_ubolt([x, -yl], [x, yl], db2, zc + d2 / 2 + db2 / 2, zb2);
+        for (sy = [-1, 1]) {
+            v_nut([x, sy * yl, -0.8 * db2 - ex], 1.9 * db2, 0.8 * db2);
+            if (ex > 0) v_guia([x, sy * yl, zb2 + ex], [x, sy * yl, -ex]);
+        }
+    }
+    if (tapon) {
+        color(V_LIGHT) translate([l / 2 + 40 + 4 + ex, 0, zc]) rotate([0, -90, 0]) tapon_brazo();
+        if (ex > 0) v_guia([l / 2 + 40, 0, zc], [l / 2 + 40 + ex, 0, zc]);
+    }
+}
+
+// discone: mástil → adaptador → buje de cono → aislador → buje de disco → capuchón (los bujes de aluminio son fantasmas)
+module v_discone(ex) {
+    k = 0.5 * ex;
+    v_tube([0, 0, -52], "z", MAST_D, 200);
+    color(V_ORANGE) translate([0, 0, k]) discone_adaptador_mastil();
+    color("silver", 0.6) translate([0, 0, 66 + 2 * k]) cylinder(d = HUB_D, h = HUB_T, $fn = 64);   // buje de cono (Ø70 × 12)
+    color(V_LIGHT) translate([0, 0, 78 + 3 * k]) discone_aislador();
+    color("silver", 0.6) translate([0, 0, 98 + 4 * k]) cylinder(d = HUB_D, h = HUB_T, $fn = 64);   // buje de disco (Ø70 × 12)
+    color(V_INK) translate([0, 0, 108 + 5 * k]) discone_capuchon();
+    for (z = [12, 32]) v_scr([0, -(MAST_D + 10) / 2, z + k], "y", MAST_D + 10, 6, ex > 0 ? 0.9 * ex : 0);   // pasante M6 al mástil
+    if (ex > 0) {
+        for (a = [45 : 90 : 359]) v_guia([(HUB_D / 2 - 7) * cos(a), (HUB_D / 2 - 7) * sin(a), 66 + k], [(HUB_D / 2 - 7) * cos(a), (HUB_D / 2 - 7) * sin(a), 66 + 2 * k]);
+        for (a = [0, 120, 240]) {
+            v_guia([18 * cos(a), 18 * sin(a), 78 + 2 * k], [18 * cos(a), 18 * sin(a), 78 + 3 * k]);                 // M4 buje de cono ↔ aislador
+            v_guia([18 * cos(a + 60), 18 * sin(a + 60), 98 + 3 * k], [18 * cos(a + 60), 18 * sin(a + 60), 98 + 4 * k]);   // M4 aislador ↔ buje de disco
+        }
+    }
+}
+module v_plantillas(ex) {
+    translate([-60, 0, 0]) { color(V_ORANGE) plantilla_disco(); color("silver", 0.6) translate([0, 0, 3 + ex]) cylinder(d = HUB_D, h = HUB_T, $fn = 64); }
+    translate([60, 0, 0]) { color(V_ORANGE) plantilla_cono(); color("silver", 0.6) translate([0, 0, 22 - HUB_T + ex]) cylinder(d = HUB_D, h = HUB_T, $fn = 64); }
+}
+
+// ADS-B: tapa bajo la base, radomo sobre la torreta, elemento de latón y 4 radiales (disposición orientativa)
+module v_adsb(ex) {
+    w = LNA[1] + 12; l = LNA[0] + 14; h = LNA[2] + 16;
+    sa = ex; sr = 1.4 * ex; se = 0.6 * ex;
+    color(V_ORANGE) adsb_base();
+    color(V_GREY) translate([0, 0, -3 - sa]) adsb_tapa();
+    color(V_LIGHT, 0.8) translate([0, 0, h + 1 + sr]) adsb_radomo();
+    color("goldenrod") translate([0, 0, h + 8 + se]) cylinder(d = 2, h = 62, $fn = 12);
+    for (a = [45 : 90 : 359]) rotate(a) color("goldenrod") translate([0.8 * ex, 0, h + 4]) rotate([0, 90, 0]) cylinder(d = 2, h = 68, $fn = 12);
+    for (sx = [-1, 1], sy = [-1, 1]) v_scr([sx * (w / 2 - 4), sy * (l / 2 - 4), 3], "-z", 6, 3, ex > 0 ? 16 + sa : 0);
+}
+
+// caja del lazo MLA: base, junta, tapa girada 180° y 4 × M3 (longitud orientativa)
+module v_mla(ex) {
+    i = MLA_CAJA; zm = i[2] / 2 + 3;
+    color(V_ORANGE) mla_caja_base();
+    color(V_INK) translate([0, 0, zm - 0.8 + 0.5 * ex]) mla_junta();
+    color(V_GREY) translate([0, 0, 2 * zm + ex]) rotate([180, 0, 0]) mla_caja_tapa();
+    for (sx = [-1, 1], sy = [-1, 1]) v_scr([sx * (i[0] / 2 - 4), sy * (i[1] / 2 - 4), 2 * zm - 25], "z", 25, 3, ex > 0 ? ex + 35 : 0);
+}
+// cruz del lazo MLA: 4 varillas de fibra (fantasma), clips de lazo y autorroscantes
+module v_mla_cruz(ex) {
+    h = 30; s = 34;
+    color(V_ORANGE) mla_cruz();
+    for (a = [0, 90, 180, 270]) rotate(a) {
+        color("silver", 0.35) translate([s / 2 + 2 + 0.6 * ex, 0, h / 2]) rotate([0, 90, 0]) cylinder(d = MLA_ROD - 0.3, h = 100, $fn = 24);
+        color(V_GREY) translate([s / 2 + 2 + 100 - 17 + 1.4 * ex, 0, h / 2]) rotate([0, 90, 0]) mla_clip_lazo();
+        v_scr([s / 2 + 30, 0, h / 2], "z", V_GRUB_L, 3, ex > 0 ? 25 : 0);
+    }
+    if (ex > 0) for (s2 = [-1, 1]) v_guia([s2 * 9, 0, 0], [s2 * 9, 0, -ex]);   // U M6 al mástil o al brazo
+}
+
+// GPS: soporte sobre el brazo Ø25 con dos U M6 y el puck encajado desde arriba
+module v_gps(ex) {
+    zt = -ARM_D / 2; db = HOLE_M6 - 0.6; xl = ARM_D / 2 + 4; ztop = 6 + 0.8 * db + 3;
+    v_tube([0, 0, zt], "y", ARM_D, 120);
+    color(V_ORANGE) translate([0, 0, ex]) gps_soporte();
+    color(V_GREY, 0.8) translate([-GPS_PUCK[0] / 2, -GPS_PUCK[1] / 2, 6 + 2 * ex]) cube(GPS_PUCK);
+    for (y = [-27, 27]) {
+        v_ubolt([-xl, y], [xl, y], db, zt - ARM_D / 2 - db / 2, ztop);
+        for (sx = [-1, 1]) {
+            v_nut([sx * xl, y, 6 + 1.5 * ex], 1.9 * db, 0.8 * db);
+            if (ex > 0) v_guia([sx * xl, y, ztop], [sx * xl, y, 6 + 1.5 * ex]);
+        }
+    }
+}
+
+// accesorios: fundas de TPU sobre cable, clip de filtro, separador de coaxial y tapón de varilla
+module v_fundas(ex) {
+    translate([-90, 0, 0]) { v_tube([0, 0, 20], "z", 7, 120); color(V_INK) translate([0, 0, ex]) funda_conector(9.5, 40); }
+    translate([-45, 0, 0]) { v_tube([0, 0, 20], "z", 12, 120); color(V_INK) translate([0, 0, ex]) funda_conector(17, 50); }
+    translate([0, 0, 0]) {
+        color(V_ORANGE) clip_filtro();
+        color("silver", 0.5) translate([-6.5, -30, 3 + ex]) cube([13, 60, 13]);   // filtro (≈ 13 × 13; largo esquemático)
+        if (ex > 0) v_guia([0, 0, 3], [0, 0, 3 + ex]);
+    }
+    translate([60, 0, 0]) {
+        color(V_ORANGE) separador_coax();
+        color("black", 0.7) translate([0, 36 + ex, -10]) cylinder(d = 7, h = 30, $fn = 24);   // coaxial: entra por la ranura (-Y)
+        if (ex > 0) v_guia([0, 36, 5], [0, 36 + ex, 5]);
+    }
+    translate([110, 0, 0]) {
+        v_tube([0, 0, -45], "z", 4.2, 112);
+        color(V_LIGHT) translate([0, 0, ex]) tapon_varilla();
+    }
+}
