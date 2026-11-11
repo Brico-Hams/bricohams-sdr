@@ -67,7 +67,7 @@
 | `hf17` | 18 MHz  HAM 17m (solo con el V3 como HF) | 18,118 | 1,024 | 17,6572 – 18,5788 | 17,967 | hfdl | 1000 | rama Q |
 | `hf15` | 21 MHz  HAM 15m (solo con el V3 como HF) | 21,225 | 1 | 20,775 – 21,675 | 21,074 | ft8 | 1000 | rama Q |
 | `hf12` | 24 MHz  HAM 12m (solo con el V3 como HF) | 24,94 | 1,024 | 24,4792 – 25,4008 | 24,915 | ft8 | 1000 | no |
-| `hf11` | 27 MHz · CB 11 m · 40 canales (Radio Club: canal 32 · 27,325) (solo con el V3 como HF) | 27,185 | 1 | 26,735 – 27,635 | 27,185 | nfm | 1000 | no |
+| `aprs2m` | 144,800 MHz · APRS 2 m (receptor de control RadiCodex; sustituye al perfil CB del V3; la CB sigue en el SDRplay y el Hermes Lite 2) | 145 | 2,048 | 143,976 – 146,024 | 144,8 | packet | 1000 | no |
 | `hf10` | 28 MHz  HAM 10m (solo con el V3 como HF) | 28,85 | 2,4 | 27,77 – 29,93 | 28,074 | ft8 | 1000 | no |
 | `hf6` | 50-52 MHz  HAM 6m (solo con el V3 como HF) | 51 | 2,4 | 49,92 – 52,08 | 50,313 | ft8 | 1000 | no |
 

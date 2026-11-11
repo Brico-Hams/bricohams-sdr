@@ -35,7 +35,10 @@ for sdrplay in (False, True):
     assert s['hf']['enabled'] is sdrplay
     hfdev = s['hf'] if sdrplay else s['multi']
     hf = {k: v for k, v in hfdev['profiles'].items() if k[:2] in ('hf', 'sp')}
-    assert len(hf) == 12, len(hf)
+    # The V3 swaps the CB profile for the 144,800 MHz APRS control receiver; the SDRplay keeps all 12 HF bands.
+    assert len(hf) == (12 if sdrplay else 11), len(hf)
+    aprs = s['multi']['profiles']['aprs2m']
+    assert (aprs['start_freq'], aprs['start_mod']) == (144800000, 'packet') and abs(aprs['center_freq'] - 144800000) < aprs['samp_rate'] * 0.45, aprs
     for pid, p in hf.items():
         banda = pid[2:]
         if banda == '11':
