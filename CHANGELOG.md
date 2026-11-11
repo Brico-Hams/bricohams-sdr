@@ -2,6 +2,7 @@
 
 ## Sin publicar · 2026-11-03
 
+- Manual 52: nuevo capítulo «6 bis. Distribución de componentes y cableado» (mapa de rejillas/bandejas, pasamuros, cableado interno, protecciones, interconexión de la estación y comprobaciones eléctricas de las cajas v2, v3 electrónica, potencia y SAI) con diez diagramas nuevos (40-49) en `tools/esquemas.py` y `docs/esquemas/`.
 - Manual 52 de montaje de las 110 piezas impresas (caja v2, caja v3, antenas y anclajes) con tabla maestra y nueve diagramas nuevos (31-39) en `tools/esquemas.py`.
 - Manual 52: imágenes de cada pieza y vistas de despiece y montaje por grupo (`vista_despiece_*` y `vista_montado_*` añadidas a los `.scad`, sin cambiar los STL) generadas con `tools/render_montaje.sh`.
 - Banner del receptor raíz de OpenWebRX+ (junto a la presentación del proyecto, no solo `/bricohams/`): visitas totales, IP propia

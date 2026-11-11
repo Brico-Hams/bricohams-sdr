@@ -1404,6 +1404,414 @@ def mapa_piezas_mastil():
     return svg(W, H, b, 'Mapa de piezas impresas en el mástil')
 
 
+# ---------------------------------------------------------------------
+#  40-49: component layout and wiring of every box (manual 52, chapter 6 bis).
+#  Positions are taken from hardware/caja/caja_bricohams.scad and
+#  hardware/caja_v3/caja_v3.scad (plate-local mm, y grows towards the lid
+#  side of the drawing). Anything the .scad does not define is drawn dashed
+#  and marked PENDIENTE DE CONFIRMAR.
+# ---------------------------------------------------------------------
+WIRE = {'L': '#8d5524', 'N': '#039be5', 'PE': '#2e7d32', 'V12': '#c62828', 'GND': '#37474f',
+        'V5': '#ef6c00', 'USB': '#3949ab', 'RF': '#6a1b9a', 'SIG': '#00838f'}
+
+
+def _plano(titulo, paneles, notas, k=2.0, gap=36, wmin=0):
+    # paneles: (name, W, H, items); item: (x, y, w, h, label, sub, colour, sides[, pending])
+    # sides: N/S/E/W bars mark the face where the connectors point.
+    top, ox, b = 120, 30, ''
+    hmax = max(p[2] for p in paneles)
+    for nombre, pw, ph, items in paneles:
+        b += txt(ox, top - 12, nombre, 13, C['cr'], True)
+        b += f"<rect x='{ox}' y='{top}' width='{pw * k}' height='{ph * k}' fill='#fffde7' stroke='{C['ink']}' stroke-width='2'/>"
+        for it in items:
+            x, y, w, h, lab, sub, col, lado = it[:8]
+            d = " stroke-dasharray='5 3'" if len(it) > 8 else ''
+            px, py = ox + x * k, top + (ph - y - h) * k
+            b += f"<rect x='{px}' y='{py}' width='{w * k}' height='{h * k}' fill='#fff' fill-opacity='0.85' stroke='{col}' stroke-width='1.6'{d}/>"
+            b += txt(px + w * k / 2, py + h * k / 2 - 2, lab, 10, col, True, 'middle')
+            b += txt(px + w * k / 2, py + h * k / 2 + 11, sub, 8.5, C['mute'], False, 'middle')
+            for s in lado:
+                bx, by, bw, bh = {'N': (px, py - 4, w * k, 4), 'S': (px, py + h * k, w * k, 4),
+                                  'W': (px - 4, py, 4, h * k), 'E': (px + w * k, py, 4, h * k)}[s]
+                b += f"<rect x='{bx}' y='{by}' width='{bw}' height='{bh}' fill='{C['or']}'/>"
+        ox += pw * k + gap
+    y = top + hmax * k + 30
+    b += f"<rect x='30' y='{y - 12}' width='20' height='5' fill='{C['or']}'/>" + txt(58, y - 6, 'barra naranja = cara hacia la que miran los conectores (N = arriba del dibujo, S = hacia la pared de pasamuros)', 10.5)
+    for i, t in enumerate(notas):
+        b += txt(30, y + 18 + i * 17, t, 10.5)
+    return svg(int(max(ox, wmin)), int(y + 36 + len(notas) * 17), b, titulo)
+
+
+def rejilla_caja_v2():
+    """Diagram 40: caja v2 plates (placa_electronica, placa_potencia, tapa_potencia)."""
+    s, d, m, l = C['sdr'], C['gnd'], C['pwr'], C['lora']
+    pe = ('placa_electronica 138 × 210 (abs. 79,6 · 6)', 138, 210, [
+        (42, 141, 85, 56, 'Pi 5 + HAT', '4 × M2.5 (58 × 49)', C['pi'], '', 1),
+        (3, 16, 26, 54, 'Mini RTL-SDR', 'nervios + bridas', s, 'NS'),
+        (33, 16, 26, 85, 'RTL-SDR V3', 'nervios + bridas', s, 'NS'),
+        (63, 16, 26, 85, 'FlightStick', 'nervios + bridas', s, 'NS'),
+        (93, 16, 26, 50, 'Diplexor', 'bridas', d, '')])
+    pp = ('placa_potencia 58 × 210 (abs. 9,2 · 6)', 58, 210, [
+        (-3.5, 4, 65, 95, 'Cargador 45 W', 'bridas · sale 3,5 mm', m, 'N'),
+        (9, 105, 40, 100, 'Hub USB', 'bridas', s, '')])
+    tp = ('tapa_potencia (CP_Z = 56)', 69, 210, [
+        (5, 118, 29.4, 67.4, 'LilyGO Mesh', 'cuna 29,4 × 67,4', l, '', 1),
+        (38, 118, 29.4, 67.4, 'LilyGO iGate', 'cuna 29,4 × 67,4', l, '', 1)])
+    notas = ['Posiciones del .scad (x, y desde la esquina inferior izquierda de cada placa). Rayado = orientación o alto PENDIENTE DE CONFIRMAR.',
+             'Dongles: USB (N) hacia el pasamuros del tabique, SMA (S) hacia la fila SMA de la pared. Pi, hub y cargador: cara de conectores PENDIENTE.',
+             'El cargador (65 mm) es más ancho que la placa (58 mm): el .scad solo lo dibuja con ghost() y lo sujeta con bridas.',
+             'Fuente: hardware/caja/caja_bricohams.scad · manual 52, capítulo 6 bis.']
+    return _plano('Rejilla de la caja v2: dónde va cada componente', [pe, pp, tp], notas, 2.0, 36, 700)
+
+
+def rejilla_v3_electronica():
+    """Diagram 41: v3 electronics box: placa_rejilla, bandeja_sdr, bandeja_sdr2 and Pi tray."""
+    s, d, m, p = C['sdr'], C['gnd'], C['pwr'], C['pi']
+    pl = ('placa_rejilla 211 × 223 (abs. 7,8 · 7,8)', 211, 223, [
+        (12, 28, 26, 85, 'Mini', 'soporte_dongle', s, 'NS'), (46, 28, 26, 85, 'V3', 'soporte_dongle', s, 'NS'),
+        (80, 28, 26, 85, 'Flight', 'soporte_dongle', s, 'NS'),
+        (114, 28, 98, 88, 'RSPdx (bahía 100 × 90)', 'soporte_sdrplay', s, 'NS'),
+        (20, 136, 145, 44, 'Hub USB 10 p.', 'soporte_hub · medir', d, '', 1),
+        (182, 132, 26, 50, 'Diplexor', 'bahía 26 × 50', d, '', 1),
+        (90, 186, 60, 26, 'WAGO 221-415 ×3', 'soporte_wago', m, ''),
+        (20, 186, 60, 26, 'Reserva', 'ATO · 12→5 V · HL2', m, '', 1)])
+    d1 = ('bandeja_sdr 167 × 170 (+38 mm)', 167, 170, [
+        (20, 82, 120, 75, 'HackRF (HRF)', 'SMA W · USB E', s, 'WE'),
+        (12, 20, 85, 26, 'RTL-SDR V4', 'dongle', s, 'WE'),
+        (112, 6, 45, 60, 'Airspy HF+ (AHF)', 'conectores N/S', s, 'NS')])
+    d2 = ('bandeja_sdr2 (+82 mm · tamaño PENDIENTE)', 167, 170, [
+        (4, 85, 125, 62, 'Hermes-Lite 2', '12 V + Ethernet', s, '', 1),
+        (4, 6, 85, 26, 'S1', 'dongle', s, 'WE'), (4, 36, 85, 26, 'S2', 'dongle', s, 'WE'),
+        (100, 6, 52, 30, 'S3', 'Airspy Mini…', s, 'WE'), (100, 38, 52, 24, 'S4', 'RSP1B…', s, 'WE'),
+        (136, 86, 26, 60, 'S5', 'vertical', s, 'NS')])
+    bp = ('bandeja Pi 170 × 92 (+131 mm)', 170, 92, [
+        (8, 10, 85, 56, 'Pi 5 + HAT', 'M2.5 · 58 × 49', p, '', 1),
+        (98, 12, 29.4, 67.4, 'LilyGO', 'soporte_lilygo', C['lora'], '', 1),
+        (129, 12, 32.8, 62.8, 'RAK', 'soporte_rak', C['lora'], '', 1)])
+    notas = ['Cotas del .scad (EL_RES, SDR_DECK, SDR_DECK2, PI_OFF) relativas a la esquina inferior izquierda de cada placa. Rayado = orientación PENDIENTE DE CONFIRMAR.',
+             'La bahía del RSPdx (100 × 90) sobresale ≈ 3 mm de la placa (210,8): se dibuja el volumen de 98 × 88. Postes: 38 / 41 / 46 mm.',
+             'HackRF: SMA a la izquierda y USB a la derecha (manual 17). Dongles verticales: USB hacia el hub (N), SMA hacia la pared N (S).',
+             'Fuente: hardware/caja_v3/caja_v3.scad · manual 17 · manual 52, capítulo 6 bis.']
+    return _plano('Rejilla de la caja v3 electrónica: placa, bandejas de SDR y bandeja de la Pi', [pl, d1, d2, bp], notas, 1.5, 36, 1250)
+
+
+def rejilla_v3_potencia():
+    """Diagram 42: v3 power box grid plate (positions converted from box to plate coordinates)."""
+    m, d = C['pwr'], C['gnd']
+    pl = ('placa_rejilla 154 × 182 (abs. 7,8 · 7,8)', 154, 182, [
+        (37, 22, 80, 80, 'Base Schuko', 'soporte_schuko · 2 × M4 + 4 × M3', m, 'S'),
+        (42, 32, 70, 70, 'Cargador 120 W', 'enchufado a la base', m, ''),
+        (22, 104, 110, 16, 'brida_cargador', '2 × M3', d, ''),
+        (12, 132, 60, 20, 'Gatillo PD 12 V', 'sin soporte', m, '', 1),
+        (82, 132, 60, 26, 'WAGO + fusibles', 'sin soporte', m, '', 1)])
+    notas = ['Cotas del .scad (Schuko 80 × 80 × 42 en y = 30, cargador 70 × 70 × 32 a z = 42, gatillo en (20, 140), WAGO en (90, 140), cotas de la caja).',
+             'El cable de 230 V entra por el PG9 de la cara inferior (S) a la base Schuko; el cargador se enchufa directamente en la base.',
+             'Rayado = sin pieza impresa en el .scad: posición orientativa, PENDIENTE DE CONFIRMAR. Medir la base Schuko y el cargador reales.',
+             'Fuente: hardware/caja_v3/caja_v3.scad · manual 17 · manual 52, capítulo 6 bis.']
+    return _plano('Rejilla de la caja v3 potencia: Schuko, cargador de 120 W y 12 V', [pl], notas, 2.0, 36, 760)
+
+
+def rejilla_v3_sai():
+    """Diagram 43: v3 SAI box grid plate (SAI_LAYOUT)."""
+    m, d = C['pwr'], C['gnd']
+    pl = ('placa_rejilla 211 × 223 (abs. 7,8 · 7,8)', 211, 223, [
+        (50, 4, 159, 106, 'soporte_bateria', 'correas 20-22 mm', C['line'], ''),
+        (54, 8, 151, 100, 'Batería 12 V 151 × 100 × 65', 'de pie · bornes arriba', d, 'N'),
+        (6, 6, 40, 216, 'PCB SAI', 'guia_pcb ×2 (y 18, 168)', m, 'E'),
+        (50, 118, 84, 70, 'Trafo 80 × 62 × 65', 'pletina_trafo · M5', m, '', 1),
+        (138, 118, 34, 86, 'Filtro EMI salida', 'soporte_filtro · M4', C['sdr'], '', 1),
+        (176, 118, 34, 86, 'Filtro EMI entrada', 'soporte_filtro · M4', C['sdr'], '', 1),
+        (50, 194, 84, 28, 'ATO 15 A + WAGO', 'soporte_wago', m, '')])
+    notas = ['Cotas del .scad (SAI_LAYOUT, GUIA_Y, SAI_PCB 210 × 70 de canto con los componentes hacia +X). Rayado = orientación de bornes PENDIENTE DE CONFIRMAR.',
+             'La batería deja los bornes arriba (N): el fusible ATO de 15 A debe quedar a ≤ 10 cm del borne positivo.',
+             'Entradas de 230 V por los PG9 de la cara inferior; ventilas de entrada (abajo) y salida (arriba) siempre despejadas por el hidrógeno.',
+             'Fuente: hardware/caja_v3/caja_v3.scad · manual 17 · manual 52, capítulo 6 bis.']
+    return _plano('Rejilla de la caja v3 SAI: batería, placa, trafo, filtros EMI y fusible', [pl], notas, 2.0, 36, 800)
+
+
+def _nodo(x, y, w, h, t, sub='', c=None, dash=False, fill='#f7f9fb'):
+    c = c or C['ink']
+    d = " stroke-dasharray='5 3'" if dash else ''
+    s = f"<rect x='{x}' y='{y}' width='{w}' height='{h}' rx='5' fill='{fill}' stroke='{c}' stroke-width='1.6'{d}/>"
+    s += txt(x + w / 2, y + (h / 2 - 1 if sub else h / 2 + 4), t, 10, c, True, 'middle')
+    if sub:
+        s += txt(x + w / 2, y + h / 2 + 11, sub, 8.5, C['mute'], False, 'middle')
+    return s
+
+
+def _cable(kind, pts, label='', pos=None, dash=False):
+    # kind: key of WIRE, or 'LN' / 'LNPE' for a mains bundle (brown + blue [+ green])
+    pl = ' '.join(f'{x},{y}' for x, y in pts)
+    d = " stroke-dasharray='6 4'" if dash else ''
+    if kind in ('LN', 'LNPE'):
+        s = f"<polyline points='{pl}' fill='none' stroke='{WIRE['L']}' stroke-width='7'/>"
+        s += f"<polyline points='{pl}' fill='none' stroke='{WIRE['N']}' stroke-width='4'/>"
+        if kind == 'LNPE':
+            s += f"<polyline points='{pl}' fill='none' stroke='{WIRE['PE']}' stroke-width='1.6'/>"
+        col = WIRE['L']
+    elif kind == 'PE':
+        s = (f"<polyline points='{pl}' fill='none' stroke='{WIRE['PE']}' stroke-width='3.5'/>"
+             f"<polyline points='{pl}' fill='none' stroke='#ffd600' stroke-width='3.5' stroke-dasharray='6 6'/>")
+        col = WIRE['PE']
+    else:
+        col = WIRE[kind]
+        s = f"<polyline points='{pl}' fill='none' stroke='{col}' stroke-width='2.2'{d} marker-end='url(#a{col[1:]})'/>"
+    if label:
+        lx, ly = pos or ((pts[0][0] + pts[1][0]) / 2 + 4, (pts[0][1] + pts[1][1]) / 2 - 4)
+        s += txt(lx, ly, label, 9, col, True)
+    return s
+
+
+def _pasamuros(x, y, nombre, destino='', col=None, largo=170):
+    col = col or WIRE['RF']
+    s = f"<circle cx='{x}' cy='{y}' r='7' fill='#fff' stroke='{col}' stroke-width='2'/>" + txt(x, y + 21, nombre, 8.5, C['ink'], True, 'middle')
+    if destino:
+        s += f"<line x1='{x}' y1='{y - 7}' x2='{x}' y2='{y - largo}' stroke='{col}' stroke-width='1.6' marker-end='url(#a{col[1:]})'/>"
+        s += f"<text x='{x + 4}' y='{y - 12}' font-size='8.5' fill='{col}' transform='rotate(-90 {x + 4} {y - 12})'>{esc(destino)}</text>"
+    return s
+
+
+def _leyenda(x, y):
+    items = [('L', 'L 230 V marrón'), ('N', 'N 230 V azul'), ('PE', 'PE verde/amarillo'), ('V12', '12 V rojo'),
+             ('GND', 'GND negro'), ('V5', '5 V'), ('USB', 'USB'), ('RF', 'coaxial RF'), ('SIG', 'señal / I2C / 1-Wire')]
+    s = txt(x, y, 'Código de colores', 11, C['ink'], True)
+    for i, (k, t) in enumerate(items):
+        s += f"<line x1='{x}' y1='{y + 14 + i * 17}' x2='{x + 28}' y2='{y + 14 + i * 17}' stroke='{WIRE[k]}' stroke-width='3.5'/>" + txt(x + 36, y + 18 + i * 17, t, 10)
+    return s
+
+
+def _wmark():
+    return markers(sorted(set(WIRE.values())))
+
+
+def cableado_caja_v2():
+    """Diagram 44: wiring of the v2 box (single box, 230 V compartment on the left)."""
+    W, H = 1180, 840
+    b = _wmark()
+    b += f"<rect x='40' y='100' width='760' height='520' rx='10' fill='none' stroke='{C['ink']}' stroke-width='3'/>"
+    b += f"<rect x='60' y='130' width='260' height='470' rx='6' fill='#fdecea' stroke='{C['pwr']}' stroke-width='1.4' stroke-dasharray='6 4'/>"
+    b += txt(70, 124, 'COMPARTIMENTO DE POTENCIA (230 V)', 10, C['pwr'], True) + txt(340, 124, 'ELECTRÓNICA (placa_electronica)', 10, C['sdr'], True)
+    b += _nodo(100, 150, 110, 50, 'WAGO 221-412 ×2', 'L · N (empalme)', C['pwr'])
+    b += _nodo(80, 260, 110, 70, 'Cargador 45 W', 'USB-C PD + USB-A', C['pwr'])
+    b += _nodo(80, 380, 110, 80, 'Hub USB', 'alimentado (USB-A)', C['sdr'])
+    b += _nodo(210, 380, 100, 80, 'LilyGO ×2', 'tapa_potencia', C['lora'])
+    b += _nodo(80, 490, 230, 60, 'Filtro EMI / fusible', 'no previstos: PENDIENTE DE CONFIRMAR', C['gnd'], True)
+    b += _nodo(520, 160, 150, 90, 'Pi 5 + HAT', 'SDR · LoRa · GPS · RTC', C['pi'])
+    b += _nodo(700, 150, 80, 40, 'Cámara', 'tapa · CSI', C['cam'])
+    for x, t in ((360, 'Mini'), (440, 'V3'), (520, 'Flight')):
+        b += _nodo(x, 300, 70, 50, t, 'USB', C['sdr'])
+    b += _nodo(610, 300, 90, 50, 'Diplexor', 'HF / VHF', C['gnd'])
+    b += _cable('LN', [(70, 613), (70, 175), (100, 175)]) + txt(14, 400, 'A1 230 V', 9, WIRE['L'], True)
+    b += _cable('LN', [(130, 200), (130, 260)], 'A3', (134, 236))
+    b += _cable('V5', [(190, 280), (300, 280), (300, 195), (520, 195)], 'A4 USB-C 5 V 3 A', (230, 272))
+    b += _cable('V5', [(150, 330), (150, 380)], 'A5', (154, 360))
+    b += _cable('USB', [(135, 380), (135, 350), (315, 350), (315, 275), (555, 275), (555, 250)], 'A6 hub → Pi', (320, 268))
+    for x in (395, 475, 555):
+        b += _cable('USB', [(x, 275), (x, 300)])
+    b += _cable('USB', [(190, 420), (210, 420)])
+    b += _cable('SIG', [(670, 175), (700, 175)], 'A12 CSI', (672, 168))
+    b += _cable('SIG', [(740, 613), (740, 260), (670, 230)], 'A11 Cat6', (746, 420))
+    b += _pasamuros(75, 620, 'PG9 230 V', '', WIRE['L'])
+    rf = [('SAT', 'RTL-SDR del HAT'), ('HAM', 'Mini RTL-SDR'), ('VHF', 'diplexor (VHF) → V3'), ('HF', 'MLA-30 → diplexor → V3'),
+          ('ADSB', 'bias-tee 5 V → FlightStick'), ('868', 'SX1262 del HAT'), ('GPS', 'GPS del HAT'),
+          ('M433', 'LilyGO Mesh (muesca)'), ('IG433', 'FBP-433s → LilyGO iGate')]
+    for i, (n, t) in enumerate(rf):
+        b += _pasamuros(350 + 36 * i, 620, n, t)
+    b += _pasamuros(690, 620, 'PG7 WX', 'BME280 4×0,25 apantallado ≤ 5 m', WIRE['SIG'], 90)
+    b += _pasamuros(740, 620, 'M20 LAN', '', WIRE['SIG'])
+    b += _leyenda(850, 130)
+    notas = ['• Fila inferior: 9 pasamuros SMA (SAT … IG433, paso 15 mm, z = 26), PG7 WX, M20 LAN y PG9 230 V. Sin PE: cargador clase II y caja de plástico; manguera H07RN-F 2 × 1 mm² (opción A: cable del cargador cortado a 15 cm y empalmado con 2 × WAGO 221-412).',
+             '• Los coaxiales internos son latiguillos RG-316 de 20 cm SMA–SMA; el mástil va a tierra por fuera (16 mm²). Diferencial de 30 mA aguas arriba.',
+             '• El pasamuros del tabique (pasamuros_usb, 5 ranuras) lleva USB-C, USB del hub y datos de los dongles al compartimento de electrónica.',
+             '• Numeración A1… como en la tabla de cableado interno del manual 52 (capítulo 6 bis, caja v2).']
+    for i, t in enumerate(notas):
+        b += txt(40, 690 + i * 18, t, 10.5)
+    return svg(W, H, b, 'Cableado interno de la caja v2')
+
+
+def cableado_v3_electronica():
+    """Diagram 45: wiring of the v3 electronics box (12 V bus, USB hub, Pico, RF stubs)."""
+    W, H = 1260, 900
+    b = _wmark()
+    b += f"<rect x='40' y='90' width='1000' height='700' rx='10' fill='none' stroke='{C['ink']}' stroke-width='3'/>"
+    b += _nodo(110, 125, 170, 50, 'WAGO 221-415 ×3', '+12 V · GND · reserva', C['pwr'])
+    b += _nodo(300, 125, 170, 50, 'Fusibles ATO', '2 A hub · 1 A fans · 1 A viento', C['pwr'])
+    b += _nodo(490, 125, 200, 50, 'Filtro π 12 V', '2×2200 µF · 100 nF · 10 µH (PENDIENTE)', C['gnd'], True)
+    b += _nodo(720, 125, 150, 60, 'Pi 5 + HAT', 'bandeja Pi', C['pi'])
+    b += _cable('V12', [(280, 150), (300, 150)]) + _cable('V12', [(470, 150), (490, 150)])
+    b += f"<line x1='110' y1='205' x2='960' y2='205' stroke='{WIRE['V12']}' stroke-width='3'/><line x1='110' y1='218' x2='960' y2='218' stroke='{WIRE['GND']}' stroke-width='3'/>"
+    b += txt(965, 209, '+12 V', 9, WIRE['V12'], True) + txt(965, 222, 'GND', 9, WIRE['GND'], True)
+    b += _cable('V12', [(385, 175), (385, 205)])
+    cons = [(110, 150, 'Hub USB 10 p.', '2 A'), (290, 110, 'Ventilador IN', '1 A'), (420, 110, 'Ventilador OUT', '1 A'),
+            (570, 140, 'RS485 viento', '1 A → PG7'), (730, 120, 'HL2 12 V', 'reserva 3 A'), (870, 130, '12→5 V ×2', 'reserva')]
+    for x, w, t, s2 in cons:
+        b += _nodo(x, 240, w, 50, t, s2, C['pwr'], t in ('HL2 12 V', '12→5 V ×2'))
+        b += _cable('V12', [(x + w // 2 - 8, 205), (x + w // 2 - 8, 240)])
+        b += _cable('GND', [(x + w // 2 + 8, 218), (x + w // 2 + 8, 240)])
+    b += f"<line x1='185' y1='290' x2='185' y2='330' stroke='{WIRE['USB']}' stroke-width='3'/><line x1='185' y1='330' x2='1010' y2='330' stroke='{WIRE['USB']}' stroke-width='3'/>"
+    b += _cable('USB', [(1010, 330), (1010, 155), (870, 155)], 'E15 hub → Pi USB 3.0', (880, 148))
+    usb = [(110, 60, 'Mini'), (180, 60, 'V3'), (250, 70, 'Flight'), (330, 70, 'RSPdx'), (410, 130, 'HRF·V4·AHF'), (550, 80, 'bias-tee'),
+           (640, 80, 'inyector'), (730, 60, 'LilyGO'), (800, 60, 'RAK'), (870, 60, 'Pico'), (940, 60, 'RS485')]
+    for x, w, t in usb:
+        b += _nodo(x, 360, w, 50, t, 'USB', C['sdr'])
+        b += _cable('USB', [(x + w // 2, 330), (x + w // 2, 360)])
+    b += _nodo(780, 450, 110, 50, 'Q1 · Q2 2N7002', 'PWM ventiladores', WIRE['SIG']) + _nodo(900, 450, 100, 50, 'DS18B20', '1-Wire GP22', WIRE['SIG'])
+    b += _cable('SIG', [(880, 410), (880, 450)]) + _cable('SIG', [(915, 410), (915, 450)])
+    b += _cable('SIG', [(780, 480), (325, 480), (325, 290)], 'PWM + TACH (C18)', (460, 474))
+    b += _cable('SIG', [(780, 495), (410, 495), (410, 265), (420, 265)])
+    b += _nodo(110, 540, 90, 50, 'Diplexor', 'HF / VHF', C['gnd']) + _nodo(210, 540, 100, 50, 'FBP-433s', 'sobre clip_filtro', C['rf'])
+    b += _nodo(920, 540, 100, 50, 'Cámara', 'tapa · CSI', C['cam']) + _cable('SIG', [(1020, 565), (1030, 565), (1030, 175), (870, 175)], 'CSI', (1034, 400))
+    b += _cable('V12', [(60, 783), (60, 160), (110, 160)], 'E2 +12 V', (14, 420)) + _cable('GND', [(72, 783), (72, 168), (110, 168)])
+    b += _cable('V5', [(84, 783), (84, 100), (795, 100), (795, 125)], 'E1 USB-C PD 5 V', (400, 94))
+    b += _cable('SIG', [(100, 783), (100, 112), (760, 112), (760, 125)], 'E-LAN Cat6', (300, 109))
+    b += _pasamuros(60, 790, 'M25 PWR', '', WIRE['V12']) + _pasamuros(100, 790, 'M20 LAN', '', WIRE['SIG'])
+    for i, (n, t) in enumerate((('WX', 'BME280 → Pico GP4/GP5'), ('VIENTO', '4 hilos → RS485 + 12 V'), ('LLUVIA', 'reed → Pico GP15'), ('VENT', 'ePTFE (sin cable)'))):
+        b += _pasamuros(140 + 40 * i, 790, 'PG7 ' + n, t, WIRE['SIG'], 150)
+    n_rows = [['SAT', 'HAM', 'VHF', 'HF', 'ADSB', '868', 'GPS'], ['M433', 'IG433', 'DISC2', 'HF2', 'R1', 'R2', 'R3'], ['HRF', 'AHF', 'V4', 'R4']]
+    dest = {'SAT': 'RTL del HAT', 'HAM': 'Mini', 'VHF': 'diplexor VHF', 'HF': 'inyector → diplexor', 'ADSB': 'bias-tee → Flight', '868': 'SX1262 HAT',
+            'GPS': 'GPS HAT', 'M433': 'LilyGO', 'IG433': 'FBP-433s → RAK/LilyGO', 'HRF': 'HackRF', 'AHF': 'Airspy HF+', 'V4': 'RTL-SDR V4'}
+    i = 0
+    for row in n_rows:
+        for n in row:
+            b += _pasamuros(320 + 40 * i, 790, 'N ' + n, dest.get(n, 'tapón'), WIRE['RF'], 175 if n in dest else 30)
+            i += 1
+    b += _leyenda(1070, 120)
+    notas = ['• Los 18 pasamuros N (filas z = 26 · 56 · 86) llevan latiguillo RG-316 de 20 cm N–SMA a cada receptor; los libres llevan tapon_n.',
+             '• Sin 230 V en este módulo: solo 12 V (manguera 4 × 0,75) y 5 V (USB-C PD). Masa común: GND del WAGO, Pico, MOSFET y ventiladores.',
+             '• Las posiciones de la numeración E1… coinciden con la tabla de cableado del manual 52 (capítulo 6 bis, caja v3 electrónica).']
+    for k, t in enumerate(notas):
+        b += txt(40, 840 + k * 18, t, 10.5)
+    return svg(W, H, b, 'Cableado interno de la caja v3 electrónica')
+
+
+def cableado_v3_potencia():
+    """Diagram 46: wiring of the v3 power box."""
+    W, H = 1100, 740
+    b = _wmark()
+    b += f"<rect x='40' y='90' width='700' height='520' rx='10' fill='none' stroke='{C['ink']}' stroke-width='3'/>"
+    b += _nodo(60, 360, 200, 100, 'Base Schuko', 'soporte_schuko · bornas L N PE', C['pwr'])
+    b += _nodo(80, 240, 160, 90, 'Cargador 120 W', 'USB-C 1 · USB-C 2 · USB-A', C['pwr'])
+    b += _nodo(300, 240, 110, 60, 'Gatillo PD', '12 V', C['pwr'])
+    b += _nodo(440, 240, 110, 60, 'ATO general', '(PENDIENTE)', C['pwr'], True)
+    b += _nodo(300, 130, 400, 60, 'WAGO 221-415', '+12 V · GND · 2 reserva', C['pwr'])
+    b += _nodo(480, 350, 220, 80, '2.ª base + adaptador 65 W', 'opción c del hub (PENDIENTE)', C['gnd'], True)
+    b += _cable('LN', [(80, 610), (80, 460)]) + _cable('PE', [(110, 610), (110, 460)])
+    b += txt(46, 540, 'P1-P3 230 V + PE', 9, WIRE['L'], True)
+    b += _cable('LN', [(160, 330), (160, 360)], 'P4', (164, 350))
+    b += _cable('V5', [(240, 260), (270, 260), (270, 540), (400, 540), (400, 603)], 'P5 USB-C 5 V', (280, 530))
+    b += _cable('USB', [(240, 290), (300, 290)], 'P6', (250, 284))
+    b += _cable('V12', [(410, 270), (440, 270)]) + _cable('V12', [(550, 270), (580, 270), (580, 190)], 'P7', (586, 230))
+    b += _cable('V12', [(700, 175), (720, 175), (720, 520), (420, 520), (420, 603)], 'P8 12 V + GND + 2 reserva', (440, 514))
+    b += _pasamuros(95, 610, 'PG9 230 V', '', WIRE['L']) + _pasamuros(410, 610, 'M25 A ELECTRÓNICA', '', WIRE['V12']) + _pasamuros(560, 610, 'PG7 VENT', '', WIRE['SIG'])
+    b += _leyenda(780, 120)
+    notas = ['• Entrada: H07RN-F 3G1,5 desde el PG9 «SALIDA» del SAI. La base Schuko recibe L, N y PE; el cargador se enchufa directo.',
+             '• Salida por el M25: manguera 4 × 0,75 (+12 V, GND, 2 de reserva) y el cable USB-C PD de 5 V para la Pi.',
+             '• Ferrita mix 31 (4 vueltas) en el cable de 12 V a la entrada de la electrónica (ver manual 52, protecciones).']
+    for k, t in enumerate(notas):
+        b += txt(40, 660 + k * 18, t, 10.5)
+    return svg(W, H, b, 'Cableado interno de la caja v3 potencia')
+
+
+def cableado_v3_sai():
+    """Diagram 47: wiring of the v3 SAI box (EMI in → SAI → EMI out, battery fuse)."""
+    W, H = 1160, 760
+    b = _wmark()
+    b += f"<rect x='40' y='90' width='560' height='570' rx='10' fill='none' stroke='{C['ink']}' stroke-width='3'/>"
+    b += _nodo(74, 112, 96, 518, 'PCB SAI', 'AC in · AC out · BAT', C['pwr'])
+    b += _nodo(180, 112, 202, 67, 'ATO 15 A + WAGO', '≤ 10 cm del borne +', C['pwr'])
+    b += _nodo(180, 194, 202, 168, 'Trafo SAI', 'cables según placa (PENDIENTE)', C['pwr'], True)
+    b += _nodo(391, 156, 82, 206, 'EMI salida', '6 A · 250 V', C['sdr'])
+    b += _nodo(482, 156, 82, 206, 'EMI entrada', '6 A · 250 V', C['sdr'])
+    b += _nodo(180, 381, 382, 254, 'Batería 12 V', 'BAT+ rojo · BAT− negro', C['gnd'])
+    b += _cable('LNPE', [(261, 660), (261, 652), (580, 652), (580, 300), (564, 300)], 'S1 RED', (400, 646))
+    b += _cable('LN', [(523, 156), (523, 102), (122, 102), (122, 112)], 'S2', (300, 98))
+    b += _cable('LN', [(170, 372), (432, 372), (432, 362)], 'S3', (300, 368))
+    b += _cable('LNPE', [(432, 156), (432, 126), (590, 126), (590, 640), (317, 640), (317, 660)], 'S4 SALIDA + ferrita', (440, 636))
+    b += _cable('PE', [(482, 340), (473, 340)])
+    b += _cable('V12', [(185, 385), (175, 385), (175, 150), (180, 150)]) + _cable('V12', [(180, 165), (170, 165)], 'S5', (176, 160))
+    b += _cable('GND', [(183, 420), (172, 420)])
+    b += _cable('USB', [(370, 660), (370, 646), (122, 646), (122, 630)], 'S7 DATOS', (200, 642))
+    b += _pasamuros(261, 660, 'PG9 RED', '', WIRE['L']) + _pasamuros(317, 660, 'PG9 SALIDA', '', WIRE['L']) + _pasamuros(370, 660, 'PG7 DATOS', '', WIRE['USB'])
+    b += _leyenda(640, 120)
+    notas = ['• Orden de la corriente: 230 V red → EMI entrada → placa SAI (trafo + batería con ATO 15 A) → EMI salida → PG9 «SALIDA».',
+             '• PE continuo: PG9 RED → EMI entrada → EMI salida → PG9 SALIDA → base Schuko de la caja de potencia.',
+             '• Ventilas de entrada (abajo) y salida (arriba) siempre libres: la batería puede desprender hidrógeno.']
+    for k, t in enumerate(notas):
+        b += txt(40, 700 + k * 18, t, 10.5)
+    return svg(W, H, b, 'Cableado interno de la caja v3 SAI')
+
+
+def interconexion_estacion():
+    """Diagram 48: whole station: mains → SAI → power → electronics → mast, sensors, network, earth."""
+    W, H = 1500, 1000
+    b = _wmark()
+    b += _nodo(40, 120, 200, 70, 'Red 230 V', 'magnetotérmico (PEND.) + 30 mA', C['pwr'], False, '#fdecea')
+    b += _nodo(300, 110, 230, 90, 'Caja SAI', 'EMI · SAI · batería', C['pwr'])
+    b += _nodo(300, 290, 230, 90, 'Caja potencia', 'Schuko · cargador 120 W · PD 12 V', C['pwr'])
+    b += _nodo(300, 470, 330, 120, 'Caja electrónica', 'Pi 5 · SDR · hub · Pico · 18 N', C['pi'])
+    b += _nodo(300, 700, 230, 60, 'Red Ethernet', 'switch / router (PoE PEND.)', C['net'])
+    b += _nodo(40, 600, 200, 70, 'Toma de tierra', 'edificio · mástil 16 mm²', C['pi'])
+    b += _nodo(40, 800, 340, 100, 'Alternativa: caja v2 (una sola)', 'PG9 230 V + 9 SMA + WX + LAN', C['gnd'], True)
+    b += _cable('LNPE', [(240, 155), (300, 155)], 'X1 3G1,5 · PG9 RED', (244, 146))
+    b += _cable('LNPE', [(415, 200), (415, 290)], 'X2 3G1,5 · SALIDA → 230 V', (421, 250))
+    b += _cable('V12', [(380, 380), (380, 470)], 'X3 4×0,75 · M25 → M25', (386, 430))
+    b += _cable('V5', [(340, 380), (340, 470)], 'X3b USB-C PD', (260, 430))
+    b += _cable('USB', [(300, 175), (270, 175), (270, 450), (330, 450), (330, 470)], 'X4 DATOS (PEND.)', (150, 350), True)
+    b += _cable('SIG', [(415, 590), (415, 700)], 'X10 Cat6 FTP · M20 LAN', (421, 650))
+    b += _cable('PE', [(240, 640), (990, 640)])
+    ants = [('Eggbeater SAT', 'C8 · N SAT'), ('Quad 2 m/70 cm', 'C2 · N HAM'), ('Discone VHF', 'C1 · N VHF'), ('MLA-30 + inyector', 'C9 · N HF'),
+            ('ADS-B + LNA 1090', 'C3 · N ADSB'), ('Bigsignal 868', 'C6 · N 868'), ('GPS activa', 'C4 · N GPS'), ('Fibra 433', 'C5 · N M433'),
+            ('Bigsignal 433', 'C7 · N IG433')]
+    for i, (n, t) in enumerate(ants):
+        y = 90 + i * 56
+        b += _nodo(960, y, 250, 46, n, t, WIRE['RF'])
+        b += f"<line x1='630' y1='{500 + i * 8}' x2='960' y2='{y + 23}' stroke='{WIRE['RF']}' stroke-width='1.6' marker-end='url(#a{WIRE['RF'][1:]})'/>"
+    sens = [('Anemómetro + veleta', 'C12 · PG7 VIENTO'), ('Pluviómetro', 'C13 · PG7 LLUVIA'), ('BME280 (garita)', 'C11 · PG7 WX')]
+    for i, (n, t) in enumerate(sens):
+        y = 620 + i * 56
+        b += _nodo(960, y, 250, 46, n, t, WIRE['SIG'])
+        b += f"<line x1='630' y1='{560 + i * 8}' x2='960' y2='{y + 23}' stroke='{WIRE['SIG']}' stroke-width='1.6' marker-end='url(#a{WIRE['SIG'][1:]})'/>"
+    b += _nodo(960, 800, 250, 46, 'Cámara Module 3 Wide', 'dentro de la tapa · CSI', C['cam'])
+    b += f"<rect x='1235' y='80' width='14' height='580' fill='{C['line']}'/>" + txt(1262, 370, 'MÁSTIL', 11, C['mute'], True)
+    b += _leyenda(1290, 120)
+    notas = ['• Coaxiales: bucle de goteo bajo cada pasamuros, funda_n + cinta autovulcanizante, abrazados al mástil cada 50 cm con separador_coax.',
+             '• Descargador coaxial por línea (opcional, recomendado) a la tierra de la caja; mástil a tierra con 16 mm². Distancia módulos–pie de mástil ≈ 5 m.',
+             '• Etiquetas X1… y C1… como en la tabla de interconexión del manual 52 (capítulo 6 bis, sección 5).']
+    for k, t in enumerate(notas):
+        b += txt(420, 880 + k * 18, t, 10.5)
+    return svg(W, H, b, 'Interconexión de la estación: cajas, mástil, sensores, red y tierra')
+
+
+def protecciones():
+    """Diagram 49: protection chain from the mains to the loads."""
+    W, H = 1500, 600
+    b = _wmark()
+    cadena = [('Red 230 V', 'toma de pared', C['pwr']), ('Magnetotérmico', 'PENDIENTE', C['gnd']), ('Diferencial', '30 mA', C['pwr']),
+              ('PG9 RED', 'H07RN-F 3G1,5', C['ink']), ('EMI entrada', '6 A · 250 V', C['sdr']), ('SAI + ATO 15 A', 'batería 12 V', C['pwr']),
+              ('EMI salida', '6 A · 250 V', C['sdr'])]
+    for i, (t, s2, c) in enumerate(cadena):
+        x = 30 + i * 205
+        b += _nodo(x, 110, 175, 60, t, s2, c, t == 'Magnetotérmico')
+        if i:
+            b += _cable('L', [(x - 30, 140), (x, 140)])
+    cadena2 = [('Ferrita mix 31', '4 vueltas · 230 V', C['gnd']), ('Schuko + cargador', '120 W', C['pwr']), ('Gatillo PD', '12 V', C['pwr']),
+               ('ATO general', 'PENDIENTE', C['gnd']), ('Ferrita mix 31', '4 vueltas · 12 V', C['gnd']), ('WAGO 12 V', 'bus +12 V / GND', C['pwr']),
+               ('ATO 2 A · 1 A · 1 A', 'hub · fans · viento', C['pwr'])]
+    for i, (t, s2, c) in enumerate(cadena2):
+        x = 30 + i * 205
+        b += _nodo(x, 260, 175, 60, t, s2, c, s2 == 'PENDIENTE')
+        if i:
+            b += _cable('V12', [(x - 30, 290), (x, 290)])
+    b += _cable('L', [(1347, 170), (1347, 215), (118, 215), (118, 260)], 'SALIDA SAI → PG9 230 V', (500, 209))
+    b += _nodo(30, 400, 260, 60, 'Descargador coaxial (opcional)', 'por línea N · a la tierra de la caja', WIRE['RF'], True)
+    b += _nodo(330, 400, 260, 60, 'Mástil a tierra', '16 mm² · tierra del edificio', C['pi'])
+    b += _nodo(630, 400, 260, 60, 'PE continuo', 'toma → EMI → EMI → Schuko', WIRE['PE'])
+    b += _nodo(930, 400, 260, 60, 'Cargas de 12 V', 'hub · ventiladores · RS485 · reserva', C['pwr'])
+    b += txt(30, 520, 'Orden de la corriente: red → magnetotérmico → diferencial → EMI entrada → SAI → EMI salida → ferrita → Schuko → cargador → gatillo → ATO → ferrita → WAGO → ATO por rama.', 10.5)
+    b += txt(30, 540, 'Valores sin confirmar en las fuentes (magnetotérmico, ATO general, descargador, derivación a tierra) se marcan PENDIENTE DE CONFIRMAR.', 10.5)
+    return svg(W, H, b, 'Protecciones: de la red de 230 V a las cargas')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     try:
@@ -1425,7 +1833,14 @@ def main():
                      ('34_montaje_quad', montaje_quad), ('35_montaje_discone_adsb', montaje_discone_adsb),
                      ('36_montaje_mla_gps', montaje_mla_gps), ('37_montaje_crucetas', montaje_crucetas),
                      ('38_montaje_sensores_pico', montaje_sensores_pico),
-                     ('39_mapa_piezas_mastil', mapa_piezas_mastil)]:
+                     ('39_mapa_piezas_mastil', mapa_piezas_mastil),
+                     ('40_rejilla_caja_v2', rejilla_caja_v2),
+                     ('41_rejilla_v3_electronica', rejilla_v3_electronica),
+                     ('42_rejilla_v3_potencia', rejilla_v3_potencia), ('43_rejilla_v3_sai', rejilla_v3_sai),
+                     ('44_cableado_caja_v2', cableado_caja_v2),
+                     ('45_cableado_v3_electronica', cableado_v3_electronica),
+                     ('46_cableado_v3_potencia', cableado_v3_potencia), ('47_cableado_v3_sai', cableado_v3_sai),
+                     ('48_interconexion_estacion', interconexion_estacion), ('49_protecciones', protecciones)]:
         s = fn()
         open(os.path.join(OUT, name + '.svg'), 'w', encoding='utf-8').write(s)
         if cairosvg:
