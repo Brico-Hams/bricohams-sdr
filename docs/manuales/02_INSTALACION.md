@@ -93,7 +93,7 @@ Pasos (`sudo bash install.sh --lista`, 29 en la versión actual):
 | red | país de WiFi y las dos redes de casa en NetworkManager (5 GHz con prioridad 20, 2,4 GHz con 10) |
 | arranque | `config.txt` (I2C, RTC, UART0, PPS, SPI1, cámara, USB y, con `FAN_ENABLE`, `pwm-2chan` + `w1-gpio`), consola serie fuera, TDT bloqueada |
 | hat | RTC, gpsd, chrony con PPS, encendido de módulos |
-| openwebrx | repositorio de OpenWebRX+, paquetes `openwebrx` y `soapysdr-module-sdrplay3` |
+| openwebrx | repositorio de OpenWebRX+, paquetes `openwebrx`, `direwolf` (decodificador packet/APRS) y `soapysdr-module-sdrplay3` |
 | rtlsdr | Bookworm: compila rtl-sdr-blog y lo fija con `apt-mark hold` · Trixie: usa el rtl-sdr 2.0.2 de Debian y quita el fork si quedó de antes |
 | sdrplay | API de SDRplay (solo con `INSTALL_SDRPLAY_API=yes`) |
 | configuracion | `settings.json` desde la plantilla, marcadores (fusionados con la copia), imágenes, usuarios |

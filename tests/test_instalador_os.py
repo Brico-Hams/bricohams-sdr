@@ -24,6 +24,13 @@ assert 'python3-smbus2' in S
 web = re.search(r'^paso_web\(\) \{.*?^\}', S, re.S | re.M).group(0)
 assert re.search(r'if (\[ "\$modo" != no \] && )?\[ -z "\$dom" \]; then', web) and '[ -z "$dom" ] && aviso' not in web
 assert 'install -m 644 "$FILES/nginx/bricohams-login-log.conf" /etc/nginx/conf.d/bricohams-login-log.conf' in web
+# v5.6: packet/APRS necesita direwolf, que openwebrx no trae con --no-install-recommends
+owrx = re.search(r'^paso_openwebrx\(\) \{.*?^\}', S, re.S | re.M).group(0)
+nativo = owrx.split('clave_apt https://luarvique', 1)[1]
+assert 'apt_i direwolf' in nativo and 'command -v direwolf' in nativo and 'packet/APRS' in nativo
+assert 'direwolf' not in owrx.split('clave_apt https://luarvique', 1)[0], 'direwolf no se instala en Docker'
+chk = open(os.path.join(RAIZ, 'files/bin/bricohams-check'), encoding='utf-8').read()
+assert 'command -v direwolf' in chk
 # v3.2: todo apt-get update pasa por apt_update (reintento con IPv4)
 fuera = [l for l in S.splitlines() if 'apt-get update' in l and not l.lstrip().startswith('#')
          and 'apt_update' not in l and 'aviso' not in l and 'fallo' not in l]

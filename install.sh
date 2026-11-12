@@ -868,6 +868,9 @@ paso_openwebrx() {
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/openwebrx-plus.gpg] https://luarvique.github.io/ppa/$DEB ./" >/etc/apt/sources.list.d/openwebrx-plus.list
     apt_update
     apt_i openwebrx
+    # v5.6 · el modo «packet» (APRS 1200 bd, 144,800 MHz) necesita el binario direwolf; --no-install-recommends no lo trae
+    apt_i direwolf || true
+    command -v direwolf >/dev/null || aviso "No hay direwolf: OpenWebRX+ no decodificará packet/APRS por SDR (sudo apt install direwolf)"
     apt_i soapysdr-module-sdrplay3 || aviso "No pude instalar soapysdr-module-sdrplay3"
     if si "${HF_HERMES:-no}"; then instalar_hpsdrconnector; fi
     # v4.5 · modos «LoRa APRS» y «Meshtastic» del propio OpenWebRX+ (lorarx de dxlAPRS + librería meshtastic)

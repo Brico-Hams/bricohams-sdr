@@ -102,6 +102,9 @@ servicio openwebrx
 if curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8073/; then bien "OpenWebRX+ responde en 127.0.0.1:8073 (al público por nginx: https://$(hostname -I | awk '{print $1}')/)"; else mal "la web no responde en el puerto 8073"; fi
 [ -s "$OWRX_DATA/settings.json" ] && bien "settings.json ($(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(len(d["sdrs"]),"receptores,",sum(len(s["profiles"]) for s in d["sdrs"].values()),"perfiles")' "$OWRX_DATA/settings.json"))" || mal "falta $OWRX_DATA/settings.json"
 [ -s "$OWRX_DATA/users.json" ] && bien "usuario administrador creado" || mal "no hay usuario admin: $([ "${OWRX_BACKEND:-native}" = docker ] && echo "sudo docker exec -it ${OWRX_DOCKER_CONTAINER:-owrx-mbe} openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}" || echo "sudo openwebrx admin adduser ${OWRX_ADMIN_USER:-admin}")"
+if [ "${OWRX_BACKEND:-native}" != docker ]; then
+    command -v direwolf >/dev/null && bien "direwolf instalado (decodificador packet/APRS)" || mal "falta direwolf: no se decodifica packet/APRS por SDR: sudo bash install.sh --solo openwebrx"
+fi
 if [ "${OWRX_BACKEND:-native}" = docker ]; then     # v4.3
     img=$(docker inspect --format '{{.Config.Image}}' "${OWRX_DOCKER_CONTAINER:-owrx-mbe}" 2>/dev/null) && bien "imagen $img" || mal "no encuentro el contenedor ${OWRX_DOCKER_CONTAINER:-owrx-mbe}: sudo bash install.sh --solo openwebrx"
     systemctl is-active --quiet openwebrx 2>/dev/null && mal "el OpenWebRX+ nativo también está en marcha (choca con el de Docker): sudo systemctl disable --now openwebrx"
