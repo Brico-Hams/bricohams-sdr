@@ -983,3 +983,52 @@ Y `bricohams-dispositivos` identifica por VID:PID y serie (RAK 239a:8029, LilyGO
 - MQTT opcional (`SONDAS_MQTT`) con el `Publicador` del kit (ampliado con `retener` y testamento, sin cambiar sus valores por defecto): `<tema>/<serie>/telemetria` (retenido), `<tema>/<serie>/aterrizaje` y `<tema>/estado` (online/offline, LWT). Un fallo del broker nunca tumba el puente. Usuario y clave solo en `/etc/bricohams/sondas.env` (600) y llegan al servicio por `LoadCredential`; el JSON de la web solo lleva activo, host, puerto y tema.
 - Unidad del puente endurecida como `bricohams-archivo-files` (`ProtectSystem=strict`, `NoNewPrivileges`, sin capacidades, `AF_INET/AF_INET6/AF_UNIX` para UDP, MQTT, HTTPS y resolución de nombres).
 **Consecuencias:** necesita Docker (se instala con `apt`) y una imagen de unos cientos de MB. Una instalación con datos web separados (`web-data.env`) no enlaza `sondas.json` a `/var/lib/bricohams/web`. Si el 5000 estuviera ocupado hay que cambiar el puerto del `station.cfg` generado. Manual 51.
+
+## Security review (SonarQube 2026-11-13)
+Revisión de 26 hallazgos de seguridad. Regla aplicada: no cambiar funcionalidad, API, endpoints ni valores. Tras analizar cada uno, **solo se han corregido dos en `rig_skin.js`** (S5332 de DXSummit y S5725 de satellite.js; ver «Hallazgos corregidos»); el resto son falsos positivos en este contexto o su corrección cambiaría el comportamiento o exigiría datos que no existen en el repositorio (ver cada caso y «Not changed - requires decision»).
+
+### Hallazgos y análisis
+**1. `javascript:S1523` · Dynamic code execution should not use user-controlled data (HIGH, CWE-95 / OWASP A3)** — `tests/test_banderas_unicode.cjs:10`, `tests/test_bricohams_sources.cjs:18`, `tests/test_camera_https.cjs:11`, `tests/test_meshweb_favoritos.cjs:58`, `tests/test_satelites_filtros.cjs:36`.
+- Riesgo según la regla: si datos controlados por un atacante llegan a `eval`/`Function`/ejecución dinámica, pueden ejecutar código arbitrario. Aquí `vm.runInNewContext` ejecuta el código fuente de los propios plugins del repositorio (leído de `files/htdocs/plugins/...` con `fs.readFileSync` y rutas fijas) dentro de un contexto simulado, solo en pruebas locales/CI; ningún dato externo llega a la cadena ejecutada.
+- Cambio: ninguno. Cargar el plugin en un contexto aislado es el propósito de la prueba; sustituirlo rompería las pruebas.
+- Comprobación: `node tests/test_*.cjs` sigue pasando igual que antes.
+
+**2. `javascript:S5332` · Clear-text protocols (LOW, CWE-319 / OWASP A2)**
+- `files/htdocs/plugins/receiver/init.js:27`: `'http://' + location.hostname` solo se usa cuando `SSL_MODO` es `no` (decisión explícita del ADR-40: HTTPS solo para administración / instalaciones sin dominio). Forzar https dejaría sin acceso a esas instalaciones. No cambiado.
+- `files/htdocs/plugins/receiver/rig_skin/rig_skin.js` (petición de backlog de DXSummit): **CORREGIDO**, ver «Hallazgos corregidos».
+
+**3. `javascript:S5725` · Remote artifacts without integrity checks (LOW, CWE-353 / OWASP A8)** — `rig_skin.js` (carga de `satellite.js@5.0.0` desde cdn.jsdelivr.net): **CORREGIDO**, ver «Hallazgos corregidos».
+
+**4. `python:S2612` · File permissions world-accessible (MEDIUM, CWE-732 / CWE-266)** — `os.chmod(tmp, 0o644)` en `bricohams-archivo-files.py:117`, `bricohams-camsnap.py:36`, `bricohams-fan.py:202`, `bricohams-io.py:43`, `bricohams-meteo.py:159`, `bricohams-satpass.py:199`, `bricohams-satrec.py:543`, `bricohams-visitas.py:514`, `bricohams-wspr.py:73`, `bricohams-wx-red.py:283`, `bricohams-wx.py:538`, `bricohams_locator_online.py:168`.
+- Riesgo según la regla: dar permisos a «others» puede exponer ficheros sensibles. Aquí son ficheros temporales que se renombran atómicamente (`os.replace`) a JSON/JPG públicos (meteo, cámara, pases, visitas agregadas...) que debe leer el servidor web (OpenWebRX+/nginx, otro usuario). 0644 es lectura para otros, sin escritura. Los ficheros con secretos del kit ya usan 0o600/umask 0o077 (p. ej. `bricohams-api.py`, `bricohams_conexiones.py`).
+- Cambio: ninguno; restringirlo dejaría el contenido web ilegible (404/403). Comprobación manual: los ficheros publicados no contienen datos privados (ADR-48: posición pública redondeada).
+
+**5. `python:S4502` · CSRF protection disabled (HIGH, CWE-352)** — `files/htdocs/plugins/receiver/antenna_switcher/antenna_switcher.py:33`. En esa línea no hay desactivación de CSRF (`CORS(app)` está en la 34; no hay `csrf_exempt`, `WTF_CSRF_ENABLED` ni formularios Flask-WTF). Es un plugin de terceros (DL9UL/LZ2DMV, Apache 2) sin sesiones ni cookies. No presente / no cambiado.
+
+**6. `python:S5122` · Permissive CORS (MEDIUM, CWE-942 / CWE-346)** — `antenna_switcher.py:34` `CORS(app)`. El frontend JS del plugin se sirve desde OpenWebRX+ (otro origen/puerto) y llama al backend Flask; restringir orígenes exige conocer el origen de cada instalación (no hay valor en el código). No cambiado: requiere decisión (lista de orígenes configurable).
+
+**7. `python:S5332` · Clear-text protocols (LOW)** — `files/bin/bricohams-api.py:961` y `tools/esquemas.py:110`. Son texto informativo (mensaje de arranque con la URL local y etiqueta de un diagrama `http://<pi>:8073`), no hay conexión saliente. El servidor local atiende en http (ADR-40 y manual). No cambiado.
+
+**8. `python:S5443` · Publicly writable directories (HIGH, CWE-377)** — `files/bin/bricohams-archivo-files.py:29` y `files/bin/bricohams-satrec.py:68`: `env.get('SATREC_FILES_DIR', '/tmp')`. Es solo el valor por defecto; la instalación define `SATREC_FILES_DIR` en `bricohams.env`. Cambiar el valor por defecto movería las grabaciones y rompería el enlace «Files» de OpenWebRX+; el código ya evita seguir enlaces ajenos en `/tmp` (comentarios líneas 61 y 166). No cambiado.
+
+### Hallazgos corregidos en `rig_skin.js`
+**`javascript:S5332` · Clear-text protocols** — la petición de backlog de DXSummit `$.getJSON('http://www.dxsummit.fi/api/v1/spots?limit=150')` ahora usa https.
+- Por qué era un fallo: el JSON de spots viajaba sin cifrar y podía ser leído o alterado en tránsito (man-in-the-middle; CWE-319, OWASP A02:2021); además, una página del receptor servida por https bloquearía la petición http como contenido mixto.
+- Verificado por el orquestador el 2026-11-13: `https://www.dxsummit.fi/api/v1/spots` responde HTTP 200 `application/json` con `Access-Control-Allow-Origin: *`, de modo que los mismos datos siguen cargando desde el navegador.
+- Comprobación: abrir el panel DX de la rig skin y confirmar que aparecen spots de «HolyCluster + DXSummit».
+
+**`javascript:S5725` · Remote artifacts should not be used without integrity checks** — el script creado dinámicamente para `satellite.js@5.0.0` (cdn.jsdelivr.net) ahora define `s.integrity='sha384-...'` y `s.crossOrigin='anonymous'`.
+- Por qué era un fallo: un CDN comprometido podría servir código modificado que se ejecutaría en la página del receptor (CWE-353, OWASP A08:2021).
+- El hash lo calculó el orquestador sobre el fichero fijado 5.0.0 (descargado dos veces, idéntico). Misma URL y versión, por lo que el comportamiento es idéntico.
+- Comprobación: abrir la vista de satélites y confirmar que no hay error de integridad en la consola del navegador.
+
+### Not changed - requires decision
+| Hallazgo | Motivo |
+|---|---|
+| S1523 en 5 pruebas | Falso positivo: código propio del repo, sin entrada externa. |
+| S5332 `init.js:27` | `SSL_MODO=no` exige http por diseño (ADR-40). |
+| S2612 (12 ficheros) | 0644 necesario para servir ficheros públicos al servidor web. |
+| S4502 `antenna_switcher.py:33` | No presente: la línea no desactiva CSRF. |
+| S5122 `antenna_switcher.py:34` | Falta la lista de orígenes de confianza. |
+| S5332 `bricohams-api.py:961`, `esquemas.py:110` | Solo texto; el servidor local habla http. |
+| S5443 (2 ficheros) | Valor por defecto sobrescrito en `bricohams.env`; cambiarlo altera la ubicación de datos. |

@@ -1002,7 +1002,7 @@ Plugins.rig_skin.createDxWindow = function () {
         // history on every window toggle would fetch what we have
         if (Date.now() - backlogAt < 15 * 60 * 1000) return;
         backlogAt = Date.now();
-        $.getJSON('http://www.dxsummit.fi/api/v1/spots?limit=150')
+        $.getJSON('https://www.dxsummit.fi/api/v1/spots?limit=150')
             .done(function (d) {
                 $win.find('.owrx-rig-dx-src').text('HolyCluster + DXSummit');
                 addSpots((d || []).map(function (r) {
@@ -2788,6 +2788,8 @@ Plugins.rig_skin.createSatScreen = function () {
         if (typeof satellite !== 'undefined') return cb();
         var s = document.createElement('script');
         s.src = 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js';
+        s.integrity = 'sha384-e6V1JVpc+kVNTxT0gEOla7yL4c92Romsw7itPoipfzHbEjzUwPhTv6oeVDMHHzqT';
+        s.crossOrigin = 'anonymous';
         s.onload = cb;
         s.onerror = function () {
             $head.text('orbit library unavailable');
