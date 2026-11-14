@@ -20,6 +20,7 @@ python3 tests/test_backup_oauth.py
 bash tests/test_backup_limpieza.sh
 python3 tests/test_wx_bme280.py
 python3 tests/test_render_settings.py
+python3 tests/test_cabecera_receptor.py
 python3 tests/test_locator_bookmarks.py
 python3 tests/test_locator_es.py
 python3 tests/test_meteo.py
