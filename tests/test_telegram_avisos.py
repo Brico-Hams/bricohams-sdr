@@ -83,7 +83,7 @@ with patch.object(tgm.urllib.request, 'urlopen', respuesta_migrada):
         tgm.enviar_mensaje('123:SECRETO', '-100', 'prueba')
         raise AssertionError('Confunde error HTTP con entrega')
     except RuntimeError as ex:
-        assert 'migrado' in str(ex) and 'SECRETO' not in str(ex)
+        assert 'migrado' in str(ex) and 'TELEGRAM_CHAT_ID=-100123' in str(ex) and 'SECRETO' not in str(ex)
 def respuesta_actualizaciones(*args, **kwargs):
     assert 'getUpdates' in args[0] and 'offset=12' in args[0]
     return io.BytesIO(json.dumps({'ok': True, 'result': [{'update_id': 12}]}).encode())
