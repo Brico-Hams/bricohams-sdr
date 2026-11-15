@@ -257,7 +257,7 @@ def bloque():
     bandas = ''.join('<label class="mr-2 me-2"><input type="checkbox" class="bh-rbi-banda" value="%s"%s> %s</label>'
                      % (b, ' checked' if m else '', b) for b, m in BANDAS)
     return (MARCA_INI + '''
-            <button type="button" class="btn btn-info" id="bh-rbi-abrir" title="Busca repetidores FM en RepeaterBook y los añade como bookmarks con su subtono">Importar repetidores (RepeaterBook)…</button>
+            <button type="button" class="btn btn-info" id="bh-rbi-abrir" title="Busca repetidores (RepeaterBook) o frecuencias de aeropuertos (OurAirports) y los añade como bookmarks">Importar bookmarks (repetidores, aeropuertos)…</button>
             <div id="bh-rbi-panel" class="card mt-2 mb-2" style="display:none"><div class="card-body">
               <h5 class="card-title">Importar bookmarks desde fuentes públicas</h5>
               <p class="small text-muted mb-2">Repetidores FM con su subtono (CTCSS) de RepeaterBook (la API key se configura en
