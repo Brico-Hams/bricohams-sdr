@@ -437,6 +437,11 @@ def _config():
 
 
 class RepeaterBookImportController(AuthorizationMixin, Controller):
+    def get_document_root(self):
+        # AuthorizationMixin redirects non-AJAX requests without a session to the login page and needs this
+        # (only WebpageController has it); same as owrx WebpageController.get_document_root
+        return "../" * max(0, len(self.request.path[1:].split("/")) - 1)
+
     def _json(self, d, code=200):
         self.send_response(json.dumps(d, ensure_ascii=False), code=code, content_type="application/json",
                            headers={"Cache-Control": "no-store"})

@@ -259,6 +259,11 @@ def probar_rangos_aeropuertos(m, rb):
                 b=Capa(enabled=False, profiles=Capa(y=Capa(center_freq=7000000, samp_rate=1000000))))
     assert m.rangos_sintonizables(capa) == [(144000000, 146000000)], m.rangos_sintonizables(capa)
 
+    # without a session owrx redirects to login via get_document_root (absent in plain Controller)
+    ctl = m.RepeaterBookImportController.__new__(m.RepeaterBookImportController)
+    ctl.request = types.SimpleNamespace(path='/settings/bookmarks/aeropuertos')
+    assert ctl.get_document_root() == '../../', ctl.get_document_root()
+
     aero = [
         {'ident': 'LELC', 'name': 'San Javier', 'municipality': 'Murcia', 'iso_region': 'ES-MC'},
         {'ident': 'LEMD', 'name': 'Madrid Barajas', 'municipality': 'Madrid', 'iso_region': 'ES-MD'},
