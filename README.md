@@ -1,3 +1,7 @@
+<p align="center"><img src="branding/bricohams_horizontal.svg" alt="BricoHams · Radioafición · Hazlo tú mismo" width="420"></p>
+
+<p align="center"><a href="https://bricohams.org">bricohams.org</a> · Anatol EA5KAO · Diego EA5JEF · Pedro Roca Molina</p>
+
 # BricoHams SDR · estación de ejemplo
 
 **Versión coordinada: v5.4.3 · 2026-10-27.** [VERSION](VERSION) es la fuente
