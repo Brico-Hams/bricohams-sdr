@@ -45,8 +45,10 @@ def enviar_mensaje(token, chat, texto, formato_html=True):
         raise RuntimeError('Telegram: fallo de conexión (%s).' % type(ex).__name__) from None
     if not resultado.get('ok'):
         detalle = str(resultado.get('description', 'Respuesta sin confirmación')).replace(token, '***')[:250]
-        if resultado.get('parameters', {}).get('migrate_to_chat_id'):
-            detalle += ' El grupo ha migrado: sincroniza TELEGRAM_CHAT_ID en todos los servicios.'
+        nuevo = resultado.get('parameters', {}).get('migrate_to_chat_id')
+        if nuevo:
+            detalle += (' El grupo ha migrado: pon TELEGRAM_CHAT_ID=%s en bricohams.env y en /etc/bricohams/*.env.'
+                        % int(nuevo))
         raise RuntimeError('Telegram %s: %s' % (resultado.get('error_code', ''), detalle))
     return resultado['result']
 
