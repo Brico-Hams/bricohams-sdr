@@ -17,6 +17,8 @@
 #  Settings (parche bricohams-owrx-repeaterbook). Instalado por
 #  bricohams-owrx-rbimport; no editar a mano.
 # =====================================================================
+import csv
+import io
 import json
 import re
 import threading
@@ -61,11 +63,28 @@ DISTRITOS_ES = {
     "9": ("ceuta", "melilla"),
 }
 
+URL_AIRPORTS = "https://davidmegginson.github.io/ourairports-data/airports.csv"
+URL_AIRPORT_FREQS = "https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv"
+CACHE_AERO_SEG = 24 * 3600
+
+# Códigos ISO 3166-2:ES de las comunidades y ciudades autónomas
+REGIONES_ES = {
+    "ES-AN": "Andalucía", "ES-AR": "Aragón", "ES-AS": "Principado de Asturias", "ES-CB": "Cantabria",
+    "ES-CE": "Ceuta", "ES-CL": "Castilla y León", "ES-CM": "Castilla-La Mancha", "ES-CN": "Canarias",
+    "ES-CT": "Cataluña", "ES-EX": "Extremadura", "ES-GA": "Galicia", "ES-IB": "Illes Balears",
+    "ES-MC": "Región de Murcia", "ES-MD": "Comunidad de Madrid", "ES-ML": "Melilla",
+    "ES-NC": "Navarra", "ES-PV": "País Vasco", "ES-RI": "La Rioja", "ES-VC": "Comunitat Valenciana",
+}
+
 _cache = {}
 _cerrojo = threading.Lock()
 
 
 class RepeaterBookError(Exception):
+    pass
+
+
+class AeropuertosError(Exception):
     pass
 
 
@@ -289,6 +308,123 @@ def _ocupadas():
         return {}
 
 
+def rangos_sintonizables(config_sdrs):
+    """Rangos (lo, hi) en Hz que pueden sintonizar los SDR activos, fusionados."""
+    def g(obj, k):
+        # owrx PropertyManager has «in» and [] but no .get(); plain dicts work the same way
+        return obj[k] if obj is not None and k in obj else None
+
+    rangos = []
+    for sdr in (config_sdrs.values() if config_sdrs else ()):
+        if g(sdr, "enabled") is False:
+            continue
+        perfiles = g(sdr, "profiles")
+        for perfil in (perfiles.values() if perfiles else ()):
+            c, s = _num(g(perfil, "center_freq")), _num(g(perfil, "samp_rate"))
+            if c is None or s is None or s <= 0:
+                continue
+            rangos.append((int(round(c - s / 2)), int(round(c + s / 2))))
+    rangos.sort()
+    out = []
+    for lo, hi in rangos:
+        if out and lo <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], hi))
+        else:
+            out.append((lo, hi))
+    return out
+
+
+def sintonizable(f_hz, rangos):
+    return any(lo <= f_hz <= hi for lo, hi in rangos)
+
+
+def _rangos():
+    try:
+        from owrx.config import Config
+        return rangos_sintonizables(Config.get()["sdrs"])
+    except Exception:
+        logger.exception("bricohams rbimport: no se pudieron leer los SDR")
+        return []
+
+
+def _csv(texto):
+    return list(csv.DictReader(io.StringIO(texto.lstrip("\ufeff"))))
+
+
+def descargar_aeropuertos(refrescar=False):
+    """(aeropuertos de España, frecuencias) de OurAirports, con caché de 24 h."""
+    with _cerrojo:
+        c = _cache.get("aeropuertos")
+        if c and not refrescar and time.time() - c[0] < CACHE_AERO_SEG:
+            return c[1]
+    cab = {"User-Agent": "OpenWebRX/%s (BricoHams bookmark import)" % _version()}
+    try:
+        datos = []
+        for url in (URL_AIRPORTS, URL_AIRPORT_FREQS):
+            with urllib.request.urlopen(urllib.request.Request(url, headers=cab), timeout=TIMEOUT) as r:
+                datos.append(_csv(r.read().decode("utf-8", "replace")))
+    except urllib.error.HTTPError as x:
+        raise AeropuertosError("OurAirports no respondió correctamente (HTTP %s)." % x.code)
+    except (urllib.error.URLError, OSError, csv.Error) as x:
+        raise AeropuertosError("No se pudo descargar OurAirports (%s)." % getattr(x, "reason", x))
+    aero = [a for a in datos[0] if _texto(a.get("iso_country")) == "ES"]
+    res = (aero, datos[1])
+    with _cerrojo:
+        _cache["aeropuertos"] = (time.time(), res)
+    return res
+
+
+def aeropuertos_bookmarks(airports, freqs, region="", texto=""):
+    por_ident = {_texto(a.get("ident")): a for a in airports}
+    texto = (texto or "").strip().lower()
+    out = []
+    vistos = set()
+    for fr in freqs:
+        a = por_ident.get(_texto(fr.get("airport_ident")))
+        if a is None:
+            continue
+        if region and _texto(a.get("iso_region")) != region:
+            continue
+        mhz = _num(fr.get("frequency_mhz"))
+        if mhz is None or mhz <= 0:
+            continue
+        hz = int(round(mhz * 1e6))
+        ident, nombre_a = _texto(a.get("ident")), _texto(a.get("name"))
+        muni, tipo, desc = _texto(a.get("municipality")), _texto(fr.get("type")), _texto(fr.get("description"))
+        if texto and texto not in " ".join((ident, nombre_a, muni, desc)).lower():
+            continue
+        nombre = ("✈️ %s %s" % (ident, tipo)).strip()[:60]
+        if (hz, nombre) in vistos:
+            continue
+        vistos.add((hz, nombre))
+        trozos = ["OurAirports", nombre_a, muni, desc if desc.upper().startswith(tipo.upper()) else (tipo + " " + desc).strip()]
+        out.append({
+            "name": nombre,
+            "frequency": hz,
+            "modulation": "am",
+            "description": " · ".join(t for t in trozos if t),
+            "scannable": True,
+            "aeropuerto": nombre_a,
+            "municipio": muni,
+            "region": _texto(a.get("iso_region")),
+            "tipo": tipo,
+        })
+    out.sort(key=lambda b: (b["frequency"], b["name"]))
+    return out
+
+
+def marcar(items, ocupadas, rangos, solo):
+    """Añade «existe» y «sintonizable»; con solo=True y rangos conocidos quita los no sintonizables."""
+    res = []
+    for b in items:
+        b["existe"] = ocupadas.get(b["frequency"])
+        b["sintonizable"] = sintonizable(b["frequency"], rangos) if rangos else True
+        res.append(b)
+    if solo and rangos:
+        res = [b for b in res if b["sintonizable"]]
+    return res
+
+
 def _config():
     try:
         from owrx.config import Config
@@ -301,6 +437,11 @@ def _config():
 
 
 class RepeaterBookImportController(AuthorizationMixin, Controller):
+    def get_document_root(self):
+        # AuthorizationMixin redirects non-AJAX requests without a session to the login page and needs this
+        # (only WebpageController has it); same as owrx WebpageController.get_document_root
+        return "../" * max(0, len(self.request.path[1:].split("/")) - 1)
+
     def _json(self, d, code=200):
         self.send_response(json.dumps(d, ensure_ascii=False), code=code, content_type="application/json",
                            headers={"Cache-Control": "no-store"})
@@ -327,10 +468,37 @@ class RepeaterBookImportController(AuthorizationMixin, Controller):
         except RepeaterBookError as x:
             return self._json({"ok": False, "error": str(x)}, 502)
         sel = filtrar(lista, distrito, bandas, texto, solo_activos)
-        rep = proponer(sel, _ocupadas())
+        rangos = _rangos()
+        ocu = _ocupadas()
+        todos = proponer(sel, ocu)
+        rep = marcar(todos, ocu, rangos, p("solo_sintonizables", "1") == "1")
         logger.info("bricohams rbimport: %s distrito=%s bandas=%s -> %d de %d", pais, distrito or "-",
                     ",".join(bandas), len(rep), len(lista))
-        return self._json({"ok": True, "pais": pais, "total_pais": len(lista), "total": len(rep), "repetidores": rep})
+        return self._json({"ok": True, "pais": pais, "total_pais": len(lista), "total": len(rep), "repetidores": rep,
+                           "rangos": [list(r) for r in rangos], "ocultos": len(todos) - len(rep)})
+
+    def aeropuertosAction(self):
+        q = getattr(self.request, "query", {}) or {}
+
+        def p(k, defecto=""):
+            v = q.get(k)
+            return v[0] if isinstance(v, list) and v else (v if isinstance(v, str) else defecto)
+
+        region = p("region").strip()
+        texto = p("texto").strip()
+        if region and not re.match(r"^ES-[A-Z]{2}$", region):
+            return self._json({"ok": False, "error": "Comunidad no válida."}, 400)
+        if len(texto) > 60:
+            return self._json({"ok": False, "error": "Texto demasiado largo (máximo 60 caracteres)."}, 400)
+        try:
+            aero, freqs = descargar_aeropuertos(p("refrescar", "0") == "1")
+        except AeropuertosError as x:
+            return self._json({"ok": False, "error": str(x)}, 502)
+        rangos = _rangos()
+        todos = aeropuertos_bookmarks(aero, freqs, region, texto)
+        res = marcar(todos, _ocupadas(), rangos, p("solo_sintonizables", "1") == "1")
+        return self._json({"ok": True, "total": len(res), "ocultos": len(todos) - len(res),
+                           "rangos": [list(r) for r in rangos], "regiones": REGIONES_ES, "aeropuertos": res})
 
     def tonosAction(self):
         """POST: asigna el subtono FM de RepeaterBook a los bookmarks

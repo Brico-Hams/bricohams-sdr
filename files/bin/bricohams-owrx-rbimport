@@ -43,6 +43,7 @@ IMPORT_PY = 'from owrx.controllers.settings.bricohams_rbimport import RepeaterBo
 RUTAS_PY = (
     'StaticRoute("/settings/bookmarks/repeaterbook", RepeaterBookImportController),',
     'StaticRoute("/settings/bookmarks/repeaterbook/tonos", RepeaterBookImportController, method="POST", options={"action": "tonos"}),',
+    'StaticRoute("/settings/bookmarks/aeropuertos", RepeaterBookImportController, options={"action": "aeropuertos"}),',
 )
 ANCLA_IMPORT = re.compile(r'^from owrx\.controllers\.settings\.bookmarks import BookmarksController[^\n]*\n', re.M)
 ANCLA_RUTA = re.compile(r'^([ \t]*)StaticRoute\("/settings/bookmarks", BookmarksController\),[^\n]*\n', re.M)
@@ -55,8 +56,9 @@ jQuery(function(){
   var URL_BM = location.pathname;
   while (URL_BM.length > 1 && URL_BM.charAt(URL_BM.length - 1) === '/') URL_BM = URL_BM.slice(0, -1);
   var URL_RB = URL_BM + '/repeaterbook';
+  var URL_AERO = URL_BM + '/aeropuertos';
   var panel = J('#bh-rbi-panel'), estado = J('#bh-rbi-estado'), tabla = J('#bh-rbi-tabla');
-  var lista = [];
+  var lista = [], fuente = 'rb', regionesCargadas = false;
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function aviso(html, clase){
@@ -67,7 +69,8 @@ jQuery(function(){
   function guardar(){
     try { localStorage.setItem('bh-rbi-filtro', JSON.stringify({
       pais: J('#bh-rbi-pais').val(), distrito: J('#bh-rbi-distrito').val(), texto: J('#bh-rbi-texto').val(),
-      activos: J('#bh-rbi-activos').prop('checked'),
+      activos: J('#bh-rbi-activos').prop('checked'), fuente: J('#bh-rbi-fuente').val(), region: J('#bh-rbi-region').val(),
+      sintonizables: J('#bh-rbi-sintonizables').prop('checked'),
       bandas: J('.bh-rbi-banda:checked').map(function(){ return this.value; }).get() })); } catch (e) {}
   }
   try {
@@ -77,24 +80,39 @@ jQuery(function(){
       if (f.distrito != null) J('#bh-rbi-distrito').val(f.distrito);
       J('#bh-rbi-texto').val(f.texto || '');
       J('#bh-rbi-activos').prop('checked', f.activos !== false);
+      J('#bh-rbi-sintonizables').prop('checked', f.sintonizables !== false);
+      if (f.fuente === 'aero') J('#bh-rbi-fuente').val('aero');
       if (f.bandas) J('.bh-rbi-banda').each(function(){ this.checked = f.bandas.indexOf(this.value) >= 0; });
     }
   } catch (e) {}
 
   J('#bh-rbi-abrir').on('click', function(){ panel.toggle(); });
 
+  function cambiarFuente(){
+    fuente = J('#bh-rbi-fuente').val() === 'aero' ? 'aero' : 'rb';
+    J('.bh-rbi-solo-rb').toggle(fuente === 'rb');
+    J('.bh-rbi-solo-aero').toggle(fuente === 'aero');
+    tabla.empty(); lista = []; aviso(''); contar();
+  }
+  J('#bh-rbi-fuente').on('change', cambiarFuente);
+  cambiarFuente();
+
   function pintar(){
     var h = '<table class="table table-sm table-striped"><thead><tr>' +
-            '<th><input type="checkbox" id="bh-rbi-todos" title="Marcar/desmarcar todos"></th>' +
-            '<th>Nombre</th><th>Frecuencia</th><th>Modulación</th><th>Entrada</th><th>Región</th><th>Estado</th><th>Notas</th></tr></thead><tbody>';
+            '<th><input type="checkbox" id="bh-rbi-todos" title="Marcar/desmarcar todos" aria-label="Marcar o desmarcar todos"></th>' +
+            '<th>Nombre</th><th>Frecuencia</th><th>Modulación</th><th>' + (fuente === 'aero' ? 'Aeropuerto' : 'Entrada') +
+            '</th><th>Región</th><th>' + (fuente === 'aero' ? 'Tipo' : 'Estado') + '</th><th>Notas</th></tr></thead><tbody>';
     lista.forEach(function(r, i){
-      var modo = r.ctcss ? 'FM (subtono ' + Number(r.ctcss).toFixed(1) + ' Hz)' : 'FM (sin subtono)';
+      var modo = r.modulation === 'am' ? 'AM' : (r.ctcss ? 'FM (subtono ' + Number(r.ctcss).toFixed(1) + ' Hz)' : 'FM (sin subtono)');
+      var col5 = fuente === 'aero' ? esc(r.aeropuerto) + (r.municipio ? ' <small>(' + esc(r.municipio) + ')</small>' : '')
+                                   : (r.entrada ? Number(r.entrada).toFixed(4) + ' MHz' : '');
       h += '<tr' + (r.existe ? ' class="text-muted"' : '') + '>' +
-           '<td><input type="checkbox" class="bh-rbi-sel" data-i="' + i + '"' + (r.existe ? '' : ' checked') + '></td>' +
-           '<td>' + esc(r.name) + (r.existe ? '<br><small>ya existe: ' + esc(r.existe) + '</small>' : '') + '</td>' +
+           '<td><input type="checkbox" class="bh-rbi-sel" data-i="' + i + '" aria-label="Importar ' + esc(r.name) + '"' + (r.existe ? '' : ' checked') + '></td>' +
+           '<td>' + esc(r.name) + (r.existe ? '<br><small>ya existe: ' + esc(r.existe) + '</small>' : '') +
+           (r.sintonizable === false ? '<br><small>fuera de las bandas de los receptores</small>' : '') + '</td>' +
            '<td>' + mhz(r.frequency) + ' MHz</td><td>' + esc(modo) + '</td>' +
-           '<td>' + (r.entrada ? Number(r.entrada).toFixed(4) + ' MHz' : '') + '</td>' +
-           '<td>' + esc(r.region) + '</td><td>' + esc(r.estado) + '</td>' +
+           '<td>' + col5 + '</td>' +
+           '<td>' + esc(fuente === 'aero' ? (r.region || '') : r.region) + '</td><td>' + esc(fuente === 'aero' ? r.tipo : r.estado) + '</td>' +
            '<td><small>' + esc(r.description) + '</small></td></tr>';
     });
     tabla.html(h + '</tbody></table>');
@@ -106,8 +124,45 @@ jQuery(function(){
     var n = J('.bh-rbi-sel:checked').length;
     J('#bh-rbi-importar').prop('disabled', !n).text('Importar seleccionados (' + n + ')');
   }
+  function ocultos(d){
+    return d.ocultos ? ' ' + d.ocultos + ' ocultos por estar fuera de las bandas de los receptores.' : '';
+  }
+  function fallo(x){
+    var e = x.responseJSON && x.responseJSON.error;
+    if (x.status === 403) e = 'Sesión caducada: vuelve a iniciar sesión en /settings.';
+    aviso(esc(e || ('Error ' + x.status)), 'danger');
+  }
+  function solo(){ return J('#bh-rbi-sintonizables').prop('checked') ? 1 : 0; }
+
+  function buscarAero(refrescar){
+    guardar();
+    aviso('Consultando OurAirports…');
+    tabla.empty(); lista = []; contar();
+    J('#bh-rbi-buscar, #bh-rbi-refrescar').prop('disabled', true);
+    J.ajax(URL_AERO, {dataType: 'json', headers: {'X-Requested-With': 'XMLHttpRequest'}, data: {
+        region: J('#bh-rbi-region').val(), texto: J('#bh-rbi-texto').val(), solo_sintonizables: solo(),
+        refrescar: refrescar ? 1 : 0}})
+      .done(function(d){
+        if (!d || !d.ok) { aviso(esc((d && d.error) || 'Respuesta inesperada.'), 'danger'); return; }
+        if (!regionesCargadas && d.regiones) {
+          var sel = J('#bh-rbi-region'), v = sel.val();
+          Object.keys(d.regiones).sort(function(a, b){ return d.regiones[a].localeCompare(d.regiones[b], 'es'); }).forEach(function(k){
+            sel.append(J('<option>').val(k).text(d.regiones[k])); });
+          sel.val(v); regionesCargadas = true;
+        }
+        lista = d.aeropuertos || [];
+        var nex = lista.filter(function(r){ return r.existe; }).length;
+        aviso('<b>' + lista.length + '</b> frecuencias de aeropuerto' + (nex ? '; ' + nex + ' ya tienen bookmark en su frecuencia y quedan desmarcadas' : '') + '.' + ocultos(d),
+              lista.length ? 'info' : 'warning');
+        if (lista.length) pintar();
+      })
+      .fail(fallo)
+      .always(function(){ J('#bh-rbi-buscar, #bh-rbi-refrescar').prop('disabled', false); });
+  }
+  J('#bh-rbi-fuente').on('change', function(){ if (fuente === 'aero' && !regionesCargadas) buscarAero(false); });
 
   function buscar(refrescar){
+    if (fuente === 'aero') return buscarAero(refrescar);
     guardar();
     var bandas = J('.bh-rbi-banda:checked').map(function(){ return this.value; }).get();
     if (!bandas.length) { aviso('Elige al menos una banda.', 'warning'); return; }
@@ -117,22 +172,18 @@ jQuery(function(){
     J.ajax(URL_RB, {dataType: 'json', headers: {'X-Requested-With': 'XMLHttpRequest'}, data: {
         pais: J('#bh-rbi-pais').val(), distrito: J('#bh-rbi-distrito').val(), bandas: bandas.join(','),
         texto: J('#bh-rbi-texto').val(), solo_activos: J('#bh-rbi-activos').prop('checked') ? 1 : 0,
-        refrescar: refrescar ? 1 : 0}})
+        solo_sintonizables: solo(), refrescar: refrescar ? 1 : 0}})
       .done(function(d){
         if (!d || !d.ok) { aviso(esc((d && d.error) || 'Respuesta inesperada.'), 'danger'); return; }
         lista = d.repetidores || [];
         var nex = lista.filter(function(r){ return r.existe; }).length;
         var nct = lista.filter(function(r){ return r.ctcss; }).length;
         aviso('<b>' + lista.length + '</b> repetidores FM encontrados (de ' + d.total_pais + ' en ' + esc(d.pais) + '), ' +
-              nct + ' con subtono' + (nex ? '; ' + nex + ' ya tienen bookmark en su frecuencia y quedan desmarcados' : '') + '.',
+              nct + ' con subtono' + (nex ? '; ' + nex + ' ya tienen bookmark en su frecuencia y quedan desmarcados' : '') + '.' + ocultos(d),
               lista.length ? 'info' : 'warning');
         if (lista.length) pintar();
       })
-      .fail(function(x){
-        var e = x.responseJSON && x.responseJSON.error;
-        if (x.status === 403) e = 'Sesión caducada: vuelve a iniciar sesión en /settings.';
-        aviso(esc(e || ('Error ' + x.status)), 'danger');
-      })
+      .fail(fallo)
       .always(function(){ J('#bh-rbi-buscar, #bh-rbi-refrescar').prop('disabled', false); });
   }
   J('#bh-rbi-buscar').on('click', function(){ buscar(false); });
@@ -142,7 +193,7 @@ jQuery(function(){
   function crear(sel, i, ok, fallos, fin){
     if (i >= sel.length) return fin(ok, fallos);
     aviso('Importando… ' + (i + 1) + ' / ' + sel.length);
-    var r = sel[i], b = {name: r.name, frequency: r.frequency, modulation: 'nfm',
+    var r = sel[i], b = {name: r.name, frequency: r.frequency, modulation: r.modulation || 'nfm',
                          description: r.description, scannable: true};
     if (r.ctcss) b.ctcss = r.ctcss;
     J.ajax(URL_BM, {data: JSON.stringify([b]), contentType: 'application/json', method: 'POST'})
@@ -153,12 +204,13 @@ jQuery(function(){
     var sel = J('.bh-rbi-sel:checked').map(function(){ return lista[J(this).data('i')]; }).get();
     if (!sel.length) return;
     var rep = sel.filter(function(r){ return r.existe; }).length;
-    if (!confirm('Se crearán ' + sel.length + ' bookmarks FM' +
+    if (!confirm('Se crearán ' + sel.length + (fuente === 'aero' ? ' bookmarks AM de aeropuertos' : ' bookmarks FM') +
                  (rep ? ' (' + rep + ' en frecuencias que ya tienen bookmark: el servidor podría rechazarlos)' : '') +
                  '. ¿Continuar?')) return;
     J('#bh-rbi-importar, #bh-rbi-buscar, #bh-rbi-refrescar').prop('disabled', true);
     crear(sel, 0, 0, [], function(ok, fallos){
-      var msg = '<b>RepeaterBook</b>: importados ' + ok + ' de ' + sel.length + ' repetidores (modulación FM con subtono).';
+      var msg = fuente === 'aero' ? '<b>OurAirports</b>: importadas ' + ok + ' de ' + sel.length + ' frecuencias de aeropuerto (modulación AM).'
+              : '<b>RepeaterBook</b>: importados ' + ok + ' de ' + sel.length + ' repetidores (modulación FM con subtono).';
       if (fallos.length) msg += '<div>Fallidos:</div><ul>' + fallos.slice(0, 20).map(function(s){ return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
       try { sessionStorage.setItem('bh-bm-msg', JSON.stringify({html: msg, clase: fallos.length ? 'warning' : 'success'})); } catch (e) {}
       if (ok) { location.reload(); }
@@ -205,25 +257,35 @@ def bloque():
     bandas = ''.join('<label class="mr-2 me-2"><input type="checkbox" class="bh-rbi-banda" value="%s"%s> %s</label>'
                      % (b, ' checked' if m else '', b) for b, m in BANDAS)
     return (MARCA_INI + '''
-            <button type="button" class="btn btn-info" id="bh-rbi-abrir" title="Busca repetidores FM en RepeaterBook y los añade como bookmarks con su subtono">Importar repetidores (RepeaterBook)…</button>
+            <button type="button" class="btn btn-info" id="bh-rbi-abrir" title="Busca repetidores (RepeaterBook) o frecuencias de aeropuertos (OurAirports) y los añade como bookmarks">Importar bookmarks (repetidores, aeropuertos)…</button>
             <div id="bh-rbi-panel" class="card mt-2 mb-2" style="display:none"><div class="card-body">
-              <h5 class="card-title">Importar repetidores de RepeaterBook</h5>
-              <p class="small text-muted mb-2">Repetidores FM analógicos con su subtono (CTCSS). La API key se configura en
-                <a href="../settings/general">General settings</a> → RepeaterBook. Para otros países el distrito no aplica (déjalo en «Todos»).</p>
+              <h5 class="card-title">Importar bookmarks desde fuentes públicas</h5>
+              <p class="small text-muted mb-2">Repetidores FM con su subtono (CTCSS) de RepeaterBook (la API key se configura en
+                <a href="../settings/general">General settings</a> → RepeaterBook) o frecuencias de aeropuertos españoles de OurAirports (dominio público, modulación AM).
+                Para otros países el distrito no aplica (déjalo en «Todos»).</p>
               <div class="form-row row">
-                <div class="form-group col-md-2"><label for="bh-rbi-pais">País</label>
+                <div class="form-group col-md-4"><label for="bh-rbi-fuente">Fuente</label>
+                  <select class="form-control form-control-sm" id="bh-rbi-fuente">
+                    <option value="rb" selected>Repetidores (RepeaterBook)</option>
+                    <option value="aero">Aeropuertos de España (OurAirports)</option>
+                    <option value="fm" disabled>Emisoras FM por zonas (pendiente de fuente)</option>
+                  </select></div>
+                <div class="form-group col-md-3 bh-rbi-solo-aero" style="display:none"><label for="bh-rbi-region">Comunidad</label>
+                  <select class="form-control form-control-sm" id="bh-rbi-region"><option value="">Toda España</option></select></div>
+                <div class="form-group col-md-2 bh-rbi-solo-rb"><label for="bh-rbi-pais">País</label>
                   <input type="text" class="form-control form-control-sm" id="bh-rbi-pais" value="Spain" maxlength="40"></div>
-                <div class="form-group col-md-4"><label for="bh-rbi-distrito">Distrito (España)</label>
+                <div class="form-group col-md-4 bh-rbi-solo-rb"><label for="bh-rbi-distrito">Distrito (España)</label>
                   <select class="form-control form-control-sm" id="bh-rbi-distrito">''' + opciones + '''</select></div>
-                <div class="form-group col-md-3"><label for="bh-rbi-texto">Texto (indicativo, ciudad…)</label>
+                <div class="form-group col-md-3"><label for="bh-rbi-texto">Texto (indicativo, ciudad, nombre…)</label>
                   <input type="text" class="form-control form-control-sm" id="bh-rbi-texto" maxlength="60"></div>
-                <div class="form-group col-md-3"><label>Bandas</label><div>''' + bandas + '''</div></div>
+                <div class="form-group col-md-3 bh-rbi-solo-rb"><label>Bandas</label><div>''' + bandas + '''</div></div>
               </div>
-              <label class="mr-3 me-3"><input type="checkbox" id="bh-rbi-activos" checked> Solo en servicio (on-air)</label>
+              <label class="mr-3 me-3 bh-rbi-solo-rb"><input type="checkbox" id="bh-rbi-activos" checked> Solo en servicio (on-air)</label>
+              <label class="mr-3 me-3"><input type="checkbox" id="bh-rbi-sintonizables" checked> Solo los que pueden sintonizar mis receptores</label>
               <button type="button" class="btn btn-sm btn-primary" id="bh-rbi-buscar">Buscar</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" id="bh-rbi-refrescar" title="Ignora la caché (6 h) y vuelve a descargar">Buscar (refrescar)</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="bh-rbi-refrescar" title="Ignora la caché y vuelve a descargar">Buscar (refrescar)</button>
               <button type="button" class="btn btn-sm btn-success" id="bh-rbi-importar" disabled>Importar seleccionados (0)</button>
-              <button type="button" class="btn btn-sm btn-warning" id="bh-rbi-tonos" title="Busca en RepeaterBook el subtono FM de los bookmarks FM que ya tienes (misma frecuencia de salida) y se lo asigna">Asignar subtonos a los existentes</button>
+              <button type="button" class="btn btn-sm btn-warning bh-rbi-solo-rb" id="bh-rbi-tonos" title="Busca en RepeaterBook el subtono FM de los bookmarks FM que ya tienes (misma frecuencia de salida) y se lo asigna">Asignar subtonos a los existentes</button>
               <div id="bh-rbi-estado" style="display:none"></div>
               <div id="bh-rbi-tabla" class="mt-2" style="max-height:60vh;overflow:auto"></div>
             </div></div>

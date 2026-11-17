@@ -2,6 +2,8 @@
 
 ## Sin publicar · 2026-11-03
 
+- Importador de bookmarks (`/settings/bookmarks`): nueva fuente «Aeropuertos de España (OurAirports)» con frecuencias AM por comunidad autónoma (`/settings/bookmarks/aeropuertos`), y filtro «Solo los que pueden sintonizar mis receptores» (también para RepeaterBook) según el centro y la tasa de muestreo de los SDR activos; las emisoras FM por zonas quedan pendientes de fuente. `tests/test_rbimport.py`.
+
 - Cabecera del receptor: la presentación (quiénes somos, BricoHams y enlace a bricohams.org) ya no se pierde al reinstalar o actualizar; se conserva el texto editado en el panel admin y se puede fijar con `OWRX_PHOTO_TITLE` / `OWRX_PHOTO_DESC` en `bricohams.env`.
 - El paso `openwebrx` (nativo) instala y verifica `direwolf`, necesario para decodificar el modo «packet» (APRS, 144,800 MHz) y que `--no-install-recommends` omitía; `--actualizar` lo repite en estaciones existentes y `bricohams-check` informa de su presencia. `tests/test_instalador_os.py`.
 - Manual 52: nuevo capítulo «6 bis. Distribución de componentes y cableado» (mapa de rejillas/bandejas, pasamuros, cableado interno, protecciones, interconexión de la estación y comprobaciones eléctricas de las cajas v2, v3 electrónica, potencia y SAI) con diez diagramas nuevos (40-49) en `tools/esquemas.py` y `docs/esquemas/`.

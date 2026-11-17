@@ -83,7 +83,9 @@ def probar_parche():
             assert t.count(p.MARCA_PY) == 1 + len(p.RUTAS_PY), 'líneas marcadas inesperadas'
             # las rutas nuevas van antes de la de /settings/bookmarks
             assert t.index(p.MARCA_PY + '\n            StaticRoute("/settings/bookmarks"') > 0
+            assert 'aeropuertos' in t and t.count('"action": "aeropuertos"') == 1, 'falta la ruta de aeropuertos'
             h = leer(html)
+            assert 'bh-rbi-fuente' in h and 'Aeropuertos de España (OurAirports)' in h and 'bh-rbi-sintonizables' in h
             assert h.count(p.MARCA_INI) == 1 and p.MARCA_FIN in h
             assert h.index('bookmark-add') < h.index(p.MARCA_INI), 'bloque fuera del ancla'
             assert 'NFM' not in h.split(p.MARCA_INI)[1].split(p.MARCA_FIN)[0], 'debe decir FM, no NFM'
@@ -211,6 +213,114 @@ def probar_modulo():
     dup = [dict(rb[0], Callsign='ED5AAA', PL='88.5'), dict(rb[0], Callsign='ED5BBB', PL='100')]
     assert m.elegir_tono('Otro', dup, '5') == (None, None)
     assert m.elegir_tono('ED5BBB', dup, '5')[0] == 100.0
+
+    probar_rangos_aeropuertos(m, rb)
+
+
+class Req(object):
+    def __init__(self, **q):
+        self.query = {k: [str(v)] for k, v in q.items()}
+
+
+def llamar(m, accion, **q):
+    ctl = m.RepeaterBookImportController()
+    ctl.request = Req(**q)
+    salida = []
+    ctl.send_response = lambda cuerpo, code=200, **k: salida.append((code, __import__('json').loads(cuerpo)))
+    getattr(ctl, accion)()
+    return salida[0]
+
+
+def probar_rangos_aeropuertos(m, rb):
+    sdrs = {
+        'a': {'profiles': {'p1': {'center_freq': 145000000, 'samp_rate': 4000000},
+                           'p2': {'center_freq': 146000000, 'samp_rate': 4000000},
+                           'p3': {'center_freq': 100000000, 'samp_rate': 2000000}}},
+        'b': {'enabled': False, 'profiles': {'p': {'center_freq': 1200000000, 'samp_rate': 2000000}}},
+        'c': {'enabled': True, 'profiles': {'p': {'center_freq': 125000000, 'samp_rate': 2000000}}},
+    }
+    rg = m.rangos_sintonizables(sdrs)
+    assert rg == [(99000000, 101000000), (124000000, 126000000), (143000000, 148000000)], rg
+    assert m.sintonizable(145700000, rg) and m.sintonizable(126000000, rg)
+    assert not m.sintonizable(1200000000, rg) and not m.sintonizable(130000000, rg)
+    assert m.rangos_sintonizables({}) == [] and m.rangos_sintonizables(None) == []
+
+    class Capa:
+        """Like owrx PropertyLayer: «in», [] and values(), but no .get()."""
+        def __init__(self, **kw):
+            self.p = kw
+        def __contains__(self, k):
+            return k in self.p
+        def __getitem__(self, k):
+            return self.p[k]
+        def values(self):
+            return self.p.values()
+    capa = Capa(a=Capa(profiles=Capa(x=Capa(center_freq=145000000, samp_rate=2000000))),
+                b=Capa(enabled=False, profiles=Capa(y=Capa(center_freq=7000000, samp_rate=1000000))))
+    assert m.rangos_sintonizables(capa) == [(144000000, 146000000)], m.rangos_sintonizables(capa)
+
+    # without a session owrx redirects to login via get_document_root (absent in plain Controller)
+    ctl = m.RepeaterBookImportController.__new__(m.RepeaterBookImportController)
+    ctl.request = types.SimpleNamespace(path='/settings/bookmarks/aeropuertos')
+    assert ctl.get_document_root() == '../../', ctl.get_document_root()
+
+    aero = [
+        {'ident': 'LELC', 'name': 'San Javier', 'municipality': 'Murcia', 'iso_region': 'ES-MC'},
+        {'ident': 'LEMD', 'name': 'Madrid Barajas', 'municipality': 'Madrid', 'iso_region': 'ES-MD'},
+    ]
+    fr = [
+        {'airport_ident': 'LEMD', 'type': 'TWR', 'description': 'Madrid Torre', 'frequency_mhz': '118.15'},
+        {'airport_ident': 'LELC', 'type': 'TWR', 'description': 'San Javier Torre', 'frequency_mhz': '118.7'},
+        {'airport_ident': 'LELC', 'type': 'TWR', 'description': 'repetida', 'frequency_mhz': '118.700'},
+        {'airport_ident': 'LELC', 'type': 'ATIS', 'description': '', 'frequency_mhz': '127.3'},
+        {'airport_ident': 'LELC', 'type': 'GND', 'description': 'sin frecuencia', 'frequency_mhz': ''},
+        {'airport_ident': 'LELC', 'type': 'APP', 'description': 'cero', 'frequency_mhz': '0'},
+        {'airport_ident': 'XXXX', 'type': 'TWR', 'description': 'huérfano', 'frequency_mhz': '120.0'},
+    ]
+    todos = m.aeropuertos_bookmarks(aero, fr)
+    assert [(b['frequency'], b['name']) for b in todos] == [
+        (118150000, '✈️ LEMD TWR'), (118700000, '✈️ LELC TWR'), (127300000, '✈️ LELC ATIS')], todos
+    b = todos[1]
+    assert b['modulation'] == 'am' and b['scannable'] is True
+    assert b['description'] == 'OurAirports · San Javier · Murcia · TWR San Javier Torre'
+    assert todos[2]['description'] == 'OurAirports · San Javier · Murcia · ATIS'
+    assert (b['aeropuerto'], b['municipio'], b['region'], b['tipo']) == ('San Javier', 'Murcia', 'ES-MC', 'TWR')
+    assert [x['name'] for x in m.aeropuertos_bookmarks(aero, fr, region='ES-MC')] == ['✈️ LELC TWR', '✈️ LELC ATIS']
+    assert [x['name'] for x in m.aeropuertos_bookmarks(aero, fr, texto='BARAJAS')] == ['✈️ LEMD TWR']
+    assert m.aeropuertos_bookmarks(aero, fr, region='ES-GA') == []
+    assert len(m.REGIONES_ES) == 19 and m.REGIONES_ES['ES-MC'] == 'Región de Murcia'
+
+    # acciones: oculta lo no sintonizable e informa de «ocultos»
+    m._ocupadas = lambda: {118700000: 'Ya está'}
+    m.descargar = lambda *a, **k: rb
+    m._config = lambda: 'clave'
+    m.descargar_aeropuertos = lambda refrescar=False: (aero, fr)
+    m._rangos = lambda: [(118000000, 119000000), (145000000, 146000000)]
+    code, d = llamar(m, 'aeropuertosAction', region='ES-MC', solo_sintonizables='1')
+    assert code == 200 and d['ok'] and [x['frequency'] for x in d['aeropuertos']] == [118700000]
+    assert d['ocultos'] == 1 and d['total'] == 1 and d['rangos'] == [[118000000, 119000000], [145000000, 146000000]]
+    assert d['aeropuertos'][0]['sintonizable'] is True and d['aeropuertos'][0]['existe'] == 'Ya está'
+    assert d['regiones']['ES-MD'] == 'Comunidad de Madrid'
+    code, d = llamar(m, 'aeropuertosAction', region='ES-MC', solo_sintonizables='0')
+    assert d['total'] == 2 and d['ocultos'] == 0
+    assert [x['sintonizable'] for x in d['aeropuertos']] == [True, False]
+    assert llamar(m, 'aeropuertosAction', region='es-mc')[0] == 400
+    assert llamar(m, 'aeropuertosAction', texto='x' * 61)[0] == 400
+
+    code, d = llamar(m, 'indexAction', distrito='5', solo_sintonizables='1')
+    assert [r['frequency'] for r in d['repetidores']] == [145700000] and d['ocultos'] == 1
+    assert d['rangos'] == [[118000000, 119000000], [145000000, 146000000]]
+    code, d = llamar(m, 'indexAction', distrito='5', solo_sintonizables='0')
+    assert d['total'] == 2 and d['ocultos'] == 0
+    m._rangos = lambda: []
+    for acc in ('indexAction', 'aeropuertosAction'):
+        code, d = llamar(m, acc, distrito='5', solo_sintonizables='1')
+        assert d['ocultos'] == 0 and d['total'] >= 2 and d['rangos'] == []
+
+    def falla(refrescar=False):
+        raise m.AeropuertosError('sin red')
+    m.descargar_aeropuertos = falla
+    assert llamar(m, 'aeropuertosAction')[0] == 502
 
 
 if __name__ == '__main__':
