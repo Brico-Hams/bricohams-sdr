@@ -1,0 +1,165 @@
+/* Military receiver skin — (c) 2026 EA5KAO / BricoHams, MIT. Everything is scoped to the active theme. */
+body.theme-bh-militar {
+    --mil-olive: #5d6650;
+    --mil-olive-hi: #737d64;
+    --mil-olive-lo: #444b3a;
+    --mil-cream: #e9e2c8;
+    --mil-ink: #1c1c18;
+    --mil-bakelite: #151513;
+    --mil-red: #d8261c;
+    --mil-green: #39d353;
+    --mil-plate: #c9c3a8;
+}
+
+body.theme-bh-militar #openwebrx-panel-receiver {
+    width: min(600px, 96vw) !important;
+    max-width: 96vw;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+body.theme-bh-militar #openwebrx-panel-receiver > :not(#bh-militar-panel) { display: none !important; }
+
+body.theme-bh-militar #bh-militar-panel {
+    position: relative;
+    display: block;
+    font: 700 11px/1.2 "DejaVu Sans Condensed", "Arial Narrow", Arial, sans-serif;
+    color: var(--mil-ink);
+    background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 5px),
+        linear-gradient(180deg, var(--mil-olive-hi), var(--mil-olive) 30%, var(--mil-olive-lo));
+    border: 3px solid #2f3428;
+    border-radius: 6px;
+    padding: 18px 20px 14px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .6), inset 0 0 0 2px rgba(255, 255, 255, .06);
+    user-select: none;
+}
+#bh-militar-panel button { font: inherit; cursor: pointer; }
+#bh-militar-panel :focus-visible { outline: 3px solid #ffd54a; outline-offset: 2px; }
+
+#bh-militar-panel .mil-screw {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #b9bba9, #5a5c4e 70%);
+    box-shadow: inset 0 0 0 1px #2c2e25;
+}
+#bh-militar-panel .mil-screw::after { content: ""; position: absolute; left: 1px; right: 1px; top: 4px; height: 2px; background: #3a3c31; transform: rotate(35deg); }
+#bh-militar-panel .s1 { top: 5px; left: 5px; } #bh-militar-panel .s2 { top: 5px; right: 5px; }
+#bh-militar-panel .s3 { bottom: 5px; left: 5px; } #bh-militar-panel .s4 { bottom: 5px; right: 5px; }
+
+#bh-militar-panel .mil-plate {
+    display: table; margin: -6px auto 10px; padding: 2px 10px; background: var(--mil-plate); color: #2a2a22;
+    border: 1px solid #6d6a58; border-radius: 2px; letter-spacing: 2px; font-size: 10px;
+}
+
+#bh-militar-panel .mil-row { display: grid; grid-template-columns: 110px 1fr 90px; gap: 14px; align-items: center; }
+#bh-militar-panel .mil-col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+
+/* analog meters */
+#bh-militar-panel .mil-meter {
+    width: 100px; height: 100px; border-radius: 50%; padding: 6px;
+    background: radial-gradient(circle, #3b3f33, #23261e);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .6), inset 0 0 0 3px #1c1e17;
+}
+#bh-militar-panel .mil-face {
+    position: relative; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+    background: radial-gradient(circle at 50% 40%, #fbf8ec, var(--mil-cream) 70%, #cfc7a8);
+}
+#bh-militar-panel .mil-arc {
+    position: absolute; left: 12%; right: 12%; top: 22%; height: 60%; border-radius: 50% 50% 0 0;
+    border-top: 2px solid var(--mil-ink);
+    background: repeating-conic-gradient(from 230deg at 50% 100%, var(--mil-ink) 0 1deg, transparent 1deg 10deg);
+    -webkit-mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 63%);
+            mask: radial-gradient(circle at 50% 100%, transparent 62%, #000 63%);
+}
+#bh-militar-panel .mil-arc::after {
+    content: ""; position: absolute; right: 0; top: -2px; width: 30%; height: 100%; border-top: 3px solid var(--mil-red); border-radius: 0 50% 0 0;
+}
+#bh-militar-panel .mil-needle {
+    position: absolute; left: 50%; bottom: 22%; width: 2px; height: 40%; margin-left: -1px;
+    background: var(--mil-ink); transform-origin: 50% 100%; transform: rotate(-50deg); transition: transform .18s linear;
+}
+#bh-militar-panel .mil-sig .mil-needle { background: var(--mil-red); }
+#bh-militar-panel .mil-hub {
+    position: absolute; left: 50%; bottom: 22%; width: 10px; height: 10px; margin: 0 0 -5px -5px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #666, #111);
+}
+#bh-militar-panel .mil-mlabel { position: absolute; left: 0; right: 0; bottom: 8%; text-align: center; font-size: 9px; letter-spacing: 1px; }
+
+/* big tuning dial with pointer handle */
+#bh-militar-panel .mil-dial {
+    position: relative; width: 210px; height: 210px; margin: 0 auto; border-radius: 50%; touch-action: none; cursor: grab;
+    background: radial-gradient(circle, #6e7660 0 54%, #3a4031 55% 57%, var(--mil-cream) 58% 76%, #3a4031 77% 79%, #59614c 80%);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .6), inset 0 0 0 4px #2f3428;
+}
+#bh-militar-panel .mil-scale {
+    position: absolute; inset: 21%; border-radius: 50%;
+    background: repeating-conic-gradient(var(--mil-ink) 0 .8deg, transparent .8deg 9deg);
+    -webkit-mask: radial-gradient(circle, transparent 82%, #000 83%);
+            mask: radial-gradient(circle, transparent 82%, #000 83%);
+    transform: scale(1.46);
+}
+#bh-militar-panel .mil-window {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+    background: #fbf6df; border: 2px solid #2f3428; border-radius: 3px; padding: 3px 8px; text-align: center;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4); min-width: 110px;
+}
+#bh-militar-panel .mil-freq { display: block; font: 700 15px/1.1 "DejaVu Sans Mono", Consolas, monospace; }
+#bh-militar-panel .mil-mode { display: block; font-size: 9px; letter-spacing: 2px; color: #5a5a4a; }
+#bh-militar-panel .mil-handle {
+    position: absolute; left: 6%; right: 6%; top: 50%; height: 16px; margin-top: -8px; z-index: 1;
+    background: linear-gradient(180deg, #3a3a36, var(--mil-bakelite) 40%, #000);
+    border-radius: 8px; box-shadow: 0 3px 5px rgba(0, 0, 0, .7);
+    transition: transform .12s linear;
+}
+#bh-militar-panel .mil-handle::before, #bh-militar-panel .mil-handle::after {
+    content: ""; position: absolute; top: -6px; width: 26px; height: 28px; border-radius: 6px;
+    background: radial-gradient(circle at 40% 35%, #3d3d38, #050504);
+}
+#bh-militar-panel .mil-handle::before { left: -4px; } #bh-militar-panel .mil-handle::after { right: -4px; }
+
+/* lamps and toggles */
+#bh-militar-panel .mil-lamps { display: flex; gap: 10px; }
+#bh-militar-panel .mil-lamp {
+    width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 3px #2c2e25, 0 1px 2px rgba(0, 0, 0, .6);
+}
+#bh-militar-panel .mil-green { background: radial-gradient(circle at 40% 35%, #7a9a7a, #1f3a24); }
+#bh-militar-panel .mil-red { background: radial-gradient(circle at 40% 35%, #a07070, #3a1f1f); }
+#bh-militar-panel .mil-green.on { background: radial-gradient(circle at 40% 35%, #c9ffd2, var(--mil-green)); box-shadow: inset 0 0 0 3px #2c2e25, 0 0 10px var(--mil-green); }
+#bh-militar-panel .mil-red.on { background: radial-gradient(circle at 40% 35%, #ffd0cc, var(--mil-red)); box-shadow: inset 0 0 0 3px #2c2e25, 0 0 10px var(--mil-red); }
+#bh-militar-panel .mil-toggle {
+    background: transparent; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--mil-ink);
+}
+#bh-militar-panel .mil-lever {
+    width: 22px; height: 30px; border-radius: 4px; position: relative;
+    background: linear-gradient(180deg, #c9c3a8, #8d8870); box-shadow: inset 0 0 0 2px #4a4838;
+}
+#bh-militar-panel .mil-lever::after {
+    content: ""; position: absolute; left: 7px; width: 8px; height: 18px; bottom: 12px; border-radius: 4px;
+    background: linear-gradient(90deg, #ddd, #777); transition: transform .12s; transform-origin: 50% 100%; transform: rotate(-25deg);
+}
+#bh-militar-panel .mil-toggle[aria-pressed="true"] .mil-lever::after { transform: rotate(25deg) translateY(4px); }
+#bh-militar-panel small { font-size: 9px; letter-spacing: 1px; }
+
+/* bakelite knobs */
+#bh-militar-panel .mil-knobs { display: flex; justify-content: space-around; margin-top: 14px; }
+#bh-militar-panel .mil-kwrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#bh-militar-panel .mil-knob {
+    width: 56px; height: 56px; border-radius: 50%; touch-action: none; cursor: grab;
+    background: repeating-conic-gradient(#2a2a26 0 8deg, #0b0b0a 8deg 16deg);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, .7), inset 0 0 0 3px #000;
+    display: flex; align-items: center; justify-content: center;
+}
+#bh-militar-panel .mil-knob span {
+    display: block; width: 38px; height: 38px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 38% 32%, #4a4a44, var(--mil-bakelite) 70%);
+}
+#bh-militar-panel .mil-knob span::after {
+    content: ""; position: absolute; top: 3px; left: 50%; width: 3px; height: 11px; margin-left: -1.5px; background: var(--mil-cream); border-radius: 1px;
+}
+
+@media (max-width: 767px) {
+    #bh-militar-panel .mil-row { grid-template-columns: 1fr 1fr; }
+    #bh-militar-panel .mil-dial { grid-column: 1 / -1; order: -1; width: 180px; height: 180px; }
+    #bh-militar-panel .mil-col:first-child { flex-direction: row; }
+}

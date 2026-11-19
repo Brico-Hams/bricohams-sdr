@@ -146,4 +146,42 @@ function cargar(nombre, e) {
     assert.deepEqual([...L.lastLines(['EA5KAO x', 'EB3Y y'], 8, 'ea5')], ['EA5KAO x'], 'case-insensitive filter');
 }
 
+// ---- Military: registration, lifecycle, needle ----
+{
+    const e = entorno();
+    const P = cargar('bh_skin_militar', e);
+    P.init(); P.init();
+    assert.deepEqual(e.opciones.map(o => o.value), ['bh-militar']);
+    e.clases.add('theme-bh-militar');
+    e.disparar(); e.disparar();
+    assert.equal(e.receptor.children.length, 1);
+    assert.equal(e.timers.size, 1);
+    e.clases.delete('theme-bh-militar');
+    e.disparar();
+    assert.equal(e.receptor.children.length, 0);
+    assert.equal(P._timer, null);
+    const L = P._logic;
+    assert.equal(L.needleAngle(0, 0), -50);
+    assert.equal(L.needleAngle(9, 0), 20);
+    assert.equal(L.needleAngle(9, 60), 50);
+    assert.equal(L.needleAngle(9, 200), 50);
+    assert.equal(L.needleAngle(-3, 0), -50);
+    assert.deepEqual({ ...L.sUnits(0, 7e6, {}) }, { s: 0, over: 0, dbm: null });
+    assert.equal(L.knobSteps(44), 2);
+    assert.equal(L.t('volume'), 'Volumen');
+}
+
+// ---- both skins installed: only the active one builds ----
+{
+    const e = entorno();
+    const fx = cargar('bh_skin_bricofx', e), mil = cargar('bh_skin_militar', e);
+    fx.init(); mil.init();
+    assert.deepEqual(e.opciones.map(o => o.value), ['bh-bricofx', 'bh-militar']);
+    e.clases.add('theme-bh-militar');
+    e.disparar();
+    assert.equal(e.receptor.children.length, 1);
+    assert.equal(e.receptor.children[0].id, 'bh-militar-panel');
+    assert.equal(fx._panel, null);
+}
+
 console.log('Receiver skins regression: PASS');
