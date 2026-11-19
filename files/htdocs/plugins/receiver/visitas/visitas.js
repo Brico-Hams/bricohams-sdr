@@ -36,7 +36,10 @@ Plugins.visitas.init = function () {
         '#bh-visitas:focus-visible,#bh-banner-info a:focus-visible{outline:2px solid var(--focus,#FFC18F);outline-offset:2px}' +
         '#bh-banner-info{display:block;margin-top:2px;font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);color:var(--text-muted,#BAC4CC)}' +
         '#bh-banner-info b{color:var(--text,#F6F8FA);font-weight:600}#bh-banner-info .bh-sep{margin:0 6px;color:var(--brand-orange,#F26B1D)}' +
-        '#bh-visitas-pop{color:var(--text,#F6F8FA);font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);min-width:220px;max-height:60vh;overflow:auto}' +
+        // the floating summary is always white on black, whatever theme the receiver uses
+        '#plugin-window-visitas,#plugin-window-visitas .openwebrx-plugin-body{background:#000!important}' +
+        '#bh-visitas-pop,#bh-visitas-pop b,#bh-visitas-pop td,#bh-visitas-pop i{color:#fff!important}' +
+        '#bh-visitas-pop{font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);min-width:220px;max-height:60vh;overflow:auto}' +
         '#bh-visitas-pop a{color:var(--link,#FFA06A)}'
     ).appendTo('head');
     var $b = $('<span id="bh-visitas" role="button" tabindex="0" title="Oyentes conectados y visitas">👥 …</span>');
