@@ -214,6 +214,33 @@ function cargar(nombre, e) {
     assert.equal(P._logic.orDefault(0, -150), 0);
 }
 
+// ---- Brico-FX menus inside the screen (memory / band / modes) ----
+{
+    const L = cargar('bh_skin_bricofx', entorno())._logic;
+    const items = L.memItems([
+        { name: 'ISS', frequency: 145800000, modulation: 'nfm' },
+        { name: 'METEOR', frequency: 137900000, modulation: 'lrpt' },
+        { frequency: 145825000 }
+    ]);
+    assert.deepEqual(items.map(i => i.label), ['137.900 METEOR · LRPT', '145.800 ISS · NFM', '145.825']);
+    assert.equal(items[0].b.name, 'METEOR', 'keeps the bookmark object to tune it');
+    assert.deepEqual([...L.memItems(null)], []);
+    const lista = Array.from({ length: 11 }, (_, i) => i);
+    let p = L.page(lista, 0, 5);
+    assert.deepEqual([...p.items], [0, 1, 2, 3, 4]); assert.equal(p.pages, 3); assert.equal(p.page, 0);
+    p = L.page(lista, 2, 5);
+    assert.deepEqual([...p.items], [10]);
+    p = L.page(lista, 9, 5);
+    assert.equal(p.page, 2, 'page clamped to the last one');
+    p = L.page([], 0, 5);
+    assert.deepEqual([...p.items], []); assert.equal(p.pages, 1); assert.equal(p.page, 0);
+}
+{
+    const css = fs.readFileSync(path.join(DIR, 'bh_skin_bricofx', 'bh_skin_bricofx.css'), 'utf8');
+    assert.ok(/:has\(#openwebrx-sdr-profiles-listbox\)\s*\{\s*display:\s*none/.test(css), 'profile line integrated (BAND menu)');
+    assert.ok(/#openwebrx-section-modes/.test(css), 'modes section integrated (MODE menu)');
+}
+
 // ---- the skins must not hide the rest of the receiver panel (profiles/bookmarks, plugin buttons, sections) ----
 for (const n of ['bh_skin_bricofx', 'bh_skin_militar']) {
     const css = fs.readFileSync(path.join(DIR, n, n + '.css'), 'utf8');

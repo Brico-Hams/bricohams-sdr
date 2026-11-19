@@ -21,11 +21,13 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
     var TXT = {
         en: { volume: 'Volume', squelch: 'Squelch', tune: 'Tuning knob', func: 'Function knob',
             store: 'Hold to store, tap to recall', fine: 'Fine tuning', disp: 'Next view', back: 'Main view',
-            mode: 'Next mode', empty: 'No decoded messages yet', search: 'Callsign filter' },
+            mode: 'Next mode', empty: 'No decoded messages yet', search: 'Callsign filter',
+            mem: 'Memories', band: 'Bands', modes: 'Modes', addmem: 'Store a memory here', none: 'Nothing in this band' },
         es: { volume: 'Volumen', squelch: 'Silenciador', tune: 'Mando de sintonía', func: 'Mando de funciones',
             store: 'Mantén para guardar, pulsa para recuperar', fine: 'Sintonía fina', disp: 'Siguiente vista',
             back: 'Vista principal', mode: 'Siguiente modo', empty: 'Aún no hay mensajes decodificados',
-            search: 'Filtrar por indicativo' }
+            search: 'Filtrar por indicativo', mem: 'Memorias', band: 'Bandas', modes: 'Modos',
+            addmem: 'Guardar una memoria aquí', none: 'Nada en esta banda' }
     };
     var DIGITAL = ['ft8', 'ft4', 'wspr', 'jt65', 'jt9', 'fst4', 'fst4w', 'q65', 'msk144', 'js8', 'rtty',
         'packet', 'ais', 'pocsag', 'bpsk31', 'bpsk63', 'sstv', 'fax', 'hfdl', 'dsc'];
@@ -82,6 +84,22 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
             var f = (filter || '').toLowerCase();
             var sel = f ? lines.filter(function (l) { return l.toLowerCase().indexOf(f) >= 0; }) : lines.slice();
             return sel.slice(-n).reverse();
+        },
+        // memory menu: bookmarks sorted by frequency, "145.800 ISS · NFM"
+        memItems: function (bms) {
+            return (bms || []).filter(function (b) { return b && b.frequency > 0; })
+                .slice().sort(function (a, b) { return a.frequency - b.frequency; })
+                .map(function (b) {
+                    var l = (b.frequency / 1e6).toFixed(3);
+                    if (b.name) l += ' ' + b.name;
+                    if (b.modulation) l += (b.name ? ' · ' : ' ') + String(b.modulation).toUpperCase();
+                    return { label: l, b: b };
+                });
+        },
+        page: function (items, page, size) {
+            var pages = Math.max(1, Math.ceil(items.length / size));
+            var p = P._logic.clamp(page, 0, pages - 1);
+            return { items: items.slice(p * size, p * size + size), page: p, pages: pages };
         },
         t: function (key) {
             var lang = (document.documentElement.lang || '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
@@ -177,9 +195,9 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         var t = L.t;
         panel.innerHTML =
             '<div class="fx-top">' +
-                key('S-DX', 'fx-thin', 'S-DX', ' aria-disabled="true"') + key('MODE', 'fx-thin fx-mode', t('mode')) +
-                key('BAND', 'fx-thin', 'BAND', ' aria-disabled="true"') + key('SPLIT', 'fx-thin', 'SPLIT', ' aria-disabled="true"') +
-                key('V/M', 'fx-thin fx-vm', t('store')) + key('M-V', 'fx-thin', 'M-V', ' aria-disabled="true"') +
+                key('S-DX', 'fx-thin', 'S-DX', ' aria-disabled="true"') + key('MODE', 'fx-thin fx-mode', t('modes')) +
+                key('BAND', 'fx-thin fx-band', t('band')) + key('SPLIT', 'fx-thin', 'SPLIT', ' aria-disabled="true"') +
+                key('V/M', 'fx-thin fx-vm', t('mem')) + key('M-V', 'fx-thin fx-mv', t('addmem')) +
             '</div>' +
             '<div class="fx-body">' +
                 '<div class="fx-left">' + knob('fx-k-func', t('func')) +
@@ -222,8 +240,14 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
             $p.find('.fx-af').attr('aria-pressed', P._af === 'af');
             $p.find('.fx-sql').attr('aria-pressed', P._af === 'sql');
         });
-        $p.on('click' + NS, '.fx-mode', P._nextMode);
-        $p.on('click' + NS, '.fx-vm', function () { var f = Number(ls('bh_bricofx_qmb')); if (f > 0) UI.setFrequency(f, false); });
+        // top keys open menus inside the screen
+        $p.on('click' + NS, '.fx-mode', function () { P._openMenu('modes'); });
+        $p.on('click' + NS, '.fx-band', function () { P._openMenu('band'); });
+        $p.on('click' + NS, '.fx-vm', function () { P._openMenu('mem'); });
+        $p.on('click' + NS, '.fx-mv', function () {
+            if (window.bookmarks && bookmarks.showEditDialog) bookmarks.showEditDialog();
+        });
+        $p.on('click' + NS, '.fx-menu button', function () { P._pick(Number($(this).data('i'))); });
         var t0 = 0;
         $p.on('pointerdown' + NS, '.fx-qmb', function () { t0 = Date.now(); });
         $p.on('pointerleave' + NS + ' pointercancel' + NS, '.fx-qmb', function () { t0 = 0; });
@@ -323,7 +347,56 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
     var SOFT = {
         main: [['MODE', 'mode'], ['STEP', 'fn-step'], ['NR', 'fn-nr'], ['FILTER', 'fn-filter'], ['DISP', 'disp']],
         scope: [['ZOOM−', 'zout'], ['ZOOM+', 'zin'], ['FULL', 'full'], ['BACK', 'back']],
-        digital: [['ALL', 'all'], ['SEARCH', 'search'], ['CLEAR', 'clear'], ['LOG', 'log'], ['BACK', 'back']]
+        digital: [['ALL', 'all'], ['SEARCH', 'search'], ['CLEAR', 'clear'], ['LOG', 'log'], ['BACK', 'back']],
+        mem: [['▲', 'up'], ['▼', 'down'], ['STORE', 'store'], ['BACK', 'back']],
+        band: [['▲', 'up'], ['▼', 'down'], ['BACK', 'back']],
+        modes: [['▲', 'up'], ['▼', 'down'], ['BACK', 'back']]
+    };
+    var MENU_ROWS = 5;
+    P._menuPage = 0;
+
+    // menu entries: memory = bookmarks of the current band, band = SDR profiles, modes = analog + digital
+    P._menuItems = function (kind) {
+        if (kind === 'mem') {
+            var all = (window.bookmarks && bookmarks.getAllBookmarks) ? bookmarks.getAllBookmarks() : [];
+            return L.memItems(all);
+        }
+        function opts(sel, skip, prefix) {
+            var el = document.querySelector(sel);
+            if (!el) return [];
+            return Array.prototype.filter.call(el.options, function (o) { return o.value && o.value !== skip; })
+                .map(function (o) { return { label: (prefix || '') + o.textContent.trim(), value: o.value, sel: sel }; });
+        }
+        if (kind === 'band') return opts('#openwebrx-sdr-profiles-listbox');
+        return opts('#openwebrx-panel-receiver .openwebrx-modes-select')
+            .concat(opts('#openwebrx-panel-receiver .openwebrx-secondary-demod-listbox', 'none', 'DIG '));
+    };
+
+    P._openMenu = function (kind) { P._menuPage = 0; P._show(kind, true); };
+
+    P._pick = function (i) {
+        var pg = L.page(P._menuItems(P._view), P._menuPage, MENU_ROWS), it = pg.items[i];
+        if (!it) return;
+        if (P._view === 'mem') { try { UI.tuneBookmark(it.b); } catch (e) { UI.setFrequency(it.b.frequency, false); } }
+        else {
+            var el = document.querySelector(it.sel);
+            if (!el) return;
+            el.value = it.value;
+            if (P._view === 'band' && typeof window.sdr_profile_changed === 'function') window.sdr_profile_changed();
+            else $(el).trigger('change');
+        }
+        P._show('main', true);
+    };
+
+    P._drawMenu = function ($v) {
+        var pg = L.page(P._menuItems(P._view), P._menuPage, MENU_ROWS);
+        P._menuPage = pg.page;
+        var title = { mem: L.t('mem'), band: L.t('band'), modes: L.t('modes') }[P._view];
+        var rows = pg.items.length ? pg.items.map(function (it, i) {
+            return '<li><button type="button" data-i="' + i + '">' + $('<i>').text(it.label).html() + '</button></li>';
+        }).join('') : '<li class="fx-empty">' + L.t('none') + '</li>';
+        $v.html('<div class="fx-menu-head">' + title + '<span>' + (pg.page + 1) + '/' + pg.pages + '</span></div>' +
+            '<ul class="fx-menu" aria-label="' + title + '">' + rows + '</ul>');
     };
 
     P._renderViews = function ($p) {
@@ -344,7 +417,8 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         P._view = view;
         if (!P._panel) return;
         var $p = $(P._panel), $v = $p.find('.fx-view').attr('data-view', view).empty();
-        if (view !== 'main') $v.append('<canvas class="fx-scope" aria-label="Waterfall" role="img"></canvas>');
+        if (SOFT[view].length && (view === 'mem' || view === 'band' || view === 'modes')) P._drawMenu($v);
+        else if (view !== 'main') $v.append('<canvas class="fx-scope" aria-label="Waterfall" role="img"></canvas>');
         if (view === 'digital') $v.append('<ol class="fx-msgs" aria-live="polite"></ol>');
         $p.find('.fx-soft').html(SOFT[view].map(function (k) {
             var on = k[1] === 'fn-' + P._fn;
@@ -364,6 +438,11 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         else if (act === 'search') { var q = window.prompt(L.t('search'), P._filter); if (q !== null) P._filter = q.trim(); }
         else if (act === 'clear') P._clearAt = P._decoded().length;
         else if (act === 'log') { var el = P._decoderPanel(); if (el) el.scrollIntoView({ block: 'nearest' }); }
+        else if (act === 'up' || act === 'down') {
+            P._menuPage += act === 'up' ? -1 : 1;
+            P._drawMenu($(P._panel).find('.fx-view'));
+        }
+        else if (act === 'store' && window.bookmarks && bookmarks.showEditDialog) bookmarks.showEditDialog();
     };
 
     P._decoderPanel = function () {

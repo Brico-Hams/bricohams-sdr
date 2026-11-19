@@ -22,6 +22,10 @@ body.theme-bh-bricofx #openwebrx-panel-receiver {
     background: #0e0f10 !important; color: #e6e9ec; border-radius: 22px;
 }
 body.theme-bh-bricofx #openwebrx-panel-receiver .frequencies-container { display: none !important; }
+/* integrated in the front panel: profiles → BAND menu, modes → MODE menu */
+body.theme-bh-bricofx #openwebrx-panel-receiver .openwebrx-panel-line:has(#openwebrx-sdr-profiles-listbox) { display: none !important; }
+body.theme-bh-bricofx #openwebrx-section-modes,
+body.theme-bh-bricofx #openwebrx-section-modes + .openwebrx-section { display: none !important; }
 
 body.theme-bh-bricofx #bh-bricofx-panel {
     display: block;
@@ -106,6 +110,20 @@ body.theme-bh-bricofx #bh-bricofx-panel {
 }
 #bh-bricofx-panel .fx-msgs li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #bh-bricofx-panel .fx-msgs .fx-empty { color: #8fa1b3; white-space: normal; }
+#bh-bricofx-panel .fx-view[data-view="mem"], #bh-bricofx-panel .fx-view[data-view="band"],
+#bh-bricofx-panel .fx-view[data-view="modes"] { flex-direction: column; gap: 2px; padding-bottom: 4px; }
+#bh-bricofx-panel .fx-menu-head {
+    display: flex; justify-content: space-between; color: var(--fx-cyan); font-size: 11px; letter-spacing: 1px;
+    border-bottom: 1px solid #22303f; padding: 2px 2px 1px;
+}
+#bh-bricofx-panel .fx-menu { list-style: none; margin: 0; padding: 0; }
+#bh-bricofx-panel .fx-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #16202c;
+    color: #e6edf3; padding: 3px 4px; font: 500 11px/1.25 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#bh-bricofx-panel .fx-menu button:hover, #bh-bricofx-panel .fx-menu button:focus-visible { background: var(--fx-soft); }
+#bh-bricofx-panel .fx-menu .fx-empty { color: #8fa1b3; padding: 4px; font-size: 11px; }
 #bh-bricofx-panel .fx-soft { display: flex; background: var(--fx-soft); }
 #bh-bricofx-panel .fx-soft button {
     flex: 1; background: transparent; border: 0; border-left: 1px solid rgba(255, 255, 255, .15); padding: 5px 2px;

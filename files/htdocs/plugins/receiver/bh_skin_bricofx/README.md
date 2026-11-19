@@ -31,9 +31,12 @@ Then choose **Brico-FX** in *Settings → Theme*.
 | AF / SQL keys + knob | Choose what the knob changes: volume (0–150) or squelch (−150…0 dB) |
 | FUNC knob | Turn to change the target chosen with the STEP / NR / FILTER soft keys (tuning step, noise reduction on/off, filter width ±10 %) |
 | QMB | Hold 0.6 s (or Shift+click / Shift+Enter) to store the frequency, tap or Enter to recall it |
-| V/M | Recall the stored frequency |
+| V/M | **Memories** menu on the screen: the bookmarks of the current band, sorted by frequency; tap one to tune it (▲ ▼ pages, STORE adds one) |
+| BAND | **Bands** menu: the receiver's SDR profiles (changing profile affects every listener of that SDR, as in the stock panel) |
+| MODE (top key) | **Modes** menu: analog modes and digital decoders (DIG FT8, WSPR…) |
+| M-V | Store a bookmark at the current frequency (OpenWebRX+ dialog) |
 | CLAR | Fine tuning on/off (uses the smallest tuning step while on) |
-| MODE | Next demodulator mode |
+| MODE (soft key) | Next demodulator mode |
 | DISP / BACK | Next screen view / main view |
 | Screen views | **Main** (frequency and meter), **Scope** (mini spectrum + waterfall, click to tune; ZOOM−, ZOOM+, FULL), **Digital** (mini waterfall + last decoded messages; ALL, SEARCH by callsign, CLEAR, LOG). Selecting a digital mode (FT8, FT4, WSPR, JS8, RTTY, packet…) opens the Digital view automatically. |
 | BUSY lamp | Lit when the signal is above the squelch level |
@@ -43,7 +46,8 @@ Labels follow the page language (Spanish when `<html lang="es…">`, otherwise E
 ## Notes
 
 - The panel sits on top of the stock receiver panel and drives its controls; only the stock frequency
-  line is hidden. Profiles, bookmarks, plugin buttons and the Modes / Controls / Settings sections stay below.
+  line, the profile selector and the Modes section are hidden (they live in the BAND and MODE menus). Plugin buttons
+  and the Controls / Settings / Display sections stay below in a scrollable panel.
 - No product names or logos of any manufacturer are used.
 
 ## Licence
