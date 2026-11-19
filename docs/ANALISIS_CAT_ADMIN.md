@@ -48,7 +48,16 @@ Descartada por lo explicado arriba: no tiene control de acceso, lleva un control
 - Registro de cada cambio (usuario, hora y orden) y aviso opcional por Telegram, como ya se hace con los inicios de sesión.
 - Nota: hoy `/login` y `/settings` se pueden abrir desde Internet; la opción de OpenWebRX+ «restringir a la red local» no surte efecto detrás de nginx. Antes de añadir un panel CAT conviene decidir si el administrador solo entra desde la LAN o la VPN.
 
+## Equipos elegidos (2026-11-19): Yaesu FTX-1 y QRP Labs QMX+
+
+| Equipo | Soporte en Hamlib | En el Pi (Hamlib 4.6.2 de Debian trixie) |
+|---|---|---|
+| Yaesu FTX-1 | Modelo **1051**, incluido en Hamlib **4.7.2** (`rigs/yaesu/ftx1/`; su readme indica serie a 38400 8N1, admite 4800-115200, y firmware probado de noviembre de 2025) | **No está**: hay que instalar Hamlib ≥ 4.7.2 (compilado o de backports) antes de poder usarlo |
+| QRP Labs QMX+ | Modelo **2057 «QMX»** (estado *Beta*) | Disponible. Hay que comprobar con el equipo real que el QMX+ responde igual que el QMX |
+
+Comprobado con `rigctl -l` en el Pi y en el repositorio oficial de Hamlib (tag 4.7.2). Ninguno de los dos está conectado al Pi por ahora.
+
 ## Pendiente de datos (no inventar)
 
-- **Qué equipos** se quieren controlar, su **modelo de Hamlib** y cómo se conectan (USB-CAT, CI-V, velocidad). En el Pi hoy solo hay `usb-1a86_USB_Single_Serial` y el RAK4631; no consta ningún transceptor conectado.
+- Cómo se conecta cada equipo al Pi (USB-CAT, puerto y velocidad configurada en la radio) y si comparten la antena o los receptores con el SDR.
 - Si la radio de cada equipo se usará también desde RadiCodex: habría que evitar que dos programas abran el mismo puerto (con un `rigctld` compartido se evita).
