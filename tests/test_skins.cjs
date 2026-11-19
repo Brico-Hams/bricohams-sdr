@@ -127,4 +127,23 @@ function cargar(nombre, e) {
     assert.equal(L.meterPct({ s: 9, over: 90 }), 100);
 }
 
+// ---- Brico-FX: screen views ----
+{
+    const L = cargar('bh_skin_bricofx', entorno())._logic;
+    assert.deepEqual([...L.VIEWS], ['main', 'scope', 'digital']);
+    assert.equal(L.nextView('main'), 'scope');
+    assert.equal(L.nextView('scope'), 'digital');
+    assert.equal(L.nextView('digital'), 'main');
+    assert.equal(L.nextView('bogus'), 'main');
+    assert.equal(L.viewFor('ft8', null), 'digital', 'digital mode opens the digital view');
+    assert.equal(L.viewFor('usb', 'scope'), 'scope');
+    assert.equal(L.viewFor('ft8', 'main'), 'main', 'a view picked after the mode change wins');
+    assert.equal(L.viewFor('usb', null), 'main');
+    assert.equal(L.scopeFreq(50, 100, { start: 7000000, end: 7200000 }), 7100000);
+    assert.equal(L.scopeFreq(0, 0, { start: 1, end: 2 }), null, 'zero-width canvas gives no frequency');
+    assert.deepEqual([...L.lastLines(['a', 'b', 'c'], 2)], ['c', 'b'], 'newest first');
+    assert.deepEqual([...L.lastLines([], 8)], []);
+    assert.deepEqual([...L.lastLines(['EA5KAO x', 'EB3Y y'], 8, 'ea5')], ['EA5KAO x'], 'case-insensitive filter');
+}
+
 console.log('Receiver skins regression: PASS');

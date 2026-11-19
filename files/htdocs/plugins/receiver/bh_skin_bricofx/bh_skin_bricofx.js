@@ -61,6 +61,25 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
             var p = u.s < 9 ? u.s / 9 * 60 : 60 + Math.min(60, u.over) / 60 * 40;
             return Math.round(p);
         },
+        VIEWS: ['main', 'scope', 'digital'],
+        nextView: function (cur) {
+            var v = P._logic.VIEWS, i = v.indexOf(cur);
+            return i < 0 ? 'main' : v[(i + 1) % v.length];
+        },
+        // a view the user picked after the last mode change wins; otherwise digital modes open the digital view
+        viewFor: function (mode, chosen) {
+            if (chosen) return chosen;
+            return P._logic.isDigital(mode) ? 'digital' : 'main';
+        },
+        scopeFreq: function (x, width, range) {
+            if (!width || !range) return null;
+            return Math.round(range.start + x / width * (range.end - range.start));
+        },
+        lastLines: function (lines, n, filter) {
+            var f = (filter || '').toLowerCase();
+            var sel = f ? lines.filter(function (l) { return l.toLowerCase().indexOf(f) >= 0; }) : lines.slice();
+            return sel.slice(-n).reverse();
+        },
         t: function (key) {
             var lang = (document.documentElement.lang || '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
             return TXT[lang][key] || TXT.en[key] || key;
@@ -287,6 +306,119 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
     P._unbind = function () {
         if (P._fine !== null) P._toggleFine();
         if (P._panel && typeof $ === 'function') $(P._panel).off(NS).find('*').off(NS);
+    };
+
+    // ------------------------------------------------------------------ screen views
+    P._view = 'main';
+    P._chosen = null;          // view picked by the user since the last mode change
+    P._lastMode = null;
+    P._filter = '';
+    P._clearAt = 0;            // CLEAR hides the lines decoded before this count
+    var DECODERS = ['wsjt', 'js8', 'packet', 'pocsag', 'skimmer', 'hfdl', 'dsc', 'sstv', 'fax'];
+    var SOFT = {
+        main: [['MODE', 'mode'], ['STEP', 'fn-step'], ['NR', 'fn-nr'], ['FILTER', 'fn-filter'], ['DISP', 'disp']],
+        scope: [['ZOOM−', 'zout'], ['ZOOM+', 'zin'], ['FULL', 'full'], ['BACK', 'back']],
+        digital: [['ALL', 'all'], ['SEARCH', 'search'], ['CLEAR', 'clear'], ['LOG', 'log'], ['BACK', 'back']]
+    };
+
+    P._renderViews = function ($p) {
+        $p.on('click' + NS, '.fx-disp', function () { P._show(L.nextView(P._view), true); });
+        $p.on('click' + NS, '.fx-back', function () { P._show('main', true); });
+        $p.on('click' + NS, '.fx-soft button', function () { P._soft($(this).data('act')); });
+        $p.on('click' + NS, '.fx-scope', function (e) {
+            var r = this.getBoundingClientRect();
+            var range = typeof get_visible_freq_range === 'function' ? get_visible_freq_range() : null;
+            var f = L.scopeFreq(e.clientX - r.left, r.width, range);
+            if (f) UI.setFrequency(f);
+        });
+        P._show(P._view, false);
+    };
+
+    P._show = function (view, byUser) {
+        if (byUser) P._chosen = view;
+        P._view = view;
+        if (!P._panel) return;
+        var $p = $(P._panel), $v = $p.find('.fx-view').attr('data-view', view).empty();
+        if (view !== 'main') $v.append('<canvas class="fx-scope" aria-label="Waterfall" role="img"></canvas>');
+        if (view === 'digital') $v.append('<ol class="fx-msgs" aria-live="polite"></ol>');
+        $p.find('.fx-soft').html(SOFT[view].map(function (k) {
+            var on = k[1] === 'fn-' + P._fn;
+            return '<button type="button" data-act="' + k[1] + '" aria-pressed="' + on + '">' + k[0] + '</button>';
+        }).join(''));
+    };
+
+    P._soft = function (act) {
+        if (act === 'mode') P._nextMode();
+        else if (act === 'disp') P._show(L.nextView(P._view), true);
+        else if (act === 'back') P._show('main', true);
+        else if (act.indexOf('fn-') === 0) { P._fn = act.slice(3); P._show(P._view, false); }
+        else if (act === 'zin' && typeof zoomInOneStep === 'function') zoomInOneStep();
+        else if (act === 'zout' && typeof zoomOutOneStep === 'function') zoomOutOneStep();
+        else if (act === 'full' && typeof zoomOutTotal === 'function') zoomOutTotal();
+        else if (act === 'all') { P._filter = ''; P._clearAt = 0; }
+        else if (act === 'search') { var q = window.prompt(L.t('search'), P._filter); if (q !== null) P._filter = q.trim(); }
+        else if (act === 'clear') P._clearAt = P._decoded().length;
+        else if (act === 'log') { var el = P._decoderPanel(); if (el) el.scrollIntoView({ block: 'nearest' }); }
+    };
+
+    P._decoderPanel = function () {
+        for (var i = 0; i < DECODERS.length; i++) {
+            var el = document.getElementById('openwebrx-panel-' + DECODERS[i] + '-message');
+            if (el && el.offsetParent !== null) return el;
+        }
+        return null;
+    };
+
+    P._decoded = function () {
+        var el = P._decoderPanel();
+        if (!el) return [];
+        var rows = el.querySelectorAll('tbody tr');
+        if (!rows.length) rows = el.lastElementChild ? el.lastElementChild.children : [];
+        return Array.prototype.map.call(rows, function (r) { return r.textContent.replace(/\s+/g, ' ').trim(); })
+            .filter(Boolean);
+    };
+
+    // copies what OpenWebRX+ already draws (spectrum + waterfall) into the small screen canvas
+    P._drawScope = function (cv) {
+        var w = cv.clientWidth, h = cv.clientHeight;
+        if (!w || !h) return;
+        if (cv.width !== w) cv.width = w;
+        if (cv.height !== h) cv.height = h;
+        var ctx = cv.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+        var spec = document.getElementById('openwebrx-spectrum-canvas');
+        var top = 0;
+        if (spec && spec.width && spec.offsetParent !== null) {
+            top = Math.round(h * 0.3);
+            ctx.drawImage(spec, 0, 0, w, top);
+        }
+        var box = document.getElementById('webrx-canvas-container');
+        if (!box) return;
+        var br = box.getBoundingClientRect();
+        if (!br.width || !br.height) return;
+        var sx = w / br.width, sy = (h - top) / br.height;
+        box.querySelectorAll('canvas').forEach(function (c) {
+            var r = c.getBoundingClientRect();
+            if (!c.width || r.bottom < br.top || r.top > br.bottom) return;
+            ctx.drawImage(c, (r.left - br.left) * sx, top + (r.top - br.top) * sy, r.width * sx, r.height * sy);
+        });
+    };
+
+    P._tickViews = function ($p) {
+        var m = modo();
+        if (m !== P._lastMode) { P._lastMode = m; P._chosen = null; P._clearAt = 0; }
+        var v = L.viewFor(m, P._chosen);
+        if (v !== P._view) P._show(v, false);
+        var cv = $p.find('.fx-scope')[0];
+        if (cv) P._drawScope(cv);
+        var $ol = $p.find('.fx-msgs');
+        if ($ol.length) {
+            var lines = P._decoded().slice(P._clearAt);
+            var out = L.lastLines(lines, 8, P._filter);
+            $ol.html(out.length ? out.map(function (l) { return '<li>' + $('<i>').text(l).html() + '</li>'; }).join('')
+                : '<li class="fx-empty">' + L.t('empty') + '</li>');
+        }
     };
 
     P._tick = function () {
