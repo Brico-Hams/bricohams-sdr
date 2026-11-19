@@ -26,7 +26,10 @@ Plugins.marca.no_css = true;
         '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;' + DARK + '}}' +
         ':root[data-theme="dark"]{color-scheme:dark;' + DARK + '}' +
         '[id^="bh-"]:focus-visible,[id^="bricohams-"]:focus-visible,[class^="bha-"]:focus-visible,' +
-        '[id^="bh-"] :focus-visible,[id^="bricohams-"] :focus-visible{outline:3px solid var(--focus);outline-offset:3px}';
+        '[id^="bh-"] :focus-visible,[id^="bricohams-"] :focus-visible{outline:3px solid var(--focus);outline-offset:3px}' +
+        // the rig theme paints the receiver title near-white on the light bar: use the brand text tokens
+        '.webrx-rx-title{color:var(--text)!important}' +
+        '.webrx-rx-desc{color:var(--text-muted)!important}.webrx-rx-desc a{color:var(--link)!important}';
 
     function get() {
         try { var t = localStorage.getItem(KEY); return t === 'light' || t === 'dark' ? t : 'system'; } catch (e) { return 'system'; }
