@@ -24,6 +24,9 @@ body.theme-bh-bricofx #openwebrx-panel-receiver {
 body.theme-bh-bricofx #openwebrx-panel-receiver .frequencies-container { display: none !important; }
 /* integrated in the front panel: profiles → BAND menu, modes → MODE menu */
 body.theme-bh-bricofx #openwebrx-panel-receiver .openwebrx-panel-line:has(#openwebrx-sdr-profiles-listbox) { display: none !important; }
+/* readable dropdowns on the dark panel (the open list is drawn by the OS, so it needs its own colours) */
+body.theme-bh-bricofx #openwebrx-panel-receiver select,
+body.theme-bh-bricofx #openwebrx-panel-receiver option { background-color: #1d1f21; color: #f2f4f5; }
 body.theme-bh-bricofx #openwebrx-section-modes,
 body.theme-bh-bricofx #openwebrx-section-modes + .openwebrx-section { display: none !important; }
 
@@ -144,23 +147,24 @@ body.theme-bh-bricofx #bh-bricofx-panel {
 }
 #bh-bricofx-panel .fx-vfo::before { border-left-color: var(--fx-led); filter: drop-shadow(0 0 5px var(--fx-led)); transform: rotate(-20deg); }
 #bh-bricofx-panel .fx-vfo::after { border-right-color: var(--fx-led); filter: drop-shadow(0 0 5px var(--fx-led)); transform: rotate(20deg); }
+/* knob: thin knurled rubber rim + large spun-metal face with a finger dimple */
 #bh-bricofx-panel .fx-vfo-ring {
     width: 116px; height: 116px; border-radius: 50%;
-    background: repeating-conic-gradient(#323436 0 3deg, #0c0d0e 3deg 6deg);
-    box-shadow: 0 5px 10px rgba(0, 0, 0, .8), inset 0 0 0 3px #090a0b;
+    background: repeating-conic-gradient(#25272a 0 2deg, #121315 2deg 4deg);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, .85), inset 0 0 0 2px #070808, inset 0 3px 3px rgba(255, 255, 255, .06);
     display: flex; align-items: center; justify-content: center;
 }
 #bh-bricofx-panel .fx-vfo-cap {
-    width: 78px; height: 78px; border-radius: 50%;
-    background: repeating-radial-gradient(circle, #2a2c2e 0 1px, #1a1b1c 1px 2px),
-                radial-gradient(circle at 40% 35%, #4a4d50, #121314 70%);
-    background-blend-mode: overlay;
-    box-shadow: inset 0 2px 4px rgba(255, 255, 255, .12), inset 0 -3px 6px rgba(0, 0, 0, .7);
-    position: relative;
+    width: 98px; height: 98px; border-radius: 50%; position: relative;
+    background:
+        repeating-radial-gradient(circle, rgba(255, 255, 255, .035) 0 1px, transparent 1px 3px),
+        conic-gradient(from 30deg, #2c2f32, #16181a 22%, #474b4f 48%, #16181a 74%, #2c2f32);
+    box-shadow: 0 0 0 2px #0a0b0c, inset 0 2px 3px rgba(255, 255, 255, .14), inset 0 -4px 8px rgba(0, 0, 0, .7);
 }
 #bh-bricofx-panel .fx-vfo-cap::after {
-    content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; top: 14px; left: 50%; margin-left: -9px;
-    background: radial-gradient(circle at 40% 35%, #3b3e41, #050606); box-shadow: inset 0 1px 2px rgba(255, 255, 255, .2);
+    content: ""; position: absolute; width: 24px; height: 24px; border-radius: 50%; top: 16px; left: 54%;
+    background: radial-gradient(circle at 60% 65%, #3d4044, #0b0c0d 70%);
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 255, 255, .12);
 }
 
 /* phones: knob column below the screen */

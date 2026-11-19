@@ -247,6 +247,8 @@ for (const n of ['bh_skin_bricofx', 'bh_skin_militar']) {
     assert.ok(!/#openwebrx-panel-receiver\s*>\s*:not\(/.test(css), n + ' hides every receiver child');
     assert.ok(/#openwebrx-panel-receiver\s+\.frequencies-container\s*\{\s*display:\s*none/.test(css),
         n + ' hides only the stock frequency line it replaces');
+    assert.ok(/#openwebrx-panel-receiver option\s*\{\s*background-color:\s*#[0-9a-f]{6};\s*color:\s*#[0-9a-f]{6}/i.test(css),
+        n + ' gives dropdown options their own background and text colour (OS-drawn list)');
 }
 
 console.log('Receiver skins regression: PASS');

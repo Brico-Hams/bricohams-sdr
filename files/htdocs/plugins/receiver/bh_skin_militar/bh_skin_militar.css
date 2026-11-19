@@ -18,6 +18,9 @@ body.theme-bh-militar #openwebrx-panel-receiver {
     background: #2f3428 !important; color: #ecead9; border-radius: 6px;
 }
 body.theme-bh-militar #openwebrx-panel-receiver .frequencies-container { display: none !important; }
+/* readable dropdowns on the dark panel (the open list is drawn by the OS, so it needs its own colours) */
+body.theme-bh-militar #openwebrx-panel-receiver select,
+body.theme-bh-militar #openwebrx-panel-receiver option { background-color: #3a4031; color: #ecead9; }
 
 body.theme-bh-militar #bh-militar-panel {
     position: relative;
