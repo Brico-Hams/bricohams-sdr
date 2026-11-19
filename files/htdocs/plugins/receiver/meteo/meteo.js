@@ -3,7 +3,7 @@
  *
  * Autor: BricoHams
  *
- * Botón "METEO" en la barra superior (detrás de SOL). La ventana muestra
+ * Botón "METEO" en el panel de plugins de OpenWebRX+ (Plugins.addButton). La ventana (Plugins.addWindow) muestra
  * las estaciones AEMET más cercanas al QTH (temperatura, humedad, viento,
  * racha, presión, lluvia, máx/mín y la curva de 24 h) y la previsión de
  * 3 días de Open-Meteo. El botón enseña la temperatura de la estación
@@ -31,12 +31,8 @@ Plugins.meteo.init = function () {
     var css =
         '#bh-meteo-button{position:relative}' +
         '#bh-meteo-button svg{width:18px;height:18px}' +
-        '#bh-meteo{position:fixed;top:90px;left:460px;z-index:1002;width:440px;max-width:calc(100vw - 16px);' +
-            'display:none;flex-direction:column;padding:8px;border-radius:12px;color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif);' +
-            'background:var(--surface,#1C2329);border:1px solid var(--border,#38434C);box-shadow:0 6px 18px rgba(0,0,0,.45)}' +
-        '#bh-meteo.open{display:flex}' +
-        '#bh-meteo .mt-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#bh-meteo .mt-title{flex:1;color:var(--text-muted,#BAC4CC);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '#bh-meteo{display:flex;flex-direction:column;min-width:min(420px,calc(100vw - 48px));max-height:calc(100vh - 120px);color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif)}' +
+        '#bh-meteo .mt-hdr{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0 2px 6px}' +
         '#bh-meteo .mt-time{color:var(--text-muted,#BAC4CC);font-size:11px}' +
         '#bh-meteo .mt-btn{cursor:pointer;color:var(--text-muted,#BAC4CC);padding:0 4px;font-size:15px;line-height:1}' +
         '#bh-meteo .mt-btn:hover{color:var(--text,#F6F8FA)}' +
@@ -59,8 +55,7 @@ Plugins.meteo.init = function () {
         '#bh-meteo .mt-day b{font-size:20px;display:block}' +
         '#bh-meteo .mt-note{color:var(--text-muted,#BAC4CC);font-size:10px;margin-top:6px;line-height:1.4}' +
         '#bh-meteo a{color:var(--link,#FFA06A)}' +
-        '#bh-meteo :focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}' +
-        '@media (max-width:600px){#bh-meteo{left:8px!important;top:60px!important}}';
+        '#bh-meteo :focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -101,68 +96,61 @@ Plugins.meteo.init = function () {
 
     var THERMO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<path d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/><path d="M17 6h3M17 9h2M17 12h3"/></svg>';
-    var $btn = $('<div class="button" id="bh-meteo-button" title="Tiempo en vivo de las estaciones cercanas">' +
-        THERMO + '<br><span class="mt-label">METEO</span></div>');
-
-    function placeButton(tries) {
-        var $after = $(AFTER);
-        if (!$after.length) $after = $('#owrx-rig-dx-button');
-        if ($after.length) { $after.after($btn); return; }
-        if (tries > 0) { setTimeout(function () { placeButton(tries - 1); }, 500); return; }
-        var $bar = $('.openwebrx-main-buttons').first();
-        var $status = $bar.children('.button').filter(function () { return /Estado|Status/.test($(this).text()); }).first();
-        if ($status.length) $status.after($btn); else $bar.append($btn);
+    var TITLE_BTN = 'Tiempo en vivo de las estaciones cercanas';
+    var $btn, $label;
+    // botón nativo del panel de plugins; si no existe, el de la barra superior de antes
+    var nativeBtn = typeof Plugins.addButton === 'function'
+        ? Plugins.addButton('meteo', 'METEO', function () { toggle(!win.abierta()); }) : null;
+    if (nativeBtn) {
+        $btn = $label = $(nativeBtn).attr('title', TITLE_BTN);
+    } else {
+        $btn = $('<div class="button" id="bh-meteo-button" title="' + TITLE_BTN + '">' +
+            THERMO + '<br><span class="mt-label">METEO</span></div>');
+        $label = $btn.find('.mt-label');
+        $btn.on('click', function () { toggle(!win.abierta()); });
+        (function placeButton(tries) {
+            var $after = $(AFTER);
+            if (!$after.length) $after = $('#owrx-rig-dx-button');
+            if ($after.length) { $after.after($btn); return; }
+            if (tries > 0) { setTimeout(function () { placeButton(tries - 1); }, 500); return; }
+            var $bar = $('.openwebrx-main-buttons').first();
+            var $status = $bar.children('.button').filter(function () { return /Estado|Status/.test($(this).text()); }).first();
+            if ($status.length) $status.after($btn); else $bar.append($btn);
+        })(20);
     }
-    placeButton(20);
 
-    var $win = $('<div id="bh-meteo" role="dialog" aria-label="Tiempo en vivo">' +
-        '<div class="mt-hdr"><span class="mt-title">🌡 METEO · VEGA DEL SEGURA</span>' +
-        '<span class="mt-time"></span><span class="mt-btn mt-reload" title="Actualizar">⟳</span>' +
-        '<span class="mt-btn mt-close" title="Cerrar">×</span></div>' +
+    // ventana nativa (Plugins.addWindow); sin ella, un bloque suelto
+    function crearVentana(id, titulo, html) {
+        var nativa = typeof Plugins.addWindow === 'function' && typeof Plugins.toggleWindow === 'function';
+        var el = nativa ? Plugins.addWindow(id, titulo, html) : null;
+        if (!el) {
+            nativa = false;
+            el = $('<div class="openwebrx-plugin-body"></div>').html(html)
+                .css({ display: 'none', position: 'absolute', top: '90px', left: '12px', zIndex: 1002 }).appendTo('body')[0];
+        }
+        return {
+            el: el,
+            abierta: function () { return $(el).is(':visible'); },
+            mostrar: function (on) { if (nativa) Plugins.toggleWindow(id, on); else $(el).toggle(on); }
+        };
+    }
+    var win = crearVentana('meteo', '🌡 METEO · VEGA DEL SEGURA',
+        '<div id="bh-meteo" role="region" aria-label="Tiempo en vivo">' +
+        '<div class="mt-hdr"><span class="mt-time"></span><span class="mt-btn mt-reload" title="Actualizar">⟳</span></div>' +
         '<div class="mt-lcd"><div class="mt-note">Cargando…</div></div></div>');
-    $('body').append($win);
+    var $win = $(win.el).find('#bh-meteo');
     var $lcd = $win.find('.mt-lcd');
     var data = null, sensor = null, caja = null, open = false;
 
-    function fitHeight() {
-        var top = $win[0].getBoundingClientRect().top;
-        $win.css('max-height', Math.max(160, window.innerHeight - top - 10) + 'px');
-    }
-    $(window).on('resize', function () { if (open) fitHeight(); });
-
-    (function () {
-        var p = (lsGet('bh_meteo_pos') || '').split(',');
-        if (p.length === 2 && window.innerWidth > 600) {
-            $win.css({ left: Math.max(0, Math.min(+p[0], window.innerWidth - 120)) + 'px',
-                       top: Math.max(0, Math.min(+p[1], window.innerHeight - 60)) + 'px' });
-        }
-        var drag = null;
-        $win.find('.mt-hdr').on('pointerdown', function (e) {
-            if ($(e.target).hasClass('mt-btn')) return;
-            var o = $win[0].getBoundingClientRect();
-            drag = { dx: e.clientX - o.left, dy: e.clientY - o.top };
-            this.setPointerCapture(e.pointerId);
-        }).on('pointermove', function (e) {
-            if (!drag) return;
-            $win.css({ left: Math.max(0, e.clientX - drag.dx) + 'px', top: Math.max(0, e.clientY - drag.dy) + 'px' });
-            fitHeight();
-        }).on('pointerup pointercancel', function () {
-            if (!drag) return;
-            drag = null;
-            lsSet('bh_meteo_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
-        });
-    })();
-
     function toggle(on) {
         open = on;
-        $win.toggleClass('open', on);
+        win.mostrar(on);
         $btn.toggleClass('highlighted', on);
         lsSet('bh_meteo_open', on ? '1' : '0');
-        if (on) { fitHeight(); render(); load(); }
+        if (on) { render(); load(); }
     }
     Plugins.meteo._toggle = toggle;
-    $btn.on('click', function () { toggle(!open); });
-    $win.find('.mt-close').on('click', function () { toggle(false); });
+    $(win.el).find('.openwebrx-plugin-close').on('click touchend', function () { toggle(false); });
     $win.find('.mt-reload').on('click', load);
 
     function fresco(s) { return s && s.updated && (Date.now() - Date.parse(s.updated)) < 15 * 60 * 1000; }
@@ -205,7 +193,7 @@ Plugins.meteo.init = function () {
         if (fresco(sensor)) {
             $btn.attr('title', sensor.name + ': ' + num(sensor.ta) + ' °C' + (typeof sensor.hr === 'number' ? ', ' + num(sensor.hr, 0) + ' % HR' : '') + ', ' + num(sensor.pres_nmar) + ' hPa');
         }
-        $btn.find('.mt-label').text(typeof t === 'number' ? t.toFixed(1) + '°' : 'METEO')
+        $label.text(typeof t === 'number' ? t.toFixed(1) + '°' : 'METEO')
             .css('color', typeof t === 'number' && t >= 28 ? tempColor(t) : '');
         if (n && !fresco(sensor)) $btn.attr('title', n.name + ': ' + num(n.ta) + ' °C, ' + num(n.hr, 0) + ' % HR, viento ' + num(n.vv_kmh, 0) + ' km/h ' + compass(n.dv) + ' (' + fmtTime(n.time) + ')');
     }

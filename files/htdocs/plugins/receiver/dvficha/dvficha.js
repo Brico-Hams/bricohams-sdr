@@ -4,7 +4,7 @@
  * Autor: BricoHams (v4)
  *
  * Cuando llega una trama de voz con indicativo muestra, junto al panel de
- * voz digital, una ficha con:
+ * voz digital, una ficha (ventana nativa de OpenWebRX+, Plugins.addWindow) con:
  *   bandera · indicativo (enlace a QRZ) · nombre · ciudad y país · foto
  * Datos:
  *   1. DMR/NXDN: OpenWebRX+ ya consulta RadioID por el número DMR («additional»).
@@ -26,15 +26,24 @@ Plugins.dvficha.init = function () {
     var cache = {}, ocultar = null, actual = '';
 
     $('<style>').text(
-        '#bh-dvficha{position:fixed;left:12px;bottom:64px;z-index:9998;display:none;min-width:230px;max-width:320px;' +
-        'background:var(--surface,#1C2329);color:var(--text,#F6F8FA);border:1px solid var(--brand-orange,#F26B1D);border-radius:12px;padding:10px 12px;' +
-        'font:13px/1.35 var(--bh-font-ui,system-ui,sans-serif);box-shadow:0 4px 16px rgba(0,0,0,.5)}' +
+        '#bh-dvficha{min-width:230px;max-width:320px;color:var(--text,#F6F8FA);font:13px/1.35 var(--bh-font-ui,system-ui,sans-serif)}' +
         '#bh-dvficha .f{display:flex;gap:10px;align-items:center}' +
         '#bh-dvficha img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--border,#38434C)}' +
         '#bh-dvficha .c{font:700 17px/1.1 monospace;color:var(--text,#F6F8FA)}#bh-dvficha .c a{color:var(--text,#F6F8FA);text-decoration:none}' +
         '#bh-dvficha .m{color:var(--text-muted,#BAC4CC);font-size:12px}#bh-dvficha .modo{float:right;font-size:11px;color:var(--link,#FFA06A)}'
     ).appendTo('head');
-    var $f = $('<div id="bh-dvficha"></div>').appendTo('body');
+
+    // ventana nativa (Plugins.addWindow) que se abre sola con cada trama y se cierra a los SEG segundos;
+    // sin ella, un bloque suelto
+    var nativa = typeof Plugins.addWindow === 'function' && typeof Plugins.toggleWindow === 'function';
+    var ventana = nativa ? Plugins.addWindow('dvficha', '📻 FICHA DEL OPERADOR', '<div id="bh-dvficha"></div>') : null;
+    if (!ventana) {
+        nativa = false;
+        ventana = $('<div class="openwebrx-plugin-body"><div id="bh-dvficha"></div></div>')
+            .css({ display: 'none', position: 'absolute', left: '12px', bottom: '64px', zIndex: 1002 }).appendTo('body')[0];
+    }
+    var $f = $(ventana).find('#bh-dvficha');
+    function abrir(on) { if (nativa) Plugins.toggleWindow('dvficha', on); else $(ventana).toggle(on); }
 
     function bandera(cc) { return (Plugins.banderas && cc) ? Plugins.banderas.bandera(cc) : ''; }
     function ccDe(call) {
@@ -53,9 +62,10 @@ Plugins.dvficha.init = function () {
             (linea2 ? '<div>' + esc(linea2) + '</div>' : '') +
             (linea3 ? '<div class="m">' + esc(linea3) + '</div>' : '') +
             (d.dmrid ? '<div class="m">DMR ID ' + esc(String(d.dmrid)) + '</div>' : '') +
-            '</div></div>').show();
+            '</div></div>');
+        abrir(true);
         clearTimeout(ocultar);
-        ocultar = setTimeout(function () { $f.fadeOut(400); actual = ''; }, SEG * 1000);
+        ocultar = setTimeout(function () { abrir(false); actual = ''; }, SEG * 1000);
     }
 
     function mostrar(modo, call, extra) {
@@ -64,7 +74,7 @@ Plugins.dvficha.init = function () {
         if (!/[A-Z]/.test(call) || !/[0-9]/.test(call)) return;
         var base = $.extend({ call: call }, extra || {});
         clearTimeout(ocultar);
-        ocultar = setTimeout(function () { $f.fadeOut(400); actual = ''; }, SEG * 1000);
+        ocultar = setTimeout(function () { abrir(false); actual = ''; }, SEG * 1000);
         if (actual === call) return;
         actual = call;
         if (cache[call]) { pintar(modo, $.extend({}, base, cache[call])); return; }

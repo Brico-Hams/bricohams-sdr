@@ -110,19 +110,13 @@ Plugins.audio_cadena.no_css = true;
     }
 
     // -----------------------------------------------------------------
-    //  interfaz común: botón en la barra, ventana flotante y controles
+    //  interfaz común: botón del panel de plugins, ventana nativa y controles
     // -----------------------------------------------------------------
     var CSS =
         '.bha-btn{position:relative}.bha-btn svg{width:18px;height:18px}' +
         '.bha-btn .bha-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--text-muted,#BAC4CC)}' +
         '.bha-btn.on .bha-dot{background:var(--brand-orange,#F26B1D);box-shadow:0 0 0 2px rgba(242,107,29,.35)}' +
-        '.bha-win{position:fixed;top:110px;left:460px;z-index:1002;width:340px;max-width:calc(100vw - 16px);display:none;flex-direction:column;' +
-            'padding:8px;border-radius:12px;color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif);background:var(--surface,#1C2329);' +
-            'border:1px solid var(--border,#38434C);box-shadow:0 6px 18px rgba(0,0,0,.45)}' +
-        '.bha-win.open{display:flex}' +
-        '.bha-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '.bha-title{flex:1;font-weight:bold;letter-spacing:.5px;color:var(--link,#FFA06A)}' +
-        '.bha-x{cursor:pointer;padding:0 6px;font-size:15px}.bha-x:hover{color:var(--link,#FFA06A)}' +
+        '.bha-win{display:flex;flex-direction:column;min-width:min(320px,calc(100vw - 48px));color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif)}' +
         '.bha-sec{margin:4px 0;padding:6px;border-radius:8px;background:var(--bg,#111518)}' +
         '.bha-sec h4{margin:0 0 4px;font-size:11px;color:var(--text-muted,#BAC4CC);font-weight:normal;letter-spacing:.5px}' +
         '.bha-row{display:flex;align-items:center;gap:6px;margin:3px 0}.bha-row label{width:92px;color:var(--text-muted,#BAC4CC)}' +
@@ -147,53 +141,47 @@ Plugins.audio_cadena.no_css = true;
 
     P.ui = {};
 
-    // botón en la barra superior (detrás de los de BricoHams), o en el panel de plugins
+    // botón del panel de plugins de OpenWebRX+ (Plugins.addButton); sin él, en la barra superior (detrás de los de BricoHams)
     P.ui.boton = function (id, texto, svg, titulo, alPulsar) {
         ponerCss();
+        var nativo = typeof Plugins.addButton === 'function'
+            ? Plugins.addButton(id.replace(/^bh-/, '').replace(/-button$/, ''), texto, alPulsar) : null;
+        if (nativo) return $(nativo).addClass('bha-btn').attr('title', titulo).append('<span class="bha-dot"></span>');
         var $b = $('<div class="button bha-btn" id="' + id + '" title="' + titulo + '">' + svg + '<br>' + texto + '<span class="bha-dot"></span></div>');
         $b.on('click', alPulsar);
         (function colocar(intentos) {
             var $tras = $('#bh-dsp-button, #bh-filtro-button, #bh-cam-button, #bh-meteo-button, #bh-solar-button, #owrx-rig-dx-button').not($b).last();
             if ($tras.length) { $tras.after($b); return; }
             if (intentos > 0) { setTimeout(function () { colocar(intentos - 1); }, 500); return; }
-            var $bar = $('.openwebrx-main-buttons').first();
-            if ($bar.length) $bar.append($b);
-            else if (Plugins.addButton) Plugins.addButton(id, texto, alPulsar);
+            $('.openwebrx-main-buttons').first().append($b);
         })(10);
         return $b;
     };
 
-    // ventana flotante que recuerda su posición; devuelve {$win, $cuerpo, abrir(bool), abierta()}
-    var zArriba = 1002;
+    // ventana nativa (Plugins.addWindow); sin ella, un bloque suelto en pos0. Devuelve {$win, $cuerpo, abrir(bool), abierta()}
     P.ui.ventana = function (id, titulo, pos0) {
         ponerCss();
-        var $w = $('<div class="bha-win" id="' + id + '" role="dialog" aria-label="' + titulo + '">' +
-                   '<div class="bha-hdr"><span class="bha-title">' + titulo + '</span><span class="bha-x" title="Cerrar">×</span></div>' +
-                   '<div class="bha-cuerpo"></div></div>');
-        $('body').append($w);
-        var pos = P.lsGet(id + '_pos', null);
-        pos = pos || pos0;                                  // posición inicial distinta para cada ventana
-        if (pos && window.innerWidth > 600) $w.css({ left: P.limitar(pos[0], 0, window.innerWidth - 120) + 'px', top: P.limitar(pos[1], 0, window.innerHeight - 60) + 'px' });
-        $w.on('pointerdown', function () { $w.css('z-index', ++zArriba); });   // la que tocas, delante
-        var drag = null;
-        $w.find('.bha-hdr').on('pointerdown', function (e) {
-            if ($(e.target).hasClass('bha-x')) return;
-            var o = $w[0].getBoundingClientRect();
-            drag = { dx: e.clientX - o.left, dy: e.clientY - o.top };
-            this.setPointerCapture(e.pointerId);
-        }).on('pointermove', function (e) {
-            if (drag) $w.css({ left: Math.max(0, e.clientX - drag.dx) + 'px', top: Math.max(0, e.clientY - drag.dy) + 'px' });
-        }).on('pointerup pointercancel', function () {
-            if (!drag) return;
-            drag = null;
-            P.lsSet(id + '_pos', [parseInt($w.css('left'), 10), parseInt($w.css('top'), 10)]);
-        });
+        var nid = id.replace(/^bh-/, '');
+        var html = '<div class="bha-win" id="' + id + '" role="region" aria-label="' + titulo + '"><div class="bha-cuerpo"></div></div>';
+        var nativa = typeof Plugins.addWindow === 'function' && typeof Plugins.toggleWindow === 'function';
+        var host = nativa ? Plugins.addWindow(nid, titulo, html) : null;
+        if (!host) {
+            nativa = false;
+            host = $('<div class="openwebrx-plugin-body"></div>').html(html)
+                .css({ display: 'none', position: 'absolute', top: (pos0 ? pos0[1] : 110) + 'px', left: (pos0 ? pos0[0] : 460) + 'px', zIndex: 1002 }).appendTo('body')[0];
+        }
+        var $w = $(host).find('#' + id);
         var api = {
             $win: $w, $cuerpo: $w.find('.bha-cuerpo'),
-            abrir: function (on) { $w.toggleClass('open', !!on); if (on) $w.css('z-index', ++zArriba); if (api.alCambiar) api.alCambiar(!!on); },
-            abierta: function () { return $w.hasClass('open'); }
+            abrir: function (on) {
+                if (nativa) Plugins.toggleWindow(nid, !!on); else $(host).toggle(!!on);
+                if (api.alCambiar) api.alCambiar(!!on);
+            },
+            abierta: function () { return $(host).is(':visible'); }
         };
-        $w.find('.bha-x').on('click', function () { api.abrir(false); });
+        $(host).find('.openwebrx-plugin-close').on('click touchend', function () {
+            setTimeout(function () { if (api.alCambiar) api.alCambiar(false); }, 0);
+        });
         return api;
     };
 

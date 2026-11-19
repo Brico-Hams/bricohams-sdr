@@ -26,9 +26,20 @@ except ImportError:
 
 HTML = r'''<!doctype html><meta charset="utf-8"><title>prueba audio</title>
 <script src="jquery.js"></script>
-<div class="openwebrx-main-buttons"><div class="button" id="bh-solar-button">SOL</div></div>
+<div id="openwebrx-panel-plugins"></div><div id="webrx-page-container"></div>
 <script>
-var Plugins = { load: async function (name) {
+var Plugins = {
+    addButton: function (id, title, handler) { var b = document.createElement('div');
+        b.className = 'openwebrx-button openwebrx-plugin-button'; b.id = 'plugin-button-' + id; b.textContent = title;
+        if (handler) b.addEventListener('click', handler); document.getElementById('openwebrx-panel-plugins').appendChild(b); return b; },
+    addWindow: function (id, title, content) { var w = document.getElementById('plugin-window-' + id); if (w) return w;
+        w = document.createElement('div'); w.id = 'plugin-window-' + id; w.style.display = 'none';
+        w.innerHTML = '<div><span>' + title + '</span><span class="openwebrx-plugin-close">x</span></div><div class="openwebrx-plugin-body">' + content + '</div>';
+        w.querySelector('.openwebrx-plugin-close').addEventListener('click', function () { w.style.display = 'none'; });
+        document.getElementById('webrx-page-container').appendChild(w); return w; },
+    toggleWindow: function (id, on) { var w = document.getElementById('plugin-window-' + id);
+        w.style.display = (on === undefined ? w.style.display === 'none' : on) ? 'block' : 'none'; },
+    load: async function (name) {
     Plugins[name] = { _version: 0 };
     await new Promise(function (ok, ko) { var s = document.createElement('script');
         s.src = 'plugins/receiver/' + name + '/' + name + '.js'; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
@@ -95,15 +106,15 @@ try:
         pg.goto(url)
         assert pg.evaluate('listo') is True
         pg.wait_for_timeout(600)
-        assert pg.locator('#bh-filtro-button').count() == 1 and pg.locator('#bh-dsp-button').count() == 1
-        orden = pg.evaluate("$('.openwebrx-main-buttons .button').map(function(){return this.id}).get()")
-        assert orden == ['bh-solar-button', 'bh-filtro-button', 'bh-dsp-button'], orden
+        assert pg.locator('#plugin-button-filtro').count() == 1 and pg.locator('#plugin-button-dsp').count() == 1
+        orden = pg.evaluate("$('#openwebrx-panel-plugins .openwebrx-plugin-button').map(function(){return this.id}).get()")
+        assert orden == ['plugin-button-filtro', 'plugin-button-dsp'], orden
 
         sin = pg.evaluate('nivel(1000)')
         voz_sin = pg.evaluate('banda(300, 700)')
         assert sin > -40, 'sin filtro el 1 kHz debe oírse: %.1f dB' % sin
         # encender el filtro desde la interfaz (modo AM: 100–4500 Hz)
-        pg.click('#bh-filtro-button')
+        pg.click('#plugin-button-filtro')
         pg.click('#bh-filtro .bha-chip[data-k="am"]')
         pg.click('#bh-filtro .bha-sw:has-text("Filtro activo")')
         pg.wait_for_timeout(2500)
@@ -116,7 +127,7 @@ try:
         assert pg.evaluate('nivelToma(1000)') > -40, 'otros plugins que cuelgan del audio (osciloscopio de rig_skin) siguen recibiéndolo'
 
         # DSP: encender y ver que los medidores se mueven
-        pg.click('#bh-dsp-button')
+        pg.click('#plugin-button-dsp')
         pg.click('#bh-dsp .bha-sw:has-text("DSP activo")')
         pg.wait_for_timeout(800)
         txt = pg.inner_text('#bh-dsp')

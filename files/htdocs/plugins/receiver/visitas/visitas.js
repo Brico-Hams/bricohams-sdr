@@ -4,7 +4,7 @@
  * Autor: BricoHams (v4)
  *
  * Muestra junto al nombre del receptor «👥 3 ahora 🇪🇸🇪🇸🇮🇹 · 1.234 visitas» y,
- * al pulsar, un resumen por países de los últimos 30 días.
+ * al pulsar, un resumen por países de los últimos 30 días (ventana nativa de OpenWebRX+, Plugins.addWindow).
  * Los datos los genera bricohams-visitas (avisos de conexión de OpenWebRX+ por
  * MQTT + GeoIP local) en static/plugins/receiver/visitas/visitas.json.
  * En la web pública solo salen países y totales: nunca IPs.
@@ -36,13 +36,29 @@ Plugins.visitas.init = function () {
         '#bh-visitas:focus-visible,#bh-banner-info a:focus-visible{outline:2px solid var(--focus,#FFC18F);outline-offset:2px}' +
         '#bh-banner-info{display:block;margin-top:2px;font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);color:var(--text-muted,#BAC4CC)}' +
         '#bh-banner-info b{color:var(--text,#F6F8FA);font-weight:600}#bh-banner-info .bh-sep{margin:0 6px;color:var(--brand-orange,#F26B1D)}' +
-        '#bh-visitas-pop{position:fixed;top:60px;left:12px;z-index:9998;display:none;background:var(--surface,#1C2329);color:var(--text,#F6F8FA);' +
-        'border:1px solid var(--brand-orange,#F26B1D);border-radius:12px;padding:8px 12px;font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);max-height:60vh;overflow:auto}' +
+        // the floating summary is always white on black, whatever theme the receiver uses
+        '#plugin-window-visitas,#plugin-window-visitas .openwebrx-plugin-body{background:#000!important}' +
+        '#bh-visitas-pop,#bh-visitas-pop b,#bh-visitas-pop td,#bh-visitas-pop i{color:#fff!important}' +
+        '#bh-visitas-pop{font:12px/1.5 var(--bh-font-ui,system-ui,sans-serif);min-width:220px;max-height:60vh;overflow:auto}' +
         '#bh-visitas-pop a{color:var(--link,#FFA06A)}'
     ).appendTo('head');
     var $b = $('<span id="bh-visitas" role="button" tabindex="0" title="Oyentes conectados y visitas">👥 …</span>');
     var $info = $('<span id="bh-banner-info" aria-live="polite"></span>');
-    var $pop = $('<div id="bh-visitas-pop"></div>').appendTo('body');
+    // resumen por países en ventana nativa (Plugins.addWindow); sin ella, un bloque suelto
+    var nativa = typeof Plugins.addWindow === 'function' && typeof Plugins.toggleWindow === 'function';
+    var ventana = nativa ? Plugins.addWindow('visitas', '👥 Oyentes · BricoHams SDR', '<div id="bh-visitas-pop"></div>') : null;
+    if (!ventana) {
+        nativa = false;
+        ventana = $('<div class="openwebrx-plugin-body"><div id="bh-visitas-pop"></div></div>')
+            .css({ display: 'none', position: 'absolute', top: '60px', left: '12px', zIndex: 1002 }).appendTo('body')[0];
+    }
+    var $pop = $(ventana).find('#bh-visitas-pop');
+    function resumenAbierto() { return $(ventana).is(':visible'); }
+    function mostrarResumen(on) {
+        if (nativa) Plugins.toggleWindow('visitas', on); else $(ventana).toggle(on);
+        $b.attr('aria-expanded', on ? 'true' : 'false');
+    }
+    $(ventana).find('.openwebrx-plugin-close').on('click touchend', function () { $b.attr('aria-expanded', 'false'); });
 
     // El banner real de OpenWebRX+ (título + descripción con la presentación del proyecto) puede tardar o
     // reconstruirse según el tema: se reintenta y, sin él, la píldora queda fija en pantalla.
@@ -67,16 +83,15 @@ Plugins.visitas.init = function () {
         var filas = (resumen.paises_30d || []).slice(0, 25).map(function (p) {
             return '<tr><td>' + flag(p.cc) + ' ' + $('<i>').text(p.pais || p.cc).html() + '</td><td style="text-align:right">' + n(p.n) + '</td></tr>';
         }).join('');
-        $pop.html('<b>👥 Oyentes · BricoHams SDR</b> <span style="float:right;cursor:pointer" onclick="$(\'#bh-visitas-pop\').hide()">✕</span><br>' +
-            'Ahora: <b>' + n(resumen.ahora) + '</b> · Hoy: <b>' + n(resumen.hoy) + '</b> · Total: <b>' + n(typeof resumen.total === 'number' ? resumen.total : total) + '</b><br>' +
+        $pop.html('Ahora: <b>' + n(resumen.ahora) + '</b> · Hoy: <b>' + n(resumen.hoy) + '</b> · Total: <b>' + n(typeof resumen.total === 'number' ? resumen.total : total) + '</b><br>' +
             '<table style="margin-top:4px">' + filas + '</table>' +
             '<div style="opacity:.8;margin-top:6px">Visitas de los últimos 30 días por país. <a href="' + PRIV + '" target="_blank">Privacidad</a></div>');
         $pop.append($('<div>').append($info.contents().clone()));
     }
     function abrirResumen() {
-        pintarResumen();
-        $pop.toggle();
-        $b.attr('aria-expanded', $pop.is(':visible') ? 'true' : 'false');
+        var abrir = !resumenAbierto();
+        if (abrir) pintarResumen();
+        mostrarResumen(abrir);
     }
     $b.on('click', function (e) { e.stopPropagation(); abrirResumen(); })
       .on('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirResumen(); } });
@@ -105,7 +120,7 @@ Plugins.visitas.init = function () {
             if (i) $info.append('<span class="bh-sep" aria-hidden="true">·</span>');
             $info.append(p);
         });
-        if ($pop.is(':visible')) pintarResumen();
+        if (resumenAbierto()) pintarResumen();
     }
 
     function visitaApi() {

@@ -3,8 +3,9 @@
  *
  * Autor: BricoHams
  *
- * Añade un botón "SOL" en la barra superior, junto al de DX cluster
- * (rig_skin). Abre una ventana flotante con datos en vivo de NOAA SWPC:
+ * Añade un botón "SOL" al panel de plugins de OpenWebRX+ (Plugins.addButton,
+ * junto a MAP, DOP y PASES) que abre una ventana flotante nativa
+ * (Plugins.addWindow) con datos en vivo de NOAA SWPC:
  *   - Flujo solar (SFI), rayos X (clase de fulguración), protones,
  *     índices Kp/A, viento solar y escalas NOAA R/S/G (+ previsión).
  *   - Gráficas de 6 h de rayos X (GOES) y protones >=10 MeV.
@@ -14,7 +15,8 @@
  * El punto del botón toma el color de la escala NOAA más alta.
  *
  * Ajustes opcionales en init.js (antes de cargar el plugin):
- *   window.solar_config = { lat: 42.23, lon: -8.71, after: '#owrx-rig-dx-button' };
+ *   window.solar_config = { lat: 42.23, lon: -8.71 };
+ *   («after» solo se usa si el panel de plugins no existe y el botón va a la barra superior)
  */
 
 Plugins.solar._version = '1.0.0';
@@ -50,15 +52,11 @@ Plugins.solar.init = function () {
     //  estilos (un solo archivo: no hace falta solar.css)
     // ---------------------------------------------------------------
     var css =
-        '#bh-solar-button{position:relative}' +
+        '#bh-solar-button,#plugin-button-solar{position:relative}' +
         '#bh-solar-button svg{width:18px;height:18px}' +
-        '#bh-solar-button .sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#BAC4CC;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
-        '#bh-solar{position:fixed;top:90px;left:420px;z-index:1002;width:430px;max-width:calc(100vw - 16px);max-height:calc(100vh - 20px);' +
-            'display:none;flex-direction:column;padding:8px;border-radius:12px;color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif);' +
-            'background:var(--surface,#1C2329);border:1px solid var(--border,#38434C);box-shadow:0 6px 18px rgba(0,0,0,.45)}' +
-        '#bh-solar.open{display:flex}' +
-        '#bh-solar .sol-hdr{display:flex;align-items:center;gap:6px;padding:0 2px 6px;cursor:move;user-select:none;touch-action:none}' +
-        '#bh-solar .sol-title{flex:1;color:var(--text-muted,#BAC4CC);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+        '.sol-dot{position:absolute;top:2px;right:8px;width:7px;height:7px;border-radius:50%;background:#BAC4CC;box-shadow:0 0 4px rgba(0,0,0,.8)}' +
+        '#bh-solar{display:flex;flex-direction:column;min-width:min(430px,calc(100vw - 48px));max-height:calc(100vh - 120px);color:var(--text,#F6F8FA);font:12px var(--bh-font-ui,system-ui,sans-serif)}' +
+        '#bh-solar .sol-hdr{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:0 2px 6px}' +
         '#bh-solar .sol-time{color:var(--text-muted,#BAC4CC);font-size:11px}' +
         '#bh-solar .sol-btn{cursor:pointer;color:var(--text-muted,#BAC4CC);padding:0 4px;font-size:15px;line-height:1}' +
         '#bh-solar .sol-btn:hover{color:var(--text,#F6F8FA)}' +
@@ -83,7 +81,7 @@ Plugins.solar.init = function () {
         '#bh-solar .sol-note{color:var(--text-muted,#BAC4CC);font-size:10px;margin-top:6px;line-height:1.4}' +
         '#bh-solar a{color:var(--link,#FFA06A)}' +
         '#bh-solar :focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:3px}' +
-        '@media (max-width:600px){#bh-solar{left:8px!important;top:60px!important}#bh-solar .sol-grid{grid-template-columns:repeat(2,1fr)}}';
+        '@media (max-width:600px){#bh-solar .sol-grid{grid-template-columns:repeat(2,1fr)}}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -166,34 +164,56 @@ Plugins.solar.init = function () {
     // ---------------------------------------------------------------
     var SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
         '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>';
-    var $btn = $('<div class="button" id="bh-solar-button" title="Radiación solar y propagación (NOAA SWPC)">' +
-        SUN_SVG + '<br>SOL<span class="sol-dot"></span></div>');
+    var TITLE_BTN = 'Radiación solar y propagación (NOAA SWPC)';
+    var $btn = null;
 
-    function placeButton(tries) {
-        var $after = $(AFTER);
-        if ($after.length) { $after.after($btn); return; }
-        if (tries > 0) { setTimeout(function () { placeButton(tries - 1); }, 500); return; }
-        // sin rig_skin: detrás de "Estado" o al final de la barra
-        var $bar = $('.openwebrx-main-buttons').first();
-        var $status = $bar.children('.button').filter(function () { return /Estado|Status/.test($(this).text()); }).first();
-        if ($status.length) $status.after($btn); else $bar.append($btn);
+    // botón nativo del panel de plugins; si no existe, el de la barra superior de antes
+    var nativeBtn = typeof Plugins.addButton === 'function'
+        ? Plugins.addButton('solar', 'SOL', function () { toggle(!win.abierta()); }) : null;
+    if (nativeBtn) {
+        $btn = $(nativeBtn).attr('title', TITLE_BTN).append('<span class="sol-dot"></span>');
+    } else {
+        $btn = $('<div class="button" id="bh-solar-button" title="' + TITLE_BTN + '">' +
+            SUN_SVG + '<br>SOL<span class="sol-dot"></span></div>');
+        $btn.on('click', function () { toggle(!win.abierta()); });
+        (function placeButton(tries) {
+            var $after = $(AFTER);
+            if ($after.length) { $after.after($btn); return; }
+            if (tries > 0) { setTimeout(function () { placeButton(tries - 1); }, 500); return; }
+            // sin rig_skin: detrás de "Estado" o al final de la barra
+            var $bar = $('.openwebrx-main-buttons').first();
+            var $status = $bar.children('.button').filter(function () { return /Estado|Status/.test($(this).text()); }).first();
+            if ($status.length) $status.after($btn); else $bar.append($btn);
+        })(20);
     }
-    placeButton(20);
 
     // ---------------------------------------------------------------
-    //  ventana
+    //  ventana (Plugins.addWindow de OpenWebRX+; sin ella, un bloque suelto)
     // ---------------------------------------------------------------
-    var $win = $('<div id="bh-solar" role="dialog" aria-label="Radiación solar">' +
-        '<div class="sol-hdr"><span class="sol-title">☀ SOL · RADIACIÓN Y PROPAGACIÓN</span>' +
-        '<span class="sol-time"></span><span class="sol-btn sol-reload" title="Actualizar">⟳</span>' +
-        '<span class="sol-btn sol-close" title="Cerrar">×</span></div>' +
+    function crearVentana(id, titulo, html) {
+        var nativa = typeof Plugins.addWindow === 'function' && typeof Plugins.toggleWindow === 'function';
+        var el = nativa ? Plugins.addWindow(id, titulo, html) : null;
+        if (!el) {
+            nativa = false;
+            el = $('<div class="openwebrx-plugin-body"></div>').html(html)
+                .css({ display: 'none', position: 'absolute', top: '90px', left: '12px', zIndex: 1002 }).appendTo('body')[0];
+        }
+        return {
+            el: el,
+            abierta: function () { return $(el).is(':visible'); },
+            mostrar: function (on) { if (nativa) Plugins.toggleWindow(id, on); else $(el).toggle(on); }
+        };
+    }
+    var win = crearVentana('solar', '☀ SOL · RADIACIÓN Y PROPAGACIÓN',
+        '<div id="bh-solar" role="region" aria-label="Radiación solar">' +
+        '<div class="sol-hdr"><span class="sol-time"></span><span class="sol-btn sol-reload" title="Actualizar">⟳</span></div>' +
         '<div class="sol-tabs">' +
         '<span class="sol-chip on" data-tab="datos">DATOS</span>' +
         '<span class="sol-chip" data-tab="graf">RAYOS X · PROTONES</span>' +
         '<span class="sol-chip" data-tab="bandas">BANDAS HF</span>' +
         '<span class="sol-chip" data-tab="img">IMÁGENES</span></div>' +
         '<div class="sol-lcd"></div></div>');
-    $('body').append($win);
+    var $win = $(win.el).find('#bh-solar');
     var $lcd = $win.find('.sol-lcd');
 
     var tab = lsGet('bh_solar_tab') || 'datos';
@@ -206,45 +226,12 @@ Plugins.solar.init = function () {
         render();
     }
     $win.on('click', '.sol-chip', function () { setTab($(this).data('tab')); });
-    $win.find('.sol-close').on('click', function () { toggle(false); });
+    $(win.el).find('.openwebrx-plugin-close').on('click touchend', function () { toggle(false); });
     $win.find('.sol-reload').on('click', function () { load(true); });
-    $btn.on('click', function () { toggle(!open); });
-
-    // posición guardada y arrastre por la cabecera
-    (function () {
-        var p = (lsGet('bh_solar_pos') || '').split(',');
-        if (p.length === 2 && window.innerWidth > 600) {
-            $win.css({ left: Math.max(0, Math.min(+p[0], window.innerWidth - 120)) + 'px',
-                       top: Math.max(0, Math.min(+p[1], window.innerHeight - 60)) + 'px' });
-        }
-        var drag = null;
-        $win.find('.sol-hdr').on('pointerdown', function (e) {
-            if ($(e.target).hasClass('sol-btn')) return;
-            var o = $win[0].getBoundingClientRect();
-            drag = { dx: e.clientX - o.left, dy: e.clientY - o.top };
-            this.setPointerCapture(e.pointerId);
-        }).on('pointermove', function (e) {
-            if (!drag) return;
-            $win.css({ left: Math.max(0, e.clientX - drag.dx) + 'px', top: Math.max(0, e.clientY - drag.dy) + 'px' });
-            fitHeight();
-        }).on('pointerup pointercancel', function () {
-            if (!drag) return;
-            drag = null;
-            lsSet('bh_solar_pos', parseInt($win.css('left')) + ',' + parseInt($win.css('top')));
-        });
-    })();
-
-    // que la ventana nunca se salga por abajo de la pantalla
-    function fitHeight() {
-        var top = $win[0].getBoundingClientRect().top;
-        $win.css('max-height', Math.max(160, window.innerHeight - top - 10) + 'px');
-    }
-    $(window).on('resize', function () { if (open) fitHeight(); });
 
     function toggle(on) {
         open = on;
-        $win.toggleClass('open', on);
-        if (on) fitHeight();
+        win.mostrar(on);
         $btn.toggleClass('highlighted', on);
         lsSet('bh_solar_open', on ? '1' : '0');
         if (on) {

@@ -6,7 +6,8 @@
  *  - Franja carmesí (bandera de la Región de Murcia) y naranja BricoHams
  *    bajo la barra superior.
  *  - Mini bandera de Murcia junto al nombre del receptor.
- *  - Botón flotante al canal de Telegram.
+ *  - Botones TG (Telegram) y KIT (hazlo tú mismo) en el panel de plugins (Plugins.addButton) y selector
+ *    de tema en una sección del panel (Plugins.addSection); sin API nativa, enlaces al final de la página.
  *  - v4: plan de bandas visible por defecto (la primera vez; luego manda lo que elija
  *    cada visitante) y foto superior más baja para que se vea la web.
  *
@@ -46,15 +47,7 @@ Plugins.bricohams.init = function () {
         '.webrx-top-container{border-bottom:3px solid var(--brand-orange,#F26B1D)}' +
         '#bh-murcia-flag{display:inline-block;vertical-align:middle;margin-right:6px;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}' +
         '#bh-murcia-flag svg{display:block}' +
-        '#bricohams-tg,#bricohams-gh,#bricohams-theme{position:fixed;right:12px;z-index:9999;display:flex;gap:6px;align-items:center;' +
-            'padding:6px 12px;border-radius:999px;font:600 13px/1 var(--bh-font-ui,system-ui,sans-serif);' +
-            'text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.92;cursor:pointer}' +
-        '#bricohams-tg{bottom:12px;background:var(--brand-orange,#F26B1D);color:var(--on-accent,#23272B);border:1px solid var(--brand-orange,#F26B1D)}' +
-        '#bricohams-gh{bottom:48px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
-        '#bricohams-theme{bottom:84px;background:var(--surface,#F6F7F8);color:var(--text,#23272B);border:1px solid var(--border,#DCE1E5)}' +
-        '#bricohams-tg:hover,#bricohams-gh:hover,#bricohams-theme:hover{opacity:1;text-decoration:underline}' +
-        '#bricohams-tg:focus-visible,#bricohams-gh:focus-visible,#bricohams-theme:focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:2px}' +
-        '@media (max-width:600px){#bricohams-tg span,#bricohams-gh span{display:none}}';
+        '#bricohams-theme:focus-visible{outline:3px solid var(--focus,#FFC18F);outline-offset:2px}';
     // v4: la foto de cabecera abierta no tapa media pantalla
     // (altura adaptable: con 210px fijos se recortaban descripción, logo y enlaces; si no cabe, desplaza dentro)
     css += '.openwebrx-description-container.expanded{height:auto!important;min-height:210px;max-height:min(60vh,420px)!important;' +
@@ -62,7 +55,11 @@ Plugins.bricohams.init = function () {
         '.webrx-top-container{overflow:visible}' +
         '.webrx-top-bar{flex-wrap:wrap;min-width:0}.webrx-rx-texts{min-width:0;overflow-wrap:anywhere}' +
         '.webrx-top-logo{max-width:100%;flex-shrink:0}' +
-        '@media (max-width:600px){.openwebrx-description-container.expanded{min-height:0;max-height:55vh!important}}';
+        '@media (max-width:600px){.openwebrx-description-container.expanded{min-height:0;max-height:55vh!important}}' +
+        // on narrow screens OWRX+ hangs the native plugin stack off-screen left of the receiver panel: show it as a row
+        '@media (max-width:767px){#openwebrx-panel-plugins{position:static!important;left:auto!important;right:auto!important;' +
+        'transform:none!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;' +
+        'justify-content:center;gap:4px;width:auto!important;margin:0 0 6px 0}}';
     var st = document.createElement('style');
     st.textContent = css;
     document.head.appendChild(st);
@@ -73,8 +70,13 @@ Plugins.bricohams.init = function () {
         $title.prepend($('<span id="bh-murcia-flag" title="Región de Murcia"></span>').html(flag(24)));
     }
 
-    // botón de Telegram
-    if (cfg.boton !== false && !document.getElementById('bricohams-tg')) {
+    var nativo = typeof Plugins.addButton === 'function';
+    function abrir(url) { window.open(url, '_blank', 'noopener'); }
+
+    // botón de Telegram (panel de plugins; sin él, enlace al final de la página)
+    var tgNativo = cfg.boton !== false && nativo ? Plugins.addButton('bricohams-tg', 'TG', function () { abrir(TG); }) : null;
+    if (tgNativo) { tgNativo.title = 'Canal de Telegram de BricoHams'; tgNativo.setAttribute('aria-label', tgNativo.title); }
+    if (cfg.boton !== false && !tgNativo && !document.getElementById('bricohams-tg')) {
         var a = document.createElement('a');
         a.id = 'bricohams-tg';
         a.href = TG;
@@ -89,7 +91,10 @@ Plugins.bricohams.init = function () {
     }
     // v5.0 · «¿Quieres una estación como esta?» → fuentes del kit
     var FU = 'https://github.com/Brico-Hams/bricohams-sdr';
-    if (/^https:\/\/[^\s'"<>]+$/.test(FU) && !document.getElementById('bricohams-gh')) {
+    var ghOk = /^https:\/\/[^\s'"<>]+$/.test(FU);
+    var ghNativo = ghOk && nativo ? Plugins.addButton('bricohams-gh', 'KIT', function () { abrir(FU); }) : null;
+    if (ghNativo) { ghNativo.title = 'Hazlo tú mismo: instalador, caja 3D, manuales y código de esta estación'; ghNativo.setAttribute('aria-label', ghNativo.title); }
+    if (ghOk && !ghNativo && !document.getElementById('bricohams-gh')) {
         var g = document.createElement('a');
         g.id = 'bricohams-gh';
         g.href = FU;
@@ -115,7 +120,9 @@ Plugins.bricohams.init = function () {
         };
         tb.addEventListener('click', function () { window.BricoHamsTheme.set(SIG[window.BricoHamsTheme.get()]); pintar(); });
         pintar();
-        document.body.appendChild(tb);
+        var sec = typeof Plugins.addSection === 'function' ? Plugins.addSection('bricohams', 'BricoHams', '') : null;
+        if (sec && sec.classList && sec.classList.contains('openwebrx-section-divider')) sec = sec.nextElementSibling;
+        (sec || document.body).appendChild(tb);
     }
     // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
     try {
