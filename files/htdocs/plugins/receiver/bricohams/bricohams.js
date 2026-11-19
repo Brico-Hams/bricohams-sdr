@@ -123,7 +123,10 @@ Plugins.bricohams.init = function () {
         var sec = typeof Plugins.addSection === 'function' ? Plugins.addSection('bricohams', 'BricoHams', '') : null;
         if (sec && sec.classList && sec.classList.contains('openwebrx-section-divider')) sec = sec.nextElementSibling;
         (sec || document.body).appendChild(tb);
+        Plugins.bricohams.skinSelector(sec || document.body);
     }
+    // v5.6 · Brico-FX una vez para todos; los plugins de skins ya están cargados (init.js)
+    setTimeout(Plugins.bricohams.skinPorDefecto, 500);
     // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
     try {
         if (typeof LS !== 'undefined' && !LS.has('ui_bandplan') && typeof UI !== 'undefined' && UI.toggleBandplan) {
@@ -131,4 +134,48 @@ Plugins.bricohams.init = function () {
         }
     } catch (e) { console.debug('bandplan', e); }
     return true;
+};
+
+// v5.6 · receiver skins (independent plugins bh_skin_bricofx / bh_skin_militar)
+var BH_SKINS = [['bh-bricofx', 'Brico-FX'], ['bh-militar', 'Militar'], ['rig', 'Rig'], ['default', 'Original']];
+
+function bhTemas() {
+    var lb = document.getElementById('openwebrx-themes-listbox');
+    return lb ? Array.prototype.map.call(lb.options, function (o) { return o.value; }) : [];
+}
+
+// everyone gets Brico-FX once (flag bh_bricofx_default); afterwards their own choice is kept
+Plugins.bricohams.skinPorDefecto = function () {
+    if (bhTemas().indexOf('bh-bricofx') < 0 || typeof UI === 'undefined' || !UI.setTheme) return;
+    var hecho = null;
+    try { hecho = localStorage.getItem('bh_bricofx_default'); } catch (e) { /* blocked storage */ }
+    if (hecho === '1') return;
+    UI.setTheme('bh-bricofx');
+    try { localStorage.setItem('bh_bricofx_default', '1'); } catch (e) { /* blocked storage */ }
+};
+
+// visible style selector in the BricoHams section, kept in sync with OpenWebRX+'s theme listbox
+Plugins.bricohams.skinSelector = function (caja) {
+    if (!caja || document.getElementById('bricohams-skin')) return;
+    var hay = bhTemas();
+    var sel = document.createElement('select');
+    sel.id = 'bricohams-skin';
+    sel.setAttribute('aria-label', 'Estilo del receptor');
+    sel.setAttribute('title', 'Estilo del receptor');
+    BH_SKINS.forEach(function (s) {
+        if (hay.indexOf(s[0]) < 0 && s[0] !== 'default') return;
+        var o = document.createElement('option');
+        o.value = s[0];
+        o.textContent = s[1];
+        sel.appendChild(o);
+    });
+    var actual = function () { return (typeof UI !== 'undefined' && UI.theme) || 'default'; };
+    sel.value = actual();
+    sel.addEventListener('change', function () { if (typeof UI !== 'undefined' && UI.setTheme) UI.setTheme(sel.value); });
+    // UI.setTheme also runs from the stock listbox and from skinPorDefecto: follow the body class
+    if (typeof MutationObserver === 'function' && document.body) {
+        new MutationObserver(function () { if (sel.value !== actual()) sel.value = actual(); })
+            .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+    caja.appendChild(sel);
 };
