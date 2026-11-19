@@ -29,8 +29,8 @@ Then choose **Brico-FX** in *Settings → Theme*.
 |---|---|
 | VFO knob | Drag in a circle, mouse wheel, or arrow keys: tunes by the current tuning step |
 | AF / SQL keys + knob | Choose what the knob changes: volume (0–150) or squelch (−150…0 dB) |
-| FUNC knob | Click to choose STEP / NR / FILTER, turn to change it (tuning step, noise reduction, filter width ±10 %) |
-| QMB | Hold 0.6 s to store the frequency, tap to recall it |
+| FUNC knob | Turn to change the target chosen with the STEP / NR / FILTER soft keys (tuning step, noise reduction on/off, filter width ±10 %) |
+| QMB | Hold 0.6 s (or Shift+click / Shift+Enter) to store the frequency, tap or Enter to recall it |
 | V/M | Recall the stored frequency |
 | CLAR | Fine tuning on/off (uses the smallest tuning step while on) |
 | MODE | Next demodulator mode |
@@ -42,8 +42,8 @@ Labels follow the page language (Spanish when `<html lang="es…">`, otherwise E
 
 ## Notes
 
-- The stock receiver controls stay in the page and are driven by the skin, so other plugins keep
-  working; they are only hidden while Brico-FX is active.
+- The panel sits on top of the stock receiver panel and drives its controls; only the stock frequency
+  line is hidden. Profiles, bookmarks, plugin buttons and the Modes / Controls / Settings sections stay below.
 - No product names or logos of any manufacturer are used.
 
 ## Licence

@@ -11,15 +11,9 @@ body.theme-bh-militar {
     --mil-plate: #c9c3a8;
 }
 
-body.theme-bh-militar #openwebrx-panel-receiver {
-    width: min(600px, 96vw) !important;
-    max-width: 96vw;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-}
-body.theme-bh-militar #openwebrx-panel-receiver > :not(#bh-militar-panel) { display: none !important; }
+/* only the stock frequency line is replaced; profiles/bookmarks, plugin buttons and sections stay below */
+body.theme-bh-militar #openwebrx-panel-receiver { width: min(620px, 96vw) !important; max-width: 96vw; }
+body.theme-bh-militar #openwebrx-panel-receiver .frequencies-container { display: none !important; }
 
 body.theme-bh-militar #bh-militar-panel {
     position: relative;

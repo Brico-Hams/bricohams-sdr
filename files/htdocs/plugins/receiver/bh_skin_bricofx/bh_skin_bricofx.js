@@ -51,6 +51,9 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
             return n < 0 ? Math.ceil(n) : Math.floor(n);
         },
         clamp: function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
+        orDefault: function (v, d) { return (v === null || v === undefined || isNaN(v)) ? d : v; },
+        // QMB: long press (≥ 600 ms) or Shift stores, a tap / Enter recalls
+        qmbAction: function (heldMs, shift) { return (shift || heldMs >= 600) ? 'store' : 'recall'; },
         fmtFreq: function (hz) {
             if (!hz || !isFinite(hz)) return '---.---.---';
             var s = String(Math.round(hz));
@@ -204,17 +207,15 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         var $p = $(panel);
         P._bindKnob($p.find('.fx-vfo'), 15, function (n) { tune(n); }, '.fx-vfo-ring');
         P._bindKnob($p.find('.fx-k-af'), 12, function (n) {
-            if (P._af === 'sql') slider('.openwebrx-squelch-slider', L.clamp((slider('.openwebrx-squelch-slider') || -150) + 2 * n, -150, 0));
+            if (P._af === 'sql') slider('.openwebrx-squelch-slider', L.clamp(L.orDefault(slider('.openwebrx-squelch-slider'), -150) + 2 * n, -150, 0));
             else {
-                var v = L.clamp((slider('#openwebrx-panel-volume') || 0) + 5 * n, 0, 150);
+                var v = L.clamp(L.orDefault(slider('#openwebrx-panel-volume'), 0) + 5 * n, 0, 150);
                 slider('#openwebrx-panel-volume', v);
                 try { UI.setVolume(v); } catch (e) {}
             }
         });
+        // FUNC turns only; its target (STEP / NR / FILTER) is chosen with the soft keys
         P._bindKnob($p.find('.fx-k-func'), 20, P._funcTurn);
-        $p.on('click' + NS, '.fx-k-func', function () {
-            P._fn = { step: 'nr', nr: 'filter', filter: 'step' }[P._fn];
-        });
         $p.on('click' + NS, '.fx-af, .fx-sql', function () {
             P._af = $(this).hasClass('fx-sql') ? 'sql' : 'af';
             $p.find('.fx-af').attr('aria-pressed', P._af === 'af');
@@ -224,8 +225,11 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         $p.on('click' + NS, '.fx-vm', function () { var f = Number(ls('bh_bricofx_qmb')); if (f > 0) UI.setFrequency(f, false); });
         var t0 = 0;
         $p.on('pointerdown' + NS, '.fx-qmb', function () { t0 = Date.now(); });
-        $p.on('pointerup' + NS, '.fx-qmb', function () {
-            if (Date.now() - t0 >= 600) ls('bh_bricofx_qmb', String(freq()));
+        $p.on('pointerleave' + NS + ' pointercancel' + NS, '.fx-qmb', function () { t0 = 0; });
+        $p.on('click' + NS, '.fx-qmb', function (e) {
+            var held = t0 ? Date.now() - t0 : 0;
+            t0 = 0;
+            if (L.qmbAction(held, e.shiftKey) === 'store') ls('bh_bricofx_qmb', String(freq()));
             else { var f = Number(ls('bh_bricofx_qmb')); if (f > 0) UI.setFrequency(f, false); }
         });
         $p.on('click' + NS, '.fx-clar', P._toggleFine);
@@ -405,6 +409,14 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         });
     };
 
+    // the message list is an aria-live region: rebuild it only when its content changes
+    P._lastMsgs = null;
+    P._msgsChanged = function (html) {
+        if (html === P._lastMsgs) return false;
+        P._lastMsgs = html;
+        return true;
+    };
+
     P._tickViews = function ($p) {
         var m = modo();
         if (m !== P._lastMode) { P._lastMode = m; P._chosen = null; P._clearAt = 0; }
@@ -416,8 +428,9 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         if ($ol.length) {
             var lines = P._decoded().slice(P._clearAt);
             var out = L.lastLines(lines, 8, P._filter);
-            $ol.html(out.length ? out.map(function (l) { return '<li>' + $('<i>').text(l).html() + '</li>'; }).join('')
-                : '<li class="fx-empty">' + L.t('empty') + '</li>');
+            var html = out.length ? out.map(function (l) { return '<li>' + $('<i>').text(l).html() + '</li>'; }).join('')
+                : '<li class="fx-empty">' + L.t('empty') + '</li>';
+            if (P._msgsChanged(html) || !$ol.children().length) $ol.html(html);
         }
     };
 

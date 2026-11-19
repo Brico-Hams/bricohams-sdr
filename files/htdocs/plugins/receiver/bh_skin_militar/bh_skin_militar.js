@@ -49,6 +49,7 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
             return n < 0 ? Math.ceil(n) : Math.floor(n);
         },
         clamp: function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
+        orDefault: function (v, d) { return (v === null || v === undefined || isNaN(v)) ? d : v; },
         t: function (key) {
             var lang = (document.documentElement.lang || '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
             return TXT[lang][key] || TXT.en[key] || key;
@@ -103,6 +104,8 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
     P._destroy = function () {
         if (P._timer !== null) clearInterval(P._timer);
         P._timer = null;
+        // the MUTE switch only lives in this skin: never leave the listener muted in another theme
+        if (P._mute) { try { UI.toggleMute(false); } catch (e) {} P._mute = false; }
         if (P._panel && typeof $ === 'function') $(P._panel).off(NS).find('*').off(NS);
         if (P._panel && P._panel.parentNode) P._panel.parentNode.removeChild(P._panel);
         P._panel = null;
@@ -131,8 +134,8 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
         return '<div class="mil-kwrap"><div class="mil-knob ' + cls + '" role="slider" tabindex="0" aria-label="' + label +
             '"><span></span></div><small>' + label + '</small></div>';
     }
-    function toggle(cls, label) {
-        return '<button type="button" class="mil-toggle ' + cls + '" aria-pressed="false" aria-label="' + label +
+    function toggle(cls, label, on) {
+        return '<button type="button" class="mil-toggle ' + cls + '" aria-pressed="' + !!on + '" aria-label="' + label +
             '"><span class="mil-lever"></span><small>' + label + '</small></button>';
     }
     function screws() { return '<i class="mil-screw s1"></i><i class="mil-screw s2"></i><i class="mil-screw s3"></i><i class="mil-screw s4"></i>'; }
@@ -151,7 +154,7 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
                 '<div class="mil-col mil-side">' +
                     '<div class="mil-lamps"><span class="mil-lamp mil-green" title="' + t('signal') + '"></span>' +
                     '<span class="mil-lamp mil-red" title="' + t('mute') + '"></span></div>' +
-                    toggle('mil-nr', t('nr')) + toggle('mil-mutesw', t('mute')) +
+                    toggle('mil-nr', t('nr'), P._nr) + toggle('mil-mutesw', t('mute'), P._mute) +
                 '</div>' +
             '</div>' +
             '<div class="mil-knobs">' + knob('mil-k-vol', t('volume')) + knob('mil-k-sql', t('squelch')) +
@@ -162,12 +165,12 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
             P._dial += n * 12;
         }, null);
         P._bindKnob($p.find('.mil-k-vol'), 12, function (n) {
-            var v = L.clamp((slider('#openwebrx-panel-volume') || 0) + 5 * n, 0, 150);
+            var v = L.clamp(L.orDefault(slider('#openwebrx-panel-volume'), 0) + 5 * n, 0, 150);
             slider('#openwebrx-panel-volume', v);
             try { UI.setVolume(v); } catch (e) {}
         }, 'span');
         P._bindKnob($p.find('.mil-k-sql'), 12, function (n) {
-            slider('.openwebrx-squelch-slider', L.clamp((slider('.openwebrx-squelch-slider') || -150) + 2 * n, -150, 0));
+            slider('.openwebrx-squelch-slider', L.clamp(L.orDefault(slider('.openwebrx-squelch-slider'), -150) + 2 * n, -150, 0));
         }, 'span');
         P._bindKnob($p.find('.mil-k-mode'), 30, function (n) { P._nextMode(n); }, 'span');
         $p.on('click' + NS, '.mil-nr', function () {

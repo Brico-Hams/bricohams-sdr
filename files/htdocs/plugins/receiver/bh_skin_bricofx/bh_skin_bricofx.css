@@ -14,16 +14,10 @@ body.theme-bh-bricofx {
     --fx-orange: #ff9a1f;
 }
 
-/* the stock receiver controls stay in the page (the skin drives them) but are hidden */
-body.theme-bh-bricofx #openwebrx-panel-receiver {
-    width: min(620px, 96vw) !important;
-    max-width: 96vw;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-}
-body.theme-bh-bricofx #openwebrx-panel-receiver > :not(#bh-bricofx-panel) { display: none !important; }
+/* the front panel sits on top of the receiver panel; only the stock frequency line it replaces is hidden,
+   profiles/bookmarks, plugin buttons and sections (modes, controls, settings…) stay available below */
+body.theme-bh-bricofx #openwebrx-panel-receiver { width: min(640px, 96vw) !important; max-width: 96vw; }
+body.theme-bh-bricofx #openwebrx-panel-receiver .frequencies-container { display: none !important; }
 
 body.theme-bh-bricofx #bh-bricofx-panel {
     display: block;

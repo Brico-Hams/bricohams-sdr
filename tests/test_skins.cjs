@@ -184,4 +184,42 @@ function cargar(nombre, e) {
     assert.equal(fx._panel, null);
 }
 
+// ---- review fixes ----
+{
+    const P = cargar('bh_skin_bricofx', entorno());
+    const L = P._logic;
+    assert.equal(L.qmbAction(0, false), 'recall', 'tap / Enter recalls');
+    assert.equal(L.qmbAction(700, false), 'store', 'long press stores');
+    assert.equal(L.qmbAction(0, true), 'store', 'Shift+Enter stores from the keyboard');
+    assert.equal(L.orDefault(0, -150), 0, 'squelch fully open (0) is a value, not missing');
+    assert.equal(L.orDefault(null, -150), -150);
+    assert.equal(L.orDefault(NaN, -150), -150);
+    assert.equal(P._msgsChanged('<li>a</li>'), true);
+    assert.equal(P._msgsChanged('<li>a</li>'), false, 'unchanged list is not rebuilt (no live-region spam)');
+    assert.equal(P._msgsChanged('<li>b</li>'), true);
+    const js = src('bh_skin_bricofx');
+    assert.ok(!/'click' \+ NS, '\.fx-k-func'/.test(js), 'releasing a FUNC drag must not change its target');
+}
+{
+    const e = entorno();
+    const llamadas = [];
+    e.ctx.UI = { toggleMute: on => llamadas.push(on) };
+    const P = cargar('bh_skin_militar', e);
+    P.init();
+    e.clases.add('theme-bh-militar'); e.disparar();
+    P._mute = true;
+    e.clases.delete('theme-bh-militar'); e.disparar();
+    assert.deepEqual(llamadas, [false], 'leaving Military unmutes what its switch muted');
+    assert.equal(P._mute, false);
+    assert.equal(P._logic.orDefault(0, -150), 0);
+}
+
+// ---- the skins must not hide the rest of the receiver panel (profiles/bookmarks, plugin buttons, sections) ----
+for (const n of ['bh_skin_bricofx', 'bh_skin_militar']) {
+    const css = fs.readFileSync(path.join(DIR, n, n + '.css'), 'utf8');
+    assert.ok(!/#openwebrx-panel-receiver\s*>\s*:not\(/.test(css), n + ' hides every receiver child');
+    assert.ok(/#openwebrx-panel-receiver\s+\.frequencies-container\s*\{\s*display:\s*none/.test(css),
+        n + ' hides only the stock frequency line it replaces');
+}
+
 console.log('Receiver skins regression: PASS');
