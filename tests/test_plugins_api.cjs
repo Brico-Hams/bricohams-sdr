@@ -29,7 +29,8 @@ const context = {
         getElementById: () => null,
         createElement: nodo
     },
-    $: () => ({ first: () => ({ length: 0 }) })
+    $: () => ({ first: () => ({ length: 0 }) }),
+    setTimeout: () => 0
 };
 vm.runInNewContext(src('bricohams'), context);
 context.Plugins.bricohams.init();

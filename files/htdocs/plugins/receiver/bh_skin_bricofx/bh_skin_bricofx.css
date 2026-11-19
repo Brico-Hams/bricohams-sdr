@@ -1,0 +1,176 @@
+/* Brico-FX receiver skin — (c) 2026 EA5KAO / BricoHams, MIT. Everything is scoped to the active theme. */
+body.theme-bh-bricofx {
+    --fx-body: #141516;
+    --fx-body-hi: #2a2c2e;
+    --fx-key: #1d1f21;
+    --fx-label: #f2f4f5;
+    --fx-screen: #0b1420;
+    --fx-strip: #dfe9f2;
+    --fx-digits: #5fd0ff;
+    --fx-cyan: #4fc3f7;
+    --fx-red: #ff4b3e;
+    --fx-soft: #10306b;
+    --fx-led: #1e88ff;
+    --fx-orange: #ff9a1f;
+}
+
+/* the front panel sits on top of the receiver panel; only the stock frequency line it replaces is hidden,
+   profiles/bookmarks, plugin buttons and sections (modes, controls, settings…) stay available below */
+body.theme-bh-bricofx #openwebrx-panel-receiver {
+    width: min(640px, 96vw) !important; max-width: 96vw;
+    flex-shrink: 0 !important; max-height: calc(100vh - 180px); overflow-y: auto;   /* a column flex parent would squash it */
+    background: #0e0f10 !important; color: #e6e9ec; border-radius: 22px;
+}
+body.theme-bh-bricofx #openwebrx-panel-receiver .frequencies-container { display: none !important; }
+/* integrated in the front panel: profiles → BAND menu, modes → MODE menu */
+body.theme-bh-bricofx #openwebrx-panel-receiver .openwebrx-panel-line:has(#openwebrx-sdr-profiles-listbox) { display: none !important; }
+/* readable dropdowns on the dark panel (the open list is drawn by the OS, so it needs its own colours) */
+body.theme-bh-bricofx #openwebrx-panel-receiver select,
+body.theme-bh-bricofx #openwebrx-panel-receiver option { background-color: #1d1f21; color: #f2f4f5; }
+body.theme-bh-bricofx #openwebrx-section-modes,
+body.theme-bh-bricofx #openwebrx-section-modes + .openwebrx-section { display: none !important; }
+
+body.theme-bh-bricofx #bh-bricofx-panel {
+    display: block;
+    font: 600 12px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--fx-label);
+    background: linear-gradient(180deg, var(--fx-body-hi), var(--fx-body) 18%);
+    border-radius: 22px;
+    padding: 8px 12px 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .08);
+    user-select: none;
+}
+#bh-bricofx-panel button { font: inherit; color: inherit; cursor: pointer; }
+#bh-bricofx-panel :focus-visible { outline: 3px solid var(--fx-orange); outline-offset: 2px; }
+
+/* top edge row of thin keys */
+#bh-bricofx-panel .fx-top { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
+#bh-bricofx-panel .fx-thin {
+    background: var(--fx-key); border: 1px solid #000; border-radius: 4px; padding: 2px 10px;
+    font-size: 10px; letter-spacing: .5px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+#bh-bricofx-panel .fx-thin[aria-disabled="true"] { opacity: .55; cursor: default; }
+
+#bh-bricofx-panel .fx-body { display: grid; grid-template-columns: 62px 1fr 150px; gap: 10px; align-items: center; }
+
+/* side columns */
+#bh-bricofx-panel .fx-left, #bh-bricofx-panel .fx-right { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#bh-bricofx-panel .fx-key {
+    background: var(--fx-key); border: 1px solid #000; border-radius: 10px; padding: 6px 10px; min-width: 52px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 3px rgba(0, 0, 0, .6);
+}
+#bh-bricofx-panel .fx-key[aria-pressed="true"] { color: var(--fx-cyan); box-shadow: inset 0 0 6px rgba(79, 195, 247, .5); }
+#bh-bricofx-panel .fx-led { width: 6px; height: 6px; border-radius: 50%; background: var(--fx-led); box-shadow: 0 0 6px var(--fx-led); }
+
+/* small knurled knobs */
+#bh-bricofx-panel .fx-knob {
+    width: 46px; height: 46px; border-radius: 50%; touch-action: none; cursor: grab;
+    background: repeating-conic-gradient(#2b2d2f 0 6deg, #0d0e0f 6deg 12deg);
+    box-shadow: 0 3px 5px rgba(0, 0, 0, .7), inset 0 0 0 4px #111;
+    display: flex; align-items: center; justify-content: center;
+}
+#bh-bricofx-panel .fx-knob span {
+    display: block; width: 30px; height: 30px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #6d7174, #1b1c1d 70%);
+    position: relative;
+}
+#bh-bricofx-panel .fx-knob span::after {
+    content: ""; position: absolute; top: 3px; left: 50%; width: 2px; height: 8px; margin-left: -1px; background: #d9dde0;
+}
+
+/* screen */
+#bh-bricofx-panel .fx-screen {
+    background: var(--fx-screen); border: 6px solid #050607; border-radius: 12px; overflow: hidden;
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, .8); min-height: 200px; display: flex; flex-direction: column;
+}
+#bh-bricofx-panel .fx-status {
+    display: flex; align-items: center; gap: 8px; background: var(--fx-strip); color: #0b1420; padding: 2px 8px; font-size: 11px;
+}
+#bh-bricofx-panel .fx-status b { letter-spacing: 1px; }
+#bh-bricofx-panel .fx-fn { margin-left: auto; background: #000; color: var(--fx-orange); padding: 0 6px; border-radius: 2px; }
+#bh-bricofx-panel .fx-modebox { border: 1px solid #0b1420; padding: 0 6px; border-radius: 2px; min-width: 34px; text-align: center; }
+#bh-bricofx-panel .fx-meter { padding: 4px 8px 0; font-size: 10px; }
+#bh-bricofx-panel .fx-scale { color: #fff; letter-spacing: 2px; }
+#bh-bricofx-panel .fx-scale i { font-style: normal; font-weight: 800; }
+#bh-bricofx-panel .fx-scale em { font-style: normal; color: var(--fx-cyan); letter-spacing: 1px; }
+#bh-bricofx-panel .fx-bar { height: 5px; background: #1c2633; border-radius: 2px; margin: 2px 0 3px; }
+#bh-bricofx-panel .fx-bar span { display: block; height: 100%; width: 0; background: var(--fx-red); border-radius: 2px; transition: width .15s; }
+#bh-bricofx-panel .fx-vol { color: #cfd8e0; display: flex; align-items: center; gap: 6px; }
+#bh-bricofx-panel .fx-vol span { display: block; height: 2px; background: var(--fx-red); }
+#bh-bricofx-panel .fx-freq {
+    color: var(--fx-digits); font: italic 700 34px/1.1 "DejaVu Sans Mono", Consolas, monospace; text-align: right;
+    padding: 2px 10px; letter-spacing: 1px; text-shadow: 0 0 8px rgba(95, 208, 255, .45);
+}
+#bh-bricofx-panel .fx-view { flex: 1; min-height: 70px; padding: 0 6px; display: flex; gap: 6px; }
+#bh-bricofx-panel .fx-view[data-view="main"] { min-height: 24px; }
+#bh-bricofx-panel .fx-scope { flex: 1; width: 100%; height: 96px; display: block; cursor: crosshair; border: 1px solid #22303f; }
+#bh-bricofx-panel .fx-view[data-view="scope"] .fx-scope { height: 120px; }
+#bh-bricofx-panel .fx-view[data-view="digital"] .fx-scope { flex: 0 0 40%; height: 96px; }
+#bh-bricofx-panel .fx-msgs {
+    flex: 1; margin: 0; padding: 0 4px; list-style: none; max-height: 96px; overflow: hidden;
+    font: 500 10px/1.35 "DejaVu Sans Mono", Consolas, monospace; color: #e6edf3;
+    border: 1px solid #22303f; background: #08101a;
+}
+#bh-bricofx-panel .fx-msgs li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bh-bricofx-panel .fx-msgs .fx-empty { color: #8fa1b3; white-space: normal; }
+#bh-bricofx-panel .fx-view[data-view="mem"], #bh-bricofx-panel .fx-view[data-view="band"],
+#bh-bricofx-panel .fx-view[data-view="modes"] { flex-direction: column; gap: 2px; padding-bottom: 4px; }
+#bh-bricofx-panel .fx-menu-head {
+    display: flex; justify-content: space-between; color: var(--fx-cyan); font-size: 11px; letter-spacing: 1px;
+    border-bottom: 1px solid #22303f; padding: 2px 2px 1px;
+}
+#bh-bricofx-panel .fx-menu { list-style: none; margin: 0; padding: 0; }
+#bh-bricofx-panel .fx-menu button {
+    display: block; width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #16202c;
+    color: #e6edf3; padding: 3px 4px; font: 500 11px/1.25 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#bh-bricofx-panel .fx-menu button:hover, #bh-bricofx-panel .fx-menu button:focus-visible { background: var(--fx-soft); }
+#bh-bricofx-panel .fx-menu .fx-empty { color: #8fa1b3; padding: 4px; font-size: 11px; }
+#bh-bricofx-panel .fx-soft { display: flex; background: var(--fx-soft); }
+#bh-bricofx-panel .fx-soft button {
+    flex: 1; background: transparent; border: 0; border-left: 1px solid rgba(255, 255, 255, .15); padding: 5px 2px;
+    color: #fff; font-size: 11px; letter-spacing: .5px;
+}
+#bh-bricofx-panel .fx-soft button:first-child { border-left: 0; }
+#bh-bricofx-panel .fx-soft button[aria-pressed="true"] { background: rgba(255, 255, 255, .15); }
+
+/* right column: lamps and VFO with blue LED arcs */
+#bh-bricofx-panel .fx-lamps { font-size: 9px; color: #9aa3aa; }
+#bh-bricofx-panel .fx-busy.on { color: #45e06f; text-shadow: 0 0 6px #45e06f; }
+#bh-bricofx-panel .fx-vfo {
+    width: 124px; height: 124px; border-radius: 50%; position: relative; touch-action: none; cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+}
+#bh-bricofx-panel .fx-vfo::before, #bh-bricofx-panel .fx-vfo::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 4px solid transparent; pointer-events: none;
+}
+#bh-bricofx-panel .fx-vfo::before { border-left-color: var(--fx-led); filter: drop-shadow(0 0 5px var(--fx-led)); transform: rotate(-20deg); }
+#bh-bricofx-panel .fx-vfo::after { border-right-color: var(--fx-led); filter: drop-shadow(0 0 5px var(--fx-led)); transform: rotate(20deg); }
+/* knob: thin knurled rubber rim + large spun-metal face with a finger dimple */
+#bh-bricofx-panel .fx-vfo-ring {
+    width: 116px; height: 116px; border-radius: 50%;
+    background: repeating-conic-gradient(#25272a 0 2deg, #121315 2deg 4deg);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, .85), inset 0 0 0 2px #070808, inset 0 3px 3px rgba(255, 255, 255, .06);
+    display: flex; align-items: center; justify-content: center;
+}
+#bh-bricofx-panel .fx-vfo-cap {
+    width: 98px; height: 98px; border-radius: 50%; position: relative;
+    background:
+        repeating-radial-gradient(circle, rgba(255, 255, 255, .035) 0 1px, transparent 1px 3px),
+        conic-gradient(from 30deg, #2c2f32, #16181a 22%, #474b4f 48%, #16181a 74%, #2c2f32);
+    box-shadow: 0 0 0 2px #0a0b0c, inset 0 2px 3px rgba(255, 255, 255, .14), inset 0 -4px 8px rgba(0, 0, 0, .7);
+}
+#bh-bricofx-panel .fx-vfo-cap::after {
+    content: ""; position: absolute; width: 24px; height: 24px; border-radius: 50%; top: 16px; left: 54%;
+    background: radial-gradient(circle at 60% 65%, #3d4044, #0b0c0d 70%);
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, .8), 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+/* phones: knob column below the screen */
+@media (max-width: 767px) {
+    #bh-bricofx-panel .fx-body { grid-template-columns: 1fr 1fr; }
+    #bh-bricofx-panel .fx-screen { grid-column: 1 / -1; order: -1; }
+    #bh-bricofx-panel .fx-left { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+    #bh-bricofx-panel .fx-freq { font-size: 28px; }
+}
