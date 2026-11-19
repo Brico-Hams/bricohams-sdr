@@ -45,6 +45,22 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         isDigital: function (mode) {
             return typeof mode === 'string' && DIGITAL.indexOf(mode.toLowerCase()) >= 0;
         },
+        // whole detents turned (sign kept, truncated toward zero)
+        knobSteps: function (deltaDeg, detentDeg) {
+            var n = deltaDeg / (detentDeg || 15);
+            return n < 0 ? Math.ceil(n) : Math.floor(n);
+        },
+        clamp: function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); },
+        fmtFreq: function (hz) {
+            if (!hz || !isFinite(hz)) return '---.---.---';
+            var s = String(Math.round(hz));
+            return s.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        },
+        // bar position: S0..S9 fill 0..60 %, S9+0..60 dB fill 60..100 %
+        meterPct: function (u) {
+            var p = u.s < 9 ? u.s / 9 * 60 : 60 + Math.min(60, u.over) / 60 * 40;
+            return Math.round(p);
+        },
         t: function (key) {
             var lang = (document.documentElement.lang || '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en';
             return TXT[lang][key] || TXT.en[key] || key;
@@ -103,7 +119,186 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         P._panel = null;
     };
 
-    // filled in by the panel code below
-    P._render = function () {};
-    P._tick = function () {};
+    // ------------------------------------------------------------------ panel
+    var L = P._logic, NS = '.bhfx';
+    P._fn = 'step';            // FUNC knob target: step | nr | filter
+    P._af = 'af';              // AF/SQL knob target: af | sql
+    P._fine = null;            // saved tuning step while CLAR (fine tuning) is on
+
+    function cfg() { return ((window.bh_skin_bricofx_config || {}).smeter) || {}; }
+    function ls(k, v) {
+        try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; }
+    }
+    function freq() { try { return UI.getFrequency(); } catch (e) { return 0; } }
+    function modo() { try { return UI.getModulation() || ''; } catch (e) { return ''; } }
+    function rawDb() { return (typeof smeter_level === 'number' && smeter_level > 0) ? 10 * Math.log10(smeter_level) : -200; }
+    function tune(n) { if (n && typeof tuneBySteps === 'function') tuneBySteps(n); }
+    function slider(sel, v) {
+        var el = document.querySelector(sel);
+        if (!el) return null;
+        if (v === undefined) return Number(el.value);
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return v;
+    }
+    function key(label, cls, title, extra) {
+        return '<button type="button" class="fx-key ' + (cls || '') + '" aria-label="' + title + '" title="' + title + '"' +
+            (extra || '') + '>' + label + '</button>';
+    }
+    function knob(cls, title) {
+        return '<div class="fx-knob ' + cls + '" role="slider" tabindex="0" aria-label="' + title + '"><span></span></div>';
+    }
+
+    P._render = function (panel) {
+        var t = L.t;
+        panel.innerHTML =
+            '<div class="fx-top">' +
+                key('S-DX', 'fx-thin', 'S-DX', ' aria-disabled="true"') + key('MODE', 'fx-thin fx-mode', t('mode')) +
+                key('BAND', 'fx-thin', 'BAND', ' aria-disabled="true"') + key('SPLIT', 'fx-thin', 'SPLIT', ' aria-disabled="true"') +
+                key('V/M', 'fx-thin fx-vm', t('store')) + key('M-V', 'fx-thin', 'M-V', ' aria-disabled="true"') +
+            '</div>' +
+            '<div class="fx-body">' +
+                '<div class="fx-left">' + knob('fx-k-func', t('func')) +
+                    '<span class="fx-led" aria-hidden="true"></span>' +
+                    '<button type="button" class="fx-key fx-af" aria-pressed="true">AF</button>' +
+                    '<button type="button" class="fx-key fx-sql" aria-pressed="false">SQL</button>' +
+                    knob('fx-k-af', t('volume')) + '</div>' +
+                '<div class="fx-screen">' +
+                    '<div class="fx-status"><b>BRICO-FX</b><span class="fx-fn"></span><span class="fx-modebox"></span></div>' +
+                    '<div class="fx-meter" aria-hidden="true">' +
+                        '<div class="fx-scale"><i>S</i>1 3 5 7 9 <em>+20 +40 +60dB</em></div>' +
+                        '<div class="fx-bar"><span></span></div>' +
+                        '<div class="fx-vol">VOL <span></span></div>' +
+                    '</div>' +
+                    '<div class="fx-freq" aria-live="off"></div>' +
+                    '<div class="fx-view" data-view="main"></div>' +
+                    '<div class="fx-soft" role="toolbar"></div>' +
+                '</div>' +
+                '<div class="fx-right">' +
+                    '<div class="fx-lamps"><span class="fx-busy">BUSY</span></div>' +
+                    key('QMB', 'fx-qmb', t('store')) + key('CLAR', 'fx-clar', t('fine'), ' aria-pressed="false"') +
+                    '<div class="fx-vfo" role="slider" tabindex="0" aria-label="' + t('tune') + '"><div class="fx-vfo-ring"><div class="fx-vfo-cap"></div></div></div>' +
+                    key('DISP', 'fx-disp', t('disp')) + key('BACK', 'fx-back', t('back')) +
+                '</div>' +
+            '</div>';
+        var $p = $(panel);
+        P._bindKnob($p.find('.fx-vfo'), 15, function (n) { tune(n); }, '.fx-vfo-ring');
+        P._bindKnob($p.find('.fx-k-af'), 12, function (n) {
+            if (P._af === 'sql') slider('.openwebrx-squelch-slider', L.clamp((slider('.openwebrx-squelch-slider') || -150) + 2 * n, -150, 0));
+            else {
+                var v = L.clamp((slider('#openwebrx-panel-volume') || 0) + 5 * n, 0, 150);
+                slider('#openwebrx-panel-volume', v);
+                try { UI.setVolume(v); } catch (e) {}
+            }
+        });
+        P._bindKnob($p.find('.fx-k-func'), 20, P._funcTurn);
+        $p.on('click' + NS, '.fx-k-func', function () {
+            P._fn = { step: 'nr', nr: 'filter', filter: 'step' }[P._fn];
+        });
+        $p.on('click' + NS, '.fx-af, .fx-sql', function () {
+            P._af = $(this).hasClass('fx-sql') ? 'sql' : 'af';
+            $p.find('.fx-af').attr('aria-pressed', P._af === 'af');
+            $p.find('.fx-sql').attr('aria-pressed', P._af === 'sql');
+        });
+        $p.on('click' + NS, '.fx-mode', P._nextMode);
+        $p.on('click' + NS, '.fx-vm', function () { var f = Number(ls('bh_bricofx_qmb')); if (f > 0) UI.setFrequency(f, false); });
+        var t0 = 0;
+        $p.on('pointerdown' + NS, '.fx-qmb', function () { t0 = Date.now(); });
+        $p.on('pointerup' + NS, '.fx-qmb', function () {
+            if (Date.now() - t0 >= 600) ls('bh_bricofx_qmb', String(freq()));
+            else { var f = Number(ls('bh_bricofx_qmb')); if (f > 0) UI.setFrequency(f, false); }
+        });
+        $p.on('click' + NS, '.fx-clar', P._toggleFine);
+        if (P._renderViews) P._renderViews($p);
+        P._tick();
+    };
+
+    // drag (rotation), wheel and arrow keys → whole detents
+    P._bindKnob = function ($el, detent, onSteps, rotSel) {
+        var acc = 0, angle = 0, last = null, $rot = rotSel ? $el.find(rotSel) : $el.find('span');
+        function rotate(deg) { angle += deg; $rot.css('transform', 'rotate(' + angle + 'deg)'); }
+        function feed(deg) {
+            acc += deg;
+            var n = L.knobSteps(acc, detent);
+            if (n) { acc -= n * detent; onSteps(n); }
+            rotate(deg);
+        }
+        function ang(e) {
+            var r = $el[0].getBoundingClientRect();
+            return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+        }
+        $el.on('pointerdown' + NS, function (e) { last = ang(e); this.setPointerCapture(e.pointerId); e.preventDefault(); });
+        $el.on('pointermove' + NS, function (e) {
+            if (last === null) return;
+            var a = ang(e), d = a - last;
+            if (d > 180) d -= 360; else if (d < -180) d += 360;
+            last = a;
+            feed(d);
+        });
+        $el.on('pointerup' + NS + ' pointercancel' + NS, function () { last = null; });
+        $el.on('wheel' + NS, function (e) {
+            e.preventDefault();
+            var dy = e.originalEvent.deltaY;
+            if (dy) { onSteps(dy < 0 ? 1 : -1); rotate(dy < 0 ? detent : -detent); }
+        });
+        $el.on('keydown' + NS, function (e) {
+            var k = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
+            if (k) { e.preventDefault(); onSteps(k); rotate(k * detent); }
+        });
+    };
+
+    P._funcTurn = function (n) {
+        if (P._fn === 'step') {
+            var lb = document.getElementById('openwebrx-tuning-step-listbox');
+            if (!lb) return;
+            lb.selectedIndex = L.clamp(lb.selectedIndex + n, 0, lb.options.length - 1);
+            lb.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (P._fn === 'nr') {
+            try { UI.toggleNR(); } catch (e) {}
+        } else {
+            var d = UI.getDemodulator && UI.getDemodulator();
+            var bp = d && d.getBandpass();
+            if (!bp || bp.low_cut === null || bp.high_cut === null) return;
+            var f = 1 + 0.1 * n;      // ±10 % width per detent around the passband centre
+            var c = (bp.low_cut + bp.high_cut) / 2, w = (bp.high_cut - bp.low_cut) / 2 * f;
+            if (w < 50) return;
+            d.setBandpass({ low_cut: Math.round(c - w), high_cut: Math.round(c + w) });
+        }
+    };
+
+    P._nextMode = function () {
+        var $b = $('#openwebrx-panel-receiver .openwebrx-demodulator-button[data-modulation]:visible');
+        if (!$b.length) $b = $('#openwebrx-panel-receiver .openwebrx-demodulator-button[data-modulation]');
+        if (!$b.length) return;
+        var i = $b.index($b.filter('.highlighted'));
+        $b.eq((i + 1) % $b.length).trigger('click');
+    };
+
+    P._toggleFine = function () {
+        var lb = document.getElementById('openwebrx-tuning-step-listbox');
+        if (!lb || !lb.options.length) return;
+        if (P._fine === null) { P._fine = lb.selectedIndex; lb.selectedIndex = 0; }
+        else { lb.selectedIndex = P._fine; P._fine = null; }
+        lb.dispatchEvent(new Event('change', { bubbles: true }));
+        $(P._panel).find('.fx-clar').attr('aria-pressed', P._fine !== null);
+    };
+
+    P._unbind = function () {
+        if (P._fine !== null) P._toggleFine();
+        if (P._panel && typeof $ === 'function') $(P._panel).off(NS).find('*').off(NS);
+    };
+
+    P._tick = function () {
+        if (!P._panel) return;
+        var $p = $(P._panel), f = freq(), u = L.sUnits(typeof smeter_level === 'number' ? smeter_level : 0, f, cfg());
+        $p.find('.fx-freq').text(L.fmtFreq(f));
+        $p.find('.fx-modebox').text(modo().toUpperCase());
+        $p.find('.fx-fn').text({ step: 'STEP', nr: 'NR', filter: 'FILTER' }[P._fn]);
+        $p.find('.fx-bar span').css('width', L.meterPct(u) + '%');
+        $p.find('.fx-vol span').css('width', Math.round((slider('#openwebrx-panel-volume') || 0) / 150 * 100) + '%');
+        var sq = slider('.openwebrx-squelch-slider');
+        $p.find('.fx-busy').toggleClass('on', rawDb() > (sq === null ? -150 : sq));
+        if (P._tickViews) P._tickViews($p);
+    };
 })(Plugins.bh_skin_bricofx);

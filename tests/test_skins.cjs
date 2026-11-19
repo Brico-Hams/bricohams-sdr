@@ -108,4 +108,23 @@ function cargar(nombre, e) {
     assert.equal(L.t('volume'), 'Volumen');
 }
 
+// ---- Brico-FX: knob helpers ----
+{
+    const L = cargar('bh_skin_bricofx', entorno())._logic;
+    assert.equal(L.knobSteps(44), 2);
+    assert.equal(L.knobSteps(-16), -1);
+    assert.equal(L.knobSteps(14), 0);
+    assert.equal(L.knobSteps(30, 10), 3);
+    assert.equal(L.clamp(200, 0, 150), 150);
+    assert.equal(L.clamp(-5, 0, 150), 0);
+    assert.equal(L.clamp(70, 0, 150), 70);
+    assert.equal(L.fmtFreq(145525000), '145.525.000');
+    assert.equal(L.fmtFreq(7074000), '7.074.000');
+    assert.equal(L.fmtFreq(0), '---.---.---');
+    assert.equal(L.meterPct({ s: 0, over: 0 }), 0);
+    assert.equal(L.meterPct({ s: 9, over: 0 }), 60);
+    assert.equal(L.meterPct({ s: 9, over: 60 }), 100);
+    assert.equal(L.meterPct({ s: 9, over: 90 }), 100);
+}
+
 console.log('Receiver skins regression: PASS');
