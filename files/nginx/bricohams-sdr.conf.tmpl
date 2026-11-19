@@ -14,6 +14,8 @@ map $uri $bh_admin_cache {
     default "";
     ~^/static/css/(admin|login|openwebrx-header)\.css$ "no-cache";   # tema y cabecera actualizados
     ~^/(login|logout|pwchange|settings|imageupload|clients|services|ban|unban|broadcast|files/delete)(/|$) "no-store";
+    # OpenWebRX+ serves plugins without Cache-Control: revalidate so deployed fixes show on a normal reload
+    ~^/static/plugins/receiver/.+[.](js|css)$ "no-cache";
 }
 # Solo los envios de credenciales consumen el limite; las vistas de login no.
 map $request_method $bh_login_key {
