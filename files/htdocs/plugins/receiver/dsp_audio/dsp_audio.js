@@ -3,7 +3,7 @@
  *
  * Autor: BricoHams · licencia MIT · necesita el plugin audio_cadena
  *
- * Botón «DSP» en la barra superior. En la ventana:
+ * Botón «DSP» en el panel de plugins de OpenWebRX+ (ventana nativa, vía audio_cadena). En la ventana:
  *   - ECUALIZADOR de 3 bandas: graves (250 Hz), medios (1,2 kHz), agudos (3 kHz), ±12 dB
  *   - PUERTA DE RUIDO: baja el soplido entre frases (umbral en dBFS, 30 dB de atenuación)
  *   - AGC / COMPRESOR: iguala estaciones flojas y fuertes (suave, medio, fuerte) con ganancia de compensación

@@ -2,6 +2,8 @@
 
 ## Sin publicar · 2026-11-03
 
+- Plugins propios del receptor (solar, meteo, camara, dvficha, visitas, bricohams, filtro_audio, dsp_audio) migrados a la API nativa de OpenWebRX+ 1.2.124+ (`Plugins.addButton`/`addWindow`/`addSection`): botones en la pila de plugins y ventanas flotantes nativas; ver `docs/OWRX_PLUGINS.md`.
+
 - Cabecera del receptor: la presentación (quiénes somos, BricoHams y enlace a bricohams.org) ya no se pierde al reinstalar o actualizar; se conserva el texto editado en el panel admin y se puede fijar con `OWRX_PHOTO_TITLE` / `OWRX_PHOTO_DESC` en `bricohams.env`.
 - El paso `openwebrx` (nativo) instala y verifica `direwolf`, necesario para decodificar el modo «packet» (APRS, 144,800 MHz) y que `--no-install-recommends` omitía; `--actualizar` lo repite en estaciones existentes y `bricohams-check` informa de su presencia. `tests/test_instalador_os.py`.
 - Manual 52: nuevo capítulo «6 bis. Distribución de componentes y cableado» (mapa de rejillas/bandejas, pasamuros, cableado interno, protecciones, interconexión de la estación y comprobaciones eléctricas de las cajas v2, v3 electrónica, potencia y SAI) con diez diagramas nuevos (40-49) en `tools/esquemas.py` y `docs/esquemas/`.

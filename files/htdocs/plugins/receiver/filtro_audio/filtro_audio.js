@@ -3,7 +3,7 @@
  *
  * Autor: BricoHams · licencia MIT · necesita el plugin audio_cadena
  *
- * Botón «FILTRO» en la barra superior. En la ventana:
+ * Botón «FILTRO» en el panel de plugins de OpenWebRX+ (ventana nativa, vía audio_cadena). En la ventana:
  *   - PASO BANDA de 24 dB/octava (2 pasa-altos + 2 pasa-bajos) con modos:
  *       Voz SSB 300–2700 Hz · AM 100–4500 · CW (tono y ancho) · Digital 200–3000 · FM 50–6000 · Libre
  *   - NOTCH MANUAL: quita un pitido fijo (frecuencia y estrechez)
