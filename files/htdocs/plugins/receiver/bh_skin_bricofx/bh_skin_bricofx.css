@@ -16,7 +16,11 @@ body.theme-bh-bricofx {
 
 /* the front panel sits on top of the receiver panel; only the stock frequency line it replaces is hidden,
    profiles/bookmarks, plugin buttons and sections (modes, controls, settings…) stay available below */
-body.theme-bh-bricofx #openwebrx-panel-receiver { width: min(640px, 96vw) !important; max-width: 96vw; }
+body.theme-bh-bricofx #openwebrx-panel-receiver {
+    width: min(640px, 96vw) !important; max-width: 96vw;
+    flex-shrink: 0 !important; max-height: calc(100vh - 180px); overflow-y: auto;   /* a column flex parent would squash it */
+    background: #0e0f10 !important; color: #e6e9ec; border-radius: 22px;
+}
 body.theme-bh-bricofx #openwebrx-panel-receiver .frequencies-container { display: none !important; }
 
 body.theme-bh-bricofx #bh-bricofx-panel {

@@ -128,6 +128,7 @@ Plugins.bh_skin_bricofx = Plugins.bh_skin_bricofx || {};
         panel.setAttribute('role', 'group');
         panel.setAttribute('aria-label', 'Brico-FX');
         host.insertBefore(panel, host.firstChild || null);
+        host.scrollTop = 0;            // the front panel is the first thing seen
         P._panel = panel;
         P._render(panel);
         P._timer = setInterval(function () { P._tick(); }, 250);

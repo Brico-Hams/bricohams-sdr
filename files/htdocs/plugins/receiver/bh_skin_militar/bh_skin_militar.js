@@ -96,6 +96,7 @@ Plugins.bh_skin_militar = Plugins.bh_skin_militar || {};
         panel.setAttribute('role', 'group');
         panel.setAttribute('aria-label', L.t('label'));
         host.insertBefore(panel, host.firstChild || null);
+        host.scrollTop = 0;            // the front panel is the first thing seen
         P._panel = panel;
         P._render(panel);
         P._timer = setInterval(function () { P._tick(); }, 200);
