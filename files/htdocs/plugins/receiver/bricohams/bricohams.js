@@ -125,7 +125,7 @@ Plugins.bricohams.init = function () {
         (sec || document.body).appendChild(tb);
         Plugins.bricohams.skinSelector(sec || document.body);
     }
-    // v5.6 · Brico-FX una vez para todos; los plugins de skins ya están cargados (init.js)
+    // v5.6 · estilo por defecto (Rig) una vez para todos; los plugins de skins ya están cargados (init.js)
     setTimeout(Plugins.bricohams.skinPorDefecto, 500);
     // v4: plan de bandas visible por defecto (sustituye al plugin show_band_plan, ya obsoleto)
     try {
@@ -144,14 +144,16 @@ function bhTemas() {
     return lb ? Array.prototype.map.call(lb.options, function (o) { return o.value; }) : [];
 }
 
-// everyone gets Brico-FX once (flag bh_bricofx_default); afterwards their own choice is kept
+// everyone gets the station's default style once (bricohams_config.skin_defecto, Rig if unset);
+// the flag bh_skin_default remembers which default was applied, so changing it applies the new one once
 Plugins.bricohams.skinPorDefecto = function () {
-    if (bhTemas().indexOf('bh-bricofx') < 0 || typeof UI === 'undefined' || !UI.setTheme) return;
+    var defecto = ((window.bricohams_config || {}).skin_defecto) || 'rig';
+    if (bhTemas().indexOf(defecto) < 0 || typeof UI === 'undefined' || !UI.setTheme) return;
     var hecho = null;
-    try { hecho = localStorage.getItem('bh_bricofx_default'); } catch (e) { /* blocked storage */ }
-    if (hecho === '1') return;
-    UI.setTheme('bh-bricofx');
-    try { localStorage.setItem('bh_bricofx_default', '1'); } catch (e) { /* blocked storage */ }
+    try { hecho = localStorage.getItem('bh_skin_default'); } catch (e) { /* blocked storage */ }
+    if (hecho === defecto) return;
+    UI.setTheme(defecto);
+    try { localStorage.setItem('bh_skin_default', defecto); } catch (e) { /* blocked storage */ }
 };
 
 // visible style selector in the BricoHams section, kept in sync with OpenWebRX+'s theme listbox

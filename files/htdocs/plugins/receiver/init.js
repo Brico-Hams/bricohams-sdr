@@ -16,8 +16,8 @@ const rig_url = 'https://aganet.github.io/openwebrxplus-rig-skin/receiver/rig_sk
 window.rig_skin_config = {
     smeter: { offset_hf: 7, offset_vhf: -50, iaru_vhf: true }
 };
-// v5.6 · skins propias Brico-FX y Militar: misma calibración que el Rig. Brico-FX sale por defecto
-// una vez a todo el mundo (lo hace el plugin bricohams); después se respeta lo que elija cada oyente.
+// v5.6 · skins propias Brico-FX y Militar: misma calibración que el Rig. El estilo por defecto
+// (bricohams_config.skin_defecto) se aplica una vez a todo el mundo; después se respeta lo que elija cada oyente.
 window.bh_skin_bricofx_config = { smeter: { offset_hf: 7, offset_vhf: -50, iaru_vhf: true } };
 window.bh_skin_militar_config = { smeter: { offset_hf: 7, offset_vhf: -50, iaru_vhf: true } };
 
@@ -32,7 +32,7 @@ const BH_WEB = location.port ? ('__SSL_MODO__' === 'no' ? 'http://' + location.h
 window.solar_config     = { lat: __LAT__, lon: __LON__ };                   // QTH para día/noche
 window.meteo_config     = { url: 'static/plugins/receiver/meteo/meteo.json' };
 window.camara_config    = { live: BH_WEB + '/camara/mastil/', refresh: __CAM_SNAPSHOT_SECONDS__, title: 'Cámara del mástil · __QTH__' };
-window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true, fuentes: '__FUENTES__' };   // fuentes: «¿Quieres una estación como esta?» (FUENTES_URL)
+window.bricohams_config = { telegram: 'https://t.me/bricohams', boton: true, fuentes: '__FUENTES__', skin_defecto: 'rig' };   // fuentes: «¿Quieres una estación como esta?» (FUENTES_URL)
 // v4
 window.satelites_config = { url: 'static/plugins/receiver/satelites/pases.json', min_el: 15 };
 window.visitas_config   = { url: 'static/plugins/receiver/visitas/visitas.json', privacidad: BH_WEB + '/bricohams/privacidad.html' };
@@ -132,7 +132,7 @@ const PluginsOpcionales = [
     // audio_cadena va antes que filtro_audio y dsp_audio (es su base común)
     // ea5hkx_puente va antes que callsign_gate (adapta su ventana y filtra su anuncio en el chat)
     const externoActivo = { callsign_gate: window.ea5hkx_config.callsign_gate, tone_detector: window.ea5hkx_config.tone_detector };
-    // las skins van antes que bricohams (su selector de estilo y el Brico-FX por defecto las necesitan)
+    // las skins van antes que bricohams (su selector de estilo y el estilo por defecto las necesitan)
     for (const name of ['idioma', 'marca', 'bh_skin_bricofx', 'bh_skin_militar', 'consentimiento', 'solar', 'meteo', 'camara', 'panel_visitas', 'bricohams', 'banderas', 'dvficha',
                         'satelites', 'visitas', 'identificacion', 'ea5hkx_puente', 'callsign_gate',
                         'audio_cadena', 'filtro_audio', 'dsp_audio', 'tone_detector']) {

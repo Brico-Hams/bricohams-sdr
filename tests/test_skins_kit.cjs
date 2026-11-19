@@ -35,25 +35,36 @@ function entorno({ opciones = ['default', 'rig', 'bh-bricofx', 'bh-militar'], al
 {
     const e = entorno();
     e.ctx.Plugins.bricohams.skinPorDefecto();
-    assert.deepEqual(e.temas, ['bh-bricofx'], 'everyone switched to Brico-FX once');
-    assert.equal(e.almacen.bh_bricofx_default, '1');
+    assert.deepEqual(e.temas, ['rig'], 'everyone switched to the default style (Rig) once');
+    assert.equal(e.almacen.bh_skin_default, 'rig');
     e.ctx.Plugins.bricohams.skinPorDefecto();
-    assert.deepEqual(e.temas, ['bh-bricofx'], 'never again after the flag');
+    assert.deepEqual(e.temas, ['rig'], 'never again after the flag');
 }
 {
     const e = entorno({ almacen: { bh_bricofx_default: '1' } });
     e.ctx.Plugins.bricohams.skinPorDefecto();
-    assert.deepEqual(e.temas, [], 'a visitor who already got it keeps their choice');
+    assert.deepEqual(e.temas, ['rig'], 'visitors moved to Brico-FX earlier also get the new default once');
+}
+{
+    const e = entorno({ almacen: { bh_skin_default: 'rig' } });
+    e.ctx.Plugins.bricohams.skinPorDefecto();
+    assert.deepEqual(e.temas, [], 'a visitor who already got this default keeps their choice');
 }
 {
     const e = entorno({ roto: true });
     assert.doesNotThrow(() => e.ctx.Plugins.bricohams.skinPorDefecto());
-    assert.deepEqual(e.temas, ['bh-bricofx'], 'blocked storage still shows Brico-FX');
+    assert.deepEqual(e.temas, ['rig'], 'blocked storage still shows the default style');
 }
 {
-    const e = entorno({ opciones: ['default', 'rig'] });
+    const e = entorno({ opciones: ['default', 'bh-bricofx'] });
     e.ctx.Plugins.bricohams.skinPorDefecto();
-    assert.deepEqual(e.temas, [], 'nothing to do when the skin is not installed');
+    assert.deepEqual(e.temas, [], 'nothing to do when the default style is not installed');
+}
+{
+    const e = entorno({ almacen: { bh_skin_default: 'rig' } });
+    e.ctx.window.bricohams_config = { skin_defecto: 'bh-militar' };
+    e.ctx.Plugins.bricohams.skinPorDefecto();
+    assert.deepEqual(e.temas, ['bh-militar'], 'changing the configured default applies it once more');
 }
 
 // style selector

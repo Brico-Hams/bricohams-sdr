@@ -141,3 +141,10 @@ published):
 - Tests: a Node check per plugin (registers its theme, cleans up on switch, kit default selection),
   existing tests green, and a real-browser check on the live SDR (desktop and 375 px).
 - Deploy script (backup, install, `init.js` update, rollback) following the `desplegar-*.sh` pattern.
+
+## Change 2026-11-19
+
+EA5KAO asked for **Rig** as the default style for everyone instead of Brico-FX. The kit default is now
+`bricohams_config.skin_defecto` (`rig` if unset), applied once per browser and remembered in
+`localStorage.bh_skin_default`; changing the configured default applies the new one once more. Brico-FX,
+Military and Original stay selectable.
